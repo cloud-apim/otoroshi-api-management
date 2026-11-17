@@ -18,6 +18,7 @@ import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoros
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
 import { buildOtoroshiApi } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace } from '../domain/exchange.js';
+import { gatewayBaseUrl } from './portal-api.js';
 
 const r = new Router();
 
@@ -348,6 +349,7 @@ r.get('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
   return {
     ...api,
     draft,
+    base_url: await gatewayBaseUrl(draft),
     deployment: status,
     pending_changes: { hasChanges: pending.hasChanges, count: pending.changes?.length ?? null, base: pending.snapshot },
     validation: validateDraft(draft),

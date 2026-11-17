@@ -5,6 +5,12 @@ function isObj(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
 
+export function stable(v) {
+  if (Array.isArray(v)) return `[${v.map(stable).join(',')}]`;
+  if (isObj(v)) return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(',')}}`;
+  return JSON.stringify(v);
+}
+
 function byId(arr) {
   return arr.every((x) => isObj(x) && typeof x.id === 'string');
 }
@@ -34,7 +40,8 @@ export function diff(before, after, path = '', out = []) {
     }
     return out;
   }
-  if (JSON.stringify(before) !== JSON.stringify(after)) {
+  // postgres jsonb does not keep key order: compare a canonical form
+  if (stable(before) !== stable(after)) {
     if (before === undefined) out.push({ op: 'add', path, after });
     else if (after === undefined) out.push({ op: 'remove', path, before });
     else out.push({ op: 'change', path, before, after });
