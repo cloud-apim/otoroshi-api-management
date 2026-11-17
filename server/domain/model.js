@@ -79,7 +79,8 @@ export function defaultAuthConfig(kind) {
     case 'oauth2-remote':
       return { verifier: '', clientIdPath: 'client_id', fetchUser: false };
     case 'keyless':
-      return { expr: '${req.ip}' };
+      // ephemeral identity: no apikey per visitor, quotas still counted per caller
+      return { expr: '${req.ip}', createIfMissing: false };
     default:
       return {};
   }

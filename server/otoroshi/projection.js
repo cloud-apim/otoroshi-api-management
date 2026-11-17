@@ -171,7 +171,7 @@ function accessModeConfiguration(plan, draft) {
         create_if_missing: true,
       };
     case 'keyless':
-      return { expr: c.expr || '${req.ip}', create_if_missing: true };
+      return { expr: c.expr || '${req.ip}', create_if_missing: c.createIfMissing === true };
     default:
       return {};
   }

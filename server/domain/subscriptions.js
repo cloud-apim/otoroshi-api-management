@@ -76,7 +76,8 @@ export async function requestSubscription(ctx, workspaceId, input) {
   if (!privileged && !(await isTeamMember(app.team_id, ctx.user.id))) throw forbidden('you are not a member of the team owning this application');
   const { plan } = await findPlan(api, plan_id);
   if (plan.status !== 'published') throw badRequest(`plan ${plan.name} is ${plan.status}: it does not accept subscriptions`);
-  if (!plan.subscribable) throw badRequest(`plan ${plan.name} is not subscribable`);
+  // a non subscribable plan is out of self-service: only a producer can put a consumer on it (a contract)
+  if (!plan.subscribable && !privileged) throw badRequest(`plan ${plan.name} is not open to self-service subscription`);
   const tags = await userAclTags(ctx.user, workspaceId);
   if (!privileged && !aclAllows(plan.visibility, plan.acl, tags)) throw forbidden('this plan is not visible to you');
   if (plan.usageStatement?.enabled && plan.usageStatement?.required && !(input.usage || '').trim())
