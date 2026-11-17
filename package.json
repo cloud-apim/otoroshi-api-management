@@ -1,0 +1,33 @@
+{
+  "name": "otoroshi-api-management",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API management console and developer portal for Otoroshi",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "bun server/main.js",
+    "dev": "bun --watch server/main.js",
+    "build": "bun run build:backoffice && bun run build:portal",
+    "build:backoffice": "vite build --config web/vite.backoffice.config.js",
+    "build:portal": "vite build --config web/vite.portal.config.js",
+    "watch:backoffice": "vite build --watch --config web/vite.backoffice.config.js",
+    "watch:portal": "vite build --watch --config web/vite.portal.config.js",
+    "test": "bun test",
+    "cli": "bun cli/apim.js",
+    "infra:up": "docker compose -f docker/docker-compose.yml up -d",
+    "infra:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "dependencies": {
+    "@scalar/api-reference-react": "0.9.92",
+    "dompurify": "3.4.18",
+    "marked": "18.2.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.3.0",
+    "vite": "8.3.8"
+  }
+}

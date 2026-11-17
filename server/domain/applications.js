@@ -1,0 +1,67 @@
+// Application (D-26): groups the subscriptions and the technical identity of a consumer — its
+// expected client_id (oauth2, mtls) and client certificates. It groups identity, never counters (D-31).
+// Whoever can see an application can see its credentials.
+
+import { db, newId } from '../db/index.js';
+import { badRequest, forbidden, notFound } from '../http/router.js';
+import { audit } from './audit.js';
+import { findTeam, isTeamMember } from './identity.js';
+
+export async function listApplications(workspaceId, { userId = null, teamId = null } = {}) {
+  return db`select a.*, t.name as team_name, t.personal as team_personal,
+      (select count(*)::int from subscriptions s where s.application_id = a.id and s.status = 'active') as active_subscriptions,
+      (select count(*)::int from subscriptions s where s.application_id = a.id and s.status = 'pending') as pending_subscriptions
+    from applications a join teams t on t.id = a.team_id
+    where a.workspace_id = ${workspaceId}
+      and (${userId}::text is null or exists (select 1 from team_members tm where tm.team_id = a.team_id and tm.user_id = ${userId}))
+      and (${teamId}::text is null or a.team_id = ${teamId})
+    order by a.name`;
+}
+
+export async function getApplication(workspaceId, id) {
+  const rows = await db`select a.*, t.name as team_name from applications a join teams t on t.id = a.team_id
+    where a.workspace_id = ${workspaceId} and a.id = ${id}`;
+  if (!rows[0]) throw notFound('application not found');
+  return rows[0];
+}
+
+export async function canSeeApplication(ctx, app) {
+  if (ctx.user?.is_admin || ctx.role === 'admin') return true;
+  if (!ctx.user) return false;
+  return isTeamMember(app.team_id, ctx.user.id);
+}
+
+export async function requireSeeApplication(ctx, app) {
+  if (!(await canSeeApplication(ctx, app))) throw forbidden('you cannot see this application');
+}
+
+export async function createApplication(ctx, workspaceId, input) {
+  if (!input.name) throw badRequest('name is required');
+  if (!input.team_id) throw badRequest('team_id is required');
+  const team = await findTeam(workspaceId, input.team_id);
+  if (!team) throw badRequest('unknown team');
+  if (!(ctx.user?.is_admin || ctx.role === 'admin') && !(await isTeamMember(team.id, ctx.user.id)))
+    throw forbidden('you are not a member of this team');
+  const id = newId('app');
+  const rows = await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by)
+    values (${id}, ${workspaceId}, ${team.id}, ${input.name}, ${input.description || ''}, ${input.client_id || null},
+      ${input.certificates || []}, ${input.metadata || {}}, ${ctx.user?.id || null}) returning *`;
+  await audit(ctx, { action: 'application.create', workspaceId, entityKind: 'application', entityId: id, summary: `application ${input.name} created` });
+  return rows[0];
+}
+
+export async function updateApplication(ctx, app, patch) {
+  const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
+      client_id = ${patch.client_id !== undefined ? patch.client_id || null : app.client_id},
+      certificates = ${patch.certificates ?? app.certificates}, metadata = ${patch.metadata ?? app.metadata}, updated_at = now()
+    where id = ${app.id} returning *`;
+  await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated` });
+  return rows[0];
+}
+
+export async function deleteApplication(ctx, app) {
+  const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'pending', 'pending_payment')`;
+  if (active[0].c > 0) throw badRequest('close the subscriptions of this application first');
+  await db`delete from applications where id = ${app.id}`;
+  await audit(ctx, { action: 'application.delete', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${app.name} deleted` });
+}

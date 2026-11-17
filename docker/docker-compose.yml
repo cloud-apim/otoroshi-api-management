@@ -1,0 +1,51 @@
+# Local development stack for otoroshi-api-management
+#  - postgres: one server, two databases (app data + analytics), as the product expects two connection urls
+#  - otoroshi: the gateway (18.x) the product drives, admin api on otoroshi-api.oto.tools:8080
+#  - echo: a demo backend for the apis created in the console
+name: otoroshi-apim
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: apim
+      POSTGRES_PASSWORD: apim
+      POSTGRES_DB: apim
+    ports:
+      - "5442:5432"
+    volumes:
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apim"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  otoroshi:
+    image: eclipse-temurin:21-jre
+    command: ["java", "-Xmx1g", "-jar", "/otoroshi/otoroshi.jar"]
+    environment:
+      APP_STORAGE: file
+      APP_DB_PATH: /data/otoroshi.json
+      APP_DOMAIN: oto.tools
+      OTOROSHI_INITIAL_ADMIN_LOGIN: admin@otoroshi.io
+      OTOROSHI_INITIAL_ADMIN_PASSWORD: password
+      OTOROSHI_ADMIN_API_CLIENT_ID: apim-admin-client
+      OTOROSHI_ADMIN_API_CLIENT_SECRET: apim-admin-secret
+    ports:
+      - "8080:8080"
+    volumes:
+      - ${OTOROSHI_JAR:-../../otoroshi.jar}:/otoroshi/otoroshi.jar:ro
+      - otodata:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  echo:
+    image: mendhak/http-https-echo:36
+    environment:
+      HTTP_PORT: 8080
+      HTTPS_PORT: 8443
+
+volumes:
+  pgdata:
+  otodata:
