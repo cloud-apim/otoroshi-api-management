@@ -11,7 +11,7 @@
 > modes, on one API and one set of routes, projected, reconciled and its drift detected — passes as
 > an executable test (`test/reference-catalogue.test.js`).
 
-**Documentation:** <https://cloud-apim.github.io/otoroshi-api-management/> — sources in [`documentation/`](./documentation), built with Docusaurus (`./doc.sh`).
+**Documentation:** <https://cloud-apim.github.io/otoroshi-api-management/> — sources in [`documentation/`](./documentation), built with Docusaurus and published to GitHub Pages by the `documentation` workflow on every push to `main`.
 
 ## What it is
 

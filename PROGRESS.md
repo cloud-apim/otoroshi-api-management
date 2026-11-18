@@ -208,7 +208,7 @@ waits for the data plane rather than working around it.
 
 ## Documentation
 
-✅ Docusaurus site in `documentation/` (the same base as the other extensions: local search, dark by default), 20 pages, built with no broken link; `doc.sh` publishes it into `./docs` for GitHub Pages.
+✅ Docusaurus site in `documentation/` (the same base as the other extensions: local search, dark by default), 20 pages, built with no broken link; the `documentation` GitHub workflow builds it and publishes it to GitHub Pages on every push to `main` (pull requests build only).
 
 ✅ **Screens tour** (`documentation/docs/screens.mdx`): 80 captures of every screen of the console and the portal, drawers, modals and menus included, light and dark, English and French, in `documentation/static/img/screens/`. Produced by `bun run screenshots` (headless Chromium), which also regenerates the page: run it again after every change of the interface.
 
