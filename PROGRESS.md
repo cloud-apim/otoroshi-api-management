@@ -29,7 +29,6 @@ Dernière mise à jour : 18/11/2026.
 ## Points connus
 
 - **Push bloqué** depuis le redémarrage : la clé SSH n'est plus chargée (`ssh-add`). Les commits s'accumulent en local.
-- Un échec isolé de la suite de tests, non reproduit sur 5 passages : probablement le worker du conteneur `apim`, qui partage la base avec le serveur de test.
 - Données de démo : le workspace `default` déclare un champ de plan `sla` obligatoire, donc Books et Petstore ne se publient plus tant qu'on ne le renseigne pas (c'est la règle D-18 qui joue).
 
 ---

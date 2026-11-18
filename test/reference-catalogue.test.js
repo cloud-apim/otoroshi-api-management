@@ -11,9 +11,13 @@ import { describe, test, expect, beforeAll, afterAll, setDefaultTimeout } from '
 setDefaultTimeout(40000);
 import { createHmac } from 'node:crypto';
 
-process.env.APIM_PORT = process.env.APIM_TEST_PORT || '9117';
-process.env.APIM_WORKERS_ENABLED = 'false';
-process.env.APIM_ADMIN_TOKEN = 'reference-test-token';
+// bun runs every test file in one process: another file may already have loaded the config, so
+// the test sets it on the shared object rather than through the environment
+const { config } = await import('../server/config.js');
+config.port = parseInt(process.env.APIM_TEST_PORT || '9117', 10);
+config.workers.enabled = false;
+config.adminToken = 'reference-test-token';
+process.env.APIM_PORT = String(config.port);
 
 const { start } = await import('../server/main.js');
 const { oto, otoroshi } = await import('../server/otoroshi/client.js');
