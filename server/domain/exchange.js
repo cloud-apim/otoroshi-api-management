@@ -97,3 +97,87 @@ export async function importWorkspace(ctx, ws, doc) {
   await audit(ctx, { action: 'workspace.import', workspaceId: ws.id, entityKind: 'workspace', entityId: ws.id, summary: `import: ${JSON.stringify(stats)}` });
   return { imported: stats };
 }
+
+// ---------------------------------------------------------------- declarative documents (D-28, Q-11)
+// The declarative unit is the api-version: one document carries the api and its plans, with its
+// documentation pages beside them. `apim get api -o yaml` and `apim apply -f` round-trip it.
+
+export const API_KIND = 'Api';
+export const API_VERSION = 'otoroshi-apim.io/v1';
+
+export async function apiDocument(api) {
+  const pages = await db`select slug, position, title, content from api_doc_pages where api_id = ${api.id} order by position`;
+  const team = api.team_id ? (await db`select id, name from teams where id = ${api.team_id}`)[0] : null;
+  return {
+    apiVersion: API_VERSION,
+    kind: API_KIND,
+    metadata: { workspace: (await db`select slug from workspaces where id = ${api.workspace_id}`)[0]?.slug, name: api.slug, version: api.version, id: api.id },
+    spec: {
+      name: api.name,
+      description: api.description,
+      team: team?.name || null,
+      tags: api.tags,
+      visibility: api.visibility,
+      acl: api.acl,
+      draft: normalizeDraft(api.draft),
+      pages: pages.map((p) => ({ slug: p.slug, position: p.position, title: p.title, content: p.content })),
+    },
+  };
+}
+
+// upsert by (workspace, slug, version). Writes the draft: publishing and deploying stay explicit
+// acts, unless the caller asks for them (the GitOps gesture, D-36 "reste à instruire").
+export async function applyApiDocument(ctx, ws, doc, { managedBy = null } = {}) {
+  if (doc?.kind !== API_KIND) throw badRequest(`expected kind ${API_KIND}`);
+  const slug = doc.metadata?.name;
+  const version = doc.metadata?.version || '1.0.0';
+  if (!slug) throw badRequest('metadata.name is required');
+  const spec = doc.spec || {};
+  let teamId = null;
+  if (spec.team) {
+    const t = (await db`select id from teams where workspace_id = ${ws.id} and (id = ${spec.team} or name = ${spec.team})`)[0];
+    if (!t) throw badRequest(`unknown team ${spec.team}`);
+    teamId = t.id;
+  }
+  const { createApi, updateApi, createPage, updatePage } = await import('./apis.js');
+  const existing = (await db`select * from apis where workspace_id = ${ws.id} and slug = ${slug} and version = ${version}`)[0];
+  let api;
+  let action;
+  if (!existing) {
+    api = await createApi(ctx, ws.id, {
+      name: spec.name || slug,
+      slug,
+      version,
+      description: spec.description || '',
+      team_id: teamId,
+      tags: spec.tags || [],
+      visibility: spec.visibility || 'public',
+      acl: spec.acl || [],
+      draft: normalizeDraft(spec.draft || {}),
+      managed_by: managedBy,
+      pages: [],
+    });
+    action = 'created';
+  } else {
+    if (existing.managed_by && managedBy && existing.managed_by !== managedBy)
+      throw badRequest(`this api is managed by ${existing.managed_by}, not ${managedBy}`);
+    api = await updateApi(ctx, existing, {
+      name: spec.name ?? existing.name,
+      description: spec.description ?? existing.description,
+      tags: spec.tags ?? existing.tags,
+      visibility: spec.visibility ?? existing.visibility,
+      acl: spec.acl ?? existing.acl,
+      team_id: spec.team !== undefined ? teamId : existing.team_id,
+      draft: spec.draft ? normalizeDraft(spec.draft) : existing.draft,
+      force: true,
+    });
+    if (managedBy !== existing.managed_by) await db`update apis set managed_by = ${managedBy} where id = ${api.id}`;
+    action = 'updated';
+  }
+  for (const p of spec.pages || []) {
+    const cur = (await db`select * from api_doc_pages where api_id = ${api.id} and slug = ${p.slug}`)[0];
+    if (cur) await updatePage(ctx, api, cur, p);
+    else await createPage(ctx, api, p, { silent: true });
+  }
+  return { action, api: { id: api.id, slug: api.slug, version: api.version } };
+}

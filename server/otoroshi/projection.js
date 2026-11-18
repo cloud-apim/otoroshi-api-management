@@ -110,7 +110,9 @@ export function restrictionsFor(plan, draft) {
     const methods = r.methods?.length ? r.methods : ['*'];
     methods.forEach((m) => allowed.push({ method: m, path, authorized_entity: null }));
   }
-  return { enabled: true, allowLast: true, allowed, forbidden: [], notFound: [{ method: '*', path: '*', authorized_entity: null }] };
+  // allowLast=false: the allowed list is checked first, everything else falls on the forbidden
+  // wildcard (403). With allowLast=true Otoroshi never reads the allowed list.
+  return { enabled: true, allowLast: false, allowed, forbidden: [{ method: '*', path: '*', authorized_entity: null }], notFound: [] };
 }
 
 export function rateLimitingFor(plan) {
@@ -301,6 +303,7 @@ export function comparableApi(entity) {
     snapshot: entity.metadata?.[META.snapshot] || null,
     routes: (entity.routes || []).map((r) => ({
       id: r.id,
+      name: r.name,
       enabled: r.enabled,
       domains: r.frontend?.domains,
       methods: r.frontend?.methods || [],
@@ -317,11 +320,14 @@ export function comparableApi(entity) {
     flows: (entity.flows || []).map((f) => ({ id: f.id, plugins: stripPlugins(f.plugins) })),
     plans: (entity.plans || []).map((p) => ({
       id: p.id,
+      name: p.name,
       status: p.status,
       kind: p.access_mode_configuration_type,
       rate_limiting: p.rate_limiting?.strategy?.quota || null,
       window_ms: p.rate_limiting?.strategy?.windowDurationMs || null,
-      restrictions: p.access_mode_configuration?.restrictions?.enabled ? p.access_mode_configuration.restrictions.allowed : null,
+      restrictions: p.access_mode_configuration?.restrictions?.enabled
+        ? (({ allowLast, allowed, forbidden, notFound }) => ({ allowLast, allowed, forbidden, notFound }))(p.access_mode_configuration.restrictions)
+        : null,
     })),
   };
 }

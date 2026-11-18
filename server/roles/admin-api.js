@@ -17,7 +17,7 @@ import { listTasks, queueStats, enqueue } from '../domain/tasks.js';
 import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
 import { buildOtoroshiApi } from '../otoroshi/projection.js';
-import { exportWorkspace, importWorkspace } from '../domain/exchange.js';
+import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
 
 const r = new Router();
@@ -709,6 +709,35 @@ r.get('/workspaces/:ws/export', async ({ ctx, params }) => {
 r.post('/workspaces/:ws/import', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   return importWorkspace(c, c.workspace, body);
+});
+
+// declarative api documents: the unit is the api-version (Q-11)
+r.get('/workspaces/:ws/apis/:api/document', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  return apiDocument(await apiOf(c, params));
+});
+
+r.post('/workspaces/:ws/apply', async ({ ctx, params, body, query }) => {
+  const c = await ws(ctx, params);
+  const docs = Array.isArray(body) ? body : body.items || [body];
+  const results = [];
+  for (const doc of docs) {
+    const res = await applyApiDocument(c, c.workspace, doc, { managedBy: query.get('managed_by') || null });
+    const api = await apis.getApi(c.workspace.id, res.api.id);
+    if (query.get('publish') === 'true') {
+      const pending = await apis.pendingChanges(api);
+      if (pending.hasChanges) {
+        const pub = await apis.publish(c, api, { comment: query.get('comment') || 'apply' });
+        res.snapshot = pub.snapshot.number;
+        if (query.get('deploy') === 'true') {
+          const dep = await deployments.deploy(c, await apis.getApi(c.workspace.id, api.id), { snapshot: pub.snapshot.id });
+          res.deployment = dep.deployment.status;
+        }
+      } else res.snapshot = 'unchanged';
+    }
+    results.push(res);
+  }
+  return results;
 });
 
 r.get('/meta/auth-kinds', async () => AUTH_KINDS);

@@ -1,0 +1,92 @@
+# A declarative api-version: the api, its plans and its documentation in one document (Q-11).
+#   bun cli/apim.js apply default -f examples/petstore.yaml --publish --deploy
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: petstore
+  version: 1.0.0
+spec:
+  name: Petstore
+  description: Pets, as a product. Declared from a file.
+  tags: [demo, gitops]
+  visibility: public
+  draft:
+    entrypoint:
+      domain: petstore.oto.tools
+      contextPath: /v1
+    backends:
+      - id: backend_echo
+        name: echo
+        targets:
+          - { hostname: echo, port: 8080, tls: false, weight: 1 }
+    flows:
+      - id: default_flow
+        name: Default flow
+        plugins:
+          - plugin: cp:otoroshi.next.plugins.OverrideHost
+    resources:
+      - id: res_pets
+        name: Pets
+        path: /pets
+        methods: [GET, POST]
+        backendId: backend_echo
+        flowId: default_flow
+      - id: res_store
+        name: Store
+        path: /store
+        methods: [GET]
+        backendId: backend_echo
+        flowId: default_flow
+    plans:
+      - id: plan_petstore_discovery
+        name: Discovery
+        description: Read the pets, 5 calls per second.
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 5, windowMs: 1000 }
+        quota: { daily: 1000 }
+        resourceFilter: { mode: only, resources: [res_pets] }
+        validation: auto
+      - id: plan_petstore_business
+        name: Business
+        description: Everything, reviewed by the pet team.
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 50, windowMs: 1000 }
+        validation: manual
+        usageStatement: { enabled: true, required: true, prompt: Tell us about your shop }
+    openapi:
+      format: yaml
+      content: |
+        openapi: 3.0.3
+        info:
+          title: Petstore
+          version: 1.0.0
+        paths:
+          /pets:
+            get:
+              summary: List pets
+              responses:
+                '200': { description: the pets }
+            post:
+              summary: Add a pet
+              responses:
+                '201': { description: created }
+          /store/inventory:
+            get:
+              summary: Inventory
+              responses:
+                '200': { description: the inventory }
+    documentation:
+      languages: [en, fr]
+      defaultLanguage: en
+  pages:
+    - slug: getting-started
+      title: { en: Getting started, fr: Démarrage }
+      content:
+        en: |
+          # Petstore
+          Subscribe to **Discovery** to read the pets, or to **Business** for everything.
+        fr: |
+          # Petstore
+          Souscrivez à **Discovery** pour lire les animaux, ou à **Business** pour tout.
