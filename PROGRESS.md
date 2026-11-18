@@ -25,6 +25,7 @@ Last update: 2026-11-18.
 6. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
 7. **R-7** — Stripe connector (D-36, Q-12).
 8. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+9. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -88,6 +89,7 @@ waits for the data plane rather than working around it.
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
 | R-30 | §3 | Run the roles **split across instances** (ingester alone, portal alone…) and with several instances of a role — the task queue claims atomically, never tested | S | |
+| R-41 | D-14, D-15 | A **setup mode** of the binary (`apim setup`, given an Otoroshi admin api key): creates or repairs everything the product needs on the gateway, idempotently, all of it or a part (`--only exporter,routes,…`), re-runnable at will and with `--dry-run` showing the diff first. Parts: the product's own admin api key on Otoroshi (narrowed rights), the data exporter to the ingester, the routes that expose the console and each portal (hostnames of R-3, TLS, the info-token auth module and its route for the "via Otoroshi" console login), the shared certificates the product relies on (key pair for `oauth2-local`), a health check of what it found (version, cluster, listener asking for client certificates for mtls plans). Marked like every product entity, reported in the gateway status | M | |
 
 ### Analytics and audit
 
