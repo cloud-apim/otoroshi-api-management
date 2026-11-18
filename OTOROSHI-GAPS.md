@@ -36,6 +36,8 @@ the product has to compensate, **low** = friction.
 
 ## G-1 — a pending subscription gets an enabled key — high
 
+Upstream: [MAIF/otoroshi#2940](https://github.com/MAIF/otoroshi/issues/2940).
+
 **Observed.** `ApiSubscription.generateNewApikeyFromPlan` mints the key with
 `enabled = subscription.status != ApiSubscriptionDisabled` (`next/models/Api.scala:1114`). A
 `pending` (or any custom) status therefore yields an **enabled** key: projecting a subscription
@@ -50,6 +52,8 @@ custom statuses).
 
 ## G-2 — deleting a subscription revokes nothing — high
 
+Upstream: [MAIF/otoroshi#2941](https://github.com/MAIF/otoroshi/issues/2941).
+
 **Observed.** `ApiSubscription.deleteValidator` is a no-op (`next/models/Api.scala:1341`): the
 apikeys referenced by `token_refs` stay in the datastore, enabled, still carrying their `apiRef`.
 
@@ -60,6 +64,8 @@ subscription (`removeFromGateway`, and `purge_api` when an api is deleted).
 like the `Closed` plan path already does on update.
 
 ## G-3 — an Api without a published plan has open routes — high
+
+Upstream: [MAIF/otoroshi#2942](https://github.com/MAIF/otoroshi/issues/2942).
 
 **Observed.** `applyPlansPolicies` only adds `NgApiConsumerEnforcer` when at least one plan is
 `published` (`next/models/Api.scala:1957`). Deprecating or closing the last plan opens the api to
@@ -72,6 +78,8 @@ anyone.
 (or require an explicit `open: true` / a keyless plan to be open).
 
 ## G-4 — any valid token passes on non-apikey plans — high
+
+Upstream: [MAIF/otoroshi#2943](https://github.com/MAIF/otoroshi/issues/2943).
 
 **Observed.** On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans the extractor mints the
 consumer itself on the first call (`createIfMissing`, e.g. `next/models/Api.scala:1870`). Any
@@ -89,6 +97,8 @@ is none — instead of `createIfMissing`.
 
 ## G-5 — resource filtering only on apikey plans — medium
 
+Upstream: [MAIF/otoroshi#2944](https://github.com/MAIF/otoroshi/issues/2944).
+
 **Observed.** `ApiPlan.apikeyTemplate` (`next/models/Api.scala:789`) only carries a full template
 (with `restrictions`) for the `apikey` kind; the other kinds get a template with tags and metadata
 only, so a jwt / mtls / oauth2 / keyless plan cannot restrict the resources it gives access to.
@@ -101,6 +111,8 @@ applied to the consumer it mints.
 
 ## G-6 — no plan attribute for selection rule, counter failure, circuit breaker — medium
 
+Upstream: [MAIF/otoroshi#2945](https://github.com/MAIF/otoroshi/issues/2945).
+
 **Observed.** `ApiPlan` has no field for: an expression that disambiguates two plans of the same
 kind whose extractors can both succeed; what to do when the distributed quota counter is
 unreachable (let pass / refuse); a circuit breaker per subscription instead of per api. All three are enforcement, hence projected.
@@ -112,6 +124,8 @@ unreachable (let pass / refuse); a circuit breaker per subscription instead of p
 backend client.
 
 ## G-7 — ApiDeployment cannot carry the product snapshot — medium
+
+Upstream: [MAIF/otoroshi#2946](https://github.com/MAIF/otoroshi/issues/2946).
 
 **Observed.** `withDeployment` records `owner = metadata.created_by` and a `deploymentDefinition`
 limited to routes, backends, flows and documentation (`next/models/Api.scala:2142`, `2178`), and
@@ -126,6 +140,8 @@ write, and the plans in `deploymentDefinition`.
 
 ## G-8 — the catalog-deploy path is borrowed by convention — medium
 
+Upstream: [MAIF/otoroshi#2947](https://github.com/MAIF/otoroshi/issues/2947).
+
 **Observed.** Any `Api` write whose `metadata.created_by` starts with `remote_catalog=` is a
 catalog deploy (`isWrittenByCatalog`, `next/models/Api.scala:2150`): `production_readonly` is
 lifted and the api may be created already published. The product uses it with the id
@@ -135,6 +151,8 @@ lifted and the api may be created already published. The product uses it with th
 `created_by=control_plane=<id>` or an explicit deploy flag), so this stops being a convention.
 
 ## G-9 — GatewayEvent does not carry apiRef — low
+
+Upstream: [MAIF/otoroshi#2948](https://github.com/MAIF/otoroshi/issues/2948).
 
 **Observed.** `GatewayEvent` carries the route (with `Otoroshi-Api-Ref` in its metadata) and the
 identity (client id, and the key's metadata), not the key's `apiRef = {api, plan, sub}`.
@@ -149,6 +167,8 @@ re-correlation, for every consumer of the data exporters.
 
 ## G-10 — PUT on a missing entity is refused — low
 
+Upstream: [MAIF/otoroshi#2949](https://github.com/MAIF/otoroshi/issues/2949).
+
 **Observed.** `PUT /apis/apis.otoroshi.io/v1/apis/<id>` on an id that does not exist answers
 `unauthorized: resource does not exists` (`api/api.scala:2677`); creation has to be a `POST`.
 
@@ -158,6 +178,8 @@ re-correlation, for every consumer of the data exporters.
 an explicit message instead of `unauthorized`.
 
 ## G-11 — no signal when a write becomes routable — low
+
+Upstream: [MAIF/otoroshi#2950](https://github.com/MAIF/otoroshi/issues/2950).
 
 **Observed.** After a deployment or a new apikey, the first calls get `404 no route found` /
 `401` for a few seconds, until the proxy state picks the change up. Nothing tells a writer when the
@@ -170,6 +192,8 @@ accepted.
 admin API so a control plane can wait for it.
 
 ## G-12 — the request tester with the execution trace is backoffice-only — medium
+
+Upstream: [MAIF/otoroshi#2951](https://github.com/MAIF/otoroshi/issues/2951).
 
 **Observed.** Otoroshi records an `NgExecutionReport` (every step and plugin, with timings) for a
 request carrying `Otoroshi-Try-It-Request-Id` only when that id was enabled by
@@ -188,6 +212,8 @@ an admin apikey enable a report id for the next request.
 
 ## G-13 — a deprecated plan loses its extractor — high
 
+Upstream: [MAIF/otoroshi#2952](https://github.com/MAIF/otoroshi/issues/2952).
+
 **Observed.** `applyPlansPolicies` builds the extractors and the enforcer from the **published**
 plans only (`next/models/Api.scala:1949`). A plan moved to `deprecated` — meant as "still served,
 closed to new subscriptions" — gets no extractor any more: the consumers of a deprecated jwt, mtls,
@@ -203,6 +229,8 @@ closes subscriptions, not access); keep `closed` and `staging` out.
 
 ## G-14 — no key validity relative to the subscription — low
 
+Upstream: [MAIF/otoroshi#2953](https://github.com/MAIF/otoroshi/issues/2953).
+
 **Observed.** The key template of a plan (`ApikeyAccessModeConfiguration.validUntil`,
 `next/models/Api.scala:529`) is an absolute date, applied as is to every key the plan mints.
 "Keys of this plan are valid 90 days from the subscription" cannot be expressed; a `validUntil`
@@ -214,6 +242,8 @@ written on a key afterwards is overwritten by the next plan update (`updateApike
 `validUntil` when the key is minted.
 
 ## G-15 — oauth2-remote plans check neither issuer nor audience — high
+
+Upstream: [MAIF/otoroshi#2954](https://github.com/MAIF/otoroshi/issues/2954).
 
 **Observed.** An `oauth2-remote` plan installs `NgOidcApikeyExtractor`, which validates the token
 with `LocalJwtVerifier().copy(enabled = true, algoSettings = oidcModule.jwtVerifier.get)`
@@ -231,6 +261,8 @@ the auth module's discovery document and client id), turned into the verificatio
 extractor's verifier.
 
 ## G-16 — mtls subject and issuer lists combine with OR — medium
+
+Upstream: [MAIF/otoroshi#2955](https://github.com/MAIF/otoroshi/issues/2955).
 
 **Observed.** `NgClientCertApikeyExtractor.matches` accepts a certificate when its subject matches
 **one of the subject patterns or** its issuer matches one of the issuer patterns
@@ -325,6 +357,8 @@ deletes the keys minted for it, its ApiSubscriptions and their keys.
 
 ## G-19 — data exporters send personal data and url secrets in clear, unsampled — medium
 
+Upstream: [MAIF/otoroshi#2956](https://github.com/MAIF/otoroshi/issues/2956).
+
 **Observed.** Since the 18, `GatewayEvent.writes` masks the credential headers and, by name, the
 secret fields of the configurations it embeds (`app/events/analytics.scala:478`, unless
 `OTOROSHI_EVENTS_MASK_SECRETS` is off). The rest goes out as it is: `url` with its query
@@ -352,6 +386,12 @@ belong to the analytics module of the 18, which stores the same events.
 
 ## G-20 — a narrowed admin key reads the secrets of the other admin keys — high
 
+Upstream: [MAIF/otoroshi#2957](https://github.com/MAIF/otoroshi/issues/2957).
+
+Reproduced on 18.0.1; MAIF/otoroshi#2936 guards rewriting and deleting a stronger admin or apikey,
+not reading its secret — the read path is unchanged at `a9685ede9` (read in the source, not run on a
+build of it). Little exposure in practice: narrowed admin keys are seldom used.
+
 **Observed.** An admin key (authorized on the admin api group) can be narrowed by its metadata
 `otoroshi-access-rights`: tenants, teams, kinds of entities (`app/actions/api.scala:136`). Its calls
 then run as a back office user with those rights. Reading an apikey checks only that the caller can
@@ -376,6 +416,8 @@ apisubscriptions, apikeys, certificates, auth modules, jwt verifiers, data expor
 read the global configuration (G-21).
 
 ## G-21 — the global configuration is readable by super admins only — medium
+
+Upstream: [MAIF/otoroshi#2958](https://github.com/MAIF/otoroshi/issues/2958).
 
 **Observed.** `GET /api/globalconfig` checks `RightsChecker.SuperAdminOnly`
 (`app/controllers/adminapi/GlobalConfigController.scala:27`): a right on

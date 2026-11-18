@@ -25,6 +25,50 @@ Last update: 2026-11-18.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
+## Remaining effort at a glance
+
+Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
+
+**Doable (25)**
+
+| # | Effort | What |
+|---|---|---|
+| R-39 | S | "Via Otoroshi" console login tested end to end |
+| R-30 | S | Roles split across instances, several instances of a role |
+| R-13 | S | Subscription expiry at a date |
+| R-47 | S | Free → paid plan move through a Checkout |
+| R-27 | S | Remote catalogs from S3 |
+| R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
+| R-32 | S | Correlation id carried to the backends |
+| R-22 | S | Metadata field labels in several languages |
+| R-23 | S | The shared request composer on the portal (apis without OpenAPI) |
+| R-42 | S | Free pages of the portal |
+| R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
+| R-48 | S | Compaction of old rollups (only if the volume calls for it) |
+| R-36 | M | Secrets at rest encrypted or in a vault |
+| R-38 | M | UI tests (the screens tour only today) |
+| R-37 | M | Accessibility audit of both faces |
+| R-45 | M | Admin api messages in French |
+| R-12 | M | One credential for several subscriptions |
+| R-17 | M | Adopt: take over the existing subscriptions and keys too |
+| R-20 | M | Catalogue as a discovery tool (categories, featured, reviews) |
+| R-21 | M | Dynamic client registration at the IdP |
+| R-25 | M | Threat protection per plan, and its events in observability |
+| R-34 | M | Usage-based billing (Stripe Billing Meters) |
+| R-18 | M | Token and AI budget plans (out of the MVP for now) |
+| R-10 | L | Named compositions: resources and dictionaries |
+| R-19 | L | Custom portal templates |
+
+**Blocked on Otoroshi (5):** R-14 (G-6), R-15 (G-4), R-16 (G-13), R-24 (G-12, then S), R-33 (G-7) — nothing to do on this side until fixed upstream.
+
+**Owner decisions (4):** R-26 where the gateway health and the drift live in the console · R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
+
+**Waiting for a go:** building the real image (downloads).
+
+**Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
+
+**Total doable:** 12 S + 11 M + 2 L ≈ 19 M. Without R-18, R-10 and R-19 (out of the MVP or large): ≈ 14 M.
+
 ## Known issues
 
 - Demo data: the `default` workspace declares a required plan metadata field `sla` (a D-18 demonstration); the plans of Books and Petstore fill it.
