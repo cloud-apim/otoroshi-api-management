@@ -20,6 +20,10 @@
     "title": "The menu of the person signed in — notifications (with their indicator), theme, tokens, sign out"
   },
   {
+    "file": "console-notifications.png",
+    "title": "Notifications — read and marked done by each person, even those addressed to a team"
+  },
+  {
     "file": "console-apis.png",
     "title": "APIs — lifecycle, deployment state, plans and subscriptions"
   },
@@ -30,6 +34,10 @@
   {
     "file": "console-adopt.png",
     "title": "Adopt mode — take over an Api that already runs on the gateway"
+  },
+  {
+    "file": "console-promote.png",
+    "title": "Promotion — the same snapshot on the next installation, after its dry run"
   },
   {
     "file": "console-api-overview.png",
