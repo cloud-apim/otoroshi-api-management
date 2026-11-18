@@ -15,15 +15,14 @@ Dernière mise à jour : 18/11/2026.
 
 ## Suite, dans l'ordre proposé
 
-1. Captures d'écran dans la documentation.
-2. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
-3. Console en français (le portail l'est déjà).
-4. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
-5. Notifications hors application (e-mail, webhook) — les notifications in-app existent ; le canal n'est pas tranché dans le spec.
-6. **D-28** : CRDs Kubernetes et chart Helm.
-7. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
-8. **Q-8** : rétention et échantillonnage du chemin brut.
-9. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
+1. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
+2. Console en français (le portail l'est déjà).
+3. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
+4. Notifications hors application (e-mail, webhook) — les notifications in-app existent ; le canal n'est pas tranché dans le spec.
+5. **D-28** : CRDs Kubernetes et chart Helm.
+6. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
+7. **Q-8** : rétention et échantillonnage du chemin brut.
+8. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
 
 ## Points connus
 
@@ -105,7 +104,7 @@ Dernière mise à jour : 18/11/2026.
 
 ## Documentation
 
-✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 19 pages, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
+✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 19 pages avec captures d'écran de l'application réelle, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
 
 ## Manques côté Otoroshi
 
