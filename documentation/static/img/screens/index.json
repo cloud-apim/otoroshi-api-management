@@ -100,6 +100,18 @@
     "title": "Plan editor — pricing"
   },
   {
+    "file": "console-plan-trust-ca.png",
+    "title": "Trusting a CA in an mtls plan — read by the product, with the DN Otoroshi will compare"
+  },
+  {
+    "file": "console-plan-mtls.png",
+    "title": "An mtls plan — its trusted CAs, derived as certificates of the gateway"
+  },
+  {
+    "file": "console-plan-oauth2-remote.png",
+    "title": "An oauth2-remote plan — the authorization server described, its auth module derived"
+  },
+  {
     "file": "console-api-docs.png",
     "title": "API — multilingual documentation pages, in Markdown in a code editor"
   },

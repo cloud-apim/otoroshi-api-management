@@ -9,6 +9,7 @@
 
 import puppeteer from 'puppeteer-core';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const BASE = process.env.APIM_URL || 'http://localhost:9000';
@@ -200,6 +201,28 @@ async function consoleTour(page) {
     await click(page, tab, { selector: '[role=tab]' });
     await shot(page, name, title, { full: false });
   }
+  // the gateway objects a plan derives, shown on the editor without saving: the trusted CA of an
+  // mtls plan, the authorization server of an oauth2-remote plan
+  await click(page, 'Access', { selector: '[role=tab]' });
+  await page.select('.drawer .setting select', 'mtls');
+  await click(page, 'Trust a CA');
+  await page.waitForSelector('.modal .code-editor .monaco-editor .view-lines', { timeout: 15000 }).catch(() => console.warn('    ! no code editor rendered'));
+  // pasted, as a person does: Monaco reads the clipboard of the focused edit context
+  await page.click('.modal .code-editor .monaco-editor .view-lines');
+  await page.evaluate((text) => {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    document.activeElement.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+  }, readFileSync(join(import.meta.dir, '..', 'test', 'fixtures', 'atlas-partner-ca.pem'), 'utf8').trim());
+  await settle(page, 900);
+  await shot(page, 'console-plan-trust-ca', 'Trusting a CA in an mtls plan — read by the product, with the DN Otoroshi will compare', { full: false });
+  await click(page, 'Trust it');
+  await shot(page, 'console-plan-mtls', 'An mtls plan — its trusted CAs, derived as certificates of the gateway', { full: false });
+  await page.select('.drawer .setting select', 'oauth2-remote');
+  await clickNth(page, '.drawer .seg button', 0, 'Describe it');
+  await page.type('.drawer input[placeholder="https://idp.example/realms/partners"]', 'http://oidc.oto.tools:8090/default');
+  await click(page, 'Discover');
+  await shot(page, 'console-plan-oauth2-remote', 'An oauth2-remote plan — the authorization server described, its auth module derived', { full: false });
 
   await go(page, `${A}/documentation`);
   await editors(page);
