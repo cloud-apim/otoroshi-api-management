@@ -20,6 +20,7 @@ import { buildOtoroshiApi } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
+import * as policyGroups from '../domain/policyGroups.js';
 
 const r = new Router();
 
@@ -725,6 +726,36 @@ r.get('/workspaces/:ws/export', async ({ ctx, params }) => {
 r.post('/workspaces/:ws/import', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   return importWorkspace(c, c.workspace, body);
+});
+
+// ---------------------------------------------------------------- shared policy groups (D-16)
+
+r.get('/workspaces/:ws/policy-groups', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const groups = await policyGroups.listGroups(c.workspace.id);
+  return Promise.all(groups.map(async (g) => ({ ...g, usage: await policyGroups.groupUsage(c.workspace.id, g.id) })));
+});
+r.post('/workspaces/:ws/policy-groups', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  return policyGroups.createGroup(c, c.workspace.id, body);
+});
+r.get('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const g = await policyGroups.getGroup(c.workspace.id, params.pg);
+  return { ...g, versions: await policyGroups.listVersions(g.id), usage: await policyGroups.groupUsage(c.workspace.id, g.id) };
+});
+r.put('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  return policyGroups.updateGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg), body);
+});
+r.post('/workspaces/:ws/policy-groups/:pg/publish', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  return policyGroups.publishGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg), body);
+});
+r.delete('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  await policyGroups.deleteGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg));
+  return { deleted: true };
 });
 
 // declarative api documents: the unit is the api-version (Q-11)

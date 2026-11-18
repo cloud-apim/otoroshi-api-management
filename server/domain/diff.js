@@ -30,6 +30,12 @@ export function diff(before, after, path = '', out = []) {
     }
     return out;
   }
+  // arrays of the same length without ids: compare element by element, so that one changed field
+  // in a plugin list reads as one change rather than the whole list
+  if (Array.isArray(before) && Array.isArray(after) && before.length === after.length && before.some((x) => isObj(x))) {
+    before.forEach((b, i) => diff(b, after[i], `${path}[${i}]`, out));
+    return out;
+  }
   if (isObj(before) && isObj(after)) {
     const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
     for (const k of keys) {

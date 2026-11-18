@@ -97,6 +97,19 @@ describe('projection', () => {
     expect(e.routes.map((r) => r.frontend.domains[0])).toEqual(['/pets', '/store']);
   });
 
+  test('a shared policy group is expanded inline from the version the snapshot froze (D-16)', () => {
+    const d = draft([defaultPlan({ status: 'published' })]);
+    d.flows[0].plugins = [{ plugin: 'cp:a', config: {} }, { group: 'pg_1', version: 2 }];
+    const groups = { 'pg_1@2': { name: 'company', plugins: [{ plugin: 'cp:headers', config: { v: 2 } }, { plugin: 'cp:cors', config: {} }] } };
+    const e = buildOtoroshiApi({ api: { id: 'a', name: 'x', version: '1', workspace_id: 'ws' }, draft: d, policyGroups: groups });
+    expect(e.flows[0].plugins.map((p) => p.plugin)).toEqual(['cp:a', 'cp:headers', 'cp:cors']);
+    // a snapshot that does not carry the pinned version cannot be projected
+    expect(() => buildOtoroshiApi({ api: { id: 'a', name: 'x', version: '1', workspace_id: 'ws' }, draft: d, policyGroups: {} })).toThrow(/pg_1 v2/);
+    // a floating reference is refused at validation
+    d.flows[0].plugins[1].version = null;
+    expect(validateDraft(d).ok).toBe(false);
+  });
+
   test('only an active subscription is projected as enabled', () => {
     for (const [status, wanted] of [['active', 'enabled'], ['suspended', 'disabled'], ['pending', 'disabled']]) {
       const s = buildOtoroshiSubscription({ id: 's', status, application_id: 'app', workspace_id: 'ws', plan_id: 'p', api_id: 'a', auth_kind: 'apikey', dates: {} }, { application: { name: 'x' } });

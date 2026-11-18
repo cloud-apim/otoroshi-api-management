@@ -163,13 +163,18 @@ export function normalizeDraft(input = {}) {
   d.flows = asArray(input.flows ?? base.flows).map((f) => ({
     id: f.id || newId('flow'),
     name: f.name || f.id || 'flow',
-    plugins: asArray(f.plugins).map((p) => ({
-      plugin: p.plugin,
-      enabled: p.enabled !== false,
-      include: asArray(p.include),
-      exclude: asArray(p.exclude),
-      config: p.config || {},
-    })),
+    plugins: asArray(f.plugins).map((p) =>
+      // a reference to a shared policy group, pinned to a published version (D-16)
+      p.group
+        ? { group: p.group, version: p.version ? parseInt(p.version, 10) : null }
+        : {
+            plugin: p.plugin,
+            enabled: p.enabled !== false,
+            include: asArray(p.include),
+            exclude: asArray(p.exclude),
+            config: p.config || {},
+          }
+    ),
   }));
   d.resources = asArray(input.resources ?? base.resources).map((r) => ({
     ...defaultResource(d.backends[0]?.id, d.flows[0]?.id),
@@ -216,6 +221,12 @@ export function validateDraft(draft) {
     if (!r.path || !r.path.startsWith('/'))
       errors.push({ path: `resources[${i}].path`, message: `resource "${r.name}" path must start with /` });
   });
+  d.flows.forEach((f) =>
+    f.plugins.forEach((p) => {
+      if (p.group && !p.version) errors.push({ path: `flows[${f.name}]`, message: `flow "${f.name}" references a policy group without pinning a version` });
+      if (!p.group && !p.plugin) errors.push({ path: `flows[${f.name}]`, message: `flow "${f.name}" has a plugin without id` });
+    })
+  );
   const active = d.plans.filter((p) => p.status === 'published');
   if (!active.length) {
     warnings.push({

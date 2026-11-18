@@ -61,11 +61,21 @@ function clientJson(b) {
   };
 }
 
-function flowJson(f) {
+// a policy group reference is expanded inline, from the version the snapshot froze (D-16)
+function expandGroups(plugins, groups = {}) {
+  return plugins.flatMap((p) => {
+    if (!p.group) return [p];
+    const g = groups[`${p.group}@${p.version}`];
+    if (!g) throw new Error(`the snapshot does not carry policy group ${p.group} v${p.version}`);
+    return g.plugins;
+  });
+}
+
+function flowJson(f, groups) {
   return {
     id: f.id,
     name: f.name,
-    plugins: f.plugins.map((p) => ({
+    plugins: expandGroups(f.plugins, groups).map((p) => ({
       enabled: p.enabled !== false,
       debug: false,
       plugin: p.plugin,
@@ -239,7 +249,7 @@ export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecyc
     plans: draft.plans.map((p) => planJson(p, draft)),
     routes: draft.resources.map(routeJson),
     backends: draft.backends.map(backendJson),
-    flows: draft.flows.map(flowJson),
+    flows: draft.flows.map((f) => flowJson(f, snapshot.policyGroups)),
     clients_backend_config: draft.backends.map(clientJson),
     // D-2: the documentation stays in the product, even though Otoroshi has ApiDocumentation
     documentation: null,

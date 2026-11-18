@@ -9,6 +9,7 @@ import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
+import { resolveGroups } from './policyGroups.js';
 
 export function apiSummary(row) {
   if (!row) return null;
@@ -196,10 +197,19 @@ function draftView(row) {
   };
 }
 
-export async function composeDraft(api) {
+export async function composeDraft(api, { strict = false } = {}) {
   const pages = await listPages(api.id, { withContent: true });
+  const view = draftView(api);
+  // the pinned versions of the shared policy groups are frozen into the snapshot (D-16, D-35)
+  let policyGroups = {};
+  try {
+    policyGroups = await resolveGroups(view.draft);
+  } catch (e) {
+    if (strict) throw e;
+  }
   return {
-    ...draftView(api),
+    ...view,
+    policyGroups,
     docs: {
       pages: pages.map((p) => ({ id: p.id, parent_id: p.parent_id, slug: p.slug, position: p.position, title: p.title, content: p.content })),
     },
@@ -232,7 +242,7 @@ export async function pendingChanges(api) {
 }
 
 export async function publish(ctx, api, { comment = '' } = {}) {
-  const content = await composeDraft(api);
+  const content = await composeDraft(api, { strict: true });
   const validation = validateDraft(content.draft);
   if (!validation.ok) throw badRequest('the draft has errors, it cannot be published', validation);
   const last = await lastSnapshot(api.id);

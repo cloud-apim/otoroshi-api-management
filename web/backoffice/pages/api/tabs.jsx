@@ -412,7 +412,7 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
 
 // ---------------------------------------------------------------- flows: named compositions of otoroshi plugins (D-16)
 
-function PluginModal({ value, catalog, onSave, onClose }) {
+export function PluginModal({ value, catalog, onSave, onClose }) {
   const [p, setP] = useState(value);
   const [config, setConfig] = useState(JSON.stringify(value.config || {}, null, 2));
   const [error, setError] = useState(null);
@@ -477,9 +477,48 @@ function PluginModal({ value, catalog, onSave, onClose }) {
   );
 }
 
+function AddGroupModal({ groups, onAdd, onClose }) {
+  const [sel, setSel] = useState('');
+  const published = groups.filter((g) => g.last_version);
+  return (
+    <Modal
+      title="Add a shared policy group"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn primary"
+            disabled={!sel}
+            onClick={() => {
+              const g = published.find((x) => x.id === sel);
+              onAdd({ group: g.id, version: g.last_version });
+            }}
+          >
+            Pin latest version
+          </button>
+        </>
+      }
+    >
+      <p className="muted small">The flow pins a published version of the group. Publishing a new version of the group changes nothing here until you upgrade — snapshots are immutable.</p>
+      {published.length ? (
+        <Select value={sel} onChange={setSel} options={[{ value: '', label: 'Choose a group…' }, ...published.map((g) => ({ value: g.id, label: `${g.name} — v${g.last_version}` }))]} />
+      ) : (
+        <Callout kind="info">No published policy group yet.</Callout>
+      )}
+    </Modal>
+  );
+}
+
 export function FlowsTab({ draft, setDraft, readOnly }) {
+  const { wapi, slug } = useWs();
   const catalog = useLoad(() => rootApi.get('/gateway/plugins').catch(() => []), []);
+  const groups = useLoad(() => wapi.get('/policy-groups'), [slug]);
   const [editing, setEditing] = useState(null);
+  const [addingGroup, setAddingGroup] = useState(null);
+  const groupOf = (id) => (groups.data || []).find((g) => g.id === id);
   const updateFlow = (id, patch) => setDraft((d) => ({ ...d, flows: d.flows.map((f) => (f.id === id ? { ...f, ...patch } : f)) }));
   return (
     <div className="col gap-16">
@@ -502,6 +541,9 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                   <button className="btn sm" onClick={() => setEditing({ flowId: f.id, index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
                     <Icon name="plus" /> Add plugin
                   </button>
+                  <button className="btn sm" onClick={() => setAddingGroup(f.id)}>
+                    <Icon name="layers" /> Add policy group
+                  </button>
                   <button className="btn ghost sm icon" disabled={usedBy + usedByPlans > 0} title={usedBy + usedByPlans > 0 ? 'in use' : 'delete flow'} onClick={() => setDraft((d) => ({ ...d, flows: d.flows.filter((x) => x.id !== f.id) }))}>
                     <Icon name="trash" />
                   </button>
@@ -509,14 +551,41 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
               )}
             </div>
             {f.plugins.length ? (
-              f.plugins.map((p, i) => (
+              f.plugins.map((p, i) =>
+                p.group ? (
+                  <div key={i} className="list-item">
+                    <span className="faint tiny">{i + 1}</span>
+                    <Icon name="layers" />
+                    <div className="grow">
+                      <div className="bold small">
+                        {groupOf(p.group)?.name || p.group} <span className="badge">v{p.version}</span>
+                      </div>
+                      <div className="faint tiny">shared policy group, expanded inline at projection</div>
+                    </div>
+                    {groupOf(p.group)?.last_version > p.version && (
+                      <>
+                        <span className="badge warning">v{groupOf(p.group).last_version} available</span>
+                        {!readOnly && (
+                          <button className="btn xs" onClick={() => updateFlow(f.id, { plugins: f.plugins.map((x, j) => (j === i ? { ...x, version: groupOf(p.group).last_version } : x)) })}>
+                            Upgrade
+                          </button>
+                        )}
+                      </>
+                    )}
+                    {!readOnly && (
+                      <button className="btn ghost sm icon" onClick={() => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) })} aria-label="remove">
+                        <Icon name="trash" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
                 <div key={i} className="list-item">
                   <span className="faint tiny">{i + 1}</span>
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="mono small ellipsis">{p.plugin}</div>
                     <div className="faint tiny">
-                      {p.include.length ? `only ${p.include.join(', ')}` : 'all paths'}
-                      {p.exclude.length ? ` · except ${p.exclude.join(', ')}` : ''} · {Object.keys(p.config || {}).length} config keys
+                      {p.include?.length ? `only ${p.include.join(', ')}` : 'all paths'}
+                      {p.exclude?.length ? ` · except ${p.exclude.join(', ')}` : ''} · {Object.keys(p.config || {}).length} config keys
                     </div>
                   </div>
                   {!p.enabled && <Badge>disabled</Badge>}
@@ -531,7 +600,8 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                     </>
                   )}
                 </div>
-              ))
+                )
+              )
             ) : (
               <div className="card-body muted small">No plugin.</div>
             )}
@@ -542,6 +612,17 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setDraft((d) => ({ ...d, flows: [...d.flows, { id: rid('flow'), name: 'New flow', plugins: [] }] }))}>
           <Icon name="plus" /> Add flow
         </button>
+      )}
+      {addingGroup && (
+        <AddGroupModal
+          groups={groups.data || []}
+          onClose={() => setAddingGroup(null)}
+          onAdd={(ref) => {
+            const f = draft.flows.find((x) => x.id === addingGroup);
+            updateFlow(f.id, { plugins: [...f.plugins, ref] });
+            setAddingGroup(null);
+          }}
+        />
       )}
       {editing && (
         <PluginModal

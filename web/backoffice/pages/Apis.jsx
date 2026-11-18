@@ -4,6 +4,7 @@ import { fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, Select, StatusBadge, TagsInput, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { useWs, api } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ApisTabs } from './PolicyGroups.jsx';
 
 export function deploymentLabel(a) {
   const d = a.deployment;
@@ -166,6 +167,7 @@ export function ApisPage() {
           </>
         }
       />
+      <ApisTabs current="apis" />
       <div className="row mb-16">
         <input className="input" style={{ maxWidth: 360 }} placeholder="Filter by name, description or tag" value={q} onChange={(e) => setParams({ q: e.target.value })} aria-label="filter apis" />
       </div>

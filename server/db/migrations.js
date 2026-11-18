@@ -271,6 +271,33 @@ create table auth_states (
 );
 `,
   },
+  {
+    version: '0003_policy_groups',
+    sql: `
+-- named compositions (D-16): a shared chain of Otoroshi plugins with its own lifecycle. The draft
+-- is edited, a publication freezes an immutable version, and an api pins a version (D-35).
+create table policy_groups (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null,
+  description text not null default '',
+  draft jsonb not null default '{"plugins": []}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table policy_group_versions (
+  id text primary key,
+  group_id text not null references policy_groups(id) on delete cascade,
+  number int not null,
+  plugins jsonb not null,
+  comment text not null default '',
+  published_by text,
+  published_at timestamptz not null default now(),
+  unique (group_id, number)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

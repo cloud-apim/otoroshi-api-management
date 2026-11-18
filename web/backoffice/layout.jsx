@@ -4,9 +4,9 @@ import { Dropdown, Icon, MenuItem, Modal, Seg } from '../shared/ui.jsx';
 import { getThemePref, setThemePref } from '../shared/lib.js';
 import { api, useSession, wsApi } from './context.jsx';
 
-function NavLink({ to, icon, children, exact = false, count }) {
+function NavLink({ to, icon, children, exact = false, count, also = [] }) {
   const { path } = useRouter();
-  const on = exact ? path === to : path === to || path.startsWith(to + '/');
+  const on = exact ? path === to : [to, ...also].some((t) => path === t || path.startsWith(t + '/'));
   return (
     <Link to={to} className={`navlink ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined}>
       <Icon name={icon} />
@@ -206,7 +206,7 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}`} icon="home" exact>
               Home
             </NavLink>
-            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending}>
+            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} also={[`/ws/${ws}/policy-groups`]}>
               APIs
             </NavLink>
             <NavLink to={`/ws/${ws}/applications`} icon="apps">
