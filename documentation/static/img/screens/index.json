@@ -228,6 +228,10 @@
     "title": "Workspace settings — typed metadata fields"
   },
   {
+    "file": "console-ws-payments.png",
+    "title": "Workspace settings — payments: the Stripe account the paid plans are sold with, and what Stripe said"
+  },
+  {
     "file": "console-ws-export.png",
     "title": "Workspace settings — export and import"
   },
