@@ -24,6 +24,42 @@ spec:
         name: Default flow
         plugins:
           - plugin: cp:otoroshi.next.plugins.OverrideHost
+          - plugin: cp:otoroshi.next.plugins.Cors
+            config:
+              allow_origin: https://shop.oto.tools
+              allow_methods: [GET, POST]
+              allow_headers: [Authorization, Content-Type]
+              expose_headers: [X-Request-Id]
+              excluded_patterns: []
+              max_age: 3600
+              allow_credentials: true
+          - plugin: cp:otoroshi.next.plugins.RequestBodyLengthLimiter
+            include: ['/v1/pets.*']
+            config: { max_length: 65536, fail: true }
+          - plugin: cp:otoroshi.next.plugins.AdditionalHeadersIn
+            config:
+              headers: { X-Pet-Source: petstore-gateway }
+          - plugin: cp:otoroshi.next.plugins.RemoveHeadersOut
+            config:
+              header_names: [Server, X-Powered-By]
+          - plugin: cp:otoroshi.next.plugins.IpAddressBlockList
+            enabled: false
+            config: { addresses: [203.0.113.0/24], match_forwarded_chain: false }
+      - id: business_flow
+        name: Business plan policies
+        plugins:
+          - plugin: cp:otoroshi.next.plugins.AdditionalHeadersIn
+            config:
+              headers: { X-Pet-Plan: business }
+          - plugin: cp:otoroshi.next.plugins.GzipResponseCompressor
+            exclude: ['/v1/store/health']
+            config:
+              excluded_patterns: []
+              allowed_list: [text/*, application/javascript, application/json]
+              blocked_list: []
+              buffer_size: 8192
+              chunked_threshold: 102400
+              compression_level: 5
     resources:
       - id: res_pets
         name: Pets
@@ -55,6 +91,7 @@ spec:
         rateLimit: { enabled: true, calls: 50, windowMs: 1000 }
         validation: manual
         usageStatement: { enabled: true, required: true, prompt: Tell us about your shop }
+        flowRef: business_flow
     openapi:
       format: yaml
       content: |

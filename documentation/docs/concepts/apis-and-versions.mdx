@@ -17,7 +17,7 @@ An API is the published, documented, subscribable unit. It carries:
 - **backends**: targets (host, port, TLS, weight), root path, load balancing, timeouts, retries;
 - **resources**: an endpoint or a group of endpoints (path, methods, exact or prefix match, strip
   path), each pointing at a backend and a policy flow — projected as the routes of the Otoroshi `Api`;
-- **policy flows**: named chains of Otoroshi plugins, possibly including
+- **[policy flows](./policy-flows.mdx)**: named chains of Otoroshi plugins, possibly including
   [shared policy groups](./shared-policy-groups.mdx);
 - **[plans](./plans.mdx)**, where the policy lives;
 - **documentation pages** in as many languages as you want, and an **OpenAPI** specification;

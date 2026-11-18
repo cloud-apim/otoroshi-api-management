@@ -1,0 +1,90 @@
+---
+sidebar_position: 6
+title: Policy flows
+description: Chains of Otoroshi plugins run by the resources of an API, or added by a plan for its consumers.
+---
+
+# Policy flows
+
+![The policy flows of an API: Otoroshi plugins in order, a shared policy group pinned to a version, a flow added by one plan](/img/screens/console-api-flows.png)
+
+A policy flow is a named chain of Otoroshi plugins. It belongs to the draft of the API, is frozen
+in its snapshots and projected as a flow of the Otoroshi `Api` entity: what you edit is what the
+gateway runs, the product adds nothing of its own.
+
+## Where a flow runs
+
+- Each **resource** runs one flow (*Resources → a resource → Policy flow*).
+- A **plan** can add one flow of the API on top of the flow of the resource, for the consumers of
+  this plan only (*plan editor → General → Plan plugins*), projected as the plan's `flow_ref`. That
+  is how a protection is put plan by plan: compression for a paying plan, a stricter body size, an
+  extra header for the backend.
+
+The card of a flow says what it runs for — its resources and plans, or *not used yet*. A flow in
+use cannot be deleted.
+
+![A plan adds a flow on top of the route, for its consumers only](/img/screens/console-plan-flow.png)
+
+## Plugins
+
+The plugins are Otoroshi's own. The console reads the gateway's catalog
+(`GET /api/gateway/plugins`): names, descriptions, categories, the steps of the request where a
+plugin acts, and its default configuration.
+
+- **Add plugin** searches the catalog by name or description, filtered by category. Choosing a
+  plugin fills in its default configuration, unless you already edited it.
+- **Configuration** is the plugin's native JSON, in a code editor that checks it as you type.
+  *Reset to the default configuration* restores the one from the catalog. A configuration that is
+  not a JSON object cannot be applied.
+- **Only on paths** and **Except paths** are Java regular expressions matched against the full
+  request path, context path included: `/v1/pets.*`, not `/pets/*`. Empty means everywhere; an
+  excluded path always wins.
+- **Enabled**: a disabled plugin stays in the flow and in the snapshot, projected with
+  `enabled: false`.
+- **Order**: the arrows move a plugin. Within each step of the request, the gateway runs the plugins
+  in the order of the flow.
+
+A plugin the gateway's catalog does not know — a custom plugin, or a gateway that does not run it —
+is shown as such and projected as is.
+
+![Editing a plugin: its native configuration, where it applies](/img/screens/console-api-plugin-edit.png)
+
+![Adding a plugin: the gateway's catalog, and the default configuration of the plugin chosen](/img/screens/console-api-plugin-add.png)
+
+## Shared policy groups
+
+*Add policy group* pins the latest published version of a
+[shared policy group](./shared-policy-groups.mdx). The group is expanded in place at projection, at
+its position in the flow. When a newer version is published, the flow says so and offers
+*Upgrade* — an edit of the draft like any other.
+
+## From the draft to the gateway
+
+Editing a flow edits the draft: nothing reaches the gateway before a snapshot is published and
+deployed, and the deployment shows its diff first.
+
+## In a declarative document
+
+```yaml
+flows:
+  - id: default_flow
+    name: Default flow
+    plugins:
+      - plugin: cp:otoroshi.next.plugins.Cors
+        config: { allow_origin: https://shop.oto.tools, allow_methods: [GET, POST] }
+      - plugin: cp:otoroshi.next.plugins.RequestBodyLengthLimiter
+        include: ['/v1/pets.*']
+        config: { max_length: 65536, fail: true }
+      - group: pg_01a1…      # a shared policy group, pinned
+        version: 1
+  - id: business_flow
+    name: Business plan policies
+    plugins:
+      - plugin: cp:otoroshi.next.plugins.AdditionalHeadersIn
+        config: { headers: { X-Pet-Plan: business } }
+plans:
+  - id: plan_petstore_business
+    flowRef: business_flow   # added on top of the route, for this plan
+```
+
+`examples/petstore.yaml` carries a complete one.

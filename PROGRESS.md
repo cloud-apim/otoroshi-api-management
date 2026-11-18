@@ -77,6 +77,7 @@ waits for the data plane rather than working around it.
 | R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
+| R-40 | D-3 | **Plugin configuration forms** generated from the form description the gateway's catalog carries for each plugin (`config_schema`, `config_flow`, as Otoroshi's own ui does), next to the JSON editor | M | |
 
 ### Industrialisation (GitOps, environments, operations)
 
@@ -132,7 +133,7 @@ waits for the data plane rather than working around it.
 |---|---|---|
 | D-1 Otoroshi's `Api` entity | ✅ | `server/otoroshi/projection.js`; reference catalogue test |
 | D-2 selective synchronisation | ✅ | docs, terms, usage statements, pricing, metadata never projected; `test/model.test.js` |
-| D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows |
+| D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows: plugins named and configured from the gateway's catalog (default configuration, order, regex paths), plan flows, JSON in a code editor (Monaco, bundled, loaded on first use); generated forms: R-40 |
 | D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; a subscription waits until its api is deployed — explicit "product down" test: R-2 |
 | D-5 the policy lives in the plan | ✅ | plan editor; limits and filtering projected on the plan |
 | D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4 |
@@ -210,7 +211,7 @@ waits for the data plane rather than working around it.
 
 ✅ Docusaurus site in `documentation/` (the same base as the other extensions: local search, dark by default), 20 pages, built with no broken link; the `documentation` GitHub workflow builds it and publishes it to GitHub Pages on every push to `main` (pull requests build only).
 
-✅ **Screens tour** (`documentation/docs/screens.mdx`): 80 captures of every screen of the console and the portal, drawers, modals and menus included, light and dark, English and French, in `documentation/static/img/screens/`. Produced by `bun run screenshots` (headless Chromium), which also regenerates the page: run it again after every change of the interface.
+✅ **Screens tour** (`documentation/docs/screens.mdx`): 83 captures of every screen of the console and the portal, drawers, modals and menus included, light and dark, English and French, in `documentation/static/img/screens/`. Produced by `bun run screenshots` (headless Chromium), which also regenerates the page: run it again after every change of the interface. File names are stable (`console-api-flows.png`), so the concept pages show screens of the tour; the order is the order of capture.
 
 ## Otoroshi gaps
 

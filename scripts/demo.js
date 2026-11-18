@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // Loads the demo data, idempotently (used by `mise run demo`):
-//  - examples/petstore.yaml in the default workspace, published and deployed
+//  - examples/petstore.yaml in the default workspace, published and deployed, its default flow
+//    pinning a shared policy group
 //  - a gitops workspace with a remote catalog serving examples/catalog/apis.yaml, synchronised
 //  - the Otoroshi data exporter that feeds the ingester
 import { readFileSync } from 'node:fs';
@@ -21,7 +22,22 @@ async function call(method, path, body) {
   return data;
 }
 
+// a shared policy group with two published versions; petstore pins the first one, so its flow
+// shows that a newer version is available
+const header = (value) => [{ plugin: 'cp:otoroshi.next.plugins.AdditionalHeadersOut', enabled: true, include: [], exclude: [], config: { headers: { 'X-Company-Policy': value } } }];
+let group = (await call('GET', '/workspaces/default/policy-groups')).find((g) => g.name === 'Company security headers');
+if (!group) {
+  group = await call('POST', '/workspaces/default/policy-groups', { name: 'Company security headers', description: 'what every api sends back', plugins: header('v1') });
+  await call('POST', `/workspaces/default/policy-groups/${group.id}/publish`, { comment: 'first version' });
+  await call('PUT', `/workspaces/default/policy-groups/${group.id}`, { plugins: header('v2') });
+  await call('POST', `/workspaces/default/policy-groups/${group.id}/publish`, { comment: 'policy v2' });
+  console.log('default   policy group Company security headers: v1, v2 published');
+}
+
 const petstore = YAML.parseAllDocuments(readFileSync(new globalThis.URL('../examples/petstore.yaml', import.meta.url), 'utf8')).map((d) => d.toJSON());
+for (const doc of petstore.filter((d) => d.kind === 'Api')) {
+  doc.spec.draft.flows.find((f) => f.id === 'default_flow')?.plugins.push({ group: group.id, version: 1 });
+}
 const applied = await call('POST', '/workspaces/default/apply?publish=true&deploy=true&comment=demo', petstore);
 applied.forEach((r) => console.log(`default   api ${r.api.slug} ${r.api.version}: ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));
 
