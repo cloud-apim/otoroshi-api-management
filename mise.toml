@@ -1,0 +1,206 @@
+# Mise file (https://mise.jdx.dev/) for otoroshi-api-management
+#
+# setup:    mise install && mise run install
+# stack:    mise run up            (postgres, otoroshi, echo, dev idp, catalog source + the product on :9000)
+# dev:      mise run watch         (rebuild the uis on change; the product container reloads the server)
+# test:     mise run test          (unit tests + the reference catalogue test against the real gateway)
+# docs:     mise run docs:dev
+# all:      mise run ci            (what the repository checks before a push)
+#
+# The product runs inside the docker stack so that the Otoroshi data exporter can reach the
+# ingester (http://apim:9000/ingest). `mise run dev` runs it on the host instead.
+
+min_version = "2026.1.0"
+
+# ─── Tools ───────────────────────────────────────────────────────────
+
+[tools]
+bun = "1.3.11"
+node = "24"
+
+# ─── Environment ─────────────────────────────────────────────────────
+
+[env]
+# the cli and the smoke tasks talk to the local product with the bootstrap admin token
+APIM_URL = "http://localhost:9000"
+APIM_TOKEN = "apim-admin-token"
+COMPOSE_FILE = "{{config_root}}/docker/docker-compose.yml"
+COMPOSE_PROFILES = "apim"
+
+# ─── Install ─────────────────────────────────────────────────────────
+
+[tasks.install]
+description = "Install every dependency (product + documentation)"
+depends = ["install:app", "install:docs"]
+
+[tasks."install:app"]
+description = "Install the product dependencies (server, uis, cli, scripts)"
+run = "bun install"
+
+[tasks."install:docs"]
+description = "Install the documentation dependencies"
+dir = "documentation"
+run = "npm ci"
+
+# ─── Local stack (docker) ────────────────────────────────────────────
+
+[tasks.up]
+description = "Start the whole stack: postgres, otoroshi, echo backend, dev oidc provider, catalog source, and the product on :9000"
+depends = ["build"]
+run = [
+  "docker compose up -d",
+  "bun scripts/wait.js",
+]
+
+[tasks.down]
+description = "Stop the stack (data is kept in the docker volumes)"
+run = "docker compose down"
+
+[tasks.restart]
+description = "Restart the product container (after a dependency change)"
+run = "docker compose restart apim"
+
+[tasks.logs]
+description = "Follow the logs of the product (pass a service name to see another one: mise run logs otoroshi)"
+run = "docker compose logs -f --tail 200 ${usage_service:-apim}"
+usage = 'arg "[service]" help="compose service" default="apim"'
+
+[tasks.ps]
+description = "Show the state of the stack"
+run = "docker compose ps"
+
+[tasks.reset]
+description = "Destroy the stack AND its volumes: databases and the gateway state are wiped"
+confirm = "This deletes the postgres and otoroshi volumes. Continue?"
+run = [
+  "docker compose down -v",
+  "docker compose up -d",
+  "bun scripts/wait.js",
+]
+
+[tasks.exporter]
+description = "Install the Otoroshi data exporter that feeds the ingester"
+run = "curl -sf -H \"Authorization: Bearer $APIM_TOKEN\" -H 'content-type: application/json' -X POST $APIM_URL/api/gateway/exporter -d '{}'; echo"
+
+[tasks.demo]
+description = "Load the demo data, idempotently: petstore, a gitops workspace with its remote catalog, the data exporter"
+run = "bun scripts/demo.js"
+
+# ─── Development ─────────────────────────────────────────────────────
+
+[tasks.dev]
+description = "Run the product on the host with hot reload (stop the apim container first: mise run stop:apim)"
+run = "bun --watch server/main.js"
+
+[tasks."stop:apim"]
+description = "Stop only the product container, to run the product on the host"
+run = "docker compose stop apim"
+
+[tasks.watch]
+description = "Rebuild both uis on change"
+run = "bun run watch:backoffice & bun run watch:portal & wait"
+
+[tasks."watch:backoffice"]
+description = "Rebuild the console on change"
+run = "bun run watch:backoffice"
+
+[tasks."watch:portal"]
+description = "Rebuild the developer portal on change"
+run = "bun run watch:portal"
+
+# ─── Build ───────────────────────────────────────────────────────────
+
+[tasks.build]
+description = "Build the console and the developer portal into dist/"
+depends = ["build:backoffice", "build:portal"]
+
+[tasks."build:backoffice"]
+description = "Build the console"
+sources = ["web/backoffice/**/*", "web/shared/**/*", "web/vite.backoffice.config.js"]
+outputs = ["dist/backoffice/index.html"]
+run = "bun run build:backoffice"
+
+[tasks."build:portal"]
+description = "Build the developer portal"
+sources = ["web/portal/**/*", "web/shared/**/*", "web/vite.portal.config.js"]
+outputs = ["dist/portal/index.html"]
+run = "bun run build:portal"
+
+[tasks.image]
+description = "Build the production docker image"
+run = "docker build -t otoroshi-api-management:dev ."
+
+# ─── Quality ─────────────────────────────────────────────────────────
+
+[tasks.check]
+description = "Syntax-check every server, cli, script and test file"
+run = "bun scripts/check.js"
+
+[tasks.test]
+description = "Run every test: unit tests, and the reference catalogue test against the real gateway (needs the stack)"
+run = "bun test"
+
+[tasks."test:unit"]
+description = "Run the unit tests only (no infrastructure)"
+run = "bun test test/model.test.js test/auth.test.js test/catalogs.test.js"
+
+[tasks."test:e2e"]
+description = "Run the reference catalogue test against the real gateway (needs the stack)"
+run = "bun test test/reference-catalogue.test.js"
+
+[tasks.ci]
+description = "Everything the repository checks: syntax, uis, unit and end-to-end tests, documentation build"
+run = [
+  { task = "check" },
+  { task = "build" },
+  { task = "test" },
+  { task = "docs:build" },
+]
+
+# ─── Documentation ───────────────────────────────────────────────────
+
+[tasks."docs:dev"]
+description = "Run the documentation dev server (http://localhost:3000/otoroshi-api-management/)"
+dir = "documentation"
+run = "npm run start"
+
+[tasks."docs:build"]
+description = "Build the documentation site (fails on a broken link)"
+dir = "documentation"
+run = "npm run build"
+
+[tasks."docs:serve"]
+description = "Serve the built documentation site"
+dir = "documentation"
+run = "npm run serve"
+
+[tasks.screenshots]
+description = "Capture every screen of the console and the portal and regenerate the screens tour page (needs the stack with demo data, and chromium)"
+run = "bun run screenshots"
+
+# ─── Tools ───────────────────────────────────────────────────────────
+
+[tasks.cli]
+description = "Run the apim cli against the local product (e.g. mise run cli apis list default)"
+run = "bun cli/apim.js"
+raw = true
+
+[tasks.psql]
+description = "Open a psql shell on the application database"
+run = "docker compose exec postgres psql -U apim apim"
+raw = true
+
+[tasks."psql:analytics"]
+description = "Open a psql shell on the analytics database"
+run = "docker compose exec postgres psql -U apim apim_analytics"
+raw = true
+
+[tasks.open]
+description = "Print the urls of the console, the portal, the gateway and the dev idp"
+run = """
+echo "console   http://localhost:9000/backoffice/   (admin@otoroshi.io / password)"
+echo "portal    http://localhost:9000/default/"
+echo "admin api $APIM_URL/api   (Authorization: Bearer $APIM_TOKEN)"
+echo "otoroshi  http://otoroshi.oto.tools:8080   (admin@otoroshi.io / password)"
+echo "dev idp   http://oidc.oto.tools:8090/default/.well-known/openid-configuration"
+"""

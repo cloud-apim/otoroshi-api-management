@@ -17,11 +17,22 @@ the product, all in Docker.
 
 ## Start the stack
 
+With [mise](https://mise.jdx.dev/), which also installs Bun and Node:
+
+```bash
+mise trust && mise install
+mise run install               # dependencies of the product and of the documentation
+mise run up                    # builds the uis; starts postgres :5442, otoroshi :8080, echo backend,
+                               # dev OIDC provider, catalog source and the product :9000; waits for them
+mise run demo                  # demo apis, a gitops workspace with its remote catalog, the data exporter
+```
+
+`mise tasks` lists the other tasks (tests, ci, docs, logs, psql, cli…). Without mise:
+
 ```bash
 bun install
-bun run build                  # builds the console and the portal into dist/
-bun run infra:up               # postgres :5442, otoroshi :8080, echo backend, dev OIDC provider, catalog source
-docker compose -f docker/docker-compose.yml --profile apim up -d apim   # the product on :9000
+bun run build
+docker compose -f docker/docker-compose.yml --profile apim up -d
 ```
 
 The `apim` service runs your working copy with `bun --watch`: server changes reload by themselves,

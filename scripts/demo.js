@@ -1,0 +1,42 @@
+#!/usr/bin/env bun
+// Loads the demo data, idempotently (used by `mise run demo`):
+//  - examples/petstore.yaml in the default workspace, published and deployed
+//  - a gitops workspace with a remote catalog serving examples/catalog/apis.yaml, synchronised
+//  - the Otoroshi data exporter that feeds the ingester
+import { readFileSync } from 'node:fs';
+import YAML from 'yaml';
+
+const URL = (process.env.APIM_URL || 'http://localhost:9000').replace(/\/$/, '');
+const TOKEN = process.env.APIM_TOKEN || 'apim-admin-token';
+const CATALOG_URL = process.env.APIM_DEMO_CATALOG_URL || 'http://catalog.oto.tools/catalog/apis.yaml';
+
+async function call(method, path, body) {
+  const res = await fetch(`${URL}/api${path}`, {
+    method,
+    headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`${method} ${path}: ${res.status} ${data?.error || ''} ${data?.details?.errors?.map((e) => e.message).join(', ') || ''}`);
+  return data;
+}
+
+const petstore = YAML.parseAllDocuments(readFileSync(new globalThis.URL('../examples/petstore.yaml', import.meta.url), 'utf8')).map((d) => d.toJSON());
+const applied = await call('POST', '/workspaces/default/apply?publish=true&deploy=true&comment=demo', petstore);
+applied.forEach((r) => console.log(`default   api ${r.api.slug} ${r.api.version}: ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));
+
+const workspaces = await call('GET', '/workspaces');
+if (!workspaces.some((w) => w.slug === 'gitops')) {
+  await call('POST', '/workspaces', { name: 'GitOps', slug: 'gitops' });
+  console.log('gitops    workspace created');
+}
+const catalogs = await call('GET', '/workspaces/gitops/catalogs');
+const catalog =
+  catalogs.find((c) => c.url === CATALOG_URL) ||
+  (await call('POST', '/workspaces/gitops/catalogs', { name: 'platform catalog', kind: 'http', url: CATALOG_URL, mode: 'deploy', interval_seconds: 60 }));
+const sync = await call('POST', `/workspaces/gitops/catalogs/${catalog.id}/sync`, {});
+if (!sync.ok) console.log(`gitops    catalog sync: ${sync.error || 'see items'}`);
+sync.items.forEach((i) => console.log(`gitops    api ${i.slug} ${i.version}: ${i.action}${i.snapshot ? `, snapshot ${i.snapshot}` : ''}${i.deployment ? `, ${i.deployment}` : ''}${i.error ? ` (${i.error})` : ''}`));
+
+const exporter = await call('POST', '/gateway/exporter', {});
+console.log(`gateway   data exporter -> ${exporter.url}`);

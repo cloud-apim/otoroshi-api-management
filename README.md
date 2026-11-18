@@ -29,15 +29,20 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 
 ## Quick start
 
-Requirements: [Bun](https://bun.sh) 1.3, Docker, and an Otoroshi 18 jar (`../otoroshi.jar` by
-default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`).
+Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi 18
+jar (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`).
 
 ```sh
-bun install
-bun run build                      # backoffice + portal
-bun run infra:up                   # postgres, otoroshi 18 on :8080, an echo backend
-docker compose -f docker/docker-compose.yml --profile apim up -d apim   # the product on :9000
+mise trust && mise install
+mise run install                   # dependencies of the product and of the documentation
+mise run up                        # builds the uis, starts postgres, otoroshi 18, the product… and waits
+mise run demo                      # demo apis, a gitops workspace with its remote catalog, the data exporter
+mise run open                      # the urls and credentials
 ```
+
+`mise tasks` lists everything else: `test`, `test:unit`, `test:e2e`, `ci`, `watch`, `logs`,
+`docs:dev`, `screenshots`, `cli`, `psql`, `image`, `reset`… Without mise, the same steps are
+`bun install`, `bun run build` and `docker compose -f docker/docker-compose.yml --profile apim up -d`.
 
 - console: <http://localhost:9000/backoffice/> — `admin@otoroshi.io` / `password`
 - portal: <http://localhost:9000/default/>

@@ -6,14 +6,17 @@ behaviour, and do not reopen settled decisions.
 
 ## Commands
 
+Everything goes through mise (`mise.toml`, `mise tasks` to list):
+
 ```sh
-bun install
-bun run build                 # both UIs into dist/ (the server serves dist/, rebuild after web/ changes)
-bun run infra:up              # docker: postgres :5442, otoroshi 18 :8080, echo backend
-docker compose -f docker/docker-compose.yml --profile apim up -d apim   # product on :9000, bun --watch
-bun test                      # unit tests + the reference catalogue test (needs the docker stack; starts its own server on :9117)
-bun test test/model.test.js   # unit tests only
-APIM_TOKEN=apim-admin-token bun cli/apim.js help
+mise install && mise run install
+mise run up                   # build the uis, start the docker stack (postgres :5442, otoroshi :8080, the product :9000), wait
+mise run demo                 # idempotent demo data
+mise run watch                # rebuild the uis on change (the server serves dist/)
+mise run test                 # unit tests + the reference catalogue test (needs the stack; its own server on :9117)
+mise run test:unit            # no infrastructure
+mise run ci                   # check + build + test + docs:build
+mise run cli apis list default
 ```
 
 The `apim` container mounts the working copy and runs `bun --watch`: server changes reload by
