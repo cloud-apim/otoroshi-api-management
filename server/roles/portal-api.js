@@ -12,6 +12,7 @@ import { audit } from '../domain/audit.js';
 import { normalizeDraft } from '../domain/model.js';
 import { gatewaySettings, oto } from '../otoroshi/client.js';
 import YAML from 'yaml';
+import { listFields } from '../domain/metadata.js';
 
 const r = new Router();
 
@@ -126,6 +127,12 @@ r.get('/me', async ({ ctx }) => {
   return { user: identity.publicUser(ctx.user), role: ctx.role, teams };
 });
 
+// the typed fields the portal asks: the request form of a subscription, the application fields
+r.get('/metadata-fields', async ({ ctx }) => {
+  const fields = await listFields(ctx.workspace.id);
+  return fields.filter((f) => f.portal && ['subscription', 'application'].includes(f.scope)).map(({ workspace_id, ...f }) => f);
+});
+
 // ---------------------------------------------------------------- catalogue
 
 r.get('/apis', async ({ ctx, query }) => {
@@ -223,7 +230,7 @@ r.put('/applications/:app', async ({ ctx, params, body }) => {
   requireUser(ctx);
   const app = await applications.getApplication(ctx.workspace.id, params.app);
   await applications.requireSeeApplication(ctx, app);
-  return applications.updateApplication(ctx, app, { name: body.name, description: body.description, client_id: body.client_id, certificates: body.certificates });
+  return applications.updateApplication(ctx, app, { name: body.name, description: body.description, client_id: body.client_id, certificates: body.certificates, metadata: body.metadata });
 });
 
 r.delete('/applications/:app', async ({ ctx, params }) => {

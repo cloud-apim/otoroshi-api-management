@@ -14,6 +14,7 @@ import { currentDeployment, deployedSnapshot } from './deployments.js';
 import { aclAllows, isTeamMember, userAclTags } from './identity.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiSubscription } from '../otoroshi/projection.js';
+import { checkValues } from './metadata.js';
 
 export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
 
@@ -89,6 +90,8 @@ export async function requestSubscription(ctx, workspaceId, input) {
     and status = any(${'{' + OPEN_STATUSES.join(',') + '}'}::text[])`;
   if (dup.length) throw conflict('this application already has an open subscription to this plan');
 
+  // the request form of the plan: the subscription-scoped fields asked to the requester (D-18)
+  const metadata = await checkValues(workspaceId, 'subscription', input.metadata || {}, { only: (f) => f.portal });
   const paid = plan.pricing?.kind === 'paid';
   let status = plan.validation === 'manual' ? 'pending' : paid ? 'pending_payment' : 'active';
   const id = newId('sub');
@@ -101,10 +104,10 @@ export async function requestSubscription(ctx, workspaceId, input) {
     plan_name: plan.name,
   };
   const rows = await db`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, dates,
-      payment, projection, requested_by)
+      payment, projection, requested_by, metadata)
     values (${id}, ${workspaceId}, ${api.id}, ${plan.id}, ${app.id}, ${plan.auth.kind}, ${status}, ${request}, ${dates},
       ${paid ? { status: 'awaiting_payment', provider: plan.pricing.provider } : {}}, ${{ status: status === 'active' ? 'pending' : 'none' }},
-      ${ctx.user?.id || null}) returning *`;
+      ${ctx.user?.id || null}, ${metadata}) returning *`;
   await audit(ctx, {
     action: 'subscription.request',
     workspaceId,
@@ -286,6 +289,13 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
     throw e;
   }
 });
+
+export async function setSubscriptionMetadata(ctx, sub, values) {
+  const metadata = await checkValues(sub.workspace_id, 'subscription', { ...sub.metadata, ...values });
+  await db`update subscriptions set metadata = ${metadata}, updated_at = now() where id = ${sub.id}`;
+  await audit(ctx, { action: 'subscription.metadata', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `metadata of ${sub.id} updated` });
+  return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+}
 
 export async function resync(ctx, sub) {
   return enqueue('sync_subscription', { subscription_id: sub.id }, { dedupeKey: `sub:${sub.id}` });

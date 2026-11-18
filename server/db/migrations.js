@@ -298,6 +298,28 @@ create table policy_group_versions (
 );
 `,
   },
+  {
+    version: '0004_metadata_fields',
+    sql: `
+-- one metadata mechanism, the scope as a parameter (D-18): typed fields declared per workspace,
+-- values stored on each object, never projected on the gateway (D-2)
+create table metadata_fields (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  scope text not null, -- workspace | api | plan | subscription | application
+  key text not null,
+  label text not null,
+  type text not null default 'string', -- string | text | number | boolean | date | url | email | enum
+  options jsonb not null default '[]',
+  required boolean not null default false,
+  -- subscription scope: asked to the requester in the subscription form; application scope: editable on the portal
+  portal boolean not null default false,
+  help text not null default '',
+  position int not null default 0,
+  unique (workspace_id, scope, key)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

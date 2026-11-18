@@ -21,6 +21,7 @@ import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from 
 import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as policyGroups from '../domain/policyGroups.js';
+import * as metadata from '../domain/metadata.js';
 
 const r = new Router();
 
@@ -248,6 +249,7 @@ r.get('/workspaces/:ws', async ({ ctx, params }) => {
 
 r.put('/workspaces/:ws', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
+  if (body.metadata !== undefined) body.metadata = await metadata.checkValues(c.workspace.id, 'workspace', body.metadata);
   return identity.maskWorkspace(await identity.updateWorkspace(c, c.workspace, body));
 });
 
@@ -369,7 +371,7 @@ r.get('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
     base_url: await gatewayBaseUrl(draft),
     deployment: status,
     pending_changes: { hasChanges: pending.hasChanges, count: pending.changes?.length ?? null, base: pending.snapshot },
-    validation: validateDraft(draft),
+    validation: await apis.validateWithMetadata(c.workspace.id, draft),
     resolution_order: resolutionOrder(draft),
     versions,
     can_manage: await apis.canManageApi(c, api),
@@ -386,12 +388,12 @@ r.put('/workspaces/:ws/apis/:api/draft', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params, { manage: true });
   const updated = await apis.updateApi(c, api, { draft: body.draft || body, force: body.force });
-  return { draft: normalizeDraft(updated.draft), validation: validateDraft(updated.draft), resolution_order: resolutionOrder(updated.draft) };
+  return { draft: normalizeDraft(updated.draft), validation: await apis.validateWithMetadata(c.workspace.id, updated.draft), resolution_order: resolutionOrder(updated.draft) };
 });
 
 r.post('/workspaces/:ws/apis/:api/validate', async ({ ctx, params, body }) => {
-  await ws(ctx, params);
-  return validateDraft(body.draft || body);
+  const c = await ws(ctx, params);
+  return apis.validateWithMetadata(c.workspace.id, body.draft || body);
 });
 
 r.delete('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
@@ -619,6 +621,7 @@ r.post('/workspaces/:ws/subscriptions/:sub/close', subAction((c, s) => subscript
 r.post('/workspaces/:ws/subscriptions/:sub/transfer', subAction((c, s, b) => subscriptions.transferSubscription(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/resync', subAction((c, s) => subscriptions.resync(c, s)));
 r.post('/workspaces/:ws/subscriptions/:sub/payment', subAction((c, s, b) => subscriptions.confirmPayment(c, s, b)));
+r.put('/workspaces/:ws/subscriptions/:sub/metadata', subAction((c, s, b) => subscriptions.setSubscriptionMetadata(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/credentials/:cred/rotate', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   const sub = await subscriptions.getSubscription(c.workspace.id, params.sub);
@@ -726,6 +729,17 @@ r.get('/workspaces/:ws/export', async ({ ctx, params }) => {
 r.post('/workspaces/:ws/import', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   return importWorkspace(c, c.workspace, body);
+});
+
+// ---------------------------------------------------------------- typed metadata (D-18)
+
+r.get('/workspaces/:ws/metadata-fields', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params);
+  return metadata.listFields(c.workspace.id, query.get('scope'));
+});
+r.put('/workspaces/:ws/metadata-fields', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return metadata.saveFields(c, c.workspace.id, body.fields || body);
 });
 
 // ---------------------------------------------------------------- shared policy groups (D-16)

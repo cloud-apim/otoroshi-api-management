@@ -10,6 +10,7 @@ import { diff } from './diff.js';
 import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
+import { checkValues, listFields, validateValues } from './metadata.js';
 
 export function apiSummary(row) {
   if (!row) return null;
@@ -104,6 +105,7 @@ export async function updateApi(ctx, api, patch) {
     if (patch[k] !== undefined) next[k] = patch[k];
   });
   if (!VISIBILITIES.includes(next.visibility)) throw badRequest('invalid visibility');
+  if (patch.metadata !== undefined) next.metadata = await checkValues(api.workspace_id, 'api', patch.metadata);
   if (patch.draft) next.draft = normalizeDraft(patch.draft);
   const rows = await db`update apis set name = ${next.name}, description = ${next.description}, tags = ${next.tags},
       visibility = ${next.visibility}, acl = ${next.acl}, team_id = ${next.team_id}, metadata = ${next.metadata},
@@ -216,6 +218,18 @@ export async function composeDraft(api, { strict = false } = {}) {
   };
 }
 
+// the typed metadata of the plans (D-18) is checked with the rest of the draft
+export async function validateWithMetadata(workspaceId, draft) {
+  const v = validateDraft(draft);
+  const fields = await listFields(workspaceId, 'plan');
+  for (const p of normalizeDraft(draft).plans) {
+    const { errors } = validateValues(fields, p.metadata);
+    errors.forEach((e) => v.errors.push({ path: `plans[${p.name}].metadata.${e.key}`, message: `plan "${p.name}": ${e.message}` }));
+  }
+  v.ok = v.errors.length === 0;
+  return v;
+}
+
 export async function lastSnapshot(apiId) {
   const rows = await db`select * from api_snapshots where api_id = ${apiId} order by number desc limit 1`;
   return rows[0] || null;
@@ -243,7 +257,7 @@ export async function pendingChanges(api) {
 
 export async function publish(ctx, api, { comment = '' } = {}) {
   const content = await composeDraft(api, { strict: true });
-  const validation = validateDraft(content.draft);
+  const validation = await validateWithMetadata(api.workspace_id, content.draft);
   if (!validation.ok) throw badRequest('the draft has errors, it cannot be published', validation);
   const last = await lastSnapshot(api.id);
   if (last && diff(last.content, content).length === 0) throw conflict('nothing to publish: the draft is identical to the last snapshot');

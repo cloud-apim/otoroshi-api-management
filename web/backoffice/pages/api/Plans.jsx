@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, Tabs, useLoad } from '../../../shared/ui.jsx';
-import { api as rootApi } from '../../context.jsx';
+import { api as rootApi, useMetadataFields } from '../../context.jsx';
+import { MetadataForm } from '../../../shared/metadata.jsx';
 
 const rid = () => `plan_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 
@@ -137,6 +138,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
   const [p, setP] = useState(value);
   const [section, setSection] = useState('general');
   const refs = useLoad(() => rootApi.get('/gateway/references').catch(() => ({ jwtVerifiers: [], authModules: [], keyPairs: [] })), []);
+  const metaFields = useMetadataFields('plan');
   const set = (patch) => setP((x) => ({ ...x, ...patch }));
   const setIn = (key, patch) => setP((x) => ({ ...x, [key]: { ...x[key], ...patch } }));
   const setAuthConfig = (patch) => setP((x) => ({ ...x, auth: { ...x.auth, config: { ...x.auth.config, ...patch } } }));
@@ -189,6 +191,11 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           <Setting label="Plan plugins" help="a flow of this api added on top of the route's flow for the consumers of this plan (ApiPlanPlugins.flow_ref)">
             <Select value={p.flowRef || ''} onChange={(v) => set({ flowRef: v || null })} options={[{ value: '', label: 'none' }, ...draft.flows.map((f) => ({ value: f.id, label: f.name }))]} />
           </Setting>
+          {metaFields.length > 0 && (
+            <Setting label="Metadata" help="typed fields declared for the plans of this workspace — never projected (D-18)">
+              <MetadataForm fields={metaFields} values={p.metadata} onChange={(v) => set({ metadata: v })} />
+            </Setting>
+          )}
         </div>
       )}
       {section === 'access' && (

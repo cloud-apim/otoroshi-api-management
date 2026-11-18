@@ -6,6 +6,7 @@ import { db, newId } from '../db/index.js';
 import { badRequest, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { findTeam, isTeamMember } from './identity.js';
+import { checkValues } from './metadata.js';
 
 export async function listApplications(workspaceId, { userId = null, teamId = null } = {}) {
   return db`select a.*, t.name as team_name, t.personal as team_personal,
@@ -42,15 +43,19 @@ export async function createApplication(ctx, workspaceId, input) {
   if (!team) throw badRequest('unknown team');
   if (!(ctx.user?.is_admin || ctx.role === 'admin') && !(await isTeamMember(team.id, ctx.user.id)))
     throw forbidden('you are not a member of this team');
+  // a consumer only fills the fields the portal shows; the producer side fills the others later
+  const metadata = await checkValues(workspaceId, 'application', input.metadata || {}, { only: ctx.via === 'portal' ? (f) => f.portal : null, requireAll: ctx.via === 'portal' });
   const id = newId('app');
   const rows = await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by)
     values (${id}, ${workspaceId}, ${team.id}, ${input.name}, ${input.description || ''}, ${input.client_id || null},
-      ${input.certificates || []}, ${input.metadata || {}}, ${ctx.user?.id || null}) returning *`;
+      ${input.certificates || []}, ${metadata}, ${ctx.user?.id || null}) returning *`;
   await audit(ctx, { action: 'application.create', workspaceId, entityKind: 'application', entityId: id, summary: `application ${input.name} created` });
   return rows[0];
 }
 
 export async function updateApplication(ctx, app, patch) {
+  if (patch.metadata !== undefined)
+    patch = { ...patch, metadata: await checkValues(app.workspace_id, 'application', { ...app.metadata, ...patch.metadata }, { only: ctx.via === 'portal' ? (f) => f.portal : null }) };
   const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
       client_id = ${patch.client_id !== undefined ? patch.client_id || null : app.client_id},
       certificates = ${patch.certificates ?? app.certificates}, metadata = ${patch.metadata ?? app.metadata}, updated_at = now()

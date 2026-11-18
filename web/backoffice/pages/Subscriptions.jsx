@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, Link } from '../../shared/router.jsx';
 import { AUTH_LABELS, fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, DiffView, Drawer, Empty, Field, Icon, Loader, Secret, Select, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
-import { useWs } from '../context.jsx';
+import { useWs, useMetadataFields } from '../context.jsx';
+import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 
 export function SubscriptionsTable({ query = '', showApi = true, showApp = true, onChanged }) {
@@ -104,6 +105,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [transfer, setTransfer] = useState(null);
+  const metaFields = useMetadataFields('subscription');
+  const [meta, setMeta] = useState(null);
 
   const act = async (action, body = {}, label) => {
     setBusy(true);
@@ -182,6 +185,32 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                 </p>
               )}
             </div>
+
+            {metaFields.length > 0 && (
+              <div className="panel col gap-6">
+                <div className="label">Metadata</div>
+                <p className="faint small">The fields marked for the portal form the request form of the plans; the others are filled here.</p>
+                <MetadataForm fields={metaFields} values={meta || s.metadata} onChange={setMeta} />
+                {meta && (
+                  <button
+                    className="btn sm primary"
+                    style={{ alignSelf: 'flex-start' }}
+                    onClick={async () => {
+                      try {
+                        await wapi.put(`/subscriptions/${id}/metadata`, meta);
+                        setMeta(null);
+                        toast('Metadata saved');
+                        state.reload();
+                      } catch (e) {
+                        toast(errorMessage(e), 'error');
+                      }
+                    }}
+                  >
+                    Save metadata
+                  </button>
+                )}
+              </div>
+            )}
 
             {s.status === 'pending' && (
               <div className="card flat">

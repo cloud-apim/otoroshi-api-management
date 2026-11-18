@@ -10,7 +10,7 @@ import { DeploymentTab } from './Deployment.jsx';
 import { SubscriptionsTable } from '../Subscriptions.jsx';
 import { AnalyticsDashboard } from '../Observability.jsx';
 
-const IDENTITY = ['name', 'description', 'tags', 'visibility', 'acl', 'team_id'];
+const IDENTITY = ['name', 'description', 'tags', 'visibility', 'acl', 'team_id', 'metadata'];
 
 function pick(obj, keys) {
   return Object.fromEntries(keys.map((k) => [k, obj[k]]));

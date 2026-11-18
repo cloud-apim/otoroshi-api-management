@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { fmtRelative } from '../../shared/lib.js';
 import { Empty, Field, Icon, Input, Loader, Modal, Select, Setting, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
-import { useWs } from '../context.jsx';
+import { useWs, useMetadataFields } from '../context.jsx';
+import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { SubscriptionsTable } from './Subscriptions.jsx';
 import { AnalyticsDashboard } from './Observability.jsx';
@@ -130,6 +131,7 @@ export function ApplicationPage({ id }) {
   const toast = useToast();
   const confirm = useConfirm();
   const state = useLoad(() => wapi.get(`/applications/${id}`), [id]);
+  const metaFields = useMetadataFields('application');
   const [form, setForm] = useState(null);
   const [tab, setTab] = useState('subscriptions');
   return (
@@ -162,6 +164,11 @@ export function ApplicationPage({ id }) {
                     <Setting label="Expected client_id" help="On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application (D-26).">
                       <Input value={f.client_id || ''} onChange={set('client_id')} mono />
                     </Setting>
+                    {metaFields.length > 0 && (
+                      <Setting label="Metadata" help="typed fields of the workspace's applications (D-18); the ones marked for the portal are filled by the consumer">
+                        <MetadataForm fields={metaFields} values={f.metadata} onChange={set('metadata')} />
+                      </Setting>
+                    )}
                     <Setting label="Client certificates" help="PEM, one per entry, for mtls plans">
                       <TextArea value={(f.certificates || []).join('\n-----\n')} onChange={(v) => set('certificates')(v ? v.split('\n-----\n') : [])} mono rows={4} />
                     </Setting>

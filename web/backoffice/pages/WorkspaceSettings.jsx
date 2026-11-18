@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, Field, Icon, Input, Loader, Markdown, Modal, Select, Setting, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
-import { useWs } from '../context.jsx';
+import { useWs, useMetadataFields } from '../context.jsx';
+import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 
 function General() {
@@ -313,6 +314,188 @@ function TeamMembers({ id, onClose }) {
   );
 }
 
+// D-18: one metadata mechanism, the scope as a parameter — same model, same screen, same api
+const SCOPES = [
+  ['workspace', 'Workspace'],
+  ['api', 'API'],
+  ['plan', 'Plan'],
+  ['subscription', 'Subscription'],
+  ['application', 'Application'],
+];
+const TYPES = ['string', 'text', 'number', 'boolean', 'date', 'url', 'email', 'enum'];
+
+function MetadataSettings() {
+  const { wapi, slug, ws, session } = useWs();
+  const toast = useToast();
+  const state = useLoad(() => wapi.get('/metadata-fields'), [slug]);
+  const wsFields = useMetadataFields('workspace');
+  const [fields, setFields] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [values, setValues] = useState(null);
+  return (
+    <Loader state={state}>
+      {(stored) => {
+        const list = fields || stored;
+        const save = async () => {
+          try {
+            await wapi.put('/metadata-fields', { fields: list });
+            setFields(null);
+            toast('Metadata fields saved');
+            state.reload();
+          } catch (e) {
+            toast(errorMessage(e), 'error');
+          }
+        };
+        return (
+          <div className="col gap-16">
+            <Callout kind="info">
+              Typed key/values attached to an object, wherever the model cannot foresee everything. They serve display, notifications and the review of requests, and are never projected on the gateway.
+              On the subscription scope, the fields marked <b>portal</b> form the request form of every plan.
+            </Callout>
+            <div className="card">
+              <div className="card-head">
+                <h3 className="grow">Fields</h3>
+                <button className="btn sm" onClick={() => setEditing({ scope: 'subscription', key: '', label: '', type: 'string', options: [], required: false, portal: false, help: '', _new: true })}>
+                  <Icon name="plus" /> Add field
+                </button>
+              </div>
+              {list.length ? (
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Scope</th>
+                        <th>Key</th>
+                        <th>Label</th>
+                        <th>Type</th>
+                        <th>Flags</th>
+                        <th />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.map((f, i) => (
+                        <tr key={`${f.scope}:${f.key}`}>
+                          <td>
+                            <Badge>{f.scope}</Badge>
+                          </td>
+                          <td className="mono small">{f.key}</td>
+                          <td>{f.label}</td>
+                          <td className="small">{f.type === 'enum' ? `enum (${f.options.join(', ')})` : f.type}</td>
+                          <td className="small">
+                            {f.required && <Badge kind="warning">required</Badge>} {f.portal && <Badge kind="accent">portal</Badge>}
+                          </td>
+                          <td className="actions">
+                            <button className="btn ghost sm icon" onClick={() => setEditing({ ...f, _index: i })} aria-label="edit">
+                              <Icon name="edit" />
+                            </button>
+                            <button className="btn ghost sm icon" onClick={() => setFields(list.filter((_, j) => j !== i))} aria-label="remove">
+                              <Icon name="trash" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="card-body muted small">No field declared.</div>
+              )}
+              {fields && (
+                <div className="card-body row" style={{ borderTop: '1px solid var(--border)' }}>
+                  <button className="btn primary sm" onClick={save}>
+                    Save fields
+                  </button>
+                  <button className="btn sm" onClick={() => setFields(null)}>
+                    Discard
+                  </button>
+                </div>
+              )}
+            </div>
+            {wsFields.length > 0 && (
+              <div className="card">
+                <div className="card-head">
+                  <h3>Values of this workspace</h3>
+                </div>
+                <div className="card-body col">
+                  <MetadataForm fields={wsFields} values={values || ws.metadata} onChange={setValues} />
+                  <button
+                    className="btn primary"
+                    style={{ alignSelf: 'flex-start' }}
+                    disabled={!values}
+                    onClick={async () => {
+                      try {
+                        await wapi.put('', { metadata: values });
+                        setValues(null);
+                        toast('Saved');
+                        session.reload();
+                      } catch (e) {
+                        toast(errorMessage(e), 'error');
+                      }
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+            {editing && (
+              <Modal
+                title={editing._new ? 'New field' : `Field ${editing.key}`}
+                onClose={() => setEditing(null)}
+                footer={
+                  <button
+                    className="btn primary"
+                    disabled={!editing.key}
+                    onClick={() => {
+                      const { _new, _index, ...f } = editing;
+                      const clean = { ...f, label: f.label || f.key, options: f.type === 'enum' ? f.options : [] };
+                      setFields(_new ? [...list, clean] : list.map((x, j) => (j === _index ? clean : x)));
+                      setEditing(null);
+                    }}
+                  >
+                    Apply
+                  </button>
+                }
+              >
+                <div className="grid-2">
+                  <Field label="Scope">
+                    <Select value={editing.scope} onChange={(v) => setEditing({ ...editing, scope: v })} options={SCOPES.map(([value, label]) => ({ value, label }))} />
+                  </Field>
+                  <Field label="Type">
+                    <Select value={editing.type} onChange={(v) => setEditing({ ...editing, type: v })} options={TYPES} />
+                  </Field>
+                </div>
+                <div className="grid-2">
+                  <Field label="Key" hint="lowercase, stable: it is what the api and the exports carry">
+                    <Input value={editing.key} onChange={(v) => setEditing({ ...editing, key: v })} mono />
+                  </Field>
+                  <Field label="Label">
+                    <Input value={editing.label} onChange={(v) => setEditing({ ...editing, label: v })} />
+                  </Field>
+                </div>
+                {editing.type === 'enum' && (
+                  <Field label="Options">
+                    <TagsInput value={editing.options} onChange={(v) => setEditing({ ...editing, options: v })} />
+                  </Field>
+                )}
+                <Field label="Help">
+                  <Input value={editing.help} onChange={(v) => setEditing({ ...editing, help: v })} />
+                </Field>
+                <div className="row gap-24">
+                  <Switch checked={editing.required} onChange={(v) => setEditing({ ...editing, required: v })} label="Required" />
+                  {['subscription', 'application'].includes(editing.scope) && (
+                    <Switch checked={editing.portal} onChange={(v) => setEditing({ ...editing, portal: v })} label={editing.scope === 'subscription' ? 'Asked in the request form' : 'Filled by the consumer'} />
+                  )}
+                </div>
+              </Modal>
+            )}
+          </div>
+        );
+      }}
+    </Loader>
+  );
+}
+
 // PX-07: a complete export, re-importable elsewhere
 function Exchange() {
   const { wapi, slug } = useWs();
@@ -376,7 +559,7 @@ function Exchange() {
 export function WorkspaceSettingsPage({ tab }) {
   const { slug, ws } = useWs();
   const { navigate } = useRouter();
-  const tabs = ['general', 'portal', 'members', 'teams', 'export'];
+  const tabs = ['general', 'portal', 'members', 'teams', 'metadata', 'export'];
   return (
     <div className="page">
       <PageHead title="Workspace settings" sub={ws.name} />
@@ -391,6 +574,7 @@ export function WorkspaceSettingsPage({ tab }) {
       {tab === 'portal' && <Portal />}
       {tab === 'members' && <Members />}
       {tab === 'teams' && <Teams />}
+      {tab === 'metadata' && <MetadataSettings />}
       {tab === 'export' && <Exchange />}
     </div>
   );

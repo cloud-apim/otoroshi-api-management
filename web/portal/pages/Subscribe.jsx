@@ -4,6 +4,7 @@ import { Callout, Field, Input, Modal, Secret, Select, TextArea, errorMessage, u
 import { api } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { authLabel } from '../common.jsx';
+import { MetadataForm } from '../../shared/metadata.jsx';
 
 const TOKEN_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
 
@@ -29,6 +30,12 @@ export function SubscribeModal({ api: a, plan, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // { sub, app, creds }
+  // the request form of the plans: subscription fields the workspace asks requesters (D-18)
+  const [formFields, setFormFields] = useState([]);
+  const [answers, setAnswers] = useState({});
+  useEffect(() => {
+    api.get('/metadata-fields').then((f) => setFormFields(f.filter((x) => x.scope === 'subscription'))).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (apps.data && !appId) setAppId(apps.data[0]?.id || '__new__');
@@ -43,7 +50,8 @@ export function SubscribeModal({ api: a, plan, onClose }) {
     (isNew ? newName.trim() : !!appId) &&
     (!needsClientId || clientId.trim()) &&
     (!usageRequired || usage.trim()) &&
-    (!plan.terms || terms);
+    (!plan.terms || terms) &&
+    formFields.every((f) => !f.required || (answers[f.key] !== undefined && answers[f.key] !== ''));
 
   const submit = async (e) => {
     e.preventDefault();
@@ -53,7 +61,7 @@ export function SubscribeModal({ api: a, plan, onClose }) {
       let app = selected;
       if (isNew) app = await api.post('/applications', { name: newName.trim(), client_id: needsClientId ? clientId.trim() : undefined });
       else if (needsClientId) app = await api.put(`/applications/${app.id}`, { client_id: clientId.trim() });
-      const sub = await api.post('/subscriptions', { api_id: a.id, plan_id: plan.id, application_id: app.id, usage, terms_accepted: terms });
+      const sub = await api.post('/subscriptions', { api_id: a.id, plan_id: plan.id, application_id: app.id, usage, terms_accepted: terms, metadata: answers });
       let creds = [];
       if (sub.status === 'active' && !TOKEN_KINDS.includes(sub.auth_kind) && sub.auth_kind !== 'keyless') creds = (await credentialsFor(app.id, sub.id)).creds;
       setResult({ sub, app, creds });
@@ -184,6 +192,7 @@ export function SubscribeModal({ api: a, plan, onClose }) {
               <TextArea value={usage} onChange={setUsage} rows={4} aria-label={t('sub.usage')} required={usageRequired} />
             </Field>
           )}
+          {formFields.length > 0 && <MetadataForm fields={formFields} values={answers} onChange={setAnswers} />}
           {plan.terms && (
             <label className="checkbox">
               <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />

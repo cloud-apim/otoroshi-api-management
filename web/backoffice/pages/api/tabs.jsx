@@ -5,7 +5,8 @@ import {
   Badge, Callout, Code, Empty, Field, Icon, Input, JsonBlock, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
   errorMessage, useConfirm, useLoad, useToast,
 } from '../../../shared/ui.jsx';
-import { api as rootApi, useWs } from '../../context.jsx';
+import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
+import { MetadataForm } from '../../../shared/metadata.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const rid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -649,6 +650,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
   const toast = useToast();
   const confirm = useConfirm();
   const teams = useLoad(() => wapi.get('/teams'), [slug]);
+  const metaFields = useMetadataFields('api');
   const projection = useLoad(() => wapi.get(`/apis/${api.id}/projection`), [api.id]);
   const [version, setVersion] = useState('');
   const lifecycle = async (l) => {
@@ -689,6 +691,11 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
             />
             {identity.visibility === 'restricted' && <TagsInput value={identity.acl} onChange={(v) => setIdent({ acl: v })} placeholder="user:jane@corp.com, team:<id>, role:producer" />}
           </Setting>
+          {metaFields.length > 0 && (
+            <Setting label="Metadata" help="typed fields declared for the workspace's apis — never projected on the gateway (D-18)">
+              <MetadataForm fields={metaFields} values={identity.metadata} onChange={(v) => setIdent({ metadata: v })} disabled={readOnly} />
+            </Setting>
+          )}
           <Setting label="Gateway capture" help="Otoroshi settings of the projected api">
             <Switch checked={draft.settings.capture} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, capture: v } }))} label="Capture request/response bodies" disabled={readOnly} />
             <Switch checked={draft.settings.debugFlow} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, debugFlow: v } }))} label="Debug flow" disabled={readOnly} />
