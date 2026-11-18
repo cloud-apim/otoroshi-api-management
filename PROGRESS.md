@@ -1,113 +1,217 @@
-# Avancement du prototype
+# Progress
 
-Où en est l'implémentation de [`otoroshi-api-management-specs`](../otoroshi-api-management-specs),
-décision par décision, ce qui est en cours, et ce qui vient ensuite. **Tenu à jour à chaque commit.**
+Where the implementation of [`otoroshi-api-management-specs`](../otoroshi-api-management-specs)
+stands, decision by decision, and **what remains to implement against the spec**.
+**Kept up to date with every commit.**
 
-Légende : ✅ fait et vérifié · 🟡 partiel · ⬜ à faire · ➖ sans objet / hors MVP
+Legend: ✅ done and verified · 🟡 partial · ⬜ to do · ➖ not applicable / out of the MVP
+Sizes: **S** a few hours · **M** one or two days · **L** several days.
 
-Dernière mise à jour : 18/11/2026.
-
----
-
-## En cours
-
-- Rien : prochaine entrée de la liste ci-dessous.
-
-## Suite, dans l'ordre proposé
-
-1. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
-2. Console en français (le portail l'est déjà).
-3. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
-4. Notifications hors application (e-mail, webhook) — les notifications in-app existent ; le canal n'est pas tranché dans le spec.
-5. **D-28** : CRDs Kubernetes et chart Helm.
-6. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
-7. **Q-8** : rétention et échantillonnage du chemin brut.
-8. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
-
-## Points connus
-
-- **Push bloqué** depuis le redémarrage : la clé SSH n'est plus chargée (`ssh-add`). Les commits s'accumulent en local.
-- Données de démo : le workspace `default` déclare un champ de plan `sla` obligatoire (démonstration de D-18) ; les plans de Books et Petstore l'ont renseigné.
+Last update: 2026-11-18.
 
 ---
 
-## Décisions du spec
+## Now
 
-| Décision | État | Où / comment c'est vérifié |
+- Nothing in progress: the next item is the first one of the order below.
+
+## Next, in the proposed order
+
+1. **R-1** — derived certificates and auth modules (D-15).
+2. **R-2** — the "product down, traffic flows" test (D-4, D-9 n°4).
+3. **R-3** — hostname exposure of the portals, redirects, mono-tenant (D-20).
+4. **R-4** — promotion of a snapshot to the next installation (D-37).
+5. **R-5** — console in French (D-11).
+6. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
+7. **R-7** — Stripe connector (D-36, Q-12).
+8. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+
+The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
+
+## Known issues
+
+- **Push blocked** since the machine restarted: the ssh key is not loaded (`ssh-add`). Commits pile up locally.
+- Demo data: the `default` workspace declares a required plan metadata field `sla` (a D-18 demonstration); the plans of Books and Petstore fill it.
+
+---
+
+## What remains to implement
+
+Everything below is grounded in the spec (`specs.alive.md`, decisions `D-n`, open questions `Q-n`,
+§8 "not yet drafted") or in the owner's notes (`specs.owner-locked.md`). Items that depend on a
+fix in Otoroshi cite the gap (`G-n`, see [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md)): the product
+waits for the data plane rather than working around it.
+
+### Model and projection
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-1 | D-15, D-14 | Derive and reconcile the **certificates** (trusted CAs of mTLS plans, client certificates of applications) and the **auth modules** (oauth2-remote plans), as is done for JWT verifiers | M | |
+| R-9 | D-15, Q-6 | The **object-by-object inventory** of Otoroshi entities: derived from the api description, or infrastructure consumed as is — a written table checked against the Otoroshi source | S | |
+| R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
+| R-11 | D-26, D-15 | Project the **client certificates** of an application (stored today, not projected) so that an mtls plan recognises them | M | R-1 |
+| R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for Atlas and its archive, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
+| R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
+| R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
+| R-15 | D-6, G-4 | Require a **subscription on jwt / mtls / oauth2-remote / keyless plans** — today any valid token passes | — | G-4 |
+| R-16 | G-13 | Keep the consumers of a **deprecated plan** served (only published plans get an extractor) | — | G-13 |
+| R-17 | §5 | **Adopt mode**, second half: take over the existing subscriptions and apikeys of an adopted Api, not only its description | M | |
+| R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
+
+### Developer portal
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-3 | D-20 | **Hostname exposure** (`<workspace>.<domain>`): coded, never run; **redirects** from the old url form when the pattern changes; in **mono-tenant**, no prefix and no selector at all | M | |
+| R-19 | §8, owner notes | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
+| R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
+| R-21 | §8 | **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
+| R-22 | D-11, D-18 | Metadata field **labels and help in several languages** (one language today) | S | |
+| R-23 | D-17 | The portal try-it is Scalar's; D-17 wants **one composer** for both faces — use the shared composer on the portal for apis without an OpenAPI specification | S | |
+
+### Console
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-5 | D-11, PX-05 | The console **in French** (the portal is en/fr) — the strings are not extracted yet | M | |
+| R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
+| R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
+| R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
+
+### Industrialisation (GitOps, environments, operations)
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-4 | D-37, D-35 | **Promotion**: publish the same immutable snapshot on the next installation (recette → production), with its diff and dry-run, through the export and the CLI | M | |
+| R-6 | D-28, owner notes | **Kubernetes**: deployment manifests and a Helm chart; **CRDs** for the product's own entities (Api document, applications, subscriptions) with a controller | L | |
+| R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
+| R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
+| R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
+| R-30 | §3 | Run the roles **split across instances** (ingester alone, portal alone…) and with several instances of a role — the task queue claims atomically, never tested | S | |
+
+### Analytics and audit
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-8 | D-33, Q-8 | **Raw path**: retention, sampling, lightening policy; **pseudonymisation** of personal data (ip, email, identifiers); what the computed path aggregates and at which granularity (rollups) | M | or upstream in the exporters (OTO-6) |
+| R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
+| R-32 | §8 | A **correlation id** carried beyond the gateway, to follow a request through the backends | S | |
+| R-33 | §8, G-7 | Tie Otoroshi's deployment history to the product snapshot from the gateway side | — | G-7 |
+
+### Monetisation
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-7 | D-36, Q-12 | A **payment connector** behind a narrow interface, Stripe Checkout first: checkout session, idempotent signed webhooks (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` → grace → suspension, `customer.subscription.deleted`), periodic reconciliation with the provider, customer portal link — a test connector stands in today | L | |
+| R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
+| R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
+
+### Robustness and security
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-2 | D-4, D-9 n°4 | An executable test that **traffic flows while the product is down**, and that **uninstalling leaves a working Otoroshi configuration** | S | |
+| R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
+| R-37 | PX-05 | An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
+| R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
+| R-39 | D-25 | Test the **Otoroshi authentication mode** end to end behind a real route with an auth module (unit-tested only) | S | |
+
+### Out of the MVP, by decision (kept for later)
+
+| # | Spec | Item |
 |---|---|---|
-| D-1 l'entité `Api` d'Otoroshi | ✅ | `server/otoroshi/projection.js` ; test L0 |
-| D-2 synchronisation sélective | ✅ | doc, CGU, usage, prix, métadonnées jamais projetés ; `test/model.test.js` |
-| D-3 l'API créée de bout en bout, routes comprises | ✅ | ressources → routes, backends, flows |
-| D-4 jamais dans le chemin de requête | ✅ | file de tâches rejouable `server/domain/tasks.js` ; souscription en attente tant que l'API n'est pas déployée |
-| D-5 la policy vit dans le plan | ✅ | éditeur de plan ; limites et filtrage projetés sur le plan |
-| D-6 une souscription est une apikey | ✅ | `apiRef` + `id_ref` vérifiés sur la gateway — limites : G-1, G-4 |
+| — | D-32 | AI and MCP apis as product types (the events are captured from day one) |
+| — | D-32, D-34 | Event-driven apis — needs per-message events in the event-brokers extension first |
+| — | D-32, Q-7 | Api scoring, quality review before publication |
+
+---
+
+## Status by spec decision
+
+| Decision | Status | Where / how it is verified |
+|---|---|---|
+| D-1 Otoroshi's `Api` entity | ✅ | `server/otoroshi/projection.js`; L0 test |
+| D-2 selective synchronisation | ✅ | docs, terms, usage statements, pricing, metadata never projected; `test/model.test.js` |
+| D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows |
+| D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; a subscription waits until its api is deployed — explicit "product down" test: R-2 |
+| D-5 the policy lives in the plan | ✅ | plan editor; limits and filtering projected on the plan |
+| D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4 |
 | D-8 PostgreSQL ×2 | ✅ | `server/db/migrations.js` |
-| D-9 n°1 tout ce que fait l'UI passe par l'API | ✅ | même routeur sur `/api` et `/backoffice/api` |
-| D-9 n°2 échappatoire vers l'entité projetée | ✅ | « Technical details », lien vers le backoffice Otoroshi |
-| D-9 n°3 rien d'essentiel masqué | ✅ | avertissements : routes ouvertes, tout jeton passe, attributs non appliqués, ordre de résolution |
-| D-9 n°4 réversibilité | 🟡 | export / import ✅ ; « désinstaller laisse une conf qui tourne » non testé |
+| D-9 n°1 everything the UI does goes through the API | ✅ | the same router on `/api` and `/backoffice/api` |
+| D-9 n°2 escape hatch to the projected entity | ✅ | "Technical details", link to the Otoroshi backoffice |
+| D-9 n°3 nothing essential hidden | ✅ | warnings: open routes, any token passes, attributes not enforced, deprecated plans, resolution order |
+| D-9 n°4 reversibility | 🟡 | export / import ✅; uninstall leaves a working configuration: R-2 |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
-| D-10 WAF dans l'extension | 🟡 | posable comme plugin dans un flow ou un groupe ; pas d'écran dédié |
-| D-11 i18n | 🟡 | doc multilingue ✅, portail en/fr ✅, console en anglais seulement, libellés des champs de métadonnées dans une seule langue |
-| D-12 clair / sombre / système | ✅ | console et portail |
-| D-14 plus besoin d'ouvrir Otoroshi | 🟡 | APIM complet ; reste D-15 pour les certificats et modules d'auth |
-| D-15 objets dérivés (certificats, modules d'auth, JWT verifiers) | 🟡 | JWT verifiers ✅ dérivés de la description du plan (JWKS ou HMAC, iss, aud), marqués, inclus dans le diff de déploiement et le drift, supprimés avec l'API — test L0 ; certificats et modules d'auth ⬜ |
-| D-16 compositions nommées | 🟡 | groupes de policies ✅ (versions figées, montée de version) ; resources et dictionnaires ⬜ |
-| D-17 try-it | 🟡 | portail (Scalar + proxy) ✅ ; console ✅ sans la trace des policies (G-12) |
-| D-18 métadonnées typées, une seule mécanique | ✅ | 5 portées, formulaire de demande, blocage de publication |
-| D-19 workspace + teams, utilisateurs globaux | ✅ | un admin ne voit que les membres de ses workspaces |
-| D-20 un portail par workspace, résolu par l'URL | 🟡 | par chemin ✅ ; par nom d'hôte codé, non testé ; redirections ⬜ |
-| D-22 état décrit / état déployé, diff avant d'agir | ✅ | dry-run systématique avant déploiement |
-| D-24 location `default` + marquage de propriété | ✅ | |
-| D-25 authentification | ✅ | OIDC console et portail vérifiés (IdP de dev) ; mode Otoroshi testé en unitaire |
-| D-26 application, `client_id` attendu, `id_ref` | 🟡 | ✅ ; certificats clients stockés mais pas projetés |
-| D-27 navigation de la console | ✅ | état de la gateway en bas de la sidebar (emplacement que D-37 laissait ouvert : proposition) |
-| D-28 administrable par programme | 🟡 | API ✅, CLI ✅, catalogues distants http/git ✅, CRDs ⬜ |
-| D-29 une version est une nouvelle API | ✅ | |
-| D-30 transfert vers un plan équivalent | ✅ | même clé, même historique ; un transfert qui dégrade (débit, quotas, prix, CGU, ressources) attend l'accord du consommateur ; le consommateur demande, le producteur applique ; notifications in-app des deux côtés |
-| D-31 pas de quota agrégé | ✅ | |
-| D-32 périmètre MVP, événements captés | 🟡 | GatewayEvent vérifié en réel ; LLMUsageAudit et McpAudit codés, non testés avec de vrais événements |
-| D-33 deux chemins de stockage | 🟡 | calculé + brut avec masquage ✅ ; rétention / échantillonnage ⬜ (Q-8) |
-| D-35 brouillon → snapshot immuable | ✅ | rollback = redéployer un snapshot |
-| D-36 prêt pour la monétisation | 🟡 | schéma ✅, connecteur de test ✅, Stripe ⬜ (Q-12 ouverte) |
-| D-37 une installation, un cluster | ✅ | |
-| D-38 projection par écriture marquée catalogue | ✅ | historique de déploiement côté Otoroshi |
-| D-39 CSS écrit à la main | ✅ | palette des graphiques validée |
-| D-41 unité de mesure du plan | ✅ | tokens / budget refusés sans backend LLM |
-| D-42 Scalar embarqué derrière un proxy | ✅ | |
-| ➖ D-7, D-21, D-23 (remplacées), D-13, D-34, D-40 | ➖ | |
+| D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
+| D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅; console in English: R-5; metadata labels: R-22 |
+| D-12 light / dark / system | ✅ | console and portal |
+| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules: R-1 |
+| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — L0 test; certificates and auth modules: R-1; inventory: R-9 |
+| D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
+| D-17 try-it | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
+| D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
+| D-19 workspace + teams, global users | ✅ | an admin only sees the members of its workspaces |
+| D-20 one portal per workspace, resolved from the url | 🟡 | path exposure ✅; hostname, redirects, mono-tenant: R-3 |
+| D-22 described / deployed state, diff before acting | ✅ | dry-run before every deployment |
+| D-24 `default` location + ownership marking | ✅ | |
+| D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; Otoroshi mode unit-tested: R-39 |
+| D-26 application, expected `client_id`, `id_ref` | 🟡 | ✅; client certificates stored but not projected: R-11 |
+| D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37: R-26) |
+| D-28 administrable by program | 🟡 | admin API ✅, CLI ✅, remote catalogs http/git ✅; CRDs and Kubernetes: R-6; object store: R-27 |
+| D-29 a version is a new api | ✅ | |
+| D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications |
+| D-31 no aggregated quota | ✅ | multi-api credential: R-12 |
+| D-32 MVP scope, captured events | 🟡 | GatewayEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
+| D-33 two storage paths | 🟡 | computed + raw with url masking ✅; retention, sampling, pseudonymisation: R-8 |
+| D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
+| D-36 ready for monetisation | 🟡 | schema ✅, test connector ✅; Stripe: R-7, usage billing: R-34 |
+| D-37 one installation, one cluster | ✅ | promotion to the next installation: R-4 |
+| D-38 catalog-marked projection | ✅ | Otoroshi records each deployment |
+| D-39 hand-written CSS | ✅ | chart palette validated |
+| D-41 unit of measure of a plan | ✅ | tokens / budget refused without an LLM backend; projection: R-18 |
+| D-42 Scalar bundled behind a proxy | ✅ | |
+| ➖ D-7, D-21, D-23 (replaced), D-13, D-34, D-40 | ➖ | |
 
-## Règles de la frontière de synchronisation (spec §5)
+## Synchronisation boundary rules (spec §5)
 
-| Règle | État |
+| Rule | Status |
 |---|---|
-| Projection idempotente et rejouable | ✅ |
-| Propriété explicite (marqueur, `managed_by`) | ✅ |
-| Détection de drift (API et clés), lisible | ✅ |
-| Mode adopt | 🟡 l'API est reprise sans être écrasée ; ses souscriptions existantes ne le sont pas |
-| Dry-run avant projection de masse | ✅ déploiement et synchro de catalogue |
+| Idempotent, replayable projection | ✅ |
+| Explicit ownership (marker, `managed_by`) | ✅ |
+| Drift detection (apis, keys, derived objects), readable | ✅ |
+| Adopt mode | 🟡 the api is taken over without being overwritten; its subscriptions are not: R-17 |
+| Dry-run before a mass projection | ✅ deployments and catalog syncs |
 
-## §8 du spec, pas encore instruit
+## Spec §8, not yet drafted in the spec
 
-| Sujet | État |
+| Topic | Status |
 |---|---|
-| Template de portail par défaut | ✅ ; templates utilisateur ⬜ |
-| Analytics et restitution | ✅ attribution à l'ingestion, tableaux de bord console et portail |
-| Journal d'audit, modifications et consultations | ✅ ; export vers webhooks ✅ (curseur, au moins une fois, rattrapage vérifié après coupure) |
-| Le catalogue comme système de découverte | 🟡 recherche et tags ; catégories et mise en avant ⬜ |
-| Dynamic client registration auprès de l'IdP | ⬜ |
-| Historique de déploiement relié au snapshot | 🟡 via les métadonnées de l'`Api` (G-7) |
+| Default portal template | ✅; customer templates: R-19 |
+| Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; correlation id: R-32 |
+| Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
+| The catalogue as a discovery system | 🟡 search and tags: R-20 |
+| IdP integration beyond validation | ⬜ R-21 |
+| Deployment history tied to the snapshot | 🟡 through the `Api` metadata: R-33 |
 
-## Critère de sortie de L0
+## Open questions of the spec
 
-✅ `test/reference-catalogue.test.js` : catalogue Atlas (6 plans, 5 mécanismes d'auth, 4 modes d'approbation, une API, un seul jeu de routes) projeté sur Otoroshi 18.0.1, réconcilié, drift détecté puis réparé — y compris le JWT verifier dérivé du plan Partner. 14 tests, stables.
+| Question | Status |
+|---|---|
+| Q-6 inventory of D-15 | ⬜ R-9 |
+| Q-8 computed path content, raw path lightening | 🟡 boundary implemented; content and retention: R-8 |
+| Q-11 declarative format | 🟡 implemented, to validate: R-28 |
+| Q-12 monetisation | ⬜ owner decision: R-35; connector: R-7 |
+
+## L0 exit criterion
+
+✅ `test/reference-catalogue.test.js`: the Atlas catalogue (6 plans, 5 auth mechanisms, 4 approval modes, one api, one set of routes) projected on Otoroshi 18.0.1, reconciled, drift detected then repaired — including the JWT verifier derived from the Partner plan. 14 tests, stable; the test leaves nothing behind.
 
 ## Documentation
 
-✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 20 pages, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
+✅ Docusaurus site in `documentation/` (the same base as the other extensions: local search, dark by default), 20 pages, built with no broken link; `doc.sh` publishes it into `./docs` for GitHub Pages.
 
-✅ **Visite des écrans** (`documentation/docs/screens.mdx`) : 80 captures de chaque écran de la console et du portail, tiroirs, modales et menus compris, clair et sombre, anglais et français, dans `documentation/static/img/screens/`. Elles sont produites par `bun run screenshots` (Chromium headless), qui régénère aussi la page : à relancer après chaque changement d'interface.
+✅ **Screens tour** (`documentation/docs/screens.mdx`): 80 captures of every screen of the console and the portal, drawers, modals and menus included, light and dark, English and French, in `documentation/static/img/screens/`. Produced by `bun run screenshots` (headless Chromium), which also regenerates the page: run it again after every change of the interface.
 
-## Manques côté Otoroshi
+## Otoroshi gaps
 
-Consignés au fil de l'eau dans [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 à G-14), pour correction dans le plan de données.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-14), to be fixed in the data plane.
