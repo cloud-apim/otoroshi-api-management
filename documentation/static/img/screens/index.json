@@ -16,8 +16,8 @@
     "title": "The workspace selector opens the sidebar"
   },
   {
-    "file": "console-notifications.png",
-    "title": "Notifications of the producers"
+    "file": "console-user-menu.png",
+    "title": "The menu of the person signed in — notifications (with their indicator), theme, tokens, sign out"
   },
   {
     "file": "console-apis.png",

@@ -140,8 +140,10 @@ async function consoleTour(page) {
   await shot(page, 'console-workspace-selector', 'The workspace selector opens the sidebar', { full: false });
   await page.keyboard.press('Escape');
   await go(page, W);
-  await click(page, 'notifications');
-  await shot(page, 'console-notifications', 'Notifications of the producers', { full: false });
+  await click(page, 'user menu', { selector: 'button[aria-haspopup=menu]' });
+  await shot(page, 'console-user-menu', 'The menu of the person signed in — notifications (with their indicator), theme, tokens, sign out', { full: false });
+  await page.keyboard.press('Escape');
+  await page.mouse.click(900, 450);
 
   await go(page, `${W}/apis`);
   await shot(page, 'console-apis', 'APIs — lifecycle, deployment state, plans and subscriptions');
