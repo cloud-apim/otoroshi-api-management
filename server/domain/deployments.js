@@ -8,7 +8,7 @@ import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { getSnapshot, lastSnapshot } from './apis.js';
 import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
-import { normalizeDraft, validateDraft } from './model.js';
+import { MINTED_KINDS, normalizeDraft, sharedPlanWarnings, validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
 import { META } from '../otoroshi/client.js';
@@ -42,6 +42,19 @@ async function syncDerived(apiId, snapshotContent, between = async () => null) {
 // what the gateway's own settings make of the snapshot: they are infrastructure the product
 // consumes and does not change, so it says when they defeat a plan
 async function gatewayWarnings(content, derived) {
+  return [...(await sharedOnGateway(content)), ...(await tlsWarnings(content, derived))];
+}
+
+// the other Apis of the gateway, the product's or not, with a plan of the same id and kind (G-18)
+async function sharedOnGateway(content) {
+  if (!normalizeDraft(content.draft).plans.some((p) => MINTED_KINDS.includes(p.auth.kind))) return [];
+  const others = ((await oto.listApis().catch(() => null)) || [])
+    .filter((a) => a.id !== content.api.id)
+    .flatMap((a) => (a.plans || []).map((p) => ({ name: a.name, product: !!a.metadata?.[META.api], planId: p.id, kind: p.access_mode_configuration_type })));
+  return sharedPlanWarnings(content.draft, others, (o) => `the Api "${o.name}" on the gateway${o.product ? '' : ', not managed by the product,'}`);
+}
+
+async function tlsWarnings(content, derived) {
   const mtls = (normalizeDraft(content.draft).plans || []).filter((p) => p.status === 'published' && p.auth.kind === 'mtls');
   if (!mtls.length) return [];
   const tls = (await oto.globalConfig().catch(() => null))?.tlsSettings;

@@ -114,6 +114,15 @@ the first call, so any valid token or certificate is served, subscribed or not. 
 it on the plan. See [G-4](../otoroshi-gaps.mdx).
 :::
 
+:::warning Plan ids of token, certificate and open plans
+The gateway names the consumers of these plans after the plan id alone, not the API: two APIs with
+a `jwt`, `mtls`, `oauth2-remote` or `keyless` plan of the same id and kind share their consumers,
+quotas included. The console warns (`plan_id_shared`) on the draft, against the other APIs of the
+installation, and before a deployment, against the Apis of the gateway. Plans created in the
+console get unique ids; a [declarative document](../gitops/declarative-documents.mdx) chooses
+its own. See [G-18](../otoroshi-gaps.mdx).
+:::
+
 ## Resolution order
 
 When several plans are published, the gateway tries them in the order of its extractors — it is

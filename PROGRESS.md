@@ -48,7 +48,6 @@ waits for the data plane rather than working around it.
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
-| R-44 | D-4, G-18 | Warn when a plan id of a **jwt, mtls, oauth2-remote or keyless** plan is also used by another api of the installation: the gateway shares their consumers | S | G-18 |
 | R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
 | R-15 | D-6, G-4 | Require a **subscription on jwt / mtls / oauth2-remote / keyless plans** — today any valid token passes | — | G-4 |
 | R-16 | G-13 | Keep the consumers of a **deprecated plan** served (only published plans get an extractor) | — | G-13 |
@@ -133,7 +132,7 @@ waits for the data plane rather than working around it.
 | D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows: plugins named and configured from the gateway's catalog (default configuration, order, regex paths), plan flows; configuration as a form generated from the catalog's form description (`config_schema` / `config_flow`) or as JSON; JSON, YAML and Markdown (documentation pages, portal home) in a code editor (Monaco, bundled, loaded on first use) |
 | D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; `test/product-down.test.js`: with the product and its databases stopped, keys, tokens and quotas are enforced by the gateway alone; with the gateway unreachable, the portal serves its catalogue and a subscription waits, then is projected |
 | D-5 the policy lives in the plan | ✅ | plan editor; limits and filtering projected on the plan |
-| D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4 |
+| D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4, G-17; the consumers minted for a plan are keyed by its id alone (G-18): warning `plan_id_shared` on the draft and the deployment (`test/shared-plan-ids.test.js`) |
 | D-8 PostgreSQL ×2 | ✅ | `server/db/migrations.js` |
 | D-9 n°1 everything the UI does goes through the API | ✅ | the same router on `/api` and `/backoffice/api` |
 | D-9 n°2 escape hatch to the projected entity | ✅ | "Technical details", link to the Otoroshi backoffice |

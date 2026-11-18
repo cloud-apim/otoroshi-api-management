@@ -27,7 +27,7 @@ the product has to compensate, **low** = friction.
 | G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
 | G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
 | G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
-| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; the end-to-end tests remove the keys the gateway minted for them |
+| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
 
 ---
 
@@ -291,6 +291,8 @@ client id has no key and is refused.
 
 ## G-18 — consumers minted for a plan are keyed by the plan id alone — high
 
+Upstream: [MAIF/otoroshi#2938](https://github.com/MAIF/otoroshi/issues/2938).
+
 **Observed.** The extractors of `jwt`, `mtls`, `oauth2-remote` and `keyless` plans mint their
 consumer as the apikey `<kind>_<planId>_<clientId>` — the prefix is set by `pluginsForPlan`
 (`next/models/Api.scala:1815`, `:1868`, `:1894`, `:1917`). A plan id is only unique within its
@@ -305,10 +307,15 @@ reusing the plan id picks them up. Seen on the development stack: the key
 reference test, on a new Api, with the old Api in its `apiRef`.
 
 **Product meanwhile.** Plan ids created in the console are prefixed uuids, unique; declarative
-documents choose theirs (`plan_petstore_discovery`), and nothing warns yet. The end-to-end tests
-remove the keys the gateway minted for their api.
+documents choose theirs (`plan_petstore_discovery`). A plan of these kinds whose id and kind
+another api also has gets the warning `plan_id_shared`: on the draft, against the drafts of the
+other apis of the installation, and on the deployment plan, against the Apis of the gateway —
+managed by the product or not. The keys left by a deleted Api cannot be seen without listing every
+key of the gateway: nothing warns about them. The end-to-end tests remove the keys the gateway
+minted for their api.
 
-**Upstream fix.** The api id in the prefix (`<kind>_<apiId>_<planId>_`), or the extractor and the
-enforcer refusing a key whose `apiRef.api` is not the api called; deleting an Api deletes the keys
-minted for it (`apiRef.api`, `created_by: apikey-extractor`).
-
+**Upstream fix** (detailed in the issue). The api id in the prefix (`<kind>_<apiId>_<planId>_`),
+computed by one function shared with the subscription keys of G-17; `resolveOrCreate` never uses
+an existing key whose `apiRef` names another api or plan; a one-shot migration moves the keys
+already minted to the new ids, keeping their secret and their enabled flag; deleting an Api
+deletes the keys minted for it, its ApiSubscriptions and their keys.

@@ -7,7 +7,7 @@ import { db, newId, slugify } from '../db/index.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
-import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
+import { defaultDraft, defaultPlan, MINTED_KINDS, normalizeDraft, sharedPlanWarnings, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
 import { checkValues, listFields, validateValues } from './metadata.js';
@@ -218,16 +218,35 @@ export async function composeDraft(api, { strict = false } = {}) {
   };
 }
 
-// the typed metadata of the plans is checked with the rest of the draft
-export async function validateWithMetadata(workspaceId, draft) {
+// the typed metadata of the plans is checked with the rest of the draft; given the api, so are the
+// plan ids it shares with the other apis of the installation
+export async function validateWithMetadata(workspaceId, draft, { apiId = null } = {}) {
   const v = validateDraft(draft);
   const fields = await listFields(workspaceId, 'plan');
   for (const p of normalizeDraft(draft).plans) {
     const { errors } = validateValues(fields, p.metadata);
     errors.forEach((e) => v.errors.push({ path: `plans[${p.name}].metadata.${e.key}`, message: `plan "${p.name}": ${e.message}` }));
   }
+  if (apiId) v.warnings.push(...(await sharedPlanIds(apiId, draft)));
   v.ok = v.errors.length === 0;
   return v;
+}
+
+const pgArray = (list) => `{${list.map((x) => `"${String(x).replace(/(["\\])/g, '\\$1')}"`).join(',')}}`;
+
+// the drafts of the other apis, in every workspace: the gateway's namespace is the installation's
+async function sharedPlanIds(apiId, draft) {
+  const ids = normalizeDraft(draft).plans.filter((p) => MINTED_KINDS.includes(p.auth.kind)).map((p) => p.id);
+  if (!ids.length) return [];
+  const rows = await db`select a.name, a.version, w.slug as workspace, p->>'id' as plan_id, coalesce(p->'auth'->>'kind', 'apikey') as kind
+    from apis a join workspaces w on w.id = a.workspace_id
+    cross join lateral jsonb_array_elements(coalesce(a.draft->'plans', '[]'::jsonb)) p
+    where a.id <> ${apiId} and p->>'id' = any(${pgArray(ids)}::text[])`;
+  return sharedPlanWarnings(
+    draft,
+    rows.map((r) => ({ ...r, planId: r.plan_id })),
+    (o) => `the API "${o.name}" ${o.version} (workspace ${o.workspace})`
+  );
 }
 
 export async function lastSnapshot(apiId) {
@@ -257,7 +276,7 @@ export async function pendingChanges(api) {
 
 export async function publish(ctx, api, { comment = '' } = {}) {
   const content = await composeDraft(api, { strict: true });
-  const validation = await validateWithMetadata(api.workspace_id, content.draft);
+  const validation = await validateWithMetadata(api.workspace_id, content.draft, { apiId: api.id });
   if (!validation.ok) throw badRequest('the draft has errors, it cannot be published', validation);
   const last = await lastSnapshot(api.id);
   if (last && diff(last.content, content).length === 0) throw conflict('nothing to publish: the draft is identical to the last snapshot');

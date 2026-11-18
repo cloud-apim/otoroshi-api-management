@@ -463,7 +463,7 @@ r.get('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
     base_url: await gatewayBaseUrl(draft),
     deployment: status,
     pending_changes: { hasChanges: pending.hasChanges, count: pending.changes?.length ?? null, base: pending.snapshot },
-    validation: await apis.validateWithMetadata(c.workspace.id, draft),
+    validation: await apis.validateWithMetadata(c.workspace.id, draft, { apiId: api.id }),
     resolution_order: resolutionOrder(draft),
     versions,
     can_manage: await apis.canManageApi(c, api),
@@ -480,12 +480,13 @@ r.put('/workspaces/:ws/apis/:api/draft', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params, { manage: true });
   const updated = await apis.updateApi(c, api, { draft: body.draft || body, force: body.force });
-  return { draft: normalizeDraft(updated.draft), validation: await apis.validateWithMetadata(c.workspace.id, updated.draft), resolution_order: resolutionOrder(updated.draft) };
+  return { draft: normalizeDraft(updated.draft), validation: await apis.validateWithMetadata(c.workspace.id, updated.draft, { apiId: api.id }), resolution_order: resolutionOrder(updated.draft) };
 });
 
 r.post('/workspaces/:ws/apis/:api/validate', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
-  return apis.validateWithMetadata(c.workspace.id, body.draft || body);
+  const api = await apiOf(c, params);
+  return apis.validateWithMetadata(c.workspace.id, body.draft || body, { apiId: api.id });
 });
 
 r.delete('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
