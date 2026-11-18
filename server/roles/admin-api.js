@@ -23,6 +23,7 @@ import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
 import * as catalogs from '../domain/catalogs.js';
+import * as auditExport from '../domain/auditExport.js';
 
 const r = new Router();
 
@@ -722,6 +723,32 @@ r.get('/workspaces/:ws/audit', async ({ ctx, params, query }) => {
 r.get('/audit', async ({ ctx, query }) => {
   identity.requireAdmin(ctx);
   return listAudit(null, { limit: query.get('limit'), before: query.get('before'), action: query.get('action') });
+});
+
+// audit trail exporters (installation level)
+const hideAuth = (e) => ({ ...e, headers: Object.fromEntries(Object.entries(e.headers || {}).map(([k, v]) => [k, /auth|token|key/i.test(k) ? '••••••' : v])) });
+r.get('/audit/exporters', async ({ ctx }) => {
+  identity.requireAdmin(ctx);
+  return (await auditExport.listExporters()).map(hideAuth);
+});
+r.post('/audit/exporters', async ({ ctx, body }) => {
+  identity.requireAdmin(ctx);
+  return hideAuth(await auditExport.saveExporter(ctx, body));
+});
+r.put('/audit/exporters/:id', async ({ ctx, params, body }) => {
+  identity.requireAdmin(ctx);
+  const ex = await auditExport.getExporter(params.id);
+  const headers = body.headers ? Object.fromEntries(Object.entries(body.headers).map(([k, v]) => [k, v === '••••••' ? ex.headers?.[k] : v])) : ex.headers;
+  return hideAuth(await auditExport.saveExporter(ctx, { ...body, headers }, ex));
+});
+r.delete('/audit/exporters/:id', async ({ ctx, params }) => {
+  identity.requireAdmin(ctx);
+  await auditExport.deleteExporter(ctx, await auditExport.getExporter(params.id));
+  return { deleted: true };
+});
+r.post('/audit/exporters/:id/test', async ({ ctx, params }) => {
+  identity.requireAdmin(ctx);
+  return auditExport.testExporter(await auditExport.getExporter(params.id));
 });
 
 r.get('/workspaces/:ws/drift', async ({ ctx, params }) => {

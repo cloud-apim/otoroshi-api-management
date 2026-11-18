@@ -344,6 +344,29 @@ create table remote_catalogs (
 );
 `,
   },
+  {
+    version: '0006_audit_exporters',
+    sql: `
+-- the audit trail leaves the product the way Otoroshi's events do: exporters. Each one keeps a
+-- cursor on the trail, so a delivery is at least once and an unreachable target loses nothing.
+create table audit_exporters (
+  id text primary key,
+  name text not null,
+  workspace_id text references workspaces(id) on delete cascade, -- null: every workspace
+  kind text not null default 'webhook',
+  url text not null,
+  headers jsonb not null default '{}',
+  actions jsonb not null default '[]', -- action prefixes, empty: everything
+  enabled boolean not null default true,
+  batch_size int not null default 100,
+  cursor bigint not null default 0,
+  last_error text,
+  last_delivery_at timestamptz,
+  delivered bigint not null default 0,
+  created_at timestamptz not null default now()
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

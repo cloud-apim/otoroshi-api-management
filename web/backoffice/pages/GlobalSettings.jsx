@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtRelative } from '../../shared/lib.js';
-import { Badge, Callout, Code, Field, Icon, Input, Loader, Select, Setting, Switch, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 
@@ -296,23 +296,157 @@ function Authentication() {
   );
 }
 
+// the audit trail leaves the product like Otoroshi's events do: exporters with a cursor
+function AuditExport() {
+  const { workspaces } = useSession();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const state = useLoad(() => api.get('/audit/exporters'), []);
+  const [editing, setEditing] = useState(null);
+  const set = (k) => (v) => setEditing((e) => ({ ...e, [k]: v }));
+  return (
+    <div className="col gap-16">
+      <div className="row">
+        <p className="muted small grow">
+          Every write of the admin api, and the reads of credentials and request logs, are in the audit trail. An exporter sends it in batches to a webhook (a SIEM, a log pipeline), in order and
+          at least once: it keeps a cursor, so nothing is lost while the target is down.
+        </p>
+        <button className="btn primary" onClick={() => setEditing({ name: '', url: '', headers: {}, actions: [], workspace_id: '', enabled: true, batch_size: 100, from_beginning: false })}>
+          <Icon name="plus" /> Add exporter
+        </button>
+      </div>
+      <Loader state={state}>
+        {(list) =>
+          list.length ? (
+            <div className="card">
+              {list.map((e) => (
+                <div key={e.id} className="list-item" style={{ alignItems: 'flex-start' }}>
+                  <Icon name="upload" />
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div className="bold">
+                      {e.name} {!e.enabled && <Badge>disabled</Badge>}
+                    </div>
+                    <div className="mono tiny faint ellipsis">{e.url}</div>
+                    <div className="small mt-8">
+                      <StatusBadge status={e.last_error ? 'error' : 'synced'} label={e.last_error ? 'failing' : 'delivering'} /> {e.delivered} delivered · {e.lag || 0} behind
+                      {e.actions?.length ? ` · ${e.actions.join(', ')}` : ' · every action'}
+                      {e.last_error && <span className="negative-text"> — {e.last_error}</span>}
+                    </div>
+                  </div>
+                  <button
+                    className="btn sm"
+                    onClick={async () => {
+                      const r = await api.post(`/audit/exporters/${e.id}/test`);
+                      toast(r.ok ? 'Test event delivered' : `Test failed: ${r.error}`, r.ok ? 'info' : 'error');
+                    }}
+                  >
+                    Test
+                  </button>
+                  <button className="btn ghost sm icon" onClick={() => setEditing({ ...e, workspace_id: e.workspace_id || '' })} aria-label="edit">
+                    <Icon name="edit" />
+                  </button>
+                  <button
+                    className="btn ghost sm icon"
+                    aria-label="delete"
+                    onClick={async () => {
+                      if (!(await confirm({ title: `Delete ${e.name}?`, danger: true, confirmLabel: 'Delete' }))) return;
+                      await api.del(`/audit/exporters/${e.id}`);
+                      state.reload();
+                    }}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card">
+              <Empty title="No audit exporter" icon="audit" />
+            </div>
+          )
+        }
+      </Loader>
+      {editing && (
+        <Modal
+          title={editing.id ? `Exporter ${editing.name}` : 'New audit exporter'}
+          onClose={() => setEditing(null)}
+          footer={
+            <button
+              className="btn primary"
+              disabled={!editing.url}
+              onClick={async () => {
+                try {
+                  const body = { ...editing, workspace_id: editing.workspace_id || null };
+                  if (editing.id) await api.put(`/audit/exporters/${editing.id}`, body);
+                  else await api.post('/audit/exporters', body);
+                  setEditing(null);
+                  toast('Exporter saved');
+                  state.reload();
+                } catch (e) {
+                  toast(errorMessage(e), 'error');
+                }
+              }}
+            >
+              Save
+            </button>
+          }
+        >
+          <Field label="Name">
+            <Input value={editing.name} onChange={set('name')} />
+          </Field>
+          <Field label="Webhook url" hint="receives POST batches of ApimAuditEvent as a json array">
+            <Input value={editing.url} onChange={set('url')} mono />
+          </Field>
+          <Field label="Header (e.g. a token)">
+            <Input
+              value={Object.entries(editing.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
+              onChange={(v) => {
+                const [k, ...rest] = v.split(':');
+                set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
+              }}
+              mono
+              placeholder="Authorization: Bearer …"
+            />
+          </Field>
+          <div className="grid-2">
+            <Field label="Workspace">
+              <Select value={editing.workspace_id} onChange={set('workspace_id')} options={[{ value: '', label: 'every workspace' }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]} />
+            </Field>
+            <Field label="Batch size">
+              <NumberInput value={editing.batch_size} onChange={set('batch_size')} />
+            </Field>
+          </div>
+          <Field label="Actions" hint="prefixes, e.g. subscription. or credential.read — empty: everything">
+            <TagsInput value={editing.actions} onChange={set('actions')} />
+          </Field>
+          <div className="row gap-24">
+            <Switch checked={editing.enabled} onChange={set('enabled')} label="Enabled" />
+            {!editing.id && <Switch checked={editing.from_beginning} onChange={set('from_beginning')} label="Replay the whole trail" />}
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export function GlobalSettingsPage({ tab }) {
   const { navigate } = useRouter();
   const { user } = useSession();
-  const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'tokens'] : ['tokens'];
+  const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'audit', 'tokens'] : ['tokens'];
   return (
     <div className="page">
       <PageHead title="Global settings" sub="Installation-level: workspaces, users, access tokens." />
       <div className="tabs mb-16">
         {tabs.map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/settings/${t}`)}>
-            {t === 'tokens' ? 'API tokens' : t[0].toUpperCase() + t.slice(1)}
+            {t === 'tokens' ? 'API tokens' : t === 'audit' ? 'Audit export' : t[0].toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
       {tab === 'workspaces' && user.is_admin && <Workspaces />}
       {tab === 'users' && user.is_admin && <Users />}
       {tab === 'authentication' && user.is_admin && <Authentication />}
+      {tab === 'audit' && user.is_admin && <AuditExport />}
       {tab === 'tokens' && <Tokens />}
     </div>
   );

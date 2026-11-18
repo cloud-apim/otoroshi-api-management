@@ -291,6 +291,8 @@ async function start() {
     const apisMod = await import('./domain/apis.js');
     const depsMod = await import('./domain/deployments.js');
     setInterval(() => syncDue({ apis: apisMod, deployments: depsMod }).catch((e) => console.error('[apim] catalogs failed', e.message)), 30000);
+    const { deliverAll } = await import('./domain/auditExport.js');
+    setInterval(() => deliverAll().catch((e) => console.error('[apim] audit export failed', e.message)), 5000);
     setTimeout(() => runDriftDetection().catch(() => null), 5000);
   }
   return server;
