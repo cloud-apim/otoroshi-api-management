@@ -10,6 +10,7 @@ import { PageHead } from '../layout.jsx';
 // one installation drives one Otoroshi cluster: its health, the projection queue and the
 // drift live here, not in a "clusters" list
 function Status() {
+  const { user } = useSession();
   const st = useLoad(() => api.get('/gateway/status'), []);
   const paging = usePaging({ prefix: 'tasks', size: 25 });
   const [params, setParams] = useQuery();
@@ -63,7 +64,7 @@ function Status() {
                             </td>
                             <td className="negative-text">{t.last_error}</td>
                             <td className="actions">
-                              {t.status !== 'done' && (
+                              {t.status !== 'done' && user.is_admin && (
                                 <button
                                   className="btn xs"
                                   onClick={async () => {

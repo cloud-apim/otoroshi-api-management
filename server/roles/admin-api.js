@@ -30,6 +30,13 @@ import * as notifications from '../domain/notifications.js';
 
 const r = new Router();
 
+// the workspaces whose operations someone may follow on the gateway pages (null: all, for an
+// installation administrator)
+async function visibleWorkspaces(ctx) {
+  if (ctx.user?.is_admin) return null;
+  return (await identity.listWorkspacesFor(ctx.user)).filter((w) => ['admin', 'producer'].includes(w.role)).map((w) => w.id);
+}
+
 async function ws(ctx, params, roles = ['admin', 'producer']) {
   const c = await identity.workspaceContext(ctx, params.ws);
   identity.requireRole(c, roles);
@@ -120,7 +127,7 @@ r.get('/gateway/status', async ({ ctx }) => {
   identity.requireUser(ctx);
   const [health, queue, lastDrift] = await Promise.all([
     oto.health(),
-    queueStats(),
+    queueStats({ workspaceIds: await visibleWorkspaces(ctx) }),
     db`select value from settings where key = 'drift.last_run'`.then((x) => x[0]?.value || null),
   ]);
   const ingest = await analytics.ingestStats().catch(() => null);
@@ -129,7 +136,7 @@ r.get('/gateway/status', async ({ ctx }) => {
 
 r.get('/gateway/tasks', async ({ ctx, query }) => {
   identity.requireUser(ctx);
-  return searchTasks({ status: query.get('status'), ...pageParams(query) });
+  return searchTasks({ status: query.get('status'), ...pageParams(query), workspaceIds: await visibleWorkspaces(ctx) });
 });
 
 r.post('/gateway/tasks/:id/retry', async ({ ctx, params }) => {
@@ -744,9 +751,13 @@ r.get('/workspaces/:ws/subscriptions/:sub', async ({ ctx, params }) => {
   const creds = await subscriptions.credentialsOf(sub.id);
   const drift = (await db`select * from drift_reports where entity_kind = 'subscription' and entity_id = ${sub.id}`)[0] || null;
   if (canSee) await audit(c, { action: 'credential.read', entityKind: 'subscription', entityId: sub.id, summary: `credentials of ${sub.id} read` });
+  const api = await apis.getApi(c.workspace.id, sub.api_id).catch(() => null);
   return {
     ...sub,
     credentials: creds.map((cr) => ({ ...cr, client_secret: canSee ? cr.client_secret : mask(cr.client_secret) })),
+    // what the reader may do: decide (who manages the api), see and rotate the secret (its application's team)
+    can_manage: api ? await apis.canManageApi(c, api) : false,
+    can_see_credentials: canSee,
     drift,
   };
 });

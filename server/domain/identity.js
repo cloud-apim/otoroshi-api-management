@@ -115,8 +115,10 @@ export function maskWorkspace(ws) {
   return { ...ws, portal: { ...ws.portal, oidc: { ...ws.portal.oidc, clientSecret: maskSecret(ws.portal.oidc.clientSecret) } } };
 }
 
+// the workspaces of a person, with its role in each (an installation administrator is the
+// administrator of every workspace)
 export async function listWorkspacesFor(user) {
-  if (user.is_admin) return db`select * from workspaces order by name`;
+  if (user.is_admin) return (await db`select * from workspaces order by name`).map((w) => ({ ...w, role: 'admin' }));
   return db`select w.*, m.role from workspaces w join workspace_members m on m.workspace_id = w.id
     where m.user_id = ${user.id} order by w.name`;
 }

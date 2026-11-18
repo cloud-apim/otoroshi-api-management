@@ -17,7 +17,7 @@ A personal API token acts as its owner, with exactly the same rights.
 | **Installation administrator** | the bootstrap administrators (`APIM_BOOTSTRAP_ADMINS`), and the users created as *admin* in Global settings | everywhere: the installation, and every workspace as its administrator |
 | **Workspace administrator** | a member of the workspace with the `admin` role | that workspace |
 | **Producer** | a member with the `producer` role | that workspace; manages what its teams own |
-| **Consumer** | a member with the `consumer` role | the developer portal of the workspace only |
+| **Consumer** | a member with the `consumer` role | the developer portal of the workspace only — the console sends it there |
 
 Inside a workspace, **teams** own APIs and applications. A producer manages the APIs of the teams
 it belongs to (and the APIs that belong to no team), and sees the credentials of the applications
@@ -51,9 +51,10 @@ of its teams. A team has **owners** — the person who creates it is one — and
 | Workspace settings — Teams: delete | — | — | ✓ | ✓ |
 | Workspace settings — Metadata fields | — | read | ✓ | ✓ |
 | Workspace settings — Remote catalogs, Export / import | — | — | ✓ | ✓ |
-| Gateway — status, projection queue, drift reports, run the detection | ✓ | ✓ | ✓ | ✓ |
+| Gateway — status, run the detection | — | ✓ | ✓ | ✓ |
+| Gateway — projection queue, drift reports | — | its workspaces | its workspaces | all |
 | Gateway — retry a task, install the data exporter, connection | — | — | — | ✓ |
-| Global settings — API tokens (one's own) | ✓ | ✓ | ✓ | ✓ |
+| Global settings — API tokens (one's own) | — | ✓ | ✓ | ✓ |
 | Global settings — Workspaces, Users, Authentication, Audit export | — | — | — | ✓ |
 | Create a workspace, delete a workspace | — | — | — | ✓ |
 
@@ -72,18 +73,26 @@ of its teams. A team has **owners** — the person who creates it is one — and
   what it owns. Deleting a team is a workspace administrator's.
 - **Users** are global. A workspace administrator only sees the users of the workspaces it
   administers; an installation administrator sees them all.
-- **The gateway pages** are the installation's: everyone signed in sees the gateway status and the
-  projection queue of the whole installation, and the drift reports of their own workspaces. The
-  connection settings, the data exporter and the retry of a task are an installation
-  administrator's.
+- **The gateway pages** are the installation's: everyone signed in sees the gateway status, and
+  the projection queue and the drift reports of their own workspaces (an installation
+  administrator sees all of them). The connection settings, the data exporter and the retry of a
+  task are an installation administrator's.
 - **The audit trail** of a workspace is open to its producers and administrators. The audit of the
   whole installation is read through the API (`GET /api/audit`), by an installation administrator.
 - **Consumers** work on the [developer portal](../developer-portal.mdx). What they see there — which
   APIs and plans — is the visibility and the access tags of each API and plan (`user:…`,
   `team:…`, `role:…`), not the roles above.
 
-:::note
-The console does not hide every tab a producer cannot use yet: in the workspace settings, Remote
-catalogs, Export / import and the editing of Metadata, General and Developer portal are refused by
-the API (`403`) rather than hidden.
-:::
+## What the console shows
+
+The console follows the same rights in what it shows, so nobody meets a refusal it could have
+foreseen:
+
+- a producer sees the workspace settings it may read **read only** (General, Developer portal,
+  Members, Metadata), with the reason, and does not see Remote catalogs nor Export / import;
+- the members of a team are chosen in the console by its owners and the administrators only;
+- the subscription drawer disables the decisions for who does not manage the API, and shows the
+  rotation of a secret to who may see it;
+- a consumer who signs in to the console is sent to the developer portal of its workspaces;
+- the workspace selector only offers the workspaces where the person is an administrator or a
+  producer.

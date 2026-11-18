@@ -21,6 +21,10 @@
 .navlink .count { margin-left: auto; font-size: 11px; background: var(--warning-bg); color: var(--warning-text); border-radius: 999px; padding: 0 7px; font-weight: 600; }
 .sidebar-bottom { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
 .theme-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.ro-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.ro-fieldset.col { display: flex; flex-direction: column; }
+.ro-fieldset.row { display: flex; align-items: center; flex-wrap: wrap; }
+fieldset.ro-fieldset.card-body { padding: 18px 20px; }
 /* the user menu: notifications, theme, tokens, sign out */
 .avatar-with-dot { position: relative; }
 .avatar-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--warning); border: 2px solid var(--surface); }

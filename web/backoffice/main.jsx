@@ -24,6 +24,49 @@ initTheme();
 
 const LAST_WS = 'apim.workspace';
 
+// a consumer signed in to the console: its place is the developer portal of its workspaces
+function PortalsOnly({ user, portals, onSignedOut }) {
+  return (
+    <div className="login">
+      <div className="login-theme">
+        <ThemeSwitch />
+      </div>
+      <div className="card" style={{ maxWidth: 460 }}>
+        <div className="card-body col gap-16">
+          <div className="brand" style={{ padding: 0 }}>
+            <div className="brand-mark">O</div>
+            <div>
+              <div className="brand-name">API Management</div>
+              <div className="brand-sub">for Otoroshi</div>
+            </div>
+          </div>
+          <h2 style={{ margin: 0 }}>Your place is the developer portal</h2>
+          <p className="muted small" style={{ margin: 0 }}>
+            The console is for the administrators and the producers of a workspace. {user.name || user.email}, you use the APIs of {portals.length > 1 ? 'these workspaces' : 'this workspace'} from
+            {portals.length > 1 ? ' their' : ' its'} developer portal: your applications, your keys, your consumption.
+          </p>
+          <div className="col gap-6">
+            {portals.map((w) => (
+              <a key={w.id} className="btn primary" href={`/${w.slug}/`}>
+                {w.name} — developer portal
+              </a>
+            ))}
+          </div>
+          <button
+            className="btn ghost"
+            onClick={async () => {
+              await api.post('/auth/logout').catch(() => {});
+              onSignedOut();
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Login({ onLogged }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -105,10 +148,13 @@ function App() {
   if (me === undefined) return <Loading />;
   if (me === null) return <Login onLogged={load} />;
 
-  // the workspace is a session selector in the console, carried by the url
+  // the workspace is a session selector in the console, carried by the url; the console is for
+  // the administrators and producers of a workspace — a consumer's place is the portal
   const m = /^\/ws\/([^/]+)/.exec(path);
   const wsSlug = m?.[1];
-  const workspaces = me.workspaces || [];
+  const workspaces = (me.workspaces || []).filter((w) => ['admin', 'producer'].includes(w.role));
+  const portals = (me.workspaces || []).filter((w) => !['admin', 'producer'].includes(w.role));
+  if (!me.user.is_admin && !workspaces.length && portals.length) return <PortalsOnly user={me.user} portals={portals} onSignedOut={load} />;
   if (!wsSlug && (path === '/' || path === '')) {
     let last = null;
     try {

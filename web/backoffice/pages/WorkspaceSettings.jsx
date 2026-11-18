@@ -8,11 +8,25 @@ import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 
+// what a producer may read but not change: disabled, with the reason
+function ReadOnly({ when, children }) {
+  if (!when) return children;
+  return (
+    <>
+      <Callout kind="info">Read only: the administrators of the workspace change these settings.</Callout>
+      <fieldset disabled className="ro-fieldset">
+        {children}
+      </fieldset>
+    </>
+  );
+}
+
 function General() {
-  const { wapi, ws, session } = useWs();
+  const { wapi, ws, session, isAdmin } = useWs();
   const toast = useToast();
   const [f, setF] = useState({ name: ws.name, description: ws.description });
   return (
+    <ReadOnly when={!isAdmin}>
     <div className="card">
       <div className="card-body">
         <Setting label="Name" help="the workspace is the tenant — the same word on every surface: console, api, cli, crds">
@@ -42,6 +56,7 @@ function General() {
         </div>
       </div>
     </div>
+    </ReadOnly>
   );
 }
 
@@ -49,7 +64,8 @@ function General() {
 const asLocalized = (v, def) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
 
 function Portal() {
-  const { wapi, ws, session } = useWs();
+  const { wapi, ws, session, isAdmin } = useWs();
+  const ro = !isAdmin;
   const toast = useToast();
   const [p, setP] = useState(ws.portal || {});
   const set = (k) => (v) => setP((x) => ({ ...x, [k]: v }));
@@ -75,6 +91,7 @@ function Portal() {
   };
   return (
     <div className="col gap-16">
+      {ro && <Callout kind="info">Read only: the administrators of the workspace change the portal.</Callout>}
       <Callout kind="info">
         One portal per workspace, at <a className="link" href={`/${ws.slug}/`} target="_blank" rel="noreferrer">/{ws.slug}/</a>. Its exposure pattern — root path or hostname — is an installation setting.
       </Callout>
@@ -92,10 +109,10 @@ function Portal() {
             <Callout kind="info">Not written in {current.toUpperCase()} yet: {missing(current).map((k) => ({ title: 'title', tagline: 'tagline', homeMarkdown: 'home page' })[k]).join(', ')} — the portal shows the {def.toUpperCase()} text meanwhile.</Callout>
           )}
           <Setting label={`Title (${current})`} help="the name of the portal, in its header and the browser tab">
-            <Input value={text('title')} onChange={setText('title')} placeholder={current !== def ? asLocalized(p.title, def)[def] : ''} />
+            <Input value={text('title')} onChange={setText('title')} placeholder={current !== def ? asLocalized(p.title, def)[def] : ''} disabled={ro} />
           </Setting>
           <Setting label={`Tagline (${current})`} help="below the title, on the home page">
-            <Input value={text('tagline')} onChange={setText('tagline')} placeholder={current !== def ? asLocalized(p.tagline, def)[def] : ''} />
+            <Input value={text('tagline')} onChange={setText('tagline')} placeholder={current !== def ? asLocalized(p.tagline, def)[def] : ''} disabled={ro} />
           </Setting>
           <Setting label={`Home page (${current})`} help="markdown, below the hero of the portal home">
             <Seg
@@ -107,7 +124,7 @@ function Portal() {
               ]}
             />
             {view === 'write' ? (
-              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={`home page (${current})`} placeholder="# Markdown" />
+              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} readOnly={ro} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={`home page (${current})`} placeholder="# Markdown" />
             ) : (
               <div className="panel" style={{ background: 'var(--surface)' }}>
                 {text('homeMarkdown') ? <Markdown source={text('homeMarkdown')} /> : <span className="muted small">Nothing written yet.</span>}
@@ -120,7 +137,7 @@ function Portal() {
         <div className="card-head">
           <h3>Settings</h3>
         </div>
-        <div className="card-body">
+        <fieldset disabled={ro} className="ro-fieldset card-body">
           <Setting label="Languages" help="of the portal: its interface (English and French today) and its texts above; the documentation pages declare their own">
             <TagsInput value={p.languages || []} onChange={set('languages')} />
             <Select value={def} onChange={set('defaultLanguage')} options={languages.map((l) => ({ value: l, label: `default: ${l}` }))} />
@@ -151,25 +168,29 @@ function Portal() {
               </>
             )}
           </Setting>
+        </fieldset>
+      </div>
+      {!ro && (
+        <div className="row">
+          <button className="btn primary" onClick={save}>
+            Save
+          </button>
         </div>
-      </div>
-      <div className="row">
-        <button className="btn primary" onClick={save}>
-          Save
-        </button>
-      </div>
+      )}
     </div>
   );
 }
 
 function Members() {
-  const { wapi, slug } = useWs();
+  const { wapi, slug, isAdmin } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/members'), [slug]);
   const membersPage = useLocalPaging(state.data, { prefix: 'members', size: 25, text: (m) => `${m.name} ${m.email} ${m.role} ${(m.tags || []).join(' ')}` });
   const [invite, setInvite] = useState({ email: '', role: 'producer' });
   return (
     <div className="col gap-16">
+      {!isAdmin && <Callout kind="info">Read only: the administrators of the workspace choose its members and their roles.</Callout>}
+      {isAdmin && (
       <div className="card">
         <div className="card-body row wrap">
           <Input value={invite.email} onChange={(v) => setInvite({ ...invite, email: v })} placeholder="email" />
@@ -191,6 +212,7 @@ function Members() {
           </button>
         </div>
       </div>
+      )}
       <ListToolbar paging={membersPage} placeholder="search members, emails, roles, tags" onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {() => (
@@ -213,6 +235,9 @@ function Members() {
                       <div className="faint tiny">{m.email}</div>
                     </td>
                     <td>
+                      {!isAdmin ? (
+                        <Badge>{m.role}</Badge>
+                      ) : (
                       <Select
                         value={m.role}
                         onChange={async (role) => {
@@ -222,6 +247,7 @@ function Members() {
                         options={['admin', 'producer', 'consumer']}
                         style={{ width: 140 }}
                       />
+                      )}
                     </td>
                     <td className="small">
                       {(m.tags || []).map((t) => (
@@ -231,6 +257,7 @@ function Members() {
                       ))}
                     </td>
                     <td className="actions">
+                      {isAdmin && (
                       <button
                         className="btn ghost sm icon"
                         aria-label="remove member"
@@ -241,6 +268,7 @@ function Members() {
                       >
                         <Icon name="trash" />
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -310,15 +338,19 @@ function Teams() {
 }
 
 function TeamMembers({ id, onClose }) {
-  const { wapi } = useWs();
+  const { wapi, isAdmin, session } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get(`/teams/${id}`), [id]);
   const [email, setEmail] = useState('');
   return (
     <Modal title="Team members" onClose={onClose}>
       <Loader state={state}>
-        {(t) => (
+        {(t) => {
+          const manages = isAdmin || t.members.some((m) => m.id === session.user.id && m.role === 'owner');
+          return (
           <>
+            {!manages && <Callout kind="info">The owners of the team and the administrators of the workspace choose its members.</Callout>}
+            {manages && (
             <div className="row">
               <Input value={email} onChange={setEmail} placeholder="email of a workspace member" />
               <button
@@ -336,12 +368,14 @@ function TeamMembers({ id, onClose }) {
                 Add
               </button>
             </div>
+            )}
             {t.members.map((m) => (
               <div key={m.id} className="row">
                 <span className="grow">
                   {m.name} <span className="faint small">{m.email}</span>
                 </span>
                 <Badge>{m.role}</Badge>
+                {manages && (
                 <button
                   className="btn ghost sm icon"
                   aria-label="remove"
@@ -352,10 +386,12 @@ function TeamMembers({ id, onClose }) {
                 >
                   <Icon name="trash" />
                 </button>
+                )}
               </div>
             ))}
           </>
-        )}
+          );
+        }}
       </Loader>
     </Modal>
   );
@@ -372,7 +408,7 @@ const SCOPES = [
 const TYPES = ['string', 'text', 'number', 'boolean', 'date', 'url', 'email', 'enum'];
 
 function MetadataSettings() {
-  const { wapi, slug, ws, session } = useWs();
+  const { wapi, slug, ws, session, isAdmin } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/metadata-fields'), [slug]);
   const wsFields = useMetadataFields('workspace');
@@ -394,6 +430,7 @@ function MetadataSettings() {
           }
         };
         return (
+          <ReadOnly when={!isAdmin}>
           <div className="col gap-16">
             <Callout kind="info">
               Typed key/values attached to an object, wherever the model cannot foresee everything. They serve display, notifications and the review of requests, and are never projected on the gateway.
@@ -537,6 +574,7 @@ function MetadataSettings() {
               </Modal>
             )}
           </div>
+          </ReadOnly>
         );
       }}
     </Loader>
@@ -856,9 +894,11 @@ function Exchange() {
 }
 
 export function WorkspaceSettingsPage({ tab }) {
-  const { slug, ws } = useWs();
+  const { slug, ws, isAdmin } = useWs();
   const { navigate } = useRouter();
-  const tabs = ['general', 'portal', 'members', 'teams', 'metadata', 'catalogs', 'export'];
+  // a producer reads the settings it may not change; catalogs and the export are an administrator's
+  const tabs = isAdmin ? ['general', 'portal', 'members', 'teams', 'metadata', 'catalogs', 'export'] : ['general', 'portal', 'members', 'teams', 'metadata'];
+  const allowed = tabs.includes(tab);
   return (
     <div className="page">
       <PageHead title="Workspace settings" sub={ws.name} />
@@ -874,8 +914,9 @@ export function WorkspaceSettingsPage({ tab }) {
       {tab === 'members' && <Members />}
       {tab === 'teams' && <Teams />}
       {tab === 'metadata' && <MetadataSettings />}
-      {tab === 'catalogs' && <Catalogs />}
-      {tab === 'export' && <Exchange />}
+      {tab === 'catalogs' && allowed && <Catalogs />}
+      {tab === 'export' && allowed && <Exchange />}
+      {!allowed && <Callout kind="info">The administrators of the workspace manage its remote catalogs and its export.</Callout>}
     </div>
   );
 }

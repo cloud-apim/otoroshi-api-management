@@ -68,10 +68,19 @@ export async function workOnce() {
 }
 
 // the task queue as a paged list, searched over the kind, the payload and the last error
-export async function searchTasks({ status, limit = 50, offset = 0, q = '' } = {}) {
+// the workspace a task works for, from the api, the subscription or the deployment it carries
+const taskWorkspace = () => db`coalesce(payload->>'workspace_id',
+    (select workspace_id from apis where id = payload->>'api_id'),
+    (select workspace_id from subscriptions where id = payload->>'subscription_id'),
+    (select a.workspace_id from api_deployments d join apis a on a.id = d.api_id where d.id = payload->>'deployment_id'))`;
+
+// workspaceIds: the workspaces the reader may see (null: all of them, an installation administrator)
+export async function searchTasks({ status, limit = 50, offset = 0, q = '', workspaceIds = null } = {}) {
   const pattern = q ? likePattern(q) : null;
+  const wsArr = workspaceIds ? `{${workspaceIds.join(',')}}` : null;
   const where = () => db`(${status || null}::text is null or status = ${status || null})
-      and (${pattern}::text is null or kind ilike ${pattern} or payload::text ilike ${pattern} or coalesce(last_error, '') ilike ${pattern})`;
+      and (${pattern}::text is null or kind ilike ${pattern} or payload::text ilike ${pattern} or coalesce(last_error, '') ilike ${pattern})
+      and (${wsArr}::text[] is null or ${taskWorkspace()} = any(${wsArr}::text[]))`;
   const [items, [{ total }]] = await Promise.all([
     db`select * from tasks where ${where()} order by updated_at desc limit ${limit} offset ${offset}`,
     db`select count(*)::int as total from tasks where ${where()}`,
@@ -84,8 +93,9 @@ export async function listTasks({ status, limit = 100 } = {}) {
     order by updated_at desc limit ${Math.min(limit, 500)}`;
 }
 
-export async function queueStats() {
-  const rows = await db`select status, count(*)::int as c from tasks group by status`;
+export async function queueStats({ workspaceIds = null } = {}) {
+  const wsArr = workspaceIds ? `{${workspaceIds.join(',')}}` : null;
+  const rows = await db`select status, count(*)::int as c from tasks where (${wsArr}::text[] is null or ${taskWorkspace()} = any(${wsArr}::text[])) group by status`;
   return Object.fromEntries(rows.map((r) => [r.status, r.c]));
 }
 

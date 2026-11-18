@@ -22,7 +22,9 @@ export function wsApi(ws) {
 
 export function useWs() {
   const s = useSession();
-  return { ws: s.workspace, slug: s.workspace?.slug, wapi: wsApi(s.workspace?.slug), session: s };
+  const role = s.workspace?.role || null;
+  // the console follows the rights the admin api enforces: admin, or producer
+  return { ws: s.workspace, slug: s.workspace?.slug, wapi: wsApi(s.workspace?.slug), session: s, role, isAdmin: role === 'admin' };
 }
 
 // the typed metadata fields of a scope

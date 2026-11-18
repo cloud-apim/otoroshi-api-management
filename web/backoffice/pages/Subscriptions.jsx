@@ -195,6 +195,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               )}
             </div>
 
+            {!s.can_manage && <Callout kind="info">Read only: the team of the API decides on its subscriptions.</Callout>}
+            <fieldset disabled={!s.can_manage} className="ro-fieldset col gap-16">
             {metaFields.length > 0 && (
               <div className="panel col gap-6">
                 <div className="label">Metadata</div>
@@ -238,6 +240,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                 </div>
               </div>
             )}
+            </fieldset>
 
             <div className="col gap-6">
               <div className="label">Credentials</div>
@@ -248,7 +251,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                       <Badge kind="accent">{c.kind}</Badge>
                       <StatusBadge status={c.status} />
                       <span className="spacer" />
-                      {c.status === 'active' && (
+                      {c.status === 'active' && s.can_see_credentials && (
                         <button
                           className="btn xs"
                           onClick={async () => {
@@ -288,7 +291,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             {s.pending_transfer && (
               <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={`Move to ${s.pending_transfer.to.plan_name} — ${s.pending_transfer.status === 'requested' ? 'asked by the consumer' : "waiting for the consumer's consent"}`}>
                 {s.pending_transfer.reasons?.length > 0 && <div>The target plan brings {s.pending_transfer.reasons.join(', ')} (a change of contract needs the consumer's agreement).</div>}
-                {s.pending_transfer.status === 'requested' && (
+                {s.pending_transfer.status === 'requested' && s.can_manage && (
                   <div className="row mt-8">
                     <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, 'Subscription transferred — the key does not change')}>
                       Apply the move
@@ -319,7 +322,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             )}
 
             <hr />
-            <div className="row wrap">
+            <fieldset disabled={!s.can_manage} className="ro-fieldset row wrap">
               {s.status === 'active' && (
                 <button className="btn" disabled={busy} onClick={() => act('suspend', {}, 'Subscription suspended')}>
                   <Icon name="pause" /> Suspend
@@ -363,7 +366,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                   Close
                 </button>
               )}
-            </div>
+            </fieldset>
             {transfer && <TransferPanel sub={s} onDone={() => { setTransfer(null); state.reload(); onChanged?.(); }} onCancel={() => setTransfer(null)} />}
           </>
         )}

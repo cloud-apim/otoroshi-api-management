@@ -58,7 +58,7 @@ const doc = (name, team) => ({
 
 beforeAll(async () => {
   server = await start();
-  await ok('admin', 'POST', '/workspaces', { name: `Permissions ${RUN}`, slug: WS });
+  ids.ws = (await ok('admin', 'POST', '/workspaces', { name: `Permissions ${RUN}`, slug: WS })).id;
   for (const [who, role] of [['alice', 'producer'], ['bob', 'producer'], ['carl', 'consumer']]) {
     await ok('admin', 'POST', `/workspaces/${WS}/members`, { email: email(who), name: who, password: PASSWORD, role });
     ids[who] = (await ok('admin', 'GET', `/users?q=${encodeURIComponent(email(who))}`))[0].id;
@@ -131,6 +131,16 @@ describe('a producer', () => {
       expect([method, path, (await as('bob', method, `/workspaces/${WS}${path}`, {})).status]).toEqual([method, path, 403]);
   });
 
+  test('follows the operations of its own workspaces only', async () => {
+    // the other workspaces of the installation have tasks (the admin sees them all); bob's has none
+    const mine = await ok('bob', 'GET', '/gateway/tasks?limit=5');
+    expect(mine.total).toBe(0);
+    const all = await ok('admin', 'GET', '/gateway/tasks?limit=5');
+    expect(all.total).toBeGreaterThanOrEqual(mine.total);
+    const queue = (await ok('bob', 'GET', '/gateway/status')).queue;
+    expect(Object.values(queue).reduce((a, b) => a + b, 0)).toBe(mine.total);
+  });
+
   test('has no installation rights', async () => {
     expect((await as('bob', 'GET', '/gateway/status')).status).toBe(200);
     for (const [method, path] of [
@@ -149,6 +159,14 @@ describe('a consumer', () => {
   test('has no access to the console’s workspace pages', async () => {
     for (const path of ['', '/apis', '/applications', '/subscriptions', '/audit', '/home'])
       expect([path, (await as('carl', 'GET', `/workspaces/${WS}${path}`)).status]).toEqual([path, 403]);
+  });
+});
+
+describe('the installation administrator', () => {
+  test('is the administrator of every workspace', async () => {
+    const me = await ok('admin', 'GET', '/me');
+    expect(me.workspaces.find((w) => w.slug === WS).role).toBe('admin');
+    expect(me.workspaces.every((w) => w.role === 'admin')).toBe(true);
   });
 });
 
