@@ -288,6 +288,10 @@
     "title": "Dark theme — the plugin editor, its code editor following the theme"
   },
   {
+    "file": "console-french.png",
+    "title": "The console in French — the language of the browser, or the one chosen in the user menu"
+  },
+  {
     "file": "console-consumer.png",
     "title": "A consumer signed in to the console: its place is the developer portal"
   },
