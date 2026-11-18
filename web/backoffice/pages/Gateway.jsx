@@ -81,8 +81,7 @@ function Status() {
 }
 
 function Drift() {
-  const { workspace } = useSession();
-  const reports = useLoad(() => api.get(`/workspaces/${workspace?.slug}/drift`), [workspace?.slug]);
+  const reports = useLoad(() => api.get('/gateway/drift-reports'), []);
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   return (

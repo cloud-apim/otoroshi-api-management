@@ -79,6 +79,8 @@ afterAll(async () => {
     if (state.apiId) await call('DELETE', ws(`/apis/${state.apiId}`));
     // deleting the api removed its derived verifier from the gateway
     if (state.verifierId) expect(await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).toBeNull();
+    // leave nothing behind: the workspace, and the consumer the test created
+    await call('DELETE', `/workspaces/${WS}`);
   } catch (e) {
     console.error('cleanup', e.message);
   }

@@ -123,6 +123,10 @@ export async function runDriftDetection({ workspaceId = null } = {}) {
   } catch (e) {
     results.errors.push({ gateway: e.message });
   }
+  // the reports of objects that no longer exist, or no longer run, go with them
+  await db`delete from drift_reports where entity_kind = 'api' and entity_id not in (select id from apis)`;
+  await db`delete from drift_reports where entity_kind = 'subscription'
+    and entity_id not in (select id from subscriptions where status in ('active', 'suspended'))`;
   results.durationMs = Date.now() - started;
   await db`insert into settings (key, value) values ('drift.last_run', ${{ at: new Date().toISOString(), ...results }})
     on conflict (key) do update set value = excluded.value, updated_at = now()`;
@@ -130,9 +134,11 @@ export async function runDriftDetection({ workspaceId = null } = {}) {
 }
 
 export async function driftReports(workspaceId) {
-  return db`select r.*, coalesce(a.name || ' ' || a.version, s.id) as label from drift_reports r
+  return db`select r.*, coalesce(a.name || ' ' || a.version, app.name || ' → ' || coalesce(s.request->>'plan_name', s.plan_id), r.entity_id) as label
+    from drift_reports r
     left join apis a on r.entity_kind = 'api' and a.id = r.entity_id
     left join subscriptions s on r.entity_kind = 'subscription' and s.id = r.entity_id
+    left join applications app on app.id = s.application_id
     where (${workspaceId}::text is null or r.workspace_id = ${workspaceId} or r.workspace_id is null)
     order by case r.status when 'missing' then 0 when 'drifted' then 1 when 'unmanaged' then 2 else 3 end, r.checked_at desc`;
 }

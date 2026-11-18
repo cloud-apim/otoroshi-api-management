@@ -116,8 +116,13 @@ function App() {
       return <Loading />;
     }
   }
-  const workspace = workspaces.find((w) => w.slug === wsSlug) || null;
-  if (workspace) {
+  // installation-level pages (gateway, global settings) keep the last workspace as context
+  let lastWs = null;
+  try {
+    lastWs = localStorage.getItem(LAST_WS);
+  } catch (e) {}
+  const workspace = workspaces.find((w) => w.slug === wsSlug) || (!wsSlug ? workspaces.find((w) => w.slug === lastWs) || workspaces[0] : null) || null;
+  if (workspace && wsSlug) {
     try {
       localStorage.setItem(LAST_WS, workspace.slug);
     } catch (e) {}

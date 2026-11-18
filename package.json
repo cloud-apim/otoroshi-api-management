@@ -16,7 +16,8 @@
     "test": "bun test",
     "cli": "bun cli/apim.js",
     "infra:up": "docker compose -f docker/docker-compose.yml up -d",
-    "infra:down": "docker compose -f docker/docker-compose.yml down"
+    "infra:down": "docker compose -f docker/docker-compose.yml down",
+    "screenshots": "bun scripts/screenshots.js"
   },
   "dependencies": {
     "@scalar/api-reference-react": "0.9.92",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.3.0",
+    "puppeteer-core": "25.16.0",
     "vite": "8.3.8"
   }
 }

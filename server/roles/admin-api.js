@@ -196,6 +196,15 @@ r.post('/gateway/drift', async ({ ctx }) => {
   return runDriftDetection();
 });
 
+// every report of the installation: the gateway is one cluster for all the workspaces (D-37)
+r.get('/gateway/drift-reports', async ({ ctx }) => {
+  identity.requireUser(ctx);
+  const reports = await driftReports(null);
+  if (ctx.user.is_admin) return reports;
+  const mine = (await identity.listWorkspacesFor(ctx.user)).map((w) => w.id);
+  return reports.filter((r) => !r.workspace_id || mine.includes(r.workspace_id));
+});
+
 r.get('/gateway/unmanaged-apis', async ({ ctx }) => {
   identity.requireUser(ctx);
   return unmanagedApis();

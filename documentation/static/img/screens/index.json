@@ -1,0 +1,322 @@
+[
+  {
+    "file": "console-01-login.png",
+    "title": "Console — sign in (local accounts and the OIDC provider)"
+  },
+  {
+    "file": "console-02-home.png",
+    "title": "Home — what needs attention, traffic, recent activity"
+  },
+  {
+    "file": "console-03-search.png",
+    "title": "Search (⌘K) — workspaces, pages and objects"
+  },
+  {
+    "file": "console-04-workspace-selector.png",
+    "title": "The workspace selector opens the sidebar (D-27)"
+  },
+  {
+    "file": "console-05-notifications.png",
+    "title": "Notifications of the producers"
+  },
+  {
+    "file": "console-06-apis.png",
+    "title": "APIs — lifecycle, deployment state, plans and subscriptions"
+  },
+  {
+    "file": "console-07-new-api.png",
+    "title": "New API — created as a draft, end to end"
+  },
+  {
+    "file": "console-08-adopt.png",
+    "title": "Adopt mode — take over an Api that already runs on the gateway"
+  },
+  {
+    "file": "console-10-api-overview.png",
+    "title": "API — how to call it, plans, effective resolution order"
+  },
+  {
+    "file": "console-11-api-resources.png",
+    "title": "API — entrypoint and resources (projected as routes)"
+  },
+  {
+    "file": "console-12-api-resource-edit.png",
+    "title": "API — editing a resource"
+  },
+  {
+    "file": "console-13-api-backends.png",
+    "title": "API — backends (infrastructure, never the offer)"
+  },
+  {
+    "file": "console-14-api-backend-edit.png",
+    "title": "API — editing a backend"
+  },
+  {
+    "file": "console-15-api-flows.png",
+    "title": "API — policy flows: Otoroshi plugins, and a shared policy group pinned to a version"
+  },
+  {
+    "file": "console-16-api-plugin-edit.png",
+    "title": "API — a plugin of a flow, with the gateway catalog"
+  },
+  {
+    "file": "console-17-api-plans.png",
+    "title": "API — plans: the policy lives here (D-5)"
+  },
+  {
+    "file": "console-18-plan-general.png",
+    "title": "Plan editor — general"
+  },
+  {
+    "file": "console-19-plan-access.png",
+    "title": "Plan editor — access: auth mechanism, selection rule"
+  },
+  {
+    "file": "console-20-plan-limits.png",
+    "title": "Plan editor — limits: rate, quotas, resources, failure strategies"
+  },
+  {
+    "file": "console-21-plan-catalogue.png",
+    "title": "Plan editor — catalogue and approval: never projected (D-2)"
+  },
+  {
+    "file": "console-22-plan-pricing.png",
+    "title": "Plan editor — pricing (D-36)"
+  },
+  {
+    "file": "console-23-api-docs.png",
+    "title": "API — multilingual documentation pages (D-11)"
+  },
+  {
+    "file": "console-24-api-openapi.png",
+    "title": "API — OpenAPI specification"
+  },
+  {
+    "file": "console-25-api-subscriptions.png",
+    "title": "API — its subscriptions"
+  },
+  {
+    "file": "console-26-subscription-drawer.png",
+    "title": "Subscription — request, credentials, lifecycle, transfer"
+  },
+  {
+    "file": "console-27-api-deployment.png",
+    "title": "API — deployed state, gateway drift, snapshots (rollback), history"
+  },
+  {
+    "file": "console-28-snapshot.png",
+    "title": "An immutable snapshot"
+  },
+  {
+    "file": "console-29-deploy-dry-run.png",
+    "title": "Deploy — the diff is always shown first"
+  },
+  {
+    "file": "console-30-api-out-of-sync.png",
+    "title": "The gap between the draft and what runs is always shown (D-22)"
+  },
+  {
+    "file": "console-31-publish.png",
+    "title": "Publish — changes since the last snapshot, validation"
+  },
+  {
+    "file": "console-32-api-tryit.png",
+    "title": "Try it — replay a request through the gateway (D-17)"
+  },
+  {
+    "file": "console-33-api-analytics.png",
+    "title": "API — analytics, in the catalogue vocabulary (PX-08)"
+  },
+  {
+    "file": "console-34-api-settings.png",
+    "title": "API — settings, versions, technical details (the escape hatch), danger zone"
+  },
+  {
+    "file": "console-35-policy-groups.png",
+    "title": "Shared policy groups (D-16)"
+  },
+  {
+    "file": "console-36-policy-group.png",
+    "title": "A policy group — draft, versions, the apis that use it and lag behind"
+  },
+  {
+    "file": "console-37-applications.png",
+    "title": "Applications"
+  },
+  {
+    "file": "console-38-application.png",
+    "title": "An application and its subscriptions"
+  },
+  {
+    "file": "console-39-application-identity.png",
+    "title": "An application — expected client_id, certificates, metadata (D-26)"
+  },
+  {
+    "file": "console-40-subscriptions.png",
+    "title": "Subscriptions waiting for review"
+  },
+  {
+    "file": "console-41-review.png",
+    "title": "Reviewing a request: usage statement, request form, terms"
+  },
+  {
+    "file": "console-42-observability.png",
+    "title": "Observability — traffic by api, plan, application, status, endpoint"
+  },
+  {
+    "file": "console-43-audit.png",
+    "title": "Audit — writes, and reads of credentials and request logs"
+  },
+  {
+    "file": "console-44-audit-event.png",
+    "title": "An audit event"
+  },
+  {
+    "file": "console-45-ws-general.png",
+    "title": "Workspace settings — general"
+  },
+  {
+    "file": "console-46-ws-portal.png",
+    "title": "Workspace settings — its developer portal, its identity provider"
+  },
+  {
+    "file": "console-47-ws-members.png",
+    "title": "Workspace settings — members and roles"
+  },
+  {
+    "file": "console-48-ws-teams.png",
+    "title": "Workspace settings — teams"
+  },
+  {
+    "file": "console-49-ws-metadata.png",
+    "title": "Workspace settings — typed metadata fields (D-18)"
+  },
+  {
+    "file": "console-50-ws-export.png",
+    "title": "Workspace settings — export and import (PX-07)"
+  },
+  {
+    "file": "console-51-ws-catalogs.png",
+    "title": "Workspace settings — remote catalogs (D-28)"
+  },
+  {
+    "file": "console-52-catalog-preview.png",
+    "title": "A catalog sync, previewed as a dry run"
+  },
+  {
+    "file": "console-53-managed-api.png",
+    "title": "An api managed by a catalog: edited at its source, operable here"
+  },
+  {
+    "file": "console-54-gateway-status.png",
+    "title": "Gateway — health, projection queue, ingestion (D-37)"
+  },
+  {
+    "file": "console-55-gateway-drift.png",
+    "title": "Gateway — drift reports"
+  },
+  {
+    "file": "console-56-gateway-connection.png",
+    "title": "Gateway — connection, data exporter, raw path"
+  },
+  {
+    "file": "console-57-global-workspaces.png",
+    "title": "Global settings — workspaces, portal exposure"
+  },
+  {
+    "file": "console-58-global-users.png",
+    "title": "Global settings — users"
+  },
+  {
+    "file": "console-59-global-auth.png",
+    "title": "Global settings — authentication (D-25)"
+  },
+  {
+    "file": "console-60-global-audit-export.png",
+    "title": "Global settings — audit trail exporters"
+  },
+  {
+    "file": "console-61-global-tokens.png",
+    "title": "Global settings — api tokens for the cli and ci"
+  },
+  {
+    "file": "console-62-dark-home.png",
+    "title": "Dark theme — home"
+  },
+  {
+    "file": "console-63-dark-plan.png",
+    "title": "Dark theme — plan editor"
+  },
+  {
+    "file": "portal-01-home.png",
+    "title": "Portal — home of a workspace portal (anonymous visitor)"
+  },
+  {
+    "file": "portal-02-catalogue.png",
+    "title": "Portal — catalogue"
+  },
+  {
+    "file": "portal-03-api.png",
+    "title": "Portal — an api: base url, quickstart, resources"
+  },
+  {
+    "file": "portal-04-docs.png",
+    "title": "Portal — documentation, in the languages of the api"
+  },
+  {
+    "file": "portal-05-reference.png",
+    "title": "Portal — API reference and try-it (Scalar, D-42)"
+  },
+  {
+    "file": "portal-06-plans.png",
+    "title": "Portal — plans: what really applies, per credential"
+  },
+  {
+    "file": "portal-07-signin.png",
+    "title": "Portal — sign in, with the IdP of the workspace"
+  },
+  {
+    "file": "portal-08-signup.png",
+    "title": "Portal — self signup"
+  },
+  {
+    "file": "portal-09-subscribe.png",
+    "title": "Portal — subscribing: application, usage statement, request form, terms"
+  },
+  {
+    "file": "portal-10-apps.png",
+    "title": "Portal — my applications"
+  },
+  {
+    "file": "portal-11-app.png",
+    "title": "Portal — an application: credentials, live quotas, transfer consent (D-30)"
+  },
+  {
+    "file": "portal-12-change-plan.png",
+    "title": "Portal — asking to move to an equivalent plan"
+  },
+  {
+    "file": "portal-13-usage.png",
+    "title": "Portal — my consumption"
+  },
+  {
+    "file": "portal-14-teams.png",
+    "title": "Portal — my teams"
+  },
+  {
+    "file": "portal-15-notifications.png",
+    "title": "Portal — notifications"
+  },
+  {
+    "file": "portal-16-french.png",
+    "title": "Portal — in French"
+  },
+  {
+    "file": "portal-17-dark-home.png",
+    "title": "Portal — dark theme"
+  },
+  {
+    "file": "portal-18-dark-reference.png",
+    "title": "Portal — dark theme, API reference"
+  }
+]

@@ -27,7 +27,7 @@ Dernière mise à jour : 18/11/2026.
 ## Points connus
 
 - **Push bloqué** depuis le redémarrage : la clé SSH n'est plus chargée (`ssh-add`). Les commits s'accumulent en local.
-- Données de démo : le workspace `default` déclare un champ de plan `sla` obligatoire, donc Books et Petstore ne se publient plus tant qu'on ne le renseigne pas (c'est la règle D-18 qui joue).
+- Données de démo : le workspace `default` déclare un champ de plan `sla` obligatoire (démonstration de D-18) ; les plans de Books et Petstore l'ont renseigné.
 
 ---
 
@@ -104,7 +104,9 @@ Dernière mise à jour : 18/11/2026.
 
 ## Documentation
 
-✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 19 pages avec captures d'écran de l'application réelle, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
+✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 20 pages, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
+
+✅ **Visite des écrans** (`documentation/docs/screens.mdx`) : 80 captures de chaque écran de la console et du portail, tiroirs, modales et menus compris, clair et sombre, anglais et français, dans `documentation/static/img/screens/`. Elles sont produites par `bun run screenshots` (Chromium headless), qui régénère aussi la page : à relancer après chaque changement d'interface.
 
 ## Manques côté Otoroshi
 
