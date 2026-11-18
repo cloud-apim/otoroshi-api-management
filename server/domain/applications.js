@@ -3,7 +3,7 @@
 // Whoever can see an application can see its credentials.
 
 import { db, newId } from '../db/index.js';
-import { badRequest, forbidden, notFound } from '../http/router.js';
+import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { findTeam, isTeamMember } from './identity.js';
 import { checkValues } from './metadata.js';
@@ -91,7 +91,13 @@ export async function createApplication(ctx, workspaceId, input) {
   return rows[0];
 }
 
+// what a Kubernetes resource describes changes there: the console refuses, the controller does not
+export function requireUnmanaged(ctx, obj, what) {
+  if (obj.managed_by && ctx.managedBy !== obj.managed_by) throw conflict(`this ${what} is managed by ${obj.managed_by}: change it at its source`, { managed_by: obj.managed_by });
+}
+
 export async function updateApplication(ctx, app, patch) {
+  requireUnmanaged(ctx, app, 'application');
   if (patch.metadata !== undefined)
     patch = { ...patch, metadata: await checkValues(app.workspace_id, 'application', { ...app.metadata, ...patch.metadata }, { only: ctx.via === 'portal' ? (f) => f.portal : null }) };
   const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
@@ -110,6 +116,7 @@ export async function updateApplication(ctx, app, patch) {
 }
 
 export async function deleteApplication(ctx, app) {
+  requireUnmanaged(ctx, app, 'application');
   const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'pending', 'pending_payment')`;
   if (active[0].c > 0) throw badRequest('close the subscriptions of this application first');
   await db`delete from applications where id = ${app.id}`;

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "apim.fullname" . }}
+  labels: {{- include "apim.labels" . | nindent 4 }}
+data:
+  APIM_PUBLIC_URL: {{ .Values.config.publicUrl | quote }}
+  APIM_INSTALLATION_NAME: {{ .Values.config.installationName | quote }}
+  OTOROSHI_URL: {{ .Values.config.otoroshi.url | quote }}
+  OTOROSHI_HOST: {{ .Values.config.otoroshi.host | quote }}
+  OTOROSHI_PUBLIC_SCHEME: {{ .Values.config.otoroshi.publicScheme | quote }}
+  OTOROSHI_PUBLIC_PORT: {{ .Values.config.otoroshi.publicPort | quote }}
+  {{- with .Values.config.otoroshi.backofficeUrl }}
+  OTOROSHI_BACKOFFICE_URL: {{ . | quote }}
+  {{- end }}
+  APIM_INGEST_URL: {{ default (printf "http://%s.%s.svc.cluster.local:%v/ingest" (include "apim.fullname" .) .Release.Namespace .Values.service.port) .Values.config.ingestUrl | quote }}
+  APIM_TENANCY: {{ .Values.config.tenancy | quote }}
+  APIM_PORTAL_EXPOSURE: {{ .Values.config.portal.exposure | quote }}
+  {{- with .Values.config.portal.domain }}
+  APIM_PORTAL_DOMAIN: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.portal.url }}
+  APIM_PORTAL_URL: {{ . | quote }}
+  {{- end }}
+  APIM_BOOTSTRAP_ADMINS: {{ .Values.config.bootstrapAdmins | quote }}
+  APIM_COOKIE_SECURE: {{ .Values.config.cookieSecure | quote }}
+  APIM_KUBE_RESYNC_MS: {{ .Values.controller.resyncMs | quote }}
+  {{- range $k, $v := .Values.config.extraEnv }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}

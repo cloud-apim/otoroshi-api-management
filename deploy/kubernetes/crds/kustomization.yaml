@@ -1,0 +1,7 @@
+# The custom resources of the product — applied alone with `kubectl apply -k deploy/kubernetes/crds`
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - apis.yaml
+  - applications.yaml
+  - subscriptions.yaml

@@ -162,12 +162,18 @@ export function ApplicationPage({ id }) {
               {tab === 'usage' && <AnalyticsDashboard fixed={{ application: app.id }} />}
               {tab === 'identity' && (
                 <div className="card">
-                  {!app.can_see_credentials && (
+                  {app.managed_by ? (
                     <div className="card-body" style={{ paddingBottom: 0 }}>
-                      <Callout kind="info">{tr('Read only: the team of the application and the administrators of the workspace change it.')}</Callout>
+                      <Callout kind="info" title={tr('Managed by {0}', [app.managed_by])}>{tr('A Kubernetes resource describes this application: change it there.')}</Callout>
                     </div>
+                  ) : (
+                    !app.can_see_credentials && (
+                      <div className="card-body" style={{ paddingBottom: 0 }}>
+                        <Callout kind="info">{tr('Read only: the team of the application and the administrators of the workspace change it.')}</Callout>
+                      </div>
+                    )
                   )}
-                  <fieldset disabled={!app.can_see_credentials} className="ro-fieldset card-body">
+                  <fieldset disabled={!app.can_see_credentials || !!app.managed_by} className="ro-fieldset card-body">
                     <Setting label={tr('Name')}>
                       <Input value={f.name} onChange={set('name')} />
                     </Setting>

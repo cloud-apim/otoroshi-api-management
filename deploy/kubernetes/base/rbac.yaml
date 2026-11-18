@@ -1,0 +1,33 @@
+# The controller: the product's resources in every namespace, their status and finalizers; the
+# secrets it writes the credentials of a subscription to; the labels of the namespaces (their
+# workspace). Nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otoroshi-api-management-controller
+rules:
+  - apiGroups: [otoroshi-apim.io]
+    resources: [apis, applications, subscriptions]
+    verbs: [get, list, watch, update, patch]
+  - apiGroups: [otoroshi-apim.io]
+    resources: [apis/status, applications/status, subscriptions/status, apis/finalizers, applications/finalizers, subscriptions/finalizers]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, create, update]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otoroshi-api-management-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otoroshi-api-management-controller
+subjects:
+  - kind: ServiceAccount
+    name: otoroshi-api-management-controller
+    namespace: apim

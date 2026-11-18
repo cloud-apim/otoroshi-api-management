@@ -1,0 +1,77 @@
+# A subscription of an application to a plan of an api. It goes through the approval of the plan
+# like any other request: a plan reviewed by hand keeps it pending until a producer accepts it.
+# Once active, its credentials are written to a Secret of the namespace (spec.credentialsSecret,
+# <name>-credentials by default), owned by the resource. Deleting the resource closes the
+# subscription.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: subscriptions.otoroshi-apim.io
+  labels:
+    app.kubernetes.io/part-of: otoroshi-api-management
+spec:
+  group: otoroshi-apim.io
+  scope: Namespaced
+  names:
+    kind: Subscription
+    singular: subscription
+    plural: subscriptions
+    categories: [otoroshi-apim]
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - { name: Api, type: string, jsonPath: .spec.api }
+        - { name: Plan, type: string, jsonPath: .spec.plan }
+        - { name: Application, type: string, jsonPath: .spec.application }
+        - { name: Phase, type: string, jsonPath: .status.phase }
+        - { name: Secret, type: string, jsonPath: .status.credentialsSecret }
+        - { name: Age, type: date, jsonPath: .metadata.creationTimestamp }
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [api, plan]
+              properties:
+                api:
+                  type: string
+                  description: the slug (or the id) of the api, in the workspace of the namespace
+                version:
+                  type: string
+                  description: the version of the api, 1.0.0 by default
+                plan:
+                  type: string
+                  description: the id of the plan
+                application:
+                  type: string
+                  description: the name of an Application resource of the same namespace
+                applicationId:
+                  type: string
+                  description: or the id of an application of the workspace
+                usage:
+                  type: string
+                  description: the usage statement, when the plan asks for one
+                termsAccepted:
+                  type: boolean
+                metadata:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                credentialsSecret:
+                  type: string
+                  description: the Secret the credentials are written to, <name>-credentials by default
+            status:
+              type: object
+              properties:
+                phase: { type: string }
+                message: { type: string, nullable: true }
+                workspace: { type: string }
+                subscriptionId: { type: string }
+                plan: { type: string }
+                credentialsSecret: { type: string, nullable: true }
+                observedGeneration: { type: integer }
+                lastSyncTime: { type: string }

@@ -1,0 +1,119 @@
+---
+sidebar_position: 6
+title: Kubernetes resources
+description: Apis, applications and subscriptions as resources of the cluster, reconciled by the controller of the product.
+---
+
+# Kubernetes resources
+
+The product's entities can be resources of the cluster: an **Api** (the
+[declarative document](./declarative-documents.mdx)), an **Application**, a **Subscription**, in
+the group `otoroshi-apim.io/v1`. The controller — the role `controller` of the binary, one replica
+(see [Install › On Kubernetes](../install.mdx#on-kubernetes)) — reconciles them into the product,
+which projects them on the gateway as it does any other. They are the same model as the console,
+the [CLI](./cli.mdx) and the [remote catalogs](./remote-catalogs.mdx).
+
+```yaml
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: forecasts
+  namespace: weather
+spec:
+  version: 1.0.0
+  name: Forecasts
+  team: Weather team
+  draft:
+    entrypoint: { domain: forecasts.example.com, contextPath: /v1 }
+    backends:
+      - { id: backend_main, name: main, targets: [{ hostname: forecasts.weather.svc.cluster.local, port: 8080 }] }
+    flows:
+      - { id: flow_default, name: default, plugins: [] }
+    resources:
+      - { id: res_forecasts, name: Forecasts, path: /forecasts, methods: [GET], backendId: backend_main, flowId: flow_default }
+    plans:
+      - { id: plan_forecasts_free, name: Free, status: published, auth: { kind: apikey }, validation: auto }
+---
+apiVersion: otoroshi-apim.io/v1
+kind: Application
+metadata:
+  name: dashboard
+  namespace: weather
+spec:
+  team: Weather team
+---
+apiVersion: otoroshi-apim.io/v1
+kind: Subscription
+metadata:
+  name: dashboard-forecasts
+  namespace: weather
+spec:
+  api: forecasts
+  plan: plan_forecasts_free
+  application: dashboard
+```
+
+`deploy/kubernetes/examples/weather.yaml` holds this example.
+
+## The workspace of a resource
+
+A resource lands in the workspace named by its annotation `otoroshi-apim.io/workspace`, else by
+the label `otoroshi-apim.io/workspace` of its namespace, else by the name of its namespace. The
+workspace has to exist in the product; when it does not, the resource says so in its status.
+
+## The resources
+
+| Resource | Its spec | What the controller does |
+|---|---|---|
+| `Api` | the `spec` of the declarative document, plus `version` (and `slug`, the name of the resource by default) | applies it, publishes a snapshot when it changes, and deploys it |
+| `Application` | `team` (name or id), `name`, `description`, `clientId`, `certificates`, `metadata` | creates or updates the application |
+| `Subscription` | `api` (slug or id), `version`, `plan` (its id), `application` (an Application of the namespace) or `applicationId`, `usage`, `termsAccepted`, `metadata`, `credentialsSecret` | requests the subscription, through the approval of the plan, and writes its credentials to a `Secret` |
+
+**An Api** is deployed by default. The annotation `otoroshi-apim.io/mode` chooses, as for a remote
+catalog: `draft` (the draft only), `publish` (a snapshot, deployed from the console), `deploy`.
+
+**A Subscription** follows the plan's approval: on a plan reviewed by hand it stays `Pending`
+until a producer accepts it in the console. Once active, its credentials are written to the
+`Secret` `<name>-credentials` of the namespace (or `spec.credentialsSecret`) — `clientId`,
+`clientSecret`, `kind` and the `url` of the api — owned by the resource. A workload mounts it; the
+secret follows a rotation. Changing `spec.plan` transfers the subscription to that plan (same
+mechanism, the same key). Writing the credentials to the cluster is in the audit trail
+(`credential.export`).
+
+## Who owns what
+
+What a resource describes is **owned by it**, marked `kubernetes:<namespace>/<plural>/<name>`: the
+console shows it as managed, and refuses to change it — an api's draft, an application, the plan
+or the closing of a subscription change in the resource. Decisions stay in the console: accepting
+or rejecting a request, suspending, resuming, rotating a secret.
+
+**Deleting a resource** deletes what it owns — the api (removed from the gateway), the
+application, and closes the subscription (its `Secret` goes with it). With the annotation
+`otoroshi-apim.io/deletion-policy: detach`, the object stays in the product, editable by hand
+again. A finalizer, `otoroshi-apim.io/cleanup`, holds the resource until it is done.
+
+## The status
+
+```bash
+kubectl get apis.otoroshi-apim.io,applications.otoroshi-apim.io,subscriptions.otoroshi-apim.io -n weather
+```
+
+| Field | |
+|---|---|
+| `phase` | `Ready`, `Deploying`, `Pending`, `Active`, `Suspended`, `Rejected`, `Waiting` (for another resource), `Error` |
+| `message` | what to know, or why it failed |
+| `workspace` | the workspace of the resource |
+| `apiId`, `snapshot`, `deployed`, `url` | an Api: its id, its latest snapshot, the one deployed, its url |
+| `applicationId`, `clientId` | an Application |
+| `subscriptionId`, `plan`, `credentialsSecret` | a Subscription |
+| `observedGeneration` | the generation of the resource the status describes |
+
+A generation already reconciled is not applied again: the controller passes over every resource
+every `APIM_KUBE_RESYNC_MS` (10 s), follows what runs asynchronously — a deployment waiting for the
+gateway — and writes the status only when it changes.
+
+## Its rights
+
+The controller's `ClusterRole`: the three resources, their status and finalizers; `get`, `create`
+and `update` on secrets; `get` on namespaces. In the cluster it uses its service account; outside,
+`APIM_KUBE_URL` and `APIM_KUBE_TOKEN` (with `APIM_KUBE_CA`, or `APIM_KUBE_INSECURE=true`).

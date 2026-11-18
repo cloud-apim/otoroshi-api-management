@@ -17,10 +17,9 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
-2. **R-7** — Stripe connector (D-36, Q-12).
-3. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-4. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-7** — Stripe connector (D-36, Q-12).
+2. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+3. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -75,7 +74,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-6 | D-28 | **Kubernetes**: deployment manifests and a Helm chart; **CRDs** for the product's own entities (Api document, applications, subscriptions) with a controller | L | |
+| R-46 | D-28 | **Render and test the Helm chart** (`helm lint`, `helm template` against a cluster): written, its CRDs checked against the manifests, but not rendered yet — helm is not installed where it was written | S | |
 | R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
@@ -149,7 +148,7 @@ waits for the data plane rather than working around it.
 | D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; Otoroshi mode unit-tested: R-39 |
 | D-26 application, expected `client_id`, `id_ref` | ✅ | client certificates read and checked (console and portal), derived as certificates of the gateway while an mtls subscription is active (`test/derived-objects.test.js`); a subscription of a token or certificate plan carries no consumer identity on Otoroshi (G-17, MAIF/otoroshi#2937): its ApiSubscription carries the application's client id as metadata meanwhile |
 | D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37: R-26): failed projections, waiting ones and drift counted apart, leading to the first of them; a failed task says what it works on, is retried or dismissed, and dismissed by itself when its object is gone |
-| D-28 administrable by program | 🟡 | admin API ✅, CLI ✅, remote catalogs http/git ✅; CRDs and Kubernetes: R-6; object store: R-27 |
+| D-28 administrable by program | 🟡 | admin API ✅, CLI ✅, remote catalogs http/git ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests validated by a k3s api server — `test/kubernetes.test.js`; Helm chart written, to render: R-46; object store: R-27 |
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | multi-api credential: R-12 |

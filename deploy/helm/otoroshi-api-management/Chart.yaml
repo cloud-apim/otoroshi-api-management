@@ -1,0 +1,7 @@
+apiVersion: v2
+name: otoroshi-api-management
+description: The API management console and developer portals that drive an Otoroshi cluster, and the controller of their Kubernetes resources
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [otoroshi, api-management, developer-portal, gateway]

@@ -1,0 +1,12 @@
+otoroshi-api-management {{ .Chart.AppVersion }} — release {{ .Release.Name }} in {{ .Release.Namespace }}
+
+The console:   {{ .Values.config.publicUrl }}/backoffice/
+The admin api: {{ .Values.config.publicUrl }}/api (Authorization: Bearer <the admin token>)
+{{- if .Values.controller.enabled }}
+
+The controller reconciles the resources of the product in every namespace:
+  kubectl get apis.otoroshi-apim.io,applications.otoroshi-apim.io,subscriptions.otoroshi-apim.io -A
+A namespace names its workspace by the label otoroshi-apim.io/workspace (else by its name).
+{{- end }}
+
+The data exporter of the gateway feeds /ingest: install it from the console (Gateway › Connection).

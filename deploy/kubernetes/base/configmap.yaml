@@ -1,0 +1,19 @@
+# What is not secret. Every variable: documentation › Install.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otoroshi-api-management
+data:
+  APIM_PUBLIC_URL: https://apim.example.com
+  APIM_INSTALLATION_NAME: production
+  # the single Otoroshi cluster this installation drives: its admin api
+  OTOROSHI_URL: http://otoroshi-api.otoroshi.svc.cluster.local:8080
+  OTOROSHI_HOST: otoroshi-api.oto.tools
+  OTOROSHI_PUBLIC_SCHEME: https
+  OTOROSHI_PUBLIC_PORT: "443"
+  # /ingest as the gateway reaches it: the target of its data exporter
+  APIM_INGEST_URL: http://otoroshi-api-management.apim.svc.cluster.local:9000/ingest
+  APIM_TENANCY: multi
+  APIM_PORTAL_EXPOSURE: path
+  APIM_BOOTSTRAP_ADMINS: admin@example.com
+  APIM_COOKIE_SECURE: "true"

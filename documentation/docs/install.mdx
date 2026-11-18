@@ -6,10 +6,10 @@ description: Deployment roles, configuration, databases, the container image, th
 
 # Install
 
-## One binary, four roles
+## One binary, five roles
 
 The product is a single Bun program, started with a comma-separated list of roles in `APIM_ROLES`
-(default: all of them). A deployment can carry every role, or split them according to load and
+(default: the first four). A deployment can carry every role, or split them according to load and
 exposure — the public portal and the ingester do not have the same profile as the console.
 
 | Role | Serves |
@@ -18,6 +18,7 @@ exposure — the public portal and the ingester do not have the same profile as 
 | `backoffice` | `/backoffice` (the console) and `/backoffice/api` (the same admin API, with a session) |
 | `portal` | `/<workspace>/` and `/<workspace>/front/api` — or `<workspace>.<domain>/` in hostname mode |
 | `ingester` | `/ingest` |
+| `controller` | no route: reconciles the [Kubernetes resources](./gitops/kubernetes.mdx) of the product — not a default role |
 
 `/health` answers `{"status":"ok","roles":[…]}` on every instance.
 
@@ -36,6 +37,40 @@ docker run -p 9000:9000 \
 
 The image builds both UIs in a first stage and carries `git`, used by the git
 [remote catalogs](./gitops/remote-catalogs.mdx).
+
+## On Kubernetes
+
+Two ways, the same resources: the product (its four serving roles, several replicas), its
+controller (one replica), and the custom resources it reconciles.
+
+**Kustomize**, with `kubectl` alone:
+
+```bash
+kubectl create namespace apim
+kubectl -n apim apply -f deploy/kubernetes/secret.example.yaml   # edited: databases, Otoroshi key, tokens
+kubectl apply -k deploy/kubernetes/base                          # edit configmap.yaml first, or overlay it
+```
+
+`deploy/kubernetes/base` holds the CRDs, a `ConfigMap` of what is not secret, the deployments of
+the product and of its controller, their service accounts, the `ClusterRole` of the controller and
+the service. An overlay changes the namespace (`apim` by default), the image and the
+configuration.
+
+**Helm**, the chart `deploy/helm/otoroshi-api-management`:
+
+```bash
+helm install apim deploy/helm/otoroshi-api-management -n apim --create-namespace \
+  --set config.publicUrl=https://apim.example.com \
+  --set config.otoroshi.url=http://otoroshi-api.otoroshi.svc.cluster.local:8080 \
+  --set secrets.existingSecret=otoroshi-api-management
+```
+
+Its values follow the variables of the configuration below: `config.*` for what is not secret,
+`secrets.*` (or `secrets.existingSecret`, a `Secret` with the keys of `secret.example.yaml`),
+`controller.enabled`, `ingress.*`. The CRDs are in its `crds/` folder: Helm installs them first.
+
+The databases are not part of either: point the product at a managed PostgreSQL, or at one you run
+in the cluster.
 
 ## Databases
 

@@ -16,6 +16,7 @@ import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiSubscription } from '../otoroshi/projection.js';
 import { checkValues } from './metadata.js';
 import { notify } from './notifications.js';
+import { requireUnmanaged } from './applications.js';
 
 export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
 
@@ -186,6 +187,7 @@ export async function resumeSubscription(ctx, sub) {
 }
 
 export async function closeSubscription(ctx, sub) {
+  requireUnmanaged(ctx, sub, 'subscription');
   if (!OPEN_STATUSES.includes(sub.status)) throw badRequest(`a ${sub.status} subscription cannot be closed`);
   return setStatus(ctx, sub, 'closed', { datesPatch: { closed_at: now() }, action: 'subscription.close', summary: `subscription ${sub.id} closed` });
 }
@@ -287,6 +289,7 @@ function pending(ctx, t, status, extra = {}) {
 // A producer transfers: applied at once when nothing degrades, otherwise it waits for the
 // consumer's consent. A consumer asks: the producer decides, the request carries the consent.
 export async function transferSubscription(ctx, sub, { plan_id, api_id }, { initiator = 'producer' } = {}) {
+  requireUnmanaged(ctx, sub, 'subscription');
   const t = await resolveTransfer(sub, { plan_id, api_id });
   if (initiator === 'consumer') {
     const pt = pending(ctx, t, 'requested', { consent: { by: ctx.user?.email, at: now() } });

@@ -417,6 +417,16 @@ insert into notification_states (notification_id, user_id, read_at)
 on conflict do nothing;
 `,
   },
+  {
+    version: '0010_managed_consumers',
+    sql: `
+-- an application or a subscription a Kubernetes resource describes: kubernetes:<namespace>/<kind>/<name>
+alter table applications add column managed_by text;
+alter table subscriptions add column managed_by text;
+create index applications_managed_by on applications(managed_by) where managed_by is not null;
+create index subscriptions_managed_by on subscriptions(managed_by) where managed_by is not null;
+`,
+  },
 ];
 
 export const analyticsMigrations = [

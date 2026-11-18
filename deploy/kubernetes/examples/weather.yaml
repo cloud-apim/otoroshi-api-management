@@ -1,0 +1,48 @@
+# An api, an application and its subscription, as resources of the namespace "weather" — the
+# workspace of the same name (or the one its label otoroshi-apim.io/workspace names).
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: forecasts
+  namespace: weather
+spec:
+  version: 1.0.0
+  name: Forecasts
+  description: The forecast of the next days, city by city.
+  team: Weather team
+  tags: [weather, public]
+  draft:
+    entrypoint: { domain: forecasts.example.com, contextPath: /v1 }
+    backends:
+      - { id: backend_main, name: main, targets: [{ hostname: forecasts.weather.svc.cluster.local, port: 8080 }] }
+    flows:
+      - { id: flow_default, name: default, plugins: [] }
+    resources:
+      - { id: res_forecasts, name: Forecasts, path: /forecasts, methods: [GET], backendId: backend_main, flowId: flow_default }
+    plans:
+      - id: plan_forecasts_free
+        name: Free
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 10, windowMs: 1000 }
+        validation: auto
+---
+apiVersion: otoroshi-apim.io/v1
+kind: Application
+metadata:
+  name: dashboard
+  namespace: weather
+spec:
+  name: Weather dashboard
+  team: Weather team
+---
+# active at once on an automatic plan: its key is in the Secret dashboard-forecasts-credentials
+apiVersion: otoroshi-apim.io/v1
+kind: Subscription
+metadata:
+  name: dashboard-forecasts
+  namespace: weather
+spec:
+  api: forecasts
+  plan: plan_forecasts_free
+  application: dashboard

@@ -1,0 +1,60 @@
+# The product: the admin api, the console, the developer portals and the ingester, in one image.
+# Several replicas share the work of the projection queue: a task is claimed by one of them.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otoroshi-api-management
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otoroshi-api-management
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otoroshi-api-management
+    spec:
+      serviceAccountName: otoroshi-api-management
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: apim
+          image: otoroshi-api-management
+          ports:
+            - { name: http, containerPort: 9000 }
+          env:
+            - { name: APIM_ROLES, value: "ingester,api,backoffice,portal" }
+            - { name: APIM_DATABASE_URL, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: database-url } } }
+            - { name: APIM_ANALYTICS_DATABASE_URL, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: analytics-database-url } } }
+            - { name: OTOROSHI_CLIENT_ID, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-id } } }
+            - { name: OTOROSHI_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-secret } } }
+            - { name: APIM_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: admin-token } } }
+            - { name: APIM_INGEST_TOKEN, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: ingest-token } } }
+            - { name: APIM_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: bootstrap-password } } }
+          envFrom:
+            - configMapRef: { name: otoroshi-api-management }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otoroshi-api-management
+spec:
+  selector:
+    app.kubernetes.io/name: otoroshi-api-management
+  ports:
+    - { name: http, port: 9000, targetPort: http }

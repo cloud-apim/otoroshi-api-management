@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apim.fullname" . }}
+  labels: {{- include "apim.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "apim.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "apim.fullname" . }}
+        {{- include "apim.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: apim
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 9000 }
+          env:
+            - { name: APIM_ROLES, value: {{ .Values.roles | quote }} }
+            {{- include "apim.env" . | nindent 12 }}
+            - { name: APIM_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: admin-token } } }
+            - { name: APIM_INGEST_TOKEN, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: ingest-token } } }
+          envFrom:
+            - configMapRef: { name: {{ include "apim.fullname" . }} }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}

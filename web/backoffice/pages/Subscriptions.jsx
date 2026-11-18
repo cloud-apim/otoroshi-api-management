@@ -334,7 +334,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                   <Icon name="play" /> {tr('Resume')}
                 </button>
               )}
-              {['active', 'suspended'].includes(s.status) && (
+              {['active', 'suspended'].includes(s.status) && !s.managed_by && (
                 <button className="btn" disabled={busy} onClick={() => setTransfer(true)}>
                   <Icon name="swap" /> {tr('Transfer to another plan')}
                 </button>
@@ -348,7 +348,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                 <Icon name="refresh" /> {tr('Replay projection')}
               </button>
               <span className="spacer" />
-              {['pending', 'pending_payment', 'active', 'suspended'].includes(s.status) && (
+              {s.managed_by && <span className="faint small">{tr('Its plan and its closing belong to {0}.', [s.managed_by])}</span>}
+              {['pending', 'pending_payment', 'active', 'suspended'].includes(s.status) && !s.managed_by && (
                 <button
                   className="btn danger"
                   disabled={busy}

@@ -3,6 +3,7 @@
 //   api        -> /api                     (bearer token)
 //   backoffice -> /backoffice, /backoffice/api   (console session)
 //   portal     -> /, /front/api             (one portal per workspace)
+//   controller -> no route: reconciles the Kubernetes resources of the product (not a default role)
 
 import { join, normalize } from 'node:path';
 import { config, hasRole } from './config.js';
@@ -298,6 +299,10 @@ async function start() {
   await identity.bootstrap();
   await identity.checkTenancy();
   await recordPortalForm();
+  if (hasRole('controller')) {
+    const { startController } = await import('./kube/controller.js');
+    startController();
+  }
   const server = Bun.serve({ port: config.port, fetch: fetchHandler, idleTimeout: 60, maxRequestBodySize: 50 * 1024 * 1024 });
   console.log(`[apim] listening on ${server.url} with roles: ${config.roles.join(', ')}`);
   if (config.workers.enabled && (hasRole('api') || hasRole('backoffice'))) {

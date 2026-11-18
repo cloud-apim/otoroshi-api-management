@@ -1,0 +1,63 @@
+# An application of the product: it groups the subscriptions and the technical identity of a
+# consumer. Owned by a team of the workspace of its namespace.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: applications.otoroshi-apim.io
+  labels:
+    app.kubernetes.io/part-of: otoroshi-api-management
+spec:
+  group: otoroshi-apim.io
+  scope: Namespaced
+  names:
+    kind: Application
+    singular: application
+    plural: applications
+    categories: [otoroshi-apim]
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - { name: Team, type: string, jsonPath: .spec.team }
+        - { name: Phase, type: string, jsonPath: .status.phase }
+        - { name: Client id, type: string, jsonPath: .status.clientId, priority: 1 }
+        - { name: Age, type: date, jsonPath: .metadata.creationTimestamp }
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [team]
+              properties:
+                name:
+                  type: string
+                  description: by default the name of the resource
+                description:
+                  type: string
+                team:
+                  type: string
+                  description: the name (or the id) of the team that owns the application
+                clientId:
+                  type: string
+                  description: the client id the application calls with on jwt, mtls and oauth2-remote plans
+                certificates:
+                  type: array
+                  description: its client certificates (PEM), never a private key
+                  items: { type: string }
+                metadata:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                phase: { type: string }
+                message: { type: string, nullable: true }
+                workspace: { type: string }
+                applicationId: { type: string }
+                clientId: { type: string, nullable: true }
+                observedGeneration: { type: integer }
+                lastSyncTime: { type: string }

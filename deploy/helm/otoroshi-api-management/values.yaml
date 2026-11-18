@@ -1,0 +1,82 @@
+# otoroshi-api-management — every value maps to a variable of the documentation › Install.
+
+image:
+  repository: otoroshi-api-management
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# the product: admin api, console, developer portals, ingester. Several replicas share the
+# projection queue (a task is claimed by one of them).
+replicaCount: 2
+roles: ingester,api,backoffice,portal
+
+# the controller of the product's resources (Api, Application, Subscription): one replica
+controller:
+  enabled: true
+  resyncMs: 10000
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+
+config:
+  publicUrl: https://apim.example.com
+  installationName: production
+  # the single Otoroshi cluster this installation drives
+  otoroshi:
+    url: http://otoroshi-api.otoroshi.svc.cluster.local:8080
+    host: otoroshi-api.oto.tools
+    publicScheme: https
+    publicPort: 443
+    backofficeUrl: ""
+  # /ingest as the gateway reaches it; empty: the service of this release
+  ingestUrl: ""
+  tenancy: multi
+  portal:
+    exposure: path
+    domain: ""
+    url: ""
+  bootstrapAdmins: admin@example.com
+  cookieSecure: true
+  # any other variable
+  extraEnv: {}
+
+# the secrets: an existing Secret (with the keys below), or the values here
+secrets:
+  existingSecret: ""
+  databaseUrl: ""
+  analyticsDatabaseUrl: ""
+  otoroshiClientId: ""
+  otoroshiClientSecret: ""
+  adminToken: ""
+  ingestToken: ""
+  bootstrapPassword: ""
+
+service:
+  type: ClusterIP
+  port: 9000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # the console, the admin api and the portals by path; add the portal hosts with the hostname exposure
+  hosts:
+    - host: apim.example.com
+      paths: [{ path: /, pathType: Prefix }]
+  tls: []
+
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { memory: 1Gi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities: { drop: [ALL] }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

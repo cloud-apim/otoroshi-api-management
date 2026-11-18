@@ -1,0 +1,24 @@
+# otoroshi-api-management on Kubernetes: the product (api, console, portals, ingester), its
+# controller of the cluster's resources, and the custom resources it reconciles.
+#
+#   kubectl create namespace apim
+#   kubectl -n apim apply -f secret.example.yaml   # edited: databases, Otoroshi key, tokens
+#   kubectl -n apim apply -k deploy/kubernetes/base
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# change it in an overlay: the binding of the controller follows
+namespace: apim
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: otoroshi-api-management
+resources:
+  - ../crds
+  - configmap.yaml
+  - serviceaccount.yaml
+  - rbac.yaml
+  - apim.yaml
+  - controller.yaml
+images:
+  - name: otoroshi-api-management
+    newName: otoroshi-api-management
+    newTag: latest

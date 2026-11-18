@@ -1,0 +1,47 @@
+# The controller of the product's resources (role `controller`). One replica: two would reconcile
+# the same resources twice, harmlessly but for nothing. Its workers are off: the projection queue
+# is the product's.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otoroshi-api-management-controller
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otoroshi-api-management-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: otoroshi-api-management-controller
+    spec:
+      serviceAccountName: otoroshi-api-management-controller
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: controller
+          image: otoroshi-api-management
+          ports:
+            - { name: http, containerPort: 9000 }
+          env:
+            - { name: APIM_ROLES, value: controller }
+            - { name: APIM_WORKERS_ENABLED, value: "false" }
+            - { name: APIM_DATABASE_URL, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: database-url } } }
+            - { name: APIM_ANALYTICS_DATABASE_URL, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: analytics-database-url } } }
+            - { name: OTOROSHI_CLIENT_ID, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-id } } }
+            - { name: OTOROSHI_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-secret } } }
+            - { name: APIM_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: bootstrap-password } } }
+          envFrom:
+            - configMapRef: { name: otoroshi-api-management }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }

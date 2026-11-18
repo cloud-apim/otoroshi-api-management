@@ -1,0 +1,83 @@
+# An api-version of the product, as a resource of the cluster: its spec is the spec of the
+# declarative document (`apim get api -o yaml`). The controller applies it to the workspace of its
+# namespace, publishes it and deploys it — the annotation otoroshi-apim.io/mode chooses: draft,
+# publish or deploy (the default). Deleting the resource deletes the api, or detaches it
+# (otoroshi-apim.io/deletion-policy: detach).
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: apis.otoroshi-apim.io
+  labels:
+    app.kubernetes.io/part-of: otoroshi-api-management
+spec:
+  group: otoroshi-apim.io
+  scope: Namespaced
+  names:
+    kind: Api
+    singular: api
+    plural: apis
+    categories: [otoroshi-apim]
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - { name: Version, type: string, jsonPath: .spec.version }
+        - { name: Phase, type: string, jsonPath: .status.phase }
+        - { name: Snapshot, type: integer, jsonPath: .status.snapshot }
+        - { name: Deployed, type: integer, jsonPath: .status.deployed }
+        - { name: Url, type: string, jsonPath: .status.url, priority: 1 }
+        - { name: Age, type: date, jsonPath: .metadata.creationTimestamp }
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                slug:
+                  type: string
+                  description: the slug of the api in its workspace — by default the name of the resource
+                version:
+                  type: string
+                  description: the version this resource describes (an api-version is an api), 1.0.0 by default
+                name:
+                  type: string
+                description:
+                  type: string
+                team:
+                  type: string
+                  description: the name (or the id) of the team that owns the api
+                tags:
+                  type: array
+                  items: { type: string }
+                visibility:
+                  type: string
+                  enum: [public, authenticated, restricted]
+                acl:
+                  type: array
+                  items: { type: string }
+                draft:
+                  type: object
+                  description: entrypoint, backends, flows, resources and plans — the draft of the declarative document
+                  x-kubernetes-preserve-unknown-fields: true
+                pages:
+                  type: array
+                  description: the documentation pages
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                phase: { type: string }
+                message: { type: string, nullable: true }
+                workspace: { type: string }
+                apiId: { type: string }
+                snapshot: { type: integer, nullable: true }
+                deployed: { type: integer, nullable: true }
+                url: { type: string, nullable: true }
+                observedGeneration: { type: integer }
+                lastSyncTime: { type: string }

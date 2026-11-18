@@ -77,6 +77,11 @@ export const config = {
     url: env.APIM_PORTAL_URL || null,
   },
 
+  // the Kubernetes controller (role `controller`): a pass over its resources every resyncMs
+  kube: {
+    resyncMs: parseInt(env.APIM_KUBE_RESYNC_MS || '10000', 10),
+  },
+
   workers: {
     projectionIntervalMs: parseInt(env.APIM_PROJECTION_INTERVAL_MS || '2000', 10),
     driftIntervalMs: parseInt(env.APIM_DRIFT_INTERVAL_MS || '60000', 10),

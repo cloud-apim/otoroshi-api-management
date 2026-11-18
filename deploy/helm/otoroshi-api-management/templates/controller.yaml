@@ -1,0 +1,83 @@
+{{- if .Values.controller.enabled }}
+# the controller of the product's resources: its account, its rights, one replica
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "apim.fullname" . }}-controller
+  labels: {{- include "apim.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "apim.fullname" . }}-controller
+  labels: {{- include "apim.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [otoroshi-apim.io]
+    resources: [apis, applications, subscriptions]
+    verbs: [get, list, watch, update, patch]
+  - apiGroups: [otoroshi-apim.io]
+    resources: [apis/status, applications/status, subscriptions/status, apis/finalizers, applications/finalizers, subscriptions/finalizers]
+    verbs: [get, update, patch]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, create, update]
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "apim.fullname" . }}-controller
+  labels: {{- include "apim.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "apim.fullname" . }}-controller
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "apim.fullname" . }}-controller
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "apim.fullname" . }}-controller
+  labels: {{- include "apim.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "apim.fullname" . }}-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "apim.fullname" . }}-controller
+        {{- include "apim.labels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "apim.fullname" . }}-controller
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: controller
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 9000 }
+          env:
+            - { name: APIM_ROLES, value: controller }
+            - { name: APIM_WORKERS_ENABLED, value: "false" }
+            {{- include "apim.env" . | nindent 12 }}
+          envFrom:
+            - configMapRef: { name: {{ include "apim.fullname" . }} }
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.controller.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+{{- end }}
