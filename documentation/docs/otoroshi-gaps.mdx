@@ -32,7 +32,7 @@ Reference: Otoroshi 18.0.1.
 | G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
 | G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | warns on the plan |
 | G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
-| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity: suspending or closing it changes nothing at the gateway | high | calls attributed at ingestion; application certificates trusted only while an mtls subscription is active |
+| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity: suspending or closing it changes nothing at the gateway | high | client id carried as metadata of the subscription; calls attributed at ingestion; application certificates trusted only while an mtls subscription is active |
 
 ## The ones to keep in mind
 
@@ -47,3 +47,11 @@ API to anyone. The console warns at validation and at deployment.
 the gateway sees with the catalogue, but does not stop an unsubscribed caller holding a valid token.
 Until a "subscription required" mode exists upstream, treat these plans as open to anyone your
 identity provider issues tokens to.
+
+**G-17 — suspending a token or certificate subscription.** On jwt, mtls and oauth2-remote plans,
+suspending or closing a subscription does not stop its consumer at the gateway: Otoroshi builds
+the consumer from the token or the certificate at each call, unrelated to the subscription. The
+only exception is a self-signed client certificate, which the gateway stops trusting. The
+subscription already carries the client id its application declares (metadata `apim_client_id`),
+ready for the upstream fix ([MAIF/otoroshi#2937](https://github.com/MAIF/otoroshi/issues/2937)).
+Until then, revoke such a consumer at its identity provider or its certificate authority.

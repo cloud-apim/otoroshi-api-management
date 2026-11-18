@@ -145,3 +145,16 @@ describe('client certificates of applications', () => {
     expect(codes).toContain('no_client_id_field');
   });
 });
+
+describe('subscriptions of token and certificate plans', () => {
+  const sub = (auth_kind) => ({ id: 'sub_1', workspace_id: 'ws_1', api_id: 'api_atlas', plan_id: 'plan_1', application_id: 'app_1', auth_kind, status: 'active', dates: {} });
+  const app = { id: 'app_1', name: 'Partner app', client_id: 'partner-42' };
+
+  test('carry the client id the application declares, for when Otoroshi reads one', async () => {
+    const { buildOtoroshiSubscription } = await import('../server/otoroshi/projection.js');
+    for (const kind of ['jwt', 'mtls', 'oauth2-remote']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).metadata.apim_client_id).toBe('partner-42');
+    // the key of an apikey plan is its identity; an application without a client id has nothing to carry
+    for (const kind of ['apikey', 'oauth2-local', 'keyless']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).metadata.apim_client_id).toBeUndefined();
+    expect(buildOtoroshiSubscription(sub('jwt'), { application: { ...app, client_id: null } }).metadata.apim_client_id).toBeUndefined();
+  });
+});

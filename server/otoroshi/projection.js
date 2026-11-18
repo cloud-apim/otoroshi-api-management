@@ -479,10 +479,16 @@ function ms(d) {
   return d ? new Date(d).getTime() : Date.now();
 }
 
-// a subscription is always an Otoroshi apikey; on apikey / oauth2-local plans Otoroshi mints it
-// from the ApiSubscription. The application is projected as an id_ref metadata on the key.
+// the kinds whose consumer the gateway builds at call time, from a token or a certificate
+export const IDENTITY_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
+
+// on apikey / oauth2-local plans Otoroshi mints the key from the ApiSubscription; the application is
+// projected as an id_ref metadata on the key. On jwt / mtls / oauth2-remote plans Otoroshi mints
+// nothing and the ApiSubscription has no field for who calls (G-17): the client id the application
+// declares is carried as metadata, so that it is there once Otoroshi reads one.
 export function buildOtoroshiSubscription(sub, { application }) {
   const enabled = sub.status === 'active';
+  const clientId = IDENTITY_KINDS.includes(sub.auth_kind) && application?.client_id ? application.client_id : null;
   return {
     _loc: { tenant: 'default', teams: ['default'] },
     id: sub.id,
@@ -494,6 +500,7 @@ export function buildOtoroshiSubscription(sub, { application }) {
       [META.subscription]: sub.id,
       [META.workspace]: sub.workspace_id,
       [META.managedBy]: 'otoroshi-api-management',
+      ...(clientId ? { [META.clientId]: clientId } : {}),
     },
     // never project a pending subscription as enabled: Otoroshi 18 enables the key of a pending one
     status: enabled ? 'enabled' : 'disabled',

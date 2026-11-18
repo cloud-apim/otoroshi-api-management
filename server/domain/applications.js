@@ -10,7 +10,7 @@ import { checkValues } from './metadata.js';
 import { readCertificate } from './pki.js';
 import { enqueue, registerTaskHandler } from './tasks.js';
 import { oto } from '../otoroshi/client.js';
-import { applicationCertificates } from '../otoroshi/projection.js';
+import { IDENTITY_KINDS, applicationCertificates } from '../otoroshi/projection.js';
 
 export async function listApplications(workspaceId, { userId = null, teamId = null } = {}) {
   return db`select a.*, t.name as team_name, t.personal as team_personal,
@@ -100,6 +100,12 @@ export async function updateApplication(ctx, app, patch) {
     where id = ${app.id} returning *`;
   await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated` });
   if (patch.certificates !== undefined || patch.name !== undefined) await syncCertificates(rows[0]);
+  // the subscriptions without a key carry the client id the application declares
+  if ((rows[0].client_id || null) !== (app.client_id || null)) {
+    const subs = await db`select id from subscriptions where application_id = ${app.id} and status in ('active', 'suspended')
+      and auth_kind = any(${'{' + IDENTITY_KINDS.join(',') + '}'}::text[])`;
+    for (const s of subs) await enqueue('sync_subscription', { subscription_id: s.id }, { dedupeKey: `sub:${s.id}` });
+  }
   return rows[0];
 }
 

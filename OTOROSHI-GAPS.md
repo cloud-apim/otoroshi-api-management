@@ -26,7 +26,7 @@ the product has to compensate, **low** = friction.
 | G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
 | G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
 | G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
-| G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
+| G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
 
 ---
 
@@ -244,23 +244,46 @@ switch), and an optional per-plan list of trusted CA certificate ids checked on 
 
 ## G-17 — token and certificate subscriptions carry no consumer identity — high
 
+Upstream: [MAIF/otoroshi#2937](https://github.com/MAIF/otoroshi/issues/2937).
+
 **Observed.** On `jwt`, `mtls` and `oauth2-remote` plans, an `ApiSubscription` creates nothing
-(`next/models/Api.scala:1203`: only `apikey` and `oauth2-local` subscriptions mint a key) and
-carries no identity of its consumer — `owner_ref` is the application, not a client id or a
-certificate. The extractor builds the consumer at call time as `<kind>_<planId>_<clientId>`
-(`next/plugins/apimgmt.scala`), unrelated to any subscription. So suspending or closing such a
-subscription changes nothing at the gateway, and a call cannot be tied to the subscription it was
-made under — even once G-4 refuses unsubscribed callers, there is nothing to resolve them against.
+and carries no identity of its consumer — `owner_ref` is the application, `token_refs` stays
+empty. `ApiSubscription.handleSubscriptionChanged` (`next/models/Api.scala:1188`) only creates
+(`createNewApikeyFromPlan`) and updates (`updateApikeyFromPlan`) keys for `apikey` and
+`oauth2-local` subscriptions. The extractor builds the consumer at call time as
+`<kind>_<planId>_<clientId>` — the prefix is set by `pluginsForPlan`
+(`next/models/Api.scala:1868`, `:1894`, `:1917`) — without looking at any subscription. So
+suspending or closing such a subscription changes nothing at the gateway, and a call cannot be tied
+to the subscription it was made under — even once G-4 refuses unsubscribed callers, there is
+nothing to resolve them against.
+
+**What makes the fix small.** `ApikeyFromPlan.resolveOrCreate` (`next/plugins/apimgmt.scala:200`)
+never mints over an existing key, and refuses a disabled one (401 and `RevokedApiKeyUsageAlert`).
+A key `<kind>_<planId>_<clientId>` saved ahead of the first call, enabled or not, therefore decides
+for that consumer.
+
+**Why the product does not save that key itself.** It would rely on the extractor's naming
+convention, not on a contract; it would copy what `generateNewApikeyFromPlan` builds from a plan
+(quotas, throttling, restrictions, rotation) and keep it in step with every plan change, which
+Otoroshi only does for `apikey` and `oauth2-local` subscriptions; and a closed subscription would
+have to leave its key disabled forever, since a deleted one is minted again at the next call. It
+is the data plane's job.
 
 **Product meanwhile.** The application declares its expected client id and its client
-certificates. The ingester attributes `<kind>_<planId>_<clientId>` consumers to the subscription of
-the application that declared that client id. The certificates of an application are derived as
-certificates of the gateway only while it has an active subscription to an mtls plan: suspending
-or closing removes the trust in a self-signed certificate (one signed by a CA the gateway trusts is
-not affected).
+certificates. The ApiSubscription of a jwt, mtls or oauth2-remote plan carries that client id as
+the metadata `apim_client_id`, re-projected when the application changes it and checked for
+drift: ignored by Otoroshi today, in place once it reads one. The ingester attributes
+`<kind>_<planId>_<clientId>` consumers to the subscription of the application that declared that
+client id. The certificates of an application are derived as certificates of the gateway only
+while it has an active subscription to an mtls plan: suspending or closing removes the trust in a
+self-signed certificate (one signed by a CA the gateway trusts is not affected).
 
-**Upstream fix.** An identity on the `ApiSubscription` of these kinds (the client id, or the
-certificate subject), from which Otoroshi provisions the consumer `<kind>_<planId>_<clientId>`
-with the plan's settings, enabled or not with the subscription — and which G-4's "subscription
-required" resolves against.
-
+**Upstream fix** (detailed in the issue). A `client_id` field on `ApiSubscription`, as the plan
+reads it, immutable, unique per plan. On create, Otoroshi saves the key `<plan prefix><client_id>`
+with `generateNewApikeyFromPlan` — or takes over the one minted on the fly — and references it in
+`token_refs`; on update and on plan changes the key follows the plan and the status (enabled only
+when the subscription is); deleting the subscription leaves its key disabled. Every key minted for
+these plans, on the fly or by a subscription, carries the metadata `api_id`, `plan_id`,
+`access_mode` (`jwt`, `mtls`, `oauth2-remote`) and `plan_consumer: "true"`, written after the
+template's. G-4's "subscription required" then only turns `create_if_missing` off: an unknown
+client id has no key and is refused.

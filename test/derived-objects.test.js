@@ -176,6 +176,11 @@ describe('derived objects', () => {
     const [cert] = await onGateway();
     expect(cert.chain.replace(/\s+/g, '')).toBe(CA.replace(/\s+/g, ''));
     expect(cert.metadata.apim_derived).toBe('true');
+    // the subscription carries the client id the application declares, and follows it
+    const projected = () => otoroshi('GET', `/apis/apis.otoroshi.io/v1/apisubscriptions/${sub.id}`);
+    expect((await projected()).metadata.apim_client_id).toBe('Atlas Partner CA');
+    await call('PUT', ws(`/applications/${app.id}`), { client_id: 'atlas-partner' });
+    expect((await projected()).metadata.apim_client_id).toBe('atlas-partner');
     // suspended: the gateway no longer trusts it; resumed: back
     await call('POST', ws(`/subscriptions/${sub.id}/suspend`), {});
     expect(await onGateway()).toEqual([]);

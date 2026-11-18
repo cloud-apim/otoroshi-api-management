@@ -14,6 +14,7 @@ export const META = {
   subscription: 'apim_subscription_id',
   application: 'id_ref', // the application is projected as an id_ref metadata on the apikey
   managedBy: 'apim_managed_by',
+  clientId: 'apim_client_id', // the client id an application declares, on the subscriptions that have no key
 };
 
 let cached = null;
