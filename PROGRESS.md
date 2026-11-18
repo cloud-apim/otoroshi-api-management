@@ -17,13 +17,12 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-3** — hostname exposure of the portals, redirects, mono-tenant (D-20).
-2. **R-4** — promotion of a snapshot to the next installation (D-37).
-3. **R-5** — console in French (D-11).
-4. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
-5. **R-7** — Stripe connector (D-36, Q-12).
-6. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-7. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-4** — promotion of a snapshot to the next installation (D-37).
+2. **R-5** — console in French (D-11).
+3. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
+4. **R-7** — Stripe connector (D-36, Q-12).
+5. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+6. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -58,7 +57,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-3 | D-20 | **Hostname exposure** (`<workspace>.<domain>`): coded, never run; **redirects** from the old url form when the pattern changes; in **mono-tenant**, no prefix and no selector at all | M | |
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
 | R-21 | §8 | **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
@@ -148,7 +146,7 @@ waits for the data plane rather than working around it.
 | D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
 | D-19 workspace + teams, global users | ✅ | an admin only sees the members of its workspaces |
-| D-20 one portal per workspace, resolved from the url | 🟡 | path exposure ✅; hostname, redirects, mono-tenant: R-3 |
+| D-20 one portal per workspace, resolved from the url | ✅ | by root path, by hostname, or one workspace at the root (`APIM_TENANCY=single`: no prefix, no selector); the forms served before are recorded and their urls redirected (`301`/`308`) to the same page — `test/portal-exposure.test.js`, `test/portal-forms.test.js`; `portal_url` given by the admin api |
 | D-22 described / deployed state, diff before acting | ✅ | dry-run before every deployment |
 | D-24 `default` location + ownership marking | ✅ | |
 | D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; Otoroshi mode unit-tested: R-39 |

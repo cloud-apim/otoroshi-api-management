@@ -93,7 +93,11 @@ function Portal() {
     <div className="col gap-16">
       {ro && <Callout kind="info">Read only: the administrators of the workspace change the portal.</Callout>}
       <Callout kind="info">
-        One portal per workspace, at <a className="link" href={`/${ws.slug}/`} target="_blank" rel="noreferrer">/{ws.slug}/</a>. Its exposure pattern — root path or hostname — is an installation setting.
+        One portal per workspace, at{' '}
+        <a className="link mono" href={ws.portal_url} target="_blank" rel="noreferrer">
+          {ws.portal_url}
+        </a>
+        . Its exposure — by root path, by hostname, or at the root of a single-workspace installation — is an installation setting.
       </Callout>
       <div className="card">
         <div className="card-head">
@@ -154,7 +158,7 @@ function Portal() {
           <Setting label="Self signup" help="anyone can create an account and get a key on public plans">
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
           </Setting>
-          <Setting label="Identity provider" help={`One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: ${window.location.origin}/${ws.slug}/front/api/auth/oidc/callback`}>
+          <Setting label="Identity provider" help={`One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: ${String(ws.portal_url || '').replace(/\/$/, '')}/front/api/auth/oidc/callback`}>
             <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label="Sign in with an OpenID Connect provider" />
             {p.oidc?.enabled && (
               <>

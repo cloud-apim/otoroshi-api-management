@@ -47,7 +47,7 @@ function PortalsOnly({ user, portals, onSignedOut }) {
           </p>
           <div className="col gap-6">
             {portals.map((w) => (
-              <a key={w.id} className="btn primary" href={`/${w.slug}/`}>
+              <a key={w.id} className="btn primary" href={w.portal_url}>
                 {w.name} — developer portal
               </a>
             ))}

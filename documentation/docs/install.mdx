@@ -102,8 +102,10 @@ One installation drives one Otoroshi cluster, with an administration key.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `APIM_PORTAL_EXPOSURE` | `path` | `path`: `<domain>/<workspace>/` · `hostname`: `<workspace>.<domain>/` |
+| `APIM_TENANCY` | `multi` | `multi`: one portal per workspace · `single`: one workspace, its portal at the root, no workspace selector |
+| `APIM_PORTAL_EXPOSURE` | `path` | with several workspaces — `path`: `<portal url>/<workspace>/` · `hostname`: `<workspace>.<domain>/` |
 | `APIM_PORTAL_DOMAIN` | `portal.oto.tools` | the domain of the hostname mode |
+| `APIM_PORTAL_URL` | `APIM_PUBLIC_URL` | the public base of the portals; its scheme and port make the hostname URLs |
 
 ### Console authentication
 
@@ -145,11 +147,39 @@ helper only creates the one it marks as its own and never touches the others.
 ## Portal exposure
 
 There is one portal per workspace and **no global portal**. The workspace is always read from
-the URL, never from a session, so an API URL means the same thing to everyone:
+the URL, never from a session, so an API URL means the same thing to everyone. One form for the
+whole installation:
 
-- **path** (default): `https://apis.example.com/<workspace>/` — no wildcard DNS or certificate per
-  workspace. `/` redirects to the portal of `APIM_BOOTSTRAP_WORKSPACE`.
-- **hostname**: `https://<workspace>.<APIM_PORTAL_DOMAIN>/`.
+| Form | Settings | A portal is served at |
+|---|---|---|
+| **by root path** (default) | `APIM_PORTAL_EXPOSURE=path` | `https://apis.example.com/<workspace>/` — no wildcard DNS nor certificate. `/` leads to the portal of `APIM_BOOTSTRAP_WORKSPACE` |
+| **by hostname** | `APIM_PORTAL_EXPOSURE=hostname`, `APIM_PORTAL_DOMAIN=apis.example.com` | `https://<workspace>.apis.example.com/` — a wildcard DNS entry and a wildcard certificate. The bare domain leads to the portal of `APIM_BOOTSTRAP_WORKSPACE` |
+| **one workspace, at the root** | `APIM_TENANCY=single` | `https://apis.example.com/` — no prefix; the console shows no workspace selector |
 
-The pattern holds for the whole installation and changes the form of every public URL, so choose it
-at installation time. The portal assets are always served under `/_portal/`.
+The portal API follows the same form (`<portal>/front/api`), and the portal assets are always
+served under `/_portal/`. The console and the admin API give the URL of each workspace's portal
+(`portal_url`), and **Global settings → Workspaces** shows the form in use. `APIM_PORTAL_URL` (by
+default `APIM_PUBLIC_URL`) is the public base of the portals: `https://apis.example.com` above.
+
+A single-workspace installation serves `APIM_BOOTSTRAP_WORKSPACE` alone: it refuses to start when
+the database holds other workspaces, and creates no other.
+
+### Changing the form
+
+The form changes every public URL — links in documentation, mails, tickets — so choose it at
+installation time. If it changes later, the product remembers the forms served before (the last
+five, from one start to the next) and **redirects their URLs to the same page in the current form**,
+permanently (`301`, `308` for a form or an API call):
+
+| From | To | Example |
+|---|---|---|
+| by root path | by hostname | `https://apis.example.com/acme/apis/x` → `https://acme.apis.example.com/apis/x` |
+| by hostname | by root path | `https://acme.apis.example.com/apps` → `https://apis.example.com/acme/apps` |
+| one workspace | several | `https://apis.example.com/apis/x` → `https://apis.example.com/acme/apis/x` |
+| several | one workspace | `https://apis.example.com/acme/apps` → `https://apis.example.com/apps` |
+
+The old hosts have to keep reaching the product for their redirects to be served: keep the DNS
+entries and certificates of the previous form for as long as links to it circulate.
+
+In the development stack `*.oto.tools` resolves to `127.0.0.1`: with `APIM_PORTAL_EXPOSURE=hostname`
+and the default domain, the portal of `default` is `http://default.portal.oto.tools:9000/`.

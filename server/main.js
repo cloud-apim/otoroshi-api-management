@@ -17,6 +17,7 @@ import { runDriftDetection } from './otoroshi/drift.js';
 import { consoleAuth, portalAuth, publicAuthConfig } from './auth/settings.js';
 import { authorizeUrl, completeLogin } from './auth/oidc.js';
 import { verifyOtoroshiClaim } from './auth/otoroshi.js';
+import { checkConfig, currentForm, isBareDomain, match, portalHistory, portalUrl, recordPortalForm, redirectFrom } from './portal-exposure.js';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const BO_COOKIE = 'apim_bo';
@@ -157,29 +158,41 @@ async function handleBackofficeApi(req, path, server) {
   return dispatch(adminRouter, req, path, { user, via: 'backoffice', ip: clientIp(req, server) });
 }
 
-// the workspace is read from the url — hostname or root path — never from a session
+const requestHost = (req, url) => req.headers.get('x-forwarded-host') || req.headers.get('host') || url.host;
+
+// the workspace is read from the url — hostname, root path, or the root of a single-workspace
+// installation — never from a session. The URLs of the forms served before are redirected.
 async function resolvePortal(req, url) {
-  if (config.portal.exposure === 'hostname') {
-    const host = (req.headers.get('host') || '').split(':')[0];
-    const suffix = `.${config.portal.domain}`;
-    if (!host.endsWith(suffix)) return null;
-    const slug = host.slice(0, -suffix.length);
-    const ws = await identity.findWorkspace(slug);
-    return ws ? { ws, base: '', rest: url.pathname } : null;
+  const at = { host: requestHost(req, url), pathname: url.pathname };
+  const form = currentForm();
+  const { previous } = portalHistory();
+  const opts = { findWorkspace: identity.findWorkspace, form, search: url.search };
+  // the host of an older hostname form is an old URL whatever its path; in a root portal, so is
+  // an older path URL
+  const early = previous.filter((f) => f.kind === 'hostname' || form.kind === 'root');
+  const before = early.length ? await redirectFrom(early, at, opts) : null;
+  if (before) return { redirect: before };
+  const m = match(form, at);
+  if (m) {
+    const ws = await identity.findWorkspace(m.slug);
+    if (ws && portalUrl(ws.slug, form)) return { ws, base: form.kind === 'path' ? `/${ws.slug}` : '', rest: m.rest };
   }
-  const [, first, ...rest] = url.pathname.split('/');
-  if (!first) return null;
-  const ws = await identity.findWorkspace(first);
-  return ws ? { ws, base: `/${ws.slug}`, rest: '/' + rest.join('/') } : null;
+  const after = await redirectFrom(previous, at, opts);
+  return after ? { redirect: after } : null;
 }
+
+// a permanent redirect that keeps the method of a form or an api call
+const moved = (req, location) => new Response(null, { status: ['GET', 'HEAD'].includes(req.method) ? 301 : 308, headers: { location } });
 
 async function handlePortal(req, url, server) {
   const resolved = await resolvePortal(req, url);
+  if (resolved?.redirect) return moved(req, resolved.redirect);
   if (!resolved) {
-    // there is no global portal: the root redirects to the default workspace portal
-    if (url.pathname === '/' && config.portal.exposure === 'path') {
-      const ws = (await identity.findWorkspace(config.bootstrap.workspace)) || null;
-      if (ws) return Response.redirect(`/${ws.slug}/`, 302);
+    // there is no global portal: the root of the installation leads to the default workspace portal
+    const form = currentForm();
+    if ((url.pathname === '/' && form.kind === 'path') || isBareDomain(form, requestHost(req, url))) {
+      const ws = await identity.findWorkspace(config.bootstrap.workspace);
+      if (ws) return redirect(portalUrl(ws.slug, form));
     }
     return json({ error: 'no portal here' }, 404);
   }
@@ -250,7 +263,7 @@ async function handlePortal(req, url, server) {
     checkCsrf(req);
     return dispatch(portalRouter, req, path, ctx);
   }
-  return spaIndex(join(DIST, 'portal'), { workspace: ws.slug, base, exposure: config.portal.exposure });
+  return spaIndex(join(DIST, 'portal'), { workspace: ws.slug, base, exposure: currentForm().kind });
 }
 
 async function fetchHandler(req, server) {
@@ -279,8 +292,11 @@ async function fetchHandler(req, server) {
 }
 
 async function start() {
+  checkConfig();
   await migrateAll();
   await identity.bootstrap();
+  await identity.checkTenancy();
+  await recordPortalForm();
   const server = Bun.serve({ port: config.port, fetch: fetchHandler, idleTimeout: 60, maxRequestBodySize: 50 * 1024 * 1024 });
   console.log(`[apim] listening on ${server.url} with roles: ${config.roles.join(', ')}`);
   if (config.workers.enabled && (hasRole('api') || hasRole('backoffice'))) {

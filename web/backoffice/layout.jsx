@@ -215,7 +215,8 @@ function GatewayPill() {
 }
 
 export function Layout({ children }) {
-  const { user, workspaces, workspace } = useSession();
+  const { user, workspaces, workspace, me } = useSession();
+  const single = me.installation?.tenancy === 'single';
   const { navigate } = useRouter();
   const [search, setSearch] = useState(false);
   const [pending, setPending] = useState(0);
@@ -252,8 +253,9 @@ export function Layout({ children }) {
             <div className="brand-sub">Otoroshi</div>
           </div>
         </Link>
-        {/* the workspace selector opens the sidebar: it sets the context of everything below */}
-        {workspaces.length > 1 || user.is_admin ? (
+        {/* the workspace selector opens the sidebar: it sets the context of everything below. A
+            single-workspace installation has none */}
+        {!single && (workspaces.length > 1 || user.is_admin) ? (
           <Dropdown
             trigger={({ toggle }) => (
               <button className="ws-switch" onClick={toggle} aria-label="switch workspace">
@@ -309,7 +311,7 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}/settings`} icon="settings">
               Workspace settings
             </NavLink>
-            <a className="navlink" href={`/${ws}/`} target="_blank" rel="noreferrer">
+            <a className="navlink" href={workspace.portal_url} target="_blank" rel="noreferrer">
               <Icon name="external" />
               <span>Developer portal</span>
             </a>

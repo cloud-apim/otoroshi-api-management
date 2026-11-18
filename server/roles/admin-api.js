@@ -27,6 +27,7 @@ import { readCertificate, issuerPatterns } from '../domain/pki.js';
 import * as catalogs from '../domain/catalogs.js';
 import * as auditExport from '../domain/auditExport.js';
 import * as notifications from '../domain/notifications.js';
+import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exposure.js';
 
 const r = new Router();
 
@@ -56,10 +57,13 @@ function mask(secret) {
 
 // ---------------------------------------------------------------- me & tokens
 
+// a workspace as the api answers it: with the public url of its portal
+const withPortal = (w) => ({ ...identity.maskWorkspace(w), portal_url: portalUrl(w.slug) });
+
 r.get('/me', async ({ ctx }) => {
   identity.requireUser(ctx);
-  const workspaces = (await identity.listWorkspacesFor(ctx.user)).map(identity.maskWorkspace);
-  return { user: identity.publicUser(ctx.user), workspaces };
+  const workspaces = (await identity.listWorkspacesFor(ctx.user)).map(withPortal);
+  return { user: identity.publicUser(ctx.user), workspaces, installation: { tenancy: config.tenancy, portal: currentForm() } };
 });
 
 r.get('/me/tokens', async ({ ctx }) => {
@@ -88,7 +92,7 @@ r.get('/settings', async ({ ctx }) => {
   const gw = await gatewaySettings();
   return {
     gateway: { ...gw, clientSecret: mask(gw.clientSecret) },
-    portal: { exposure: config.portal.exposure, domain: config.portal.domain, ...(rows.find((x) => x.key === 'portal')?.value || {}) },
+    portal: { tenancy: config.tenancy, exposure: config.portal.exposure, domain: config.portal.domain, url: portalBase(), form: currentForm(), history: portalHistory() },
     ingest: { storeRaw: config.ingest.storeRaw, url: config.ingest.url || `${config.publicUrl}/ingest`, ...(rows.find((x) => x.key === 'ingest')?.value || {}) },
     drift: rows.find((x) => x.key === 'drift.last_run')?.value || null,
     auth: await consoleAuth().then((a) => ({
@@ -102,7 +106,9 @@ r.get('/settings', async ({ ctx }) => {
 
 r.put('/settings/:key', async ({ ctx, params, body }) => {
   identity.requireAdmin(ctx);
-  if (!['gateway', 'portal', 'ingest', 'auth'].includes(params.key)) throw badRequest('unknown settings key');
+  // the exposure of the portals is not among them: it is set at installation (APIM_TENANCY,
+  // APIM_PORTAL_EXPOSURE), since it changes the form of every public url
+  if (!['gateway', 'ingest', 'auth'].includes(params.key)) throw badRequest('unknown settings key');
   const current = (await db`select value from settings where key = ${params.key}`)[0]?.value || {};
   const value = { ...current, ...body };
   if (params.key === 'auth') {
@@ -323,23 +329,23 @@ r.put('/users/:id', async ({ ctx, params, body }) => {
 
 r.get('/workspaces', async ({ ctx }) => {
   identity.requireUser(ctx);
-  return (await identity.listWorkspacesFor(ctx.user)).map(identity.maskWorkspace);
+  return (await identity.listWorkspacesFor(ctx.user)).map(withPortal);
 });
 
 r.post('/workspaces', async ({ ctx, body }) => {
   identity.requireAdmin(ctx);
-  return identity.createWorkspace(ctx, body);
+  return withPortal(await identity.createWorkspace(ctx, body));
 });
 
 r.get('/workspaces/:ws', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin', 'producer']);
-  return { ...identity.maskWorkspace(c.workspace), role: c.role };
+  return { ...withPortal(c.workspace), role: c.role };
 });
 
 r.put('/workspaces/:ws', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   if (body.metadata !== undefined) body.metadata = await metadata.checkValues(c.workspace.id, 'workspace', body.metadata);
-  return identity.maskWorkspace(await identity.updateWorkspace(c, c.workspace, body));
+  return withPortal(await identity.updateWorkspace(c, c.workspace, body));
 });
 
 r.delete('/workspaces/:ws', async ({ ctx, params }) => {

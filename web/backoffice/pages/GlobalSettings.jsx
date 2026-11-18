@@ -6,23 +6,63 @@ import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 
+const FORM_TITLES = { path: 'by root path', hostname: 'by hostname', root: 'one workspace, at the root' };
+
+function formUrl(form, url) {
+  if (form.kind === 'hostname') return `${new URL(url).protocol}//<workspace>.${form.domain}/`;
+  if (form.kind === 'root') return `${url}/`;
+  return `${url}/<workspace>/`;
+}
+
+// the form of the portal urls, set at installation, and the older forms still redirected
+function Exposure({ portal }) {
+  const { form, url, history } = portal;
+  return (
+    <Callout kind="info" title={`Portal exposure: ${FORM_TITLES[form.kind]}`}>
+      <div className="col gap-6">
+        <span>
+          {form.kind === 'root' ? (
+            <>
+              This installation serves the single workspace <span className="mono">{form.workspace}</span> at <span className="mono">{formUrl(form, url)}</span>: no prefix, no workspace
+              selector.
+            </>
+          ) : (
+            <>
+              Each workspace portal is served at <span className="mono">{formUrl(form, url)}</span>
+              {form.kind === 'hostname' ? ', which takes a wildcard DNS entry and a wildcard certificate.' : '.'} There is no global portal.
+            </>
+          )}{' '}
+          The form holds for the whole installation and changes every public url: it is set at installation (APIM_TENANCY, APIM_PORTAL_EXPOSURE, APIM_PORTAL_DOMAIN, APIM_PORTAL_URL).
+        </span>
+        {history.previous.length > 0 && (
+          <span>
+            The urls of the forms served before are redirected to the same pages:{' '}
+            {history.previous.map((f, i) => (
+              <span key={i}>
+                {i > 0 && ', '}
+                <span className="mono">{formUrl(f, url)}</span> (until {fmtDate(f.until)})
+              </span>
+            ))}
+            .
+          </span>
+        )}
+      </div>
+    </Callout>
+  );
+}
+
 function Workspaces() {
   const { session } = { session: useSession() };
   const toast = useToast();
   const { navigate } = useRouter();
   const [f, setF] = useState({ name: '', slug: '' });
   const settings = useLoad(() => api.get('/settings'), []);
+  // a single-workspace installation creates none
+  const single = session.me.installation?.tenancy === 'single';
   return (
     <div className="col gap-16">
-      <Loader state={settings}>
-        {(s) => (
-          <Callout kind="info" title={`Portal exposure: by ${s.portal.exposure === 'path' ? 'root path' : 'hostname'}`}>
-            {s.portal.exposure === 'path' ? 'Each workspace portal is served under /<workspace>/.' : `Each workspace portal is served on <workspace>.${s.portal.domain}.`} The pattern holds for the whole installation and changes
-            the form of every public url, so it is set at installation time (APIM_PORTAL_EXPOSURE). There is no global portal.
-          </Callout>
-        )}
-      </Loader>
-      <div className="card">
+      <Loader state={settings}>{(s) => <Exposure portal={s.portal} />}</Loader>
+      <div className="card" hidden={single}>
         <div className="card-body row wrap">
           <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder="workspace name" />
           <Input value={f.slug} onChange={(v) => setF({ ...f, slug: v })} placeholder="slug (optional)" mono />
@@ -51,7 +91,7 @@ function Workspaces() {
               <div className="bold">{w.name}</div>
               <div className="faint tiny mono">{w.slug}</div>
             </div>
-            <a className="link small" href={`/${w.slug}/`} target="_blank" rel="noreferrer">
+            <a className="link small" href={w.portal_url} target="_blank" rel="noreferrer">
               portal
             </a>
             <button className="btn sm" onClick={() => navigate(`/ws/${w.slug}`)}>

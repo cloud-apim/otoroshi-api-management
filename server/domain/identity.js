@@ -144,6 +144,8 @@ export function defaultPortalSettings(name) {
 
 export async function createWorkspace(ctx, { name, slug, description = '' }) {
   if (!name) throw badRequest('name is required');
+  if (config.tenancy === 'single' && (await db`select count(*)::int as c from workspaces`)[0].c > 0)
+    throw badRequest('this installation serves a single workspace (APIM_TENANCY=single)');
   const s = slugify(slug || name);
   if (await findWorkspace(s)) throw conflict(`workspace "${s}" already exists`);
   const id = newId('ws');
@@ -169,6 +171,7 @@ export async function updateWorkspace(ctx, ws, patch) {
 }
 
 export async function deleteWorkspace(ctx, ws) {
+  if (config.tenancy === 'single') throw badRequest('the single workspace of this installation cannot be deleted (APIM_TENANCY=single)');
   await db`delete from workspaces where id = ${ws.id}`;
   await audit(ctx, { action: 'workspace.delete', workspaceId: null, entityKind: 'workspace', entityId: ws.id, summary: `workspace ${ws.name} deleted` });
 }
@@ -324,6 +327,20 @@ export function aclAllows(visibility, acl, userTags, isProducer = false) {
 }
 
 // ---------------------------------------------------------------- bootstrap
+
+// a single-workspace installation serves the bootstrap workspace at the root: any other would
+// have no portal, and no place in a console without a workspace selector
+export async function checkTenancy() {
+  if (config.tenancy !== 'single') return;
+  const others = await db`select slug from workspaces where slug <> ${config.bootstrap.workspace} order by slug`;
+  const served = await findWorkspace(config.bootstrap.workspace);
+  if (!served && others.length === 1)
+    throw new Error(`APIM_TENANCY=single serves the workspace APIM_BOOTSTRAP_WORKSPACE ("${config.bootstrap.workspace}"), which does not exist: set APIM_BOOTSTRAP_WORKSPACE=${others[0].slug}`);
+  if (others.length)
+    throw new Error(
+      `APIM_TENANCY=single serves the workspace "${config.bootstrap.workspace}" alone, and this installation has others: ${others.map((w) => w.slug).join(', ')}. Delete them, or keep APIM_TENANCY=multi.`
+    );
+}
 
 export async function bootstrap() {
   let first = null;

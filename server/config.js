@@ -60,11 +60,18 @@ export const config = {
   // the admin api accepts a static bootstrap token, plus personal tokens stored in db
   adminToken: env.APIM_ADMIN_TOKEN || 'apim-admin-token',
 
-  // portal exposure pattern for the whole installation: 'path' or 'hostname'
+  // multi: one portal per workspace, exposed by path or by hostname; single: one workspace, its
+  // portal at the root, no workspace selector in the console
+  tenancy: env.APIM_TENANCY || 'multi',
+
+  // portal exposure pattern for the whole installation (multi tenancy): 'path' or 'hostname'
   portal: {
     exposure: env.APIM_PORTAL_EXPOSURE || 'path',
     // in hostname mode: <workspace>.<domain>
     domain: env.APIM_PORTAL_DOMAIN || 'portal.oto.tools',
+    // the public base of the portals: <url>/<workspace>/ by path, <url>/ at the root; its scheme and
+    // port make the hostname urls. Defaults to APIM_PUBLIC_URL
+    url: env.APIM_PORTAL_URL || null,
   },
 
   workers: {
