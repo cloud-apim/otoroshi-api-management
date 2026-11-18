@@ -127,11 +127,34 @@ afterAll(async () => {
   server?.stop(true);
 });
 
+// helm itself runs from its image, when the machine has it
+const HELM = 'alpine/helm:3.16.2';
+const hasHelm = Bun.spawnSync(['docker', 'image', 'inspect', HELM], { stdout: 'ignore', stderr: 'ignore' }).exitCode === 0;
+const helm = (...args) => run(['docker', 'run', '--rm', '-v', `${join(import.meta.dir, '..', 'deploy/helm')}:/charts`, '-w', '/charts', HELM, ...args]);
+
 describe('the manifests', () => {
   test('are accepted by the api server, the product and its controller', () => {
     const out = kubectl('apply', '-k', 'deploy/kubernetes/base', '--dry-run=server');
     for (const what of ['deployment.apps/otoroshi-api-management ', 'deployment.apps/otoroshi-api-management-controller', 'clusterrole.rbac.authorization.k8s.io/otoroshi-api-management-controller', 'service/otoroshi-api-management'])
       expect(out).toContain(what);
+  });
+
+  test.skipIf(!hasHelm)('the Helm chart lints, renders, and the api server accepts what it renders', () => {
+    const secrets = 'secrets.databaseUrl=postgres://a,secrets.analyticsDatabaseUrl=postgres://b,secrets.otoroshiClientId=id,secrets.otoroshiClientSecret=s,secrets.adminToken=t,secrets.ingestToken=i,secrets.bootstrapPassword=p';
+    expect(helm('lint', '--strict', 'otoroshi-api-management', '--set', secrets)).toContain('0 chart(s) failed');
+    // without its secrets, it says which one is missing
+    const missing = Bun.spawnSync(['docker', 'run', '--rm', '-v', `${join(import.meta.dir, '..', 'deploy/helm')}:/charts`, '-w', '/charts', HELM, 'template', 'apim', 'otoroshi-api-management'], { stderr: 'pipe' });
+    expect(missing.exitCode).not.toBe(0);
+    expect(missing.stderr.toString()).toContain('secrets.databaseUrl is required (or secrets.existingSecret)');
+    // every branch: its CRDs, the secret, the ingress, the controller, extra variables
+    const full = helm('template', 'apim', 'otoroshi-api-management', '-n', 'apim', '--include-crds', '--set', secrets, '--set', 'ingress.enabled=true,ingress.className=nginx', '--set', 'config.extraEnv.APIM_DRIFT_INTERVAL_MS=30000');
+    writeFileSync(join(DIR, 'chart.yaml'), full);
+    const out = kubectl('-n', 'apim', 'apply', '--dry-run=server', '-f', join(DIR, 'chart.yaml'));
+    for (const what of ['secret/apim-otoroshi-api-management', 'configmap/apim-otoroshi-api-management', 'deployment.apps/apim-otoroshi-api-management ', 'deployment.apps/apim-otoroshi-api-management-controller', 'ingress.networking.k8s.io/apim-otoroshi-api-management', 'clusterrolebinding.rbac.authorization.k8s.io/apim-otoroshi-api-management-controller'])
+      expect(out).toContain(what);
+    // an existing secret, no controller: the product alone
+    const minimal = helm('template', 'apim', 'otoroshi-api-management', '-n', 'apim', '--set', 'secrets.existingSecret=apim-secrets,controller.enabled=false');
+    expect(YAML.parseAllDocuments(minimal).map((d) => d.toJSON()?.kind).filter(Boolean).sort()).toEqual(['ConfigMap', 'Deployment', 'Service']);
   });
 });
 
