@@ -517,6 +517,60 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   };
 });
 
+// D-17, console side: replay a request through the api on the gateway — real routing, real plans,
+// real keys. The policy execution trace needs Otoroshi to expose its try-it (G-12).
+r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params);
+  const snap = await deployments.deployedSnapshot(api.id);
+  if (!snap) throw badRequest('this api is not deployed');
+  const draft = normalizeDraft(snap.content.draft);
+  const gw = await gatewaySettings();
+  const cp = draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
+  const path = `${cp}${(body.path || '/').startsWith('/') ? body.path || '/' : `/${body.path}`}`;
+  const headers = { ...(body.headers || {}), host: draft.entrypoint.domain };
+  let credential = null;
+  if (body.subscription_id) {
+    // only the credentials the caller can see (D-26): the subscriptions of its own applications
+    const sub = await subscriptions.getSubscription(c.workspace.id, body.subscription_id);
+    const app = await applications.getApplication(c.workspace.id, sub.application_id);
+    await applications.requireSeeApplication(c, app);
+    const cred = (await subscriptions.credentialsOf(sub.id)).find((x) => x.status === 'active');
+    if (!cred) throw badRequest('this subscription has no active credential');
+    headers.authorization = 'Basic ' + Buffer.from(`${cred.client_id}:${cred.client_secret}`).toString('base64');
+    credential = { subscription_id: sub.id, client_id: cred.client_id, plan_id: sub.plan_id };
+  }
+  const method = (body.method || 'GET').toUpperCase();
+  const started = performance.now();
+  let res;
+  try {
+    res = await fetch(`${gw.url}${path}${body.query ? `?${body.query.replace(/^\?/, '')}` : ''}`, {
+      method,
+      headers,
+      body: ['GET', 'HEAD'].includes(method) ? undefined : body.body || undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (e) {
+    throw badRequest(`gateway unreachable: ${e.message}`);
+  }
+  const buf = await res.arrayBuffer();
+  const durationMs = Math.round(performance.now() - started);
+  const text = new TextDecoder().decode(buf.slice(0, 256 * 1024));
+  await audit(c, { action: 'api.tryit', entityKind: 'api', entityId: api.id, summary: `${method} ${path} replayed through the gateway: ${res.status}`, data: { credential } });
+  return {
+    request: { method, url: `${draft.entrypoint.domain}${path}`, credential },
+    status: res.status,
+    durationMs,
+    headers: Object.fromEntries(res.headers),
+    body: text,
+    truncated: buf.byteLength > 256 * 1024,
+    size: buf.byteLength,
+    trace: null,
+    trace_unavailable: 'the policy execution trace needs Otoroshi to expose its try-it on the admin api (OTOROSHI-GAPS G-12)',
+  };
+});
+
 r.get('/workspaces/:ws/apis/:api/plans', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);

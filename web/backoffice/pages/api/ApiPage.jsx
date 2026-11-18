@@ -9,6 +9,31 @@ import { DocsTab, OpenApiTab } from './Docs.jsx';
 import { DeploymentTab } from './Deployment.jsx';
 import { SubscriptionsTable } from '../Subscriptions.jsx';
 import { AnalyticsDashboard } from '../Observability.jsx';
+import { RequestComposer } from '../../../shared/composer.jsx';
+
+// D-17, console context: replay a request through this api on the gateway
+function TryItTab({ api, draft }) {
+  const { wapi } = useWs();
+  const subs = useLoad(() => wapi.get(`/subscriptions?api=${api.id}&status=active`), [api.id]);
+  if (!api.deployment.deployed) return <Callout kind="info">Deploy the api first: the console replays requests through the gateway.</Callout>;
+  return (
+    <div className="col gap-16">
+      <p className="muted small">
+        The request goes through the real gateway: routing, plans, quotas and keys apply. Pick the credentials of one of your applications' subscriptions, or send it without any.
+      </p>
+      <Loader state={subs}>
+        {(list) => (
+          <RequestComposer
+            baseLabel={api.base_url}
+            paths={draft.resources.map((r) => r.path)}
+            credentials={list.map((s) => ({ value: s.id, label: `${s.application_name} — ${s.request?.plan_name || s.plan_id}` }))}
+            send={async (r) => wapi.post(`/apis/${api.id}/tryit`, { method: r.method, path: r.path, query: r.query, headers: r.headers, body: r.body, subscription_id: r.credential || undefined })}
+          />
+        )}
+      </Loader>
+    </div>
+  );
+}
 
 const IDENTITY = ['name', 'description', 'tags', 'visibility', 'acl', 'team_id', 'metadata'];
 
@@ -104,6 +129,7 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'openapi', label: 'OpenAPI' },
     { id: 'subscriptions', label: 'Subscriptions' },
     { id: 'deployment', label: 'Deployment' },
+    { id: 'tryit', label: 'Try it' },
     { id: 'analytics', label: 'Analytics' },
     { id: 'settings', label: 'Settings' },
   ];
@@ -171,6 +197,7 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'openapi' && <OpenApiTab {...ctx} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
       {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
+      {tab === 'tryit' && <TryItTab api={api} draft={draft} />}
       {tab === 'analytics' && <AnalyticsDashboard fixed={{ api: api.id }} />}
       {tab === 'settings' && <SettingsTab {...ctx} />}
 
