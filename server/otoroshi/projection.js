@@ -4,6 +4,7 @@
 // Documentation, plan visibility, terms, usage statements, pricing and metadata stay in the product.
 
 import { normalizeDraft } from '../domain/model.js';
+import { certificateKey, issuerPatterns, readCertificate } from '../domain/pki.js';
 import { META, OWNER_MARKER } from './client.js';
 
 const MAX = 10000000; // what Otoroshi uses as "no limit" in a quota
@@ -168,7 +169,8 @@ function accessModeConfiguration(plan, draft) {
     case 'mtls':
       return {
         regex_subject_dns: c.regexSubjectDNs || [],
-        regex_issuer_dns: c.regexIssuerDNs || [],
+        // without explicit issuer patterns, the plan accepts what its trusted CAs signed
+        regex_issuer_dns: c.regexIssuerDNs?.length ? c.regexIssuerDNs : issuerPatterns(c.trustedCAs) || [],
         client_id_field: c.clientIdField || null,
         create_if_missing: true,
       };
@@ -176,7 +178,8 @@ function accessModeConfiguration(plan, draft) {
       return { default_key_pair: c.defaultKeyPair || 'otoroshi-jwt-signing', expiration: c.expiration || 3600 };
     case 'oauth2-remote':
       return {
-        verifier: c.verifier || null,
+        // an auth module id, whatever Otoroshi calls the field
+        verifier: c.derive?.enabled ? derivedAuthModuleId(draft.__apiId, plan.id) : c.verifier || null,
         client_id_path: c.clientIdPath || 'client_id',
         fetch_user: !!c.fetchUser,
         user_metadata_key: 'user_profile',
@@ -216,11 +219,117 @@ export function planJson(plan, draft) {
 
 // ---------------------------------------------------------------- derived objects
 // Objects that follow from the description of an api are derived by the product, marked as its
-// own, reconciled with the api and removed with it. Today: the JWT verifiers of jwt plans that
-// describe how their tokens are validated instead of referencing an existing verifier.
+// own, reconciled with the api and removed with it: the JWT verifiers of jwt plans that describe
+// how their tokens are validated, the trusted CAs of mtls plans (certificates of the gateway), the
+// auth modules of oauth2-remote plans that describe their authorization server.
 
 export function derivedVerifierId(apiId, planId) {
   return `apim_jwt_${apiId}_${planId}`;
+}
+
+export function derivedAuthModuleId(apiId, planId) {
+  return `apim_auth_${apiId}_${planId}`;
+}
+
+export function derivedCaId(apiId, planId, pem) {
+  return `apim_ca_${apiId}_${planId}_${certificateKey(pem)}`;
+}
+
+const derivedMetadata = (api, p) => ({ [META.createdBy]: OWNER_MARKER, [META.api]: api.id, apim_plan_id: p.id, apim_derived: 'true' });
+
+function derivedCertificates(api, p) {
+  return (p.auth.config.trustedCAs || []).map((pem) => {
+    const c = readCertificate(pem);
+    const cn = /CN=([^,]+)/.exec(c.subject)?.[1] || c.subject;
+    const id = derivedCaId(api.id, p.id, pem);
+    return {
+      kind: 'Certificate',
+      path: '/api/certificates',
+      id,
+      entity: {
+        _loc: { tenant: 'default', teams: ['default'] },
+        id,
+        domain: cn,
+        name: `${api.name} ${api.version} — ${p.name} — ${cn}`,
+        description: `trusted CA derived by otoroshi-api-management from plan ${p.name} of ${api.name} ${api.version}`,
+        chain: String(pem).trim(),
+        privateKey: '',
+        caRef: null,
+        selfSigned: c.subject === c.issuer,
+        ca: c.ca,
+        client: false,
+        keypair: false,
+        valid: true,
+        exposed: false,
+        revoked: false,
+        autoRenew: false,
+        letsEncrypt: false,
+        sans: [],
+        metadata: derivedMetadata(api, p),
+        tags: [],
+      },
+    };
+  });
+}
+
+function derivedAuthModule(api, p) {
+  const d = p.auth.config.derive;
+  const id = derivedAuthModuleId(api.id, p.id);
+  return {
+    kind: 'AuthModule',
+    path: '/api/auths',
+    id,
+    entity: {
+      _loc: { tenant: 'default', teams: ['default'] },
+      type: 'oauth2',
+      id,
+      name: `${api.name} ${api.version} — ${p.name}`,
+      desc: `derived by otoroshi-api-management from plan ${p.name} of ${api.name} ${api.version}`,
+      clientSideSessionEnabled: true,
+      sessionMaxAge: 86400,
+      userValidators: [],
+      remoteValidators: [],
+      clientId: d.clientId || '',
+      clientSecret: d.clientSecret || '',
+      authorizeUrl: '',
+      tokenUrl: '',
+      userInfoUrl: d.userInfoUrl || '',
+      introspectionUrl: '',
+      loginUrl: '',
+      logoutUrl: '',
+      scope: d.scope || 'openid',
+      claims: '',
+      useCookie: false,
+      useJson: false,
+      pkce: null,
+      noWildcardRedirectURI: false,
+      readProfileFromToken: false,
+      accessTokenField: 'access_token',
+      // what the plan's extractor validates the tokens with
+      jwtVerifier: { type: 'JWKSAlgoSettings', url: d.jwksUrl, headers: {}, timeout: 2000, ttl: 3600000, kty: 'RSA' },
+      nameField: 'name',
+      emailField: 'email',
+      apiKeyMetaField: 'apkMeta',
+      apiKeyTagsField: 'apkTags',
+      otoroshiDataField: 'app_metadata|otoroshi_data',
+      callbackUrl: '',
+      oidConfig: d.discoveryUrl || null,
+      mtlsConfig: { certs: [], trustedCerts: [], mtls: false, loose: false, trustAll: false },
+      proxy: null,
+      extraMetadata: {},
+      metadata: derivedMetadata(api, p),
+      tags: [],
+      refreshTokens: false,
+      sessionCookieValues: { httpOnly: true, secure: true },
+      superAdmins: false,
+      rightsOverride: {},
+      dataOverride: {},
+      otoroshiRightsField: 'otoroshi_rights',
+      allowedUsers: [],
+      deniedUsers: [],
+      adminEntityValidatorsOverride: {},
+    },
+  };
 }
 
 export function derivedEntities(snapshot) {
@@ -228,6 +337,8 @@ export function derivedEntities(snapshot) {
   const draft = normalizeDraft(snapshot.draft);
   const out = [];
   for (const p of draft.plans) {
+    if (p.auth.kind === 'mtls') out.push(...derivedCertificates(api, p));
+    if (p.auth.kind === 'oauth2-remote' && p.auth.config.derive?.enabled) out.push(derivedAuthModule(api, p));
     const d = p.auth.kind === 'jwt' ? p.auth.config.derive : null;
     if (!d?.enabled) continue;
     const fields = {};
@@ -250,7 +361,7 @@ export function derivedEntities(snapshot) {
             ? { type: 'HSAlgoSettings', size: parseInt(d.size || 256, 10), secret: d.secret, base64: false }
             : { type: 'JWKSAlgoSettings', url: d.jwksUrl, headers: {}, timeout: 2000, ttl: 3600000, kty: 'RSA' },
         strategy: { type: 'PassThrough', verificationSettings: { fields, arrayFields: {} } },
-        metadata: { [META.createdBy]: OWNER_MARKER, [META.api]: api.id, apim_plan_id: p.id, apim_derived: 'true' },
+        metadata: derivedMetadata(api, p),
         tags: [],
       },
     });
@@ -258,9 +369,23 @@ export function derivedEntities(snapshot) {
   return out;
 }
 
+// what of a derived object the product owns, by kind (the gateway adds its own fields: the
+// subject and dates of a certificate, the secret of a module it may not give back)
 export function comparableDerived(e) {
   if (!e) return null;
-  return { source: e.source, algoSettings: e.algoSettings, verification: e.strategy?.verificationSettings || null, owner: e.metadata?.[META.createdBy] };
+  const owner = e.metadata?.[META.createdBy];
+  if ('chain' in e) return { chain: String(e.chain || '').replace(/\s+/g, ''), ca: !!e.ca, revoked: !!e.revoked, owner };
+  if ('jwtVerifier' in e)
+    return {
+      type: e.type,
+      jwks: e.jwtVerifier ? { type: e.jwtVerifier.type, url: e.jwtVerifier.url } : null,
+      userInfoUrl: e.userInfoUrl || '',
+      clientId: e.clientId || '',
+      scope: e.scope || '',
+      discovery: e.oidConfig || null,
+      owner,
+    };
+  return { source: e.source, algoSettings: e.algoSettings, verification: e.strategy?.verificationSettings || null, owner };
 }
 
 // snapshot = { api: {...}, draft: {...}, docs: {...} } — see apis.publish()

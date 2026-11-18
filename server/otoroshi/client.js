@@ -119,6 +119,7 @@ export const oto = {
   deleteEntity: (path, id) => otoroshi('DELETE', `${path}/${id}`),
   listAuthModules: () => otoroshi('GET', '/api/auths'),
   listCertificates: () => otoroshi('GET', '/api/certificates'),
+  globalConfig: () => otoroshi('GET', '/api/globalconfig'),
   listDataExporters: () => otoroshi('GET', '/api/data-exporter-configs'),
   createDataExporter: (e) => otoroshi('POST', '/api/data-exporter-configs', e),
   updateDataExporter: (e) => otoroshi('PUT', `/api/data-exporter-configs/${e.id}`, e),

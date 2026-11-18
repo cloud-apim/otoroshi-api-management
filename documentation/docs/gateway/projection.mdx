@@ -54,10 +54,17 @@ Deploying a snapshot writes one Otoroshi `Api` entity, whose id is the product's
 ## Derived objects
 
 Otoroshi objects that follow from the description of an API are **derived** by the product:
-today, the JWT verifiers of `jwt` plans that describe how their tokens are validated. They are
-written before the `Api` that references them, with the id `apim_jwt_<api>_<plan>`, marked with the
-same `created_by` marker plus `apim_api_id` and `apim_derived`, compared by drift detection, and
-removed when no plan derives them any more. What does not follow from an API — the cluster, global
+
+| Derived from | Otoroshi object | Id |
+|---|---|---|
+| a `jwt` plan that describes how its tokens are validated | JWT verifier | `apim_jwt_<api>_<plan>` |
+| the trusted CAs of an `mtls` plan | certificate (CA, no private key) | `apim_ca_<api>_<plan>_<hash of the certificate>` |
+| an `oauth2-remote` plan that describes its authorization server | auth module (`oauth2`) | `apim_auth_<api>_<plan>` |
+
+They are written before the `Api` that references them, marked with the same `created_by` marker
+plus `apim_api_id` and `apim_derived`, shown in the deployment diff, compared by drift detection
+(on what the product owns: the gateway adds the dates of a certificate, and may not give a secret
+back), and removed after the `Api` when no plan derives them any more. What does not follow from an API — the cluster, global
 plugins, data exporters, listeners — is infrastructure the product references and never owns.
 
 ## Subscriptions and keys

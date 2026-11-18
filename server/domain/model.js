@@ -4,6 +4,7 @@
 // are infrastructure; auth, rate limit, quota, resource filtering and visibility are the offer.
 
 import { newId } from '../db/index.js';
+import { issuerPatterns, readCertificate } from './pki.js';
 
 export const AUTH_KINDS = ['keyless', 'apikey', 'jwt', 'mtls', 'oauth2-local', 'oauth2-remote'];
 
@@ -79,11 +80,20 @@ export function defaultAuthConfig(kind) {
         derive: { enabled: false, kind: 'jwks', jwksUrl: '', secret: '', size: 256, issuer: '', audience: '', header: 'Authorization', prefix: 'Bearer ' },
       };
     case 'mtls':
-      return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '' };
+      // trustedCAs: the CA certificates the plan trusts, derived as certificates of the gateway;
+      // without issuer patterns, the plan accepts what they signed and nothing else
+      return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '', trustedCAs: [] };
     case 'oauth2-local':
       return { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 };
     case 'oauth2-remote':
-      return { verifier: '', clientIdPath: 'client_id', fetchUser: false };
+      // verifier: an existing auth module of the gateway (Otoroshi names the field verifier), or
+      // the description of the authorization server the product derives the module from
+      return {
+        verifier: '',
+        clientIdPath: 'client_id',
+        fetchUser: false,
+        derive: { enabled: false, discoveryUrl: '', jwksUrl: '', userInfoUrl: '', clientId: '', clientSecret: '', scope: 'openid' },
+      };
     case 'keyless':
       // ephemeral identity: no apikey per visitor, quotas still counted per caller
       return { expr: '${req.ip}', createIfMissing: false };
@@ -260,12 +270,48 @@ export function validateDraft(draft) {
         path: `plans[${i}].unit`,
         message: `plan "${p.name}" meters ${p.unit}: tokens and budget need an LLM backend, not available in this version`,
       });
-    const derive = p.auth.kind === 'jwt' && p.auth.config.derive?.enabled ? p.auth.config.derive : null;
-    if (derive) {
+    const derive = ['jwt', 'oauth2-remote'].includes(p.auth.kind) && p.auth.config.derive?.enabled ? p.auth.config.derive : null;
+    if (derive && p.auth.kind === 'jwt') {
       if (derive.kind === 'jwks' && !derive.jwksUrl) errors.push({ path: `plans[${i}].auth.config.derive.jwksUrl`, message: `plan "${p.name}" derives its verifier from a JWKS: give its url` });
       if (derive.kind === 'hmac' && !derive.secret) errors.push({ path: `plans[${i}].auth.config.derive.secret`, message: `plan "${p.name}" derives an HMAC verifier: give its secret (or a vault reference)` });
-    } else if (['jwt', 'oauth2-remote'].includes(p.auth.kind) && !p.auth.config.verifier)
+    } else if (derive && p.auth.kind === 'oauth2-remote') {
+      if (!derive.jwksUrl) errors.push({ path: `plans[${i}].auth.config.derive.jwksUrl`, message: `plan "${p.name}" derives its auth module: give the JWKS url of the authorization server` });
+      if (p.auth.config.fetchUser && !derive.userInfoUrl)
+        errors.push({ path: `plans[${i}].auth.config.derive.userInfoUrl`, message: `plan "${p.name}" fetches the user profile: give the userinfo url of the authorization server` });
+    } else if (p.auth.kind === 'jwt' && !p.auth.config.verifier)
       errors.push({ path: `plans[${i}].auth.config.verifier`, message: `plan "${p.name}" needs a verifier: reference one, or describe how its tokens are validated` });
+    else if (p.auth.kind === 'oauth2-remote' && !p.auth.config.verifier)
+      errors.push({ path: `plans[${i}].auth.config.verifier`, message: `plan "${p.name}" needs an auth module: reference one, or describe the authorization server` });
+    if (p.auth.kind === 'mtls') {
+      const cas = p.auth.config.trustedCAs || [];
+      cas.forEach((pem, j) => {
+        try {
+          const c = readCertificate(pem);
+          if (!c.ca) warnings.push({ path: `plans[${i}].auth.config.trustedCAs[${j}]`, code: 'not_a_ca', message: `plan "${p.name}": ${c.subject} is not a CA certificate — it is trusted as is` });
+        } catch (e) {
+          errors.push({ path: `plans[${i}].auth.config.trustedCAs[${j}]`, message: `plan "${p.name}": trusted CA #${j + 1} is not a readable PEM certificate` });
+        }
+      });
+      const issuers = p.auth.config.regexIssuerDNs || [];
+      if (cas.length && !issuers.length && issuerPatterns(cas) === null)
+        warnings.push({
+          path: `plans[${i}].auth.config.regexIssuerDNs`,
+          code: 'issuer_not_derived',
+          message: `plan "${p.name}": the subject of a trusted CA cannot be predicted in Otoroshi's form — give the issuer patterns, or any certificate the gateway trusts passes`,
+        });
+      if ((p.auth.config.regexSubjectDNs || []).length && !issuers.length && !cas.length && p.status === 'published')
+        warnings.push({
+          path: `plans[${i}].auth.config.regexSubjectDNs`,
+          code: 'subject_without_issuer',
+          message: `plan "${p.name}": a subject pattern alone accepts a certificate from any authority the gateway trusts (JDK CAs included) — add trusted CAs or issuer patterns (upstream gap G-16)`,
+        });
+    }
+    if (p.auth.kind === 'oauth2-remote' && p.status === 'published')
+      warnings.push({
+        path: `plans[${i}]`,
+        code: 'token_claims_not_checked',
+        message: `plan "${p.name}" (oauth2-remote): Otoroshi 18 checks the signature and the dates of the token, not its issuer nor its audience — a token the same server issued for another client passes (upstream gap G-15)`,
+      });
     if (p.flowRef && !d.flows.find((f) => f.id === p.flowRef))
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)

@@ -8,19 +8,60 @@ import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { getSnapshot, lastSnapshot } from './apis.js';
 import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
-import { validateDraft } from './model.js';
+import { normalizeDraft, validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
 import { META } from '../otoroshi/client.js';
 
-// derived objects first (the Api references them), then the stale ones of this api are removed
-async function syncDerived(apiId, snapshotContent) {
+// the kinds of objects the product derives from api descriptions (JWT verifiers, certificates,
+// auth modules), each recognised by its markers
+const DERIVED_KINDS = [
+  { path: '/api/verifiers', list: () => oto.listJwtVerifiers() },
+  { path: '/api/certificates', list: () => oto.listCertificates() },
+  { path: '/api/auths', list: () => oto.listAuthModules() },
+];
+
+// the derived objects are written before the Api (it references them); `between` writes the Api;
+// the stale derived objects of this api are removed after it, when nothing references them
+async function syncDerived(apiId, snapshotContent, between = async () => null) {
   const wanted = snapshotContent ? derivedEntities(snapshotContent) : [];
   for (const d of wanted) await oto.upsertEntity(d.path, d.entity);
-  const all = (await oto.listJwtVerifiers()) || [];
-  const stale = all.filter((v) => v.metadata?.[META.api] === apiId && v.metadata?.apim_derived === 'true' && !wanted.some((w) => w.id === v.id));
-  for (const v of stale) await oto.deleteEntity('/api/verifiers', v.id).catch(() => null);
-  return { derived: wanted.map((w) => w.id), removed: stale.map((v) => v.id) };
+  const written = await between();
+  const removed = [];
+  for (const k of DERIVED_KINDS) {
+    const all = (await k.list()) || [];
+    const stale = all.filter((v) => v.metadata?.[META.api] === apiId && v.metadata?.apim_derived === 'true' && !wanted.some((w) => w.path === k.path && w.id === v.id));
+    for (const v of stale) {
+      await oto.deleteEntity(k.path, v.id).catch(() => null);
+      removed.push(v.id);
+    }
+  }
+  return { derived: wanted.map((w) => w.id), removed, written };
+}
+
+// what the gateway's own settings make of the snapshot: they are infrastructure the product
+// consumes and does not change, so it says when they defeat a plan
+async function gatewayWarnings(content, derived) {
+  const mtls = (normalizeDraft(content.draft).plans || []).filter((p) => p.status === 'published' && p.auth.kind === 'mtls');
+  if (!mtls.length) return [];
+  const tls = (await oto.globalConfig().catch(() => null))?.tlsSettings;
+  if (!tls) return [];
+  const out = [];
+  if (!['Want', 'Need'].includes(tls.clientAuth))
+    out.push({
+      path: 'plans',
+      code: 'gateway_no_client_auth',
+      message: `the gateway does not ask callers for a client certificate (TLS client auth: ${tls.clientAuth}): nobody can use the mtls plan${mtls.length > 1 ? 's' : ''} ${mtls.map((p) => `"${p.name}"`).join(', ')} until an operator sets it to Want or Need`,
+    });
+  const trusted = tls.trustedCAsServer || [];
+  const cas = derived.filter((d) => d.kind === 'Certificate');
+  if (trusted.length && cas.some((c) => !trusted.includes(c.id)))
+    out.push({
+      path: 'plans',
+      code: 'ca_not_trusted_by_gateway',
+      message: 'the gateway trusts a fixed list of CAs (trustedCAsServer) that does not hold the CAs derived from the mtls plans: an operator has to add them',
+    });
+  return out;
 }
 
 export async function currentDeployment(apiId) {
@@ -74,6 +115,7 @@ export async function planDeployment(api, snapshotRef) {
       else diff(comparableDerived(got), comparableDerived(d.entity), `derived[${d.kind} ${d.entity.name}]`, gatewayChanges);
     }
   }
+  const warnings = [...validation.warnings, ...(gatewayError ? [] : await gatewayWarnings(snapshot.content, derived))];
   return {
     snapshot: { id: snapshot.id, number: snapshot.number, published_at: snapshot.published_at, comment: snapshot.comment },
     running: running ? { id: running.id, number: running.number } : null,
@@ -82,7 +124,7 @@ export async function planDeployment(api, snapshotRef) {
     derived: derived.map((d) => ({ kind: d.kind, id: d.id, name: d.entity.name })),
     gatewayExists: !!gateway,
     gatewayError,
-    warnings: validation.warnings,
+    warnings,
     entity,
   };
 }
@@ -127,8 +169,7 @@ registerTaskHandler('deploy_api', async ({ deployment_id }) => {
   if (!api || !snap) throw new PermanentError('api or snapshot not found');
   const entity = buildOtoroshiApi(snap.content, { snapshotId: snap.id, snapshotNumber: snap.number, lifecycle: api.lifecycle });
   try {
-    const derived = await syncDerived(api.id, snap.content);
-    const written = await oto.upsertApi(entity);
+    const { written, ...derived } = await syncDerived(api.id, snap.content, () => oto.upsertApi(entity));
     const result = {
       derived,
       otoroshi_api_id: written?.id,

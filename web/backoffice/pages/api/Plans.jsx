@@ -3,15 +3,21 @@ import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, Tabs, useLoad } from '../../../shared/ui.jsx';
 import { api as rootApi, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
+import { AuthorizationServer, TrustedCAs } from './PlanAuth.jsx';
 
 const rid = () => `plan_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 
 const AUTH_DEFAULTS = {
   apikey: { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } },
   jwt: { verifier: '', clientIdPath: 'client_id' },
-  mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '' },
+  mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '', trustedCAs: [] },
   'oauth2-local': { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 },
-  'oauth2-remote': { verifier: '', clientIdPath: 'client_id', fetchUser: false },
+  'oauth2-remote': {
+    verifier: '',
+    clientIdPath: 'client_id',
+    fetchUser: false,
+    derive: { enabled: false, discoveryUrl: '', jwksUrl: '', userInfoUrl: '', clientId: '', clientSecret: '', scope: 'openid' },
+  },
   keyless: { expr: '${req.ip}' },
 };
 
@@ -250,16 +256,14 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               )}
             </Setting>
           )}
-          {(p.auth.kind === 'oauth2-remote' || (p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled)) && (
+          {p.auth.kind === 'oauth2-remote' && <AuthorizationServer config={p.auth.config} setAuthConfig={setAuthConfig} authModules={refs.data?.authModules} />}
+          {p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled && (
             <>
-              <Setting label={p.auth.kind === 'jwt' ? 'JWT verifier' : 'Auth module'} help="infrastructure of the gateway the plan references">
+              <Setting label="JWT verifier" help="infrastructure of the gateway the plan references">
                 <Select
                   value={p.auth.config.verifier}
                   onChange={(v) => setAuthConfig({ verifier: v })}
-                  options={[
-                    { value: '', label: 'choose…' },
-                    ...((p.auth.kind === 'jwt' ? refs.data?.jwtVerifiers : refs.data?.authModules) || []).map((v) => ({ value: v.id, label: v.name })),
-                  ]}
+                  options={[{ value: '', label: 'choose…' }, ...(refs.data?.jwtVerifiers || []).map((v) => ({ value: v.id, label: v.name }))]}
                 />
                 <Input value={p.auth.config.verifier} onChange={(v) => setAuthConfig({ verifier: v })} placeholder="or an id" mono />
               </Setting>
@@ -270,11 +274,12 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           )}
           {p.auth.kind === 'mtls' && (
             <>
-              <Setting label="Allowed subject DNs" help="regexes">
-                <TagsInput value={p.auth.config.regexSubjectDNs} onChange={(v) => setAuthConfig({ regexSubjectDNs: v })} />
-              </Setting>
-              <Setting label="Allowed issuer DNs" help="regexes">
+              <TrustedCAs value={p.auth.config.trustedCAs || []} onChange={(v) => setAuthConfig({ trustedCAs: v })} hasIssuerPatterns={(p.auth.config.regexIssuerDNs || []).length > 0} />
+              <Setting label="Allowed issuer DNs" help="Java regexes on the issuer DN in Otoroshi's form (OU=…, O=…, CN=…, C=…); empty: derived from the trusted CAs">
                 <TagsInput value={p.auth.config.regexIssuerDNs} onChange={(v) => setAuthConfig({ regexIssuerDNs: v })} />
+              </Setting>
+              <Setting label="Allowed subject DNs" help="Java regexes on the subject DN. Otoroshi accepts a certificate when its subject OR its issuer matches (upstream gap G-16)">
+                <TagsInput value={p.auth.config.regexSubjectDNs} onChange={(v) => setAuthConfig({ regexSubjectDNs: v })} />
               </Setting>
               <Setting label="Client id field" help="the certificate field used as client id">
                 <Input value={p.auth.config.clientIdField} onChange={(v) => setAuthConfig({ clientIdField: v })} mono placeholder="CN" />

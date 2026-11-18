@@ -17,7 +17,7 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-1** — derived certificates and auth modules (D-15).
+1. **R-11** — project the client certificates of applications (D-26, D-15), on the derivation of R-1.
 2. **R-2** — the "product down, traffic flows" test (D-4, D-9 n°4).
 3. **R-3** — hostname exposure of the portals, redirects, mono-tenant (D-20).
 4. **R-4** — promotion of a snapshot to the next installation (D-37).
@@ -47,10 +47,9 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-1 | D-15, D-14 | Derive and reconcile the **certificates** (trusted CAs of mTLS plans, client certificates of applications) and the **auth modules** (oauth2-remote plans), as is done for JWT verifiers | M | |
 | R-9 | D-15, Q-6 | The **object-by-object inventory** of Otoroshi entities: derived from the api description, or infrastructure consumed as is — a written table checked against the Otoroshi source | S | |
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
-| R-11 | D-26, D-15 | Project the **client certificates** of an application (stored today, not projected) so that an mtls plan recognises them | M | R-1 |
+| R-11 | D-26, D-15 | Project the **client certificates** of an application (stored today, not projected) so that an mtls plan recognises them | M | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
 | R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
@@ -147,8 +146,8 @@ waits for the data plane rather than working around it.
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
 | D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅; console in English: R-5; metadata labels: R-22 |
 | D-12 light / dark / system | ✅ | console and portal |
-| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules: R-1 |
-| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; certificates and auth modules: R-1; inventory: R-9 |
+| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules derived; the gateway's own settings (TLS client auth, exposure routes): R-41 |
+| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications: R-11; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
 | D-17 try-it | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
@@ -216,4 +215,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-14), to be fixed in the data plane.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-16), to be fixed in the data plane.

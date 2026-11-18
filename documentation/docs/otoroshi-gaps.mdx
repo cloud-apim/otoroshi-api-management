@@ -30,6 +30,8 @@ Reference: Otoroshi 18.0.1.
 | G-12 | The try-it with the policy execution trace is only reachable from the Otoroshi backoffice | medium | the console replays requests through the gateway without the trace |
 | G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | warns on the plan |
 | G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
+| G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | warns on the plan |
+| G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
 
 ## The ones to keep in mind
 

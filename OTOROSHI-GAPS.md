@@ -24,6 +24,8 @@ the product has to compensate, **low** = friction.
 | G-12 | The try-it with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | the console replays requests through the gateway without the trace |
 | G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | validation warning on the plan |
 | G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
+| G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
+| G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
 
 ---
 
@@ -205,3 +207,37 @@ written on a key afterwards is overwritten by the next plan update (`updateApike
 
 **Upstream fix.** A relative validity (`validity: 90d`) in the plan's key template, turned into
 `validUntil` when the key is minted.
+
+## G-15 — oauth2-remote plans check neither issuer nor audience — high
+
+**Observed.** An `oauth2-remote` plan installs `NgOidcApikeyExtractor`, which validates the token
+with `LocalJwtVerifier().copy(enabled = true, algoSettings = oidcModule.jwtVerifier.get)`
+(`next/plugins/apimgmt.scala:681`). The default strategy of `LocalJwtVerifier` is
+`PassThrough(VerificationSettings(Map.empty))` (`models/JWTVerifier.scala:1921`): only the
+signature and the dates are checked. A token the same authorization server issued for another
+client or another audience is accepted by the plan. `OAuth2RemoteAccessModeConfiguration`
+(`next/models/Api.scala:461`) has no field to express the expected issuer or audience.
+
+**Product meanwhile.** A validation warning on every published oauth2-remote plan
+(`token_claims_not_checked`); the plan describes no issuer or audience it could not enforce.
+
+**Upstream fix.** `issuer` and `audience` in `OAuth2RemoteAccessModeConfiguration` (defaulting to
+the auth module's discovery document and client id), turned into the verification settings of the
+extractor's verifier.
+
+## G-16 — mtls subject and issuer lists combine with OR — medium
+
+**Observed.** `NgClientCertApikeyExtractor.matches` accepts a certificate when its subject matches
+**one of the subject patterns or** its issuer matches one of the issuer patterns
+(`next/plugins/apimgmt.scala:486`). A plan cannot require both "issued by this CA" and "a subject
+of this shape". Meanwhile the server trust store holds every certificate of the gateway plus the
+JDK CAs (`ssl/ssl.scala:1428`, `includeJdkCa`): a client certificate from any trusted authority
+whose subject matches a subject pattern passes.
+
+**Product meanwhile.** When an mtls plan lists trusted CAs and no issuer pattern, the projection
+derives the issuer patterns from the subjects of those CAs (exact match). A plan with subject
+patterns and no issuer pattern gets a validation warning (`subject_without_issuer`).
+
+**Upstream fix.** Combine the two lists with AND when both are given (or a `match: all | any`
+switch), and an optional per-plan list of trusted CA certificate ids checked on the chain.
+

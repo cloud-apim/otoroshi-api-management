@@ -22,6 +22,7 @@ import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
+import { readCertificate, issuerPatterns } from '../domain/pki.js';
 import * as catalogs from '../domain/catalogs.js';
 import * as auditExport from '../domain/auditExport.js';
 import * as notifications from '../domain/notifications.js';
@@ -185,6 +186,47 @@ r.get('/gateway/plugins/:plugin', async ({ ctx, params }) => {
   const p = (await gatewayPlugins()).find((x) => x.id === params.plugin);
   if (!p) throw notFound(`plugin ${params.plugin} is not in the gateway's catalog`);
   return { ...pluginSummary(p), configSchema: p.config_schema || null, configFlow: p.config_flow || [] };
+});
+
+// reads a certificate pasted in the console: what it is, and how Otoroshi will see its subject
+// when it signs the client certificates of an mtls plan
+r.post('/certificates/inspect', async ({ ctx, body }) => {
+  identity.requireUser(ctx);
+  try {
+    const c = readCertificate(body.pem);
+    return { ...c, issuerPattern: issuerPatterns([body.pem])?.[0] || null };
+  } catch (e) {
+    throw badRequest(`not a readable PEM certificate: ${e.message}`);
+  }
+});
+
+// reads the discovery document of an authorization server, to describe it in an oauth2-remote
+// plan. Fetched by the product (an IdP inside the network is reachable), http(s) only, short.
+r.post('/oidc/discovery', async ({ ctx, body }) => {
+  identity.requireUser(ctx);
+  let url;
+  try {
+    url = new URL(String(body.url || '').trim());
+  } catch (e) {
+    throw badRequest('give the url of the authorization server or of its discovery document');
+  }
+  if (!['http:', 'https:'].includes(url.protocol)) throw badRequest('an http or https url');
+  if (!url.pathname.includes('.well-known')) url = new URL(`${url.href.replace(/\/$/, '')}/.well-known/openid-configuration`);
+  let doc;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { accept: 'application/json' } });
+    if (!res.ok) throw new Error(`answered ${res.status}`);
+    doc = await res.json();
+  } catch (e) {
+    throw badRequest(`cannot read ${url.href}: ${e.message}`);
+  }
+  return {
+    discoveryUrl: url.href,
+    issuer: doc.issuer || null,
+    jwksUrl: doc.jwks_uri || null,
+    userInfoUrl: doc.userinfo_endpoint || null,
+    scopes: doc.scopes_supported || [],
+  };
 });
 
 // installs the data exporter that feeds the ingester. An exporter is infrastructure: this is a

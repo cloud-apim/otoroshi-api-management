@@ -26,8 +26,8 @@ touches the infrastructure.
 | `apikey` | a client id / secret minted by the subscription | read only, automatic secret rotation (every N hours, with a grace period) |
 | `oauth2-local` | a token obtained from the gateway with the subscription's client id / secret | signing key pair, token lifetime |
 | `jwt` | its own JWT | a reference to an Otoroshi JWT verifier, **or** a description the product derives the verifier from (see below); client id claim (`client_id`) |
-| `mtls` | a client certificate | subject and issuer DN regexes, client id field |
-| `oauth2-remote` | a token of a remote IdP, validated by an Otoroshi auth module | auth module, client id claim |
+| `mtls` | a client certificate | the trusted CAs (derived as certificates of the gateway, see below), subject and issuer DN regexes, client id field |
+| `oauth2-remote` | a token of a remote IdP, validated by an Otoroshi auth module | a reference to an auth module, **or** a description of the authorization server the product derives the module from (see below); client id claim; user profile |
 | `keyless` | nothing | the expression the caller identity is derived from (`${req.ip}`) — an ephemeral identity, so quotas still apply per caller |
 
 ### Derived JWT verifiers
@@ -45,6 +45,58 @@ auth:
   config:
     clientIdPath: client_id
     derive: { enabled: true, kind: jwks, jwksUrl: https://idp.example.com/.well-known/jwks.json, issuer: https://idp.example.com }
+```
+
+### Trusted CAs of an mtls plan
+
+An `mtls` plan lists the CA certificates (PEM, no private key) that sign its consumers'
+certificates. The product derives each of them as a **certificate of the gateway**, marked as its
+own, and removes it when the plan stops listing it or when the API goes. The console reads each
+certificate — subject, CA or not, validity — and shows the DN Otoroshi will compare.
+
+The gateway's TLS trust is global: it holds every certificate of the gateway plus the JDK CAs, so a
+certificate from any public authority completes the handshake. When the plan gives **no issuer
+pattern**, the projection derives one from the subjects of its CAs, an exact match in Otoroshi's
+form (`OU=Platform, O=Atlas Data, CN=Atlas Partner CA, C=FR`): the plan accepts what its CAs signed
+and nothing else. A subject Otoroshi's form cannot be predicted for (an e-mail attribute, an escaped
+character) gets a warning instead. Otoroshi accepts a certificate when its subject **or** its issuer
+matches (upstream gap G-16): a subject pattern alone is flagged.
+
+Two gateway settings decide whether the plan can work at all, and the deployment dry run says so:
+the gateway must **ask callers for a client certificate** (TLS client auth `Want` or `Need`), and if
+it trusts a fixed list of CAs (`trustedCAsServer`), the derived ones must be on it. Both belong to
+the gateway's operator.
+
+```yaml
+auth:
+  kind: mtls
+  config:
+    clientIdField: CN
+    trustedCAs:
+      - |
+        -----BEGIN CERTIFICATE-----
+        MIID…
+        -----END CERTIFICATE-----
+```
+
+### The authorization server of an oauth2-remote plan
+
+An `oauth2-remote` plan validates tokens issued by a remote authorization server, through an
+Otoroshi auth module (Otoroshi names the field `verifier`; it holds an auth module id). Instead of
+referencing a module that exists, the plan can describe the server — *Discover* reads its
+`.well-known/openid-configuration` — and the product derives the module: keys from the JWKS url,
+the userinfo url when the plan fetches the user profile, client id and secret when the server needs
+them. Same life as every derived object: marked, diffed, watched for drift, removed with the API.
+
+Otoroshi 18 checks the **signature and the dates** of the token, not its issuer nor its audience
+(upstream gap G-15): a token the same server issued for another client passes. The plan says so.
+
+```yaml
+auth:
+  kind: oauth2-remote
+  config:
+    clientIdPath: sub
+    derive: { enabled: true, discoveryUrl: https://idp.example.com/.well-known/openid-configuration, jwksUrl: https://idp.example.com/jwks }
 ```
 
 On `jwt`, `mtls` and `oauth2-remote` plans the application must declare its expected `client_id`:
