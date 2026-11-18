@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { Callout, Field, Input, errorMessage } from '../../shared/ui.jsx';
 import { api, runtime, usePortal } from '../context.jsx';
-import { useT } from '../i18n.jsx';
+import { pickLang, useT } from '../i18n.jsx';
 
 function safeNext(next) {
   // only relative, in-portal destinations
@@ -54,7 +54,7 @@ export function SignIn() {
   return (
     <AuthCard
       title={t('auth.signin.title')}
-      subtitle={t('auth.signin.subtitle', { portal: portal?.title })}
+      subtitle={t('auth.signin.subtitle', { portal: pickLang(portal?.title, document.documentElement.lang, portal?.defaultLanguage) })}
       footer={
         portal?.selfSignup && portal?.localLogin !== false && (
           <>
@@ -131,7 +131,7 @@ export function SignUp() {
   return (
     <AuthCard
       title={t('auth.signup.title')}
-      subtitle={t('auth.signup.subtitle', { portal: portal?.title })}
+      subtitle={t('auth.signup.subtitle', { portal: pickLang(portal?.title, document.documentElement.lang, portal?.defaultLanguage) })}
       footer={
         <>
           {t('auth.hasaccount')}{' '}

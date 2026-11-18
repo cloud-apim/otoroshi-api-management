@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
-import { Badge, Callout, DiffView, Empty, Field, Icon, Input, Loader, Markdown, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { CodeEditor } from '../../shared/code-editor.jsx';
 import { fmtRelative } from '../../shared/lib.js';
 import { useWs, useMetadataFields } from '../context.jsx';
@@ -44,23 +44,85 @@ function General() {
   );
 }
 
+// a text of the portal: one string per language; a plain string is the default language's
+const asLocalized = (v, def) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
+
 function Portal() {
   const { wapi, ws, session } = useWs();
   const toast = useToast();
   const [p, setP] = useState(ws.portal || {});
   const set = (k) => (v) => setP((x) => ({ ...x, [k]: v }));
+  const languages = p.languages?.length ? p.languages : ['en'];
+  const def = languages.includes(p.defaultLanguage) ? p.defaultLanguage : languages[0];
+  const [lang, setLang] = useState(def);
+  const current = languages.includes(lang) ? lang : def;
+  const [view, setView] = useState('write');
+  const text = (k) => asLocalized(p[k], def)[current] || '';
+  const setText = (k) => (v) => setP((x) => ({ ...x, [k]: { ...asLocalized(x[k], def), [current]: v } }));
+  const missing = (l) => ['title', 'tagline', 'homeMarkdown'].filter((k) => asLocalized(p[k], def)[def] && !asLocalized(p[k], def)[l]);
+  const save = async () => {
+    try {
+      // the texts are saved per language, the old plain strings with them
+      const portal = { ...p, title: asLocalized(p.title, def), tagline: asLocalized(p.tagline, def), homeMarkdown: asLocalized(p.homeMarkdown, def) };
+      await wapi.put('', { portal });
+      setP(portal);
+      toast('Portal settings saved');
+      session.reload();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
   return (
     <div className="col gap-16">
       <Callout kind="info">
         One portal per workspace, at <a className="link" href={`/${ws.slug}/`} target="_blank" rel="noreferrer">/{ws.slug}/</a>. Its exposure pattern — root path or hostname — is an installation setting.
       </Callout>
       <div className="card">
+        <div className="card-head">
+          <h3 className="grow">Content</h3>
+          <Seg
+            value={current}
+            onChange={setLang}
+            options={languages.map((l) => ({ value: l, label: `${l.toUpperCase()}${l === def ? ' · default' : ''}${missing(l).length ? ' · …' : ''}` }))}
+          />
+        </div>
         <div className="card-body">
-          <Setting label="Title">
-            <Input value={p.title} onChange={set('title')} />
+          {current !== def && missing(current).length > 0 && (
+            <Callout kind="info">Not written in {current.toUpperCase()} yet: {missing(current).map((k) => ({ title: 'title', tagline: 'tagline', homeMarkdown: 'home page' })[k]).join(', ')} — the portal shows the {def.toUpperCase()} text meanwhile.</Callout>
+          )}
+          <Setting label={`Title (${current})`} help="the name of the portal, in its header and the browser tab">
+            <Input value={text('title')} onChange={setText('title')} placeholder={current !== def ? asLocalized(p.title, def)[def] : ''} />
           </Setting>
-          <Setting label="Tagline">
-            <Input value={p.tagline} onChange={set('tagline')} />
+          <Setting label={`Tagline (${current})`} help="below the title, on the home page">
+            <Input value={text('tagline')} onChange={setText('tagline')} placeholder={current !== def ? asLocalized(p.tagline, def)[def] : ''} />
+          </Setting>
+          <Setting label={`Home page (${current})`} help="markdown, below the hero of the portal home">
+            <Seg
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'write', label: 'Write' },
+                { value: 'preview', label: 'Preview' },
+              ]}
+            />
+            {view === 'write' ? (
+              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={`home page (${current})`} placeholder="# Markdown" />
+            ) : (
+              <div className="panel" style={{ background: 'var(--surface)' }}>
+                {text('homeMarkdown') ? <Markdown source={text('homeMarkdown')} /> : <span className="muted small">Nothing written yet.</span>}
+              </div>
+            )}
+          </Setting>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-head">
+          <h3>Settings</h3>
+        </div>
+        <div className="card-body">
+          <Setting label="Languages" help="of the portal: its interface (English and French today) and its texts above; the documentation pages declare their own">
+            <TagsInput value={p.languages || []} onChange={set('languages')} />
+            <Select value={def} onChange={set('defaultLanguage')} options={languages.map((l) => ({ value: l, label: `default: ${l}` }))} />
           </Setting>
           <Setting label="Accent color">
             <div className="row">
@@ -70,10 +132,6 @@ function Portal() {
           </Setting>
           <Setting label="Logo url">
             <Input value={p.logoUrl} onChange={set('logoUrl')} />
-          </Setting>
-          <Setting label="Languages" help="of the portal interface; the documentation pages declare their own">
-            <TagsInput value={p.languages || []} onChange={set('languages')} />
-            <Select value={p.defaultLanguage || 'en'} onChange={set('defaultLanguage')} options={(p.languages || ['en']).map((l) => ({ value: l, label: `default: ${l}` }))} />
           </Setting>
           <Setting label="Self signup" help="anyone can create an account and get a key on public plans">
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
@@ -92,31 +150,12 @@ function Portal() {
               </>
             )}
           </Setting>
-          <Setting label="Home page content" help="markdown, below the hero of the portal home">
-            <CodeEditor value={p.homeMarkdown || ''} onChange={set('homeMarkdown')} language="markdown" wordWrap="on" minHeight={140} maxHeight={420} ariaLabel="home page content" placeholder="# Markdown" />
-            {p.homeMarkdown && (
-              <div className="panel">
-                <Markdown source={p.homeMarkdown} />
-              </div>
-            )}
-          </Setting>
-          <div className="row mt-16">
-            <button
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  await wapi.put('', { portal: p });
-                  toast('Portal settings saved');
-                  session.reload();
-                } catch (e) {
-                  toast(errorMessage(e), 'error');
-                }
-              }}
-            >
-              Save
-            </button>
-          </div>
         </div>
+      </div>
+      <div className="row">
+        <button className="btn primary" onClick={save}>
+          Save
+        </button>
       </div>
     </div>
   );
@@ -775,10 +814,21 @@ function Exchange() {
           <h3>Import</h3>
         </div>
         <div className="card-body col">
-          <p className="muted small">Idempotent: objects are upserted by id, snapshots are never rewritten, and nothing is deployed.</p>
+          <p className="muted small">Idempotent: objects are upserted by id, snapshots are never rewritten, and nothing is deployed. Paste an export document, or load a file and review it.</p>
+          <div className="row">
+            <FileButton
+              accept=".json,application/json"
+              onFile={(content, file) => {
+                setText(content);
+                toast(`${file.name} loaded — review it, then import`);
+              }}
+            >
+              Load a file…
+            </FileButton>
+          </div>
           <CodeEditor value={text} onChange={setText} language="json" minHeight={140} maxHeight={360} ariaLabel="export document" placeholder="paste an export document" />
           <button
-            className="btn"
+            className="btn primary"
             style={{ alignSelf: 'flex-start' }}
             disabled={!text}
             onClick={async () => {

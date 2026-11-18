@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { Link, useRouter } from '../../../shared/router.jsx';
 import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import {
-  Badge, Callout, Code, Empty, Field, Icon, Input, JsonBlock, Loader, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
+  Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
   errorMessage, useConfirm, useLoad, useToast,
 } from '../../../shared/ui.jsx';
 import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
-import { CodeEditor } from '../../../shared/code-editor.jsx';
+import { CodeEditor, CodeView } from '../../../shared/code-editor.jsx';
 import { PluginForm, formFields } from './PluginForm.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -990,7 +990,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   <details>
                     <summary className="link small">Show the projected entity as the gateway holds it</summary>
                     <div className="mt-8">
-                      <JsonBlock value={p.actual} />
+                      <CodeView value={p.actual} maxHeight={480} ariaLabel="entity on the gateway" />
                     </div>
                   </details>
                 )}

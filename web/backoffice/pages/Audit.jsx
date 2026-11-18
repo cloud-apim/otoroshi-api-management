@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '../../shared/router.jsx';
 import { fmtDate } from '../../shared/lib.js';
-import { Badge, Empty, JsonBlock, Loader, Modal, useLoad } from '../../shared/ui.jsx';
+import { Badge, Empty, Loader, Modal, useLoad } from '../../shared/ui.jsx';
+import { CodeView } from '../../shared/code-editor.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 
@@ -56,7 +57,7 @@ export function AuditPage() {
       </Loader>
       {open && (
         <Modal title={open.action} size="wide" onClose={() => setOpen(null)}>
-          <JsonBlock value={open} />
+          <CodeView value={open} maxHeight={600} ariaLabel="audit event" />
         </Modal>
       )}
     </div>

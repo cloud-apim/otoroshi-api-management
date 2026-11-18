@@ -3,6 +3,7 @@
 //  - examples/petstore.yaml in the default workspace, published and deployed, its default flow
 //    pinning a shared policy group
 //  - a gitops workspace with a remote catalog serving examples/catalog/apis.yaml, synchronised
+//  - the texts of the default portal, in English and French
 //  - the Otoroshi data exporter that feeds the ingester
 import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
@@ -53,6 +54,24 @@ const catalog =
 const sync = await call('POST', `/workspaces/gitops/catalogs/${catalog.id}/sync`, {});
 if (!sync.ok) console.log(`gitops    catalog sync: ${sync.error || 'see items'}`);
 sync.items.forEach((i) => console.log(`gitops    api ${i.slug} ${i.version}: ${i.action}${i.snapshot ? `, snapshot ${i.snapshot}` : ''}${i.deployment ? `, ${i.deployment}` : ''}${i.error ? ` (${i.error})` : ''}`));
+
+// the default portal speaks the two languages of the portal; a text already written is kept
+const OLD_TAGLINE = 'Discover, subscribe to and try our APIs.';
+const texts = {
+  title: { en: 'Default developer portal', fr: 'Portail développeur Default' },
+  tagline: { en: 'Discover, subscribe to and test our APIs.', fr: 'Découvrez nos API, abonnez-vous et testez-les.' },
+  homeMarkdown: {
+    en: '## Welcome\n\nThe APIs of this workspace, documented and ready to be tested. Create an application, subscribe to a plan, and follow your consumption from your applications.',
+    fr: '## Bienvenue\n\nLes API de cet espace, documentées et prêtes à être testées. Créez une application, abonnez-vous à un plan, et suivez votre consommation depuis vos applications.',
+  },
+};
+const portal = (await call('GET', '/workspaces/default')).portal || {};
+const localized = (v) => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : v ? { en: v } : {}).filter(([, t]) => t && t !== OLD_TAGLINE));
+const merged = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, { ...v, ...localized(portal[k]) }]));
+if (JSON.stringify(merged) !== JSON.stringify(Object.fromEntries(Object.keys(texts).map((k) => [k, portal[k]])))) {
+  await call('PUT', '/workspaces/default', { portal: { ...portal, ...merged } });
+  console.log('default   portal texts in en and fr');
+}
 
 const exporter = await call('POST', '/gateway/exporter', {});
 console.log(`gateway   data exporter -> ${exporter.url}`);

@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { Icon, Markdown, useLoad } from '../../shared/ui.jsx';
 import { api, usePortal } from '../context.jsx';
-import { useT } from '../i18n.jsx';
+import { usePortalText, useT } from '../i18n.jsx';
 import { ApiCard } from './Catalogue.jsx';
 
 export function Home() {
   const { portal, workspace } = usePortal();
   const t = useT();
+  const text = usePortalText(portal);
   const { navigate } = useRouter();
   const [q, setQ] = useState('');
   const apis = useLoad(() => api.get('/apis'), []);
@@ -18,8 +19,8 @@ export function Home() {
         <div className="pt-container">
           <div className="pt-hero-inner">
             <div className="pt-eyebrow">{workspace?.name}</div>
-            <h1 className="pt-hero-title">{portal?.title}</h1>
-            {portal?.tagline && <p className="pt-hero-tagline">{portal.tagline}</p>}
+            <h1 className="pt-hero-title">{text(portal?.title)}</h1>
+            {text(portal?.tagline) && <p className="pt-hero-tagline">{text(portal?.tagline)}</p>}
             <form
               className="pt-hero-search"
               role="search"
@@ -54,10 +55,10 @@ export function Home() {
           ))}
         </div>
 
-        {portal?.homeMarkdown && (
+        {text(portal?.homeMarkdown) && (
           <div className="card mt-24">
             <div className="card-body">
-              <Markdown source={portal.homeMarkdown} />
+              <Markdown source={text(portal?.homeMarkdown)} />
             </div>
           </div>
         )}

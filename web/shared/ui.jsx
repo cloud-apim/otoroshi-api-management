@@ -508,6 +508,29 @@ export function Markdown({ source }) {
   return <div className="md" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+// picks a local file and hands over its text (never uploaded as such: the caller decides)
+export function FileButton({ accept, onFile, children = 'From a file…', className = 'btn' }) {
+  const input = useRef(null);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept={accept}
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) onFile(await file.text(), file);
+        }}
+      />
+      <button type="button" className={className} onClick={() => input.current?.click()}>
+        <Icon name="upload" /> {children}
+      </button>
+    </>
+  );
+}
+
 export function JsonBlock({ value }) {
   return <Code lang="json">{JSON.stringify(value, null, 2)}</Code>;
 }

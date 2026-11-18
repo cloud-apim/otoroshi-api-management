@@ -21,7 +21,7 @@ the product has to compensate, **low** = friction.
 | G-9 | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | attribution via the key's metadata + a client id cache at ingestion |
 | G-10 | A `PUT` on an entity that does not exist is refused (`resource does not exists`) | low | `GET` then `POST` or `PUT` |
 | G-11 | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | tests poll; the console says "deployed" once the write is accepted |
-| G-12 | The try-it with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | the console replays requests through the gateway without the trace |
+| G-12 | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | the console replays requests through the gateway without the trace |
 | G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | validation warning on the plan |
 | G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
 | G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
@@ -164,20 +164,20 @@ accepted.
 **Upstream fix.** Expose the proxy state version (or a "live since" timestamp per entity) on the
 admin API so a control plane can wait for it.
 
-## G-12 — the execution trace try-it is backoffice-only — medium
+## G-12 — the request tester with the execution trace is backoffice-only — medium
 
 **Observed.** Otoroshi records an `NgExecutionReport` (every step and plugin, with timings) for a
 request carrying `Otoroshi-Try-It-Request-Id` only when that id was enabled by
 `TryItController.call` (`next/controllers/tryit.scala`), routed as `POST /bo/api/tryit`
 (`conf/routes:97`) behind `BackOfficeActionAuth`. An Admin API key cannot reach it, so a control
 plane cannot replay a request through an api "in diagnostic mode, with the trace of the policies"
-— the console half of the try-it.
+— the console half of testing.
 
 **Product meanwhile.** The console composer replays the request through the gateway (real
 routing, real plans, real keys) and shows status, headers, body and latency, and says that the
 policy trace needs this upstream change.
 
-**Upstream fix.** Expose the try-it on the Admin API (e.g. `POST /api/routes/_tryit`, and a
+**Upstream fix.** Expose the request tester on the Admin API (e.g. `POST /api/routes/_tryit`, and a
 variant taking an `Api` id + route id), returning the response and the execution report — or let
 an admin apikey enable a report id for the next request.
 

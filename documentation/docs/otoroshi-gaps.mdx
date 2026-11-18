@@ -27,7 +27,7 @@ Reference: Otoroshi 18.0.1.
 | G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | attributes calls from the key metadata and a client id cache at ingestion |
 | G-10 | A `PUT` on an entity that does not exist is refused | low | reads first, then creates or updates |
 | G-11 | Nothing says when a new route or key becomes routable | low | the console says *deployed* once the gateway accepted the write |
-| G-12 | The try-it with the policy execution trace is only reachable from the Otoroshi backoffice | medium | the console replays requests through the gateway without the trace |
+| G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | the console replays requests through the gateway without the trace |
 | G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | warns on the plan |
 | G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
 | G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | warns on the plan |

@@ -321,10 +321,10 @@ r.get('/analytics', async ({ ctx, query }) => {
 
 export const portalRouter = r;
 
-// ---------------------------------------------------------------- try-it proxy
+// ---------------------------------------------------------------- test proxy (Scalar's requests)
 // Scalar sends its requests through `proxyUrl?scalar_url=<target>`. The proxy only talks to the hosts
 // of the workspace's deployed apis and never forwards the portal cookies.
-export async function tryItProxy(req, ctx) {
+export async function testProxy(req, ctx) {
   const url = new URL(req.url);
   const target = url.searchParams.get('scalar_url');
   if (!target) return new Response('missing scalar_url', { status: 400 });

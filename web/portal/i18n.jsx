@@ -27,7 +27,7 @@ const dict = {
     'home.steps.2.title': 'Subscribe',
     'home.steps.2.text': 'Pick a plan for one of your applications and get your credentials.',
     'home.steps.3.title': 'Call it',
-    'home.steps.3.text': 'Try requests from the portal, then follow your consumption.',
+    'home.steps.3.text': 'Test requests from the portal, then follow your consumption.',
     'catalogue.title': 'API catalogue',
     'catalogue.subtitle': 'Every API published on this portal.',
     'catalogue.search': 'Search by name, description or tag',
@@ -250,7 +250,7 @@ const dict = {
     'home.steps.2.title': 'Souscrivez',
     'home.steps.2.text': 'Choisissez un plan pour une de vos applications et obtenez vos identifiants.',
     'home.steps.3.title': 'Appelez-la',
-    'home.steps.3.text': 'Essayez des requêtes depuis le portail, puis suivez votre consommation.',
+    'home.steps.3.text': 'Testez des requêtes depuis le portail, puis suivez votre consommation.',
     'catalogue.title': 'Catalogue d’API',
     'catalogue.subtitle': 'Toutes les API publiées sur ce portail.',
     'catalogue.search': 'Rechercher par nom, description ou tag',
@@ -498,6 +498,12 @@ export function useT() {
 }
 
 // a multilingual value { en: '...', fr: '...' } in the best available language
+// a text of the portal settings — one string, or one per language — in the visitor's language
+export function usePortalText(portal) {
+  const { lang } = useI18n();
+  return (value) => pickLang(value, lang, portal?.defaultLanguage);
+}
+
 export function pickLang(value, lang, fallback) {
   if (!value || typeof value !== 'object') return value || '';
   return value[lang] || (fallback && value[fallback]) || value.en || Object.values(value)[0] || '';

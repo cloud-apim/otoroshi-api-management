@@ -3,7 +3,7 @@ import { Link, Switch as Routes, useRouter } from '../shared/router.jsx';
 import { Icon, Loading, ErrorBox, Dropdown, MenuItem } from '../shared/ui.jsx';
 import { getThemePref, setThemePref } from '../shared/lib.js';
 import { api, usePortal } from './context.jsx';
-import { I18nProvider, useI18n, UI_LANGUAGES } from './i18n.jsx';
+import { I18nProvider, useI18n, usePortalText, UI_LANGUAGES } from './i18n.jsx';
 import { Home } from './pages/Home.jsx';
 import { Catalogue } from './pages/Catalogue.jsx';
 import { ApiPage } from './pages/ApiPage.jsx';
@@ -191,6 +191,11 @@ function NavLink({ to, children, onClick }) {
 
 function Shell() {
   const { portal, workspace, user } = usePortal();
+  const portalText = usePortalText(portal);
+  const title = portalText(portal?.title);
+  useEffect(() => {
+    if (title) document.title = title;
+  }, [title]);
   const { t } = useI18n();
   const [menu, setMenu] = useState(false);
   const close = () => setMenu(false);
@@ -203,7 +208,7 @@ function Shell() {
         <div className="pt-container pt-topbar-inner">
           <Link to="/" className="pt-brand" onClick={close}>
             {portal?.logoUrl ? <img src={portal.logoUrl} alt="" className="pt-logo" /> : <span className="pt-mark" aria-hidden="true">{(workspace?.name || 'A').slice(0, 1)}</span>}
-            <span className="pt-brand-name">{portal?.title || workspace?.name}</span>
+            <span className="pt-brand-name">{title || workspace?.name}</span>
           </Link>
           <nav className={`pt-nav ${menu ? 'open' : ''}`} aria-label="main">
             <NavLink to="/apis" onClick={close}>

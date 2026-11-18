@@ -1,7 +1,7 @@
 ---
 sidebar_position: 6
 title: Developer portal
-description: The public face — catalogue, documentation, reference and try-it, subscriptions, credentials and usage.
+description: The public face — catalogue, documentation, reference and testing, subscriptions, credentials and usage.
 ---
 
 # Developer portal
@@ -44,12 +44,12 @@ Search covers names, descriptions and tags.
 - **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled — the resources a plan gives access to, terms, approval mode and price.
 - A version switcher when several versions of the API are in the catalogue.
 
-### Try it
+### Testing
 
-Scalar sends its requests through the portal's proxy, `/<workspace>/front/api/tryit?scalar_url=…`.
+Scalar sends its requests through the portal's proxy, `/<workspace>/front/api/test?scalar_url=…`.
 The proxy only talks to the hosts of the workspace's deployed APIs, never forwards the portal's
 cookies, and reaches the gateway at its own address with the API's `Host` header — so the browser
-needs no CORS on the API. The consumer tries the API with its own credentials.
+needs no CORS on the API. The consumer tests the API with its own credentials.
 
 ## Subscribing
 

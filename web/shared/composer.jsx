@@ -2,9 +2,18 @@
 // request through its own api, the portal tries an api with the consumer's credentials.
 import React, { useState } from 'react';
 import { Badge, Callout, Code, Field, Icon, Select } from './ui.jsx';
-import { CodeEditor, codeLanguage } from './code-editor.jsx';
+import { CodeEditor, CodeView, codeLanguage } from './code-editor.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+function bodyLanguage(headers) {
+  const ct = headers?.['content-type'] || '';
+  if (ct.includes('json')) return 'json';
+  if (ct.includes('yaml')) return 'yaml';
+  if (ct.includes('html')) return 'html';
+  if (ct.includes('xml')) return 'xml';
+  return 'plaintext';
+}
 
 function pretty(body, headers) {
   const ct = headers?.['content-type'] || '';
@@ -126,7 +135,7 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
                   </dl>
                 </div>
               </details>
-              <Code>{pretty(res.body || '', res.headers) || '(empty body)'}</Code>
+              {res.body ? <CodeView value={pretty(res.body, res.headers)} language={bodyLanguage(res.headers)} maxHeight={480} ariaLabel="response body" /> : <p className="muted small">(empty body)</p>}
               {res.truncated && <p className="faint tiny">body truncated to 256 KB</p>}
               {res.trace_unavailable && <Callout kind="info">{res.trace_unavailable}</Callout>}
             </>

@@ -104,7 +104,7 @@ Two PostgreSQL databases: application data, and events + analytics.
 | Two storage paths, url masking on the raw one | `server/domain/ingest.js` |
 | One portal per workspace, resolved from the url | `server/main.js`, `server/roles/portal-api.js` |
 | Hand-written CSS, light/dark/system | `web/shared/theme.css` |
-| Scalar for OpenAPI and try-it, bundled, behind a proxy | `web/portal`, `tryItProxy` |
+| Scalar for OpenAPI and testing, bundled, behind a proxy | `web/portal`, `testProxy` |
 | GitOps: admin api + CLI + declarative documents | `cli/apim.js`, `server/domain/exchange.js` |
 
 ## Otoroshi gaps

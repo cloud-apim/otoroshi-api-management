@@ -10,9 +10,10 @@ import { DeploymentTab } from './Deployment.jsx';
 import { SubscriptionsTable } from '../Subscriptions.jsx';
 import { AnalyticsDashboard } from '../Observability.jsx';
 import { RequestComposer } from '../../../shared/composer.jsx';
+import { CodeView } from '../../../shared/code-editor.jsx';
 
 // console context: replay a request through this api on the gateway
-function TryItTab({ api, draft }) {
+function TestTab({ api, draft }) {
   const { wapi } = useWs();
   const subs = useLoad(() => wapi.get(`/subscriptions?api=${api.id}&status=active`), [api.id]);
   if (!api.deployment.deployed) return <Callout kind="info">Deploy the api first: the console replays requests through the gateway.</Callout>;
@@ -27,7 +28,7 @@ function TryItTab({ api, draft }) {
             baseLabel={api.base_url}
             paths={draft.resources.map((r) => r.path)}
             credentials={list.map((s) => ({ value: s.id, label: `${s.application_name} — ${s.request?.plan_name || s.plan_id}` }))}
-            send={async (r) => wapi.post(`/apis/${api.id}/tryit`, { method: r.method, path: r.path, query: r.query, headers: r.headers, body: r.body, subscription_id: r.credential || undefined })}
+            send={async (r) => wapi.post(`/apis/${api.id}/test`, { method: r.method, path: r.path, query: r.query, headers: r.headers, body: r.body, subscription_id: r.credential || undefined })}
           />
         )}
       </Loader>
@@ -129,7 +130,7 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'openapi', label: 'OpenAPI' },
     { id: 'subscriptions', label: 'Subscriptions' },
     { id: 'deployment', label: 'Deployment' },
-    { id: 'tryit', label: 'Try it' },
+    { id: 'test', label: 'Test' },
     { id: 'analytics', label: 'Analytics' },
     { id: 'settings', label: 'Settings' },
   ];
@@ -197,7 +198,7 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'openapi' && <OpenApiTab {...ctx} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
       {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
-      {tab === 'tryit' && <TryItTab api={api} draft={draft} />}
+      {tab === 'test' && <TestTab api={api} draft={draft} />}
       {tab === 'analytics' && <AnalyticsDashboard fixed={{ api: api.id }} />}
       {tab === 'settings' && <SettingsTab {...ctx} />}
 
@@ -419,9 +420,7 @@ function DeployModal({ api, snapshot, onClose, onDone }) {
               <Icon name="eye" /> {showEntity ? 'Hide' : 'Show'} the Otoroshi entity that will be written
             </button>
             {showEntity && (
-              <pre style={{ maxHeight: 360 }}>
-                <code>{JSON.stringify(p.entity, null, 2)}</code>
-              </pre>
+              <CodeView value={p.entity} maxHeight={420} ariaLabel="otoroshi entity" />
             )}
           </>
         )}

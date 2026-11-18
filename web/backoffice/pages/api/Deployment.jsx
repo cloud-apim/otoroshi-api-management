@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { fmtDate, fmtRelative } from '../../../shared/lib.js';
 import { Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
+import { CodeView } from '../../../shared/code-editor.jsx';
 
 function SnapshotView({ api, number, onClose }) {
   const { wapi } = useWs();
@@ -14,9 +15,7 @@ function SnapshotView({ api, number, onClose }) {
             <p className="muted small">
               Published {fmtDate(s.published_at)} {s.comment ? `— ${s.comment}` : ''}. Immutable: it can be redeployed, never edited.
             </p>
-            <pre style={{ maxHeight: '60vh' }}>
-              <code>{JSON.stringify(s.content, null, 2)}</code>
-            </pre>
+            <CodeView value={s.content} maxHeight={620} ariaLabel={`snapshot ${number}`} />
           </>
         )}
       </Loader>

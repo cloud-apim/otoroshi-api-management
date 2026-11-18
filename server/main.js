@@ -10,7 +10,7 @@ import { migrateAll } from './db/index.js';
 import { errorResponse, json, parseCookies, readJson, HttpError } from './http/router.js';
 import * as identity from './domain/identity.js';
 import { adminRouter } from './roles/admin-api.js';
-import { portalRouter, tryItProxy } from './roles/portal-api.js';
+import { portalRouter, testProxy } from './roles/portal-api.js';
 import { ingest, parseEvents } from './domain/ingest.js';
 import { workOnce } from './domain/tasks.js';
 import { runDriftDetection } from './otoroshi/drift.js';
@@ -191,8 +191,8 @@ async function handlePortal(req, url, server) {
 
   if (rest.startsWith('/front/api/')) {
     const path = rest.slice('/front/api'.length);
-    if (path === '/tryit' || path.startsWith('/tryit?')) {
-      return tryItProxy(req, ctx);
+    if (path === '/test' || path.startsWith('/test?')) {
+      return testProxy(req, ctx);
     }
     const pauth = portalAuth(ws);
     if (path === '/auth/config') return json({ local: pauth.localLogin, selfSignup: !!ws.portal?.selfSignup && pauth.localLogin, oidc: pauth.oidc.enabled ? { label: pauth.oidc.label } : null });

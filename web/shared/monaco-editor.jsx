@@ -83,6 +83,8 @@ export default function MonacoEditor({ value, onChange, language = 'json', readO
       value: value ?? '',
       language,
       readOnly,
+      domReadOnly: readOnly,
+      renderLineHighlight: readOnly ? 'none' : 'line',
       theme: 'apim',
       automaticLayout: true,
       minimap: { enabled: false },
@@ -143,7 +145,7 @@ export default function MonacoEditor({ value, onChange, language = 'json', readO
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.updateOptions({ readOnly });
+    editor.updateOptions({ readOnly, domReadOnly: readOnly, renderLineHighlight: readOnly ? 'none' : 'line' });
     monaco.editor.setModelLanguage(editor.getModel(), language);
   }, [readOnly, language]);
 

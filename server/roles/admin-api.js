@@ -605,8 +605,8 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
 });
 
 // console side: replay a request through the api on the gateway — real routing, real plans,
-// real keys. The policy execution trace needs Otoroshi to expose its try-it (G-12).
-r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
+// real keys. The policy execution trace needs Otoroshi to expose its request tester (G-12).
+r.post('/workspaces/:ws/apis/:api/test', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);
   const snap = await deployments.deployedSnapshot(api.id);
@@ -644,7 +644,7 @@ r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
   const buf = await res.arrayBuffer();
   const durationMs = Math.round(performance.now() - started);
   const text = new TextDecoder().decode(buf.slice(0, 256 * 1024));
-  await audit(c, { action: 'api.tryit', entityKind: 'api', entityId: api.id, summary: `${method} ${path} replayed through the gateway: ${res.status}`, data: { credential } });
+  await audit(c, { action: 'api.test', entityKind: 'api', entityId: api.id, summary: `${method} ${path} replayed through the gateway: ${res.status}`, data: { credential } });
   return {
     request: { method, url: `${draft.entrypoint.domain}${path}`, credential },
     status: res.status,
@@ -654,7 +654,7 @@ r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
     truncated: buf.byteLength > 256 * 1024,
     size: buf.byteLength,
     trace: null,
-    trace_unavailable: 'the policy execution trace needs Otoroshi to expose its try-it on the admin api (OTOROSHI-GAPS G-12)',
+    trace_unavailable: 'the policy execution trace needs Otoroshi to expose its request tester on the admin api (OTOROSHI-GAPS G-12)',
   };
 });
 

@@ -5,7 +5,7 @@ import { client } from '../shared/lib.js';
 
 export const runtime = window.__APIM__ || { workspace: 'default', base: '', exposure: 'path' };
 export const api = client(`${runtime.base}/front/api`);
-export const tryItProxyUrl = `${window.location.origin}${runtime.base}/front/api/tryit`;
+export const testProxyUrl = `${window.location.origin}${runtime.base}/front/api/test`;
 
 const PortalCtx = createContext(null);
 
@@ -46,5 +46,6 @@ function applyBrand(portal) {
     root.style.removeProperty('--brand');
     delete root.dataset.brand;
   }
-  if (portal?.title) document.title = portal.title;
+  const title = portal?.title && typeof portal.title === 'object' ? portal.title[portal.defaultLanguage] || Object.values(portal.title)[0] : portal?.title;
+  if (title) document.title = title;
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import YAML from 'yaml';
-import { Callout, Empty, Field, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Callout, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
 
@@ -198,7 +198,7 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">
-        The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its try-it goes through the portal proxy with the consumer's own credentials.
+        The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its test requests go through the portal proxy with the consumer's own credentials.
       </p>
       {!readOnly && (
         <div className="row">
@@ -218,6 +218,16 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
           >
             <Icon name="download" /> Import
           </button>
+          <span className="faint small">or</span>
+          <FileButton
+            accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+            onFile={(text, file) => {
+              set(text);
+              toast(`${file.name} imported into the draft`);
+            }}
+          >
+            From a local file…
+          </FileButton>
         </div>
       )}
       <div className="grid-2" style={{ alignItems: 'start' }}>

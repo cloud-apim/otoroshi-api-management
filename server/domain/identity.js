@@ -128,14 +128,15 @@ export async function findWorkspace(idOrSlug) {
 
 export function defaultPortalSettings(name) {
   return {
-    title: `${name} developer portal`,
-    tagline: 'Discover, subscribe to and try our APIs.',
+    // the texts of the portal: one per language of the portal (a plain string is the default one)
+    title: { en: `${name} developer portal`, fr: `Portail développeur ${name}` },
+    tagline: { en: 'Discover, subscribe to and test our APIs.', fr: 'Découvrez nos API, abonnez-vous et testez-les.' },
     accentColor: '#0061bd',
     logoUrl: '',
     languages: ['en', 'fr'],
     defaultLanguage: 'en',
     selfSignup: true,
-    homeMarkdown: '',
+    homeMarkdown: {},
   };
 }
 
