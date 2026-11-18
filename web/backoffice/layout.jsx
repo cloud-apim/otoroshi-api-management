@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useRouter } from '../shared/router.jsx';
 import { Dropdown, Icon, MenuItem, Modal } from '../shared/ui.jsx';
 import { ThemeSwitch } from '../shared/theme-switch.jsx';
+import { fmtRelative } from '../shared/lib.js';
 import { api, useSession, wsApi } from './context.jsx';
 
 function NavLink({ to, icon, children, exact = false, count, also = [] }) {
@@ -97,55 +98,89 @@ function SearchPalette({ onClose }) {
   );
 }
 
-// in-app notifications of the producers (requests to review, transfers to decide)
-function NotificationsBell() {
-  const { workspace } = useSession();
-  const { navigate } = useRouter();
+// in-app notifications of the producers (requests to review, transfers to decide), polled
+function useNotifications(ws) {
   const [data, setData] = useState({ unread: 0, items: [] });
-  const ws = workspace?.slug;
   const load = () => ws && wsApi(ws).get('/notifications').then(setData).catch(() => {});
   useEffect(() => {
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [ws]);
-  if (!ws) return null;
+  return { ...data, markRead: () => data.unread && wsApi(ws).post('/notifications/read').then(load) };
+}
+
+// the person signed in: notifications, theme, tokens, sign out — one menu at the bottom left
+function UserMenu({ user, ws, logout }) {
+  const { navigate } = useRouter();
+  const notes = useNotifications(ws);
   return (
     <Dropdown
-      trigger={({ toggle }) => (
+      align="left"
+      placement="up"
+      width="100%"
+      trigger={({ open, toggle }) => (
         <button
-          className="gw-pill"
-          style={{ border: 0, background: 'none', font: 'inherit', cursor: 'pointer', width: '100%' }}
+          className="ws-switch"
+          style={{ border: 0, marginTop: 4 }}
           onClick={() => {
             toggle();
-            if (data.unread) wsApi(ws).post('/notifications/read').then(load);
+            // shown as unread this time, read from now on
+            if (!open) setTimeout(notes.markRead, 1500);
           }}
-          aria-label="notifications"
+          aria-label={notes.unread ? `user menu, ${notes.unread} unread notifications` : 'user menu'}
+          aria-haspopup="menu"
         >
-          <Icon name="inbox" />
-          <span className="grow" style={{ textAlign: 'left' }}>
-            Notifications
+          <span className="ws-avatar avatar-with-dot" style={{ borderRadius: '50%' }}>
+            {user.name.slice(0, 1).toUpperCase()}
+            {notes.unread > 0 && <span className="avatar-dot" aria-hidden="true" />}
           </span>
-          {data.unread > 0 && <span className="badge warning">{data.unread}</span>}
+          <span className="grow" style={{ minWidth: 0 }}>
+            <span className="bold ellipsis" style={{ display: 'block' }}>
+              {user.name}
+            </span>
+            <span className="tiny faint ellipsis" style={{ display: 'block' }}>
+              {user.email}
+            </span>
+          </span>
+          {notes.unread > 0 && <span className="badge warning">{notes.unread}</span>}
         </button>
       )}
     >
-      <div style={{ maxHeight: 360, overflow: 'auto', width: 320 }}>
-        {data.items.length ? (
-          data.items.slice(0, 15).map((n) => (
-            <button key={n.id} className="btn ghost sm" style={{ width: '100%', height: 'auto', padding: '8px 10px', justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => n.link && navigate(`/ws/${ws}${n.link}`)}>
-              <span className="col gap-4" style={{ alignItems: 'flex-start' }}>
-                <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
-                {n.body && <span className="faint tiny">{n.body}</span>}
-              </span>
-            </button>
-          ))
-        ) : (
-          <div className="muted small" style={{ padding: 10 }}>
-            Nothing new.
+      {ws && (
+        <div className="menu-section">
+          <div className="row menu-title">
+            <Icon name="inbox" size={14} />
+            <span className="grow">Notifications</span>
+            {notes.unread > 0 && <span className="badge warning">{notes.unread} new</span>}
           </div>
-        )}
+          <div style={{ maxHeight: 260, overflow: 'auto' }}>
+            {notes.items.length ? (
+              notes.items.slice(0, 8).map((n) => (
+                <button key={n.id} className="menu-note" onClick={() => n.link && navigate(`/ws/${ws}${n.link}`)}>
+                  <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
+                  {n.body && <span className="faint tiny">{n.body}</span>}
+                  <span className="faint tiny">{fmtRelative(n.created_at)}</span>
+                </button>
+              ))
+            ) : (
+              <div className="muted small" style={{ padding: '6px 10px' }}>
+                Nothing new.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      <div className="menu-section row" onClick={(e) => e.stopPropagation()}>
+        <span className="small muted grow">Theme</span>
+        <ThemeSwitch />
       </div>
+      <MenuItem icon="key" onClick={() => navigate('/settings/tokens')}>
+        API tokens
+      </MenuItem>
+      <MenuItem icon="logout" onClick={logout}>
+        Sign out
+      </MenuItem>
     </Dropdown>
   );
 }
@@ -280,42 +315,13 @@ export function Layout({ children }) {
           </>
         )}
         <div className="sidebar-bottom">
-          <NotificationsBell />
           <GatewayPill />
-          <div className="theme-row">
-            <span className="small muted grow">Theme</span>
-            <ThemeSwitch />
-          </div>
           {user.is_admin && (
             <NavLink to="/settings" icon="settings">
               Global settings
             </NavLink>
           )}
-          <Dropdown
-            align="left"
-            trigger={({ toggle }) => (
-              <button className="ws-switch" style={{ border: 0, marginTop: 4 }} onClick={toggle} aria-label="user menu">
-                <span className="ws-avatar" style={{ borderRadius: '50%' }}>
-                  {user.name.slice(0, 1).toUpperCase()}
-                </span>
-                <span className="grow" style={{ minWidth: 0 }}>
-                  <span className="bold ellipsis" style={{ display: 'block' }}>
-                    {user.name}
-                  </span>
-                  <span className="tiny faint ellipsis" style={{ display: 'block' }}>
-                    {user.email}
-                  </span>
-                </span>
-              </button>
-            )}
-          >
-            <MenuItem icon="key" onClick={() => navigate('/settings/tokens')}>
-              API tokens
-            </MenuItem>
-            <MenuItem icon="logout" onClick={logout}>
-              Sign out
-            </MenuItem>
-          </Dropdown>
+          <UserMenu user={user} ws={ws} logout={logout} />
         </div>
       </aside>
       <main className="main">{children}</main>
