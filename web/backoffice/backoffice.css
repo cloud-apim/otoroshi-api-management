@@ -19,6 +19,9 @@
 .navlink.on { background: var(--selected); color: var(--ink); }
 .navlink .count { margin-left: auto; font-size: 11px; background: var(--warning-bg); color: var(--warning-text); border-radius: 999px; padding: 0 7px; font-weight: 600; }
 .sidebar-bottom { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+.theme-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; }
+.theme-switch button { padding: 5px 9px; display: inline-flex; align-items: center; }
+.login-theme { position: fixed; top: 16px; right: 16px; }
 .gw-pill { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; font-size: 12.5px; color: var(--muted); }
 .gw-pill:hover { background: var(--hover); }
 .gw-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }

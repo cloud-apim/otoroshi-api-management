@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useRouter } from '../shared/router.jsx';
-import { Dropdown, Icon, MenuItem, Modal, Seg } from '../shared/ui.jsx';
-import { getThemePref, setThemePref } from '../shared/lib.js';
+import { Dropdown, Icon, MenuItem, Modal } from '../shared/ui.jsx';
+import { ThemeSwitch } from '../shared/theme-switch.jsx';
 import { api, useSession, wsApi } from './context.jsx';
 
 function NavLink({ to, icon, children, exact = false, count, also = [] }) {
@@ -183,7 +183,6 @@ export function Layout({ children }) {
   const { user, workspaces, workspace } = useSession();
   const { navigate } = useRouter();
   const [search, setSearch] = useState(false);
-  const [theme, setTheme] = useState(getThemePref());
   const [pending, setPending] = useState(0);
   useEffect(() => {
     const on = (e) => {
@@ -283,6 +282,10 @@ export function Layout({ children }) {
         <div className="sidebar-bottom">
           <NotificationsBell />
           <GatewayPill />
+          <div className="theme-row">
+            <span className="small muted grow">Theme</span>
+            <ThemeSwitch />
+          </div>
           {user.is_admin && (
             <NavLink to="/settings" icon="settings">
               Global settings
@@ -306,21 +309,6 @@ export function Layout({ children }) {
               </button>
             )}
           >
-            <div style={{ padding: 8 }} onClick={(e) => e.stopPropagation()}>
-              <div className="tiny faint mb-8">Theme</div>
-              <Seg
-                value={theme}
-                onChange={(v) => {
-                  setTheme(v);
-                  setThemePref(v);
-                }}
-                options={[
-                  { value: 'light', label: 'Light' },
-                  { value: 'dark', label: 'Dark' },
-                  { value: 'system', label: 'System' },
-                ]}
-              />
-            </div>
             <MenuItem icon="key" onClick={() => navigate('/settings/tokens')}>
               API tokens
             </MenuItem>

@@ -5,6 +5,7 @@ import './backoffice.css';
 import { initTheme } from '../shared/lib.js';
 import { RouterProvider, Switch, useRouter } from '../shared/router.jsx';
 import { ConfirmProvider, Loading, ToastProvider, errorMessage, Field, Input } from '../shared/ui.jsx';
+import { ThemeSwitch } from '../shared/theme-switch.jsx';
 import { api, SessionCtx } from './context.jsx';
 import { Layout } from './layout.jsx';
 import { Home } from './pages/Home.jsx';
@@ -47,6 +48,9 @@ function Login({ onLogged }) {
   };
   return (
     <div className="login">
+      <div className="login-theme">
+        <ThemeSwitch />
+      </div>
       <form className="card" onSubmit={submit}>
         <div className="card-body col gap-16">
           <div className="brand" style={{ padding: 0 }}>
