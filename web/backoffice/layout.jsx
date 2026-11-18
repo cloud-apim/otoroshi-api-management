@@ -244,13 +244,14 @@ export function Layout({ children }) {
   return (
     <div className="app">
       <aside className="sidebar" aria-label="main navigation">
-        <div className="brand">
+        {/* the brand leads home: the home of the current workspace */}
+        <Link to={ws ? `/ws/${ws}` : '/'} className="brand" aria-label="home">
           <div className="brand-mark">O</div>
           <div>
             <div className="brand-name">API Management</div>
             <div className="brand-sub">Otoroshi</div>
           </div>
-        </div>
+        </Link>
         {/* the workspace selector opens the sidebar: it sets the context of everything below */}
         {workspaces.length > 1 || user.is_admin ? (
           <Dropdown
