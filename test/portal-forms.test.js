@@ -99,6 +99,8 @@ describe('by hostname', () => {
     const res = await get(`/${WS}/apis/x?tab=plans`, `localhost:${config.port}`);
     expect(res.status).toBe(301);
     expect(res.headers.get('location')).toBe(`http://${WS}.${DOMAIN}:${config.port}/apis/x?tab=plans`);
+    // not cached: going back to the previous form must not loop
+    expect(res.headers.get('cache-control')).toBe('no-store');
     const post = await get(`/${WS}/front/api/auth/login`, `localhost:${config.port}`, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
     expect(post.status).toBe(308);
     const settings = (await call('GET', '/settings')).body.portal;

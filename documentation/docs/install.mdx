@@ -169,7 +169,8 @@ the database holds other workspaces, and creates no other.
 The form changes every public URL — links in documentation, mails, tickets — so choose it at
 installation time. If it changes later, the product remembers the forms served before (the last
 five, from one start to the next) and **redirects their URLs to the same page in the current form**,
-permanently (`301`, `308` for a form or an API call):
+permanently (`301`, `308` for a form or an API call) — but not cached by the browsers, so that
+going back to a previous form never loops:
 
 | From | To | Example |
 |---|---|---|

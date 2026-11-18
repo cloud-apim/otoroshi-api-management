@@ -181,8 +181,9 @@ async function resolvePortal(req, url) {
   return after ? { redirect: after } : null;
 }
 
-// a permanent redirect that keeps the method of a form or an api call
-const moved = (req, location) => new Response(null, { status: ['GET', 'HEAD'].includes(req.method) ? 301 : 308, headers: { location } });
+// a permanent redirect that keeps the method of a form or an api call. Not kept by the browsers:
+// a form changed back would otherwise loop between their cached redirects and the new ones
+const moved = (req, location) => new Response(null, { status: ['GET', 'HEAD'].includes(req.method) ? 301 : 308, headers: { location, 'cache-control': 'no-store' } });
 
 async function handlePortal(req, url, server) {
   const resolved = await resolvePortal(req, url);
