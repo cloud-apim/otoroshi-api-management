@@ -29,6 +29,7 @@ import * as auditExport from '../domain/auditExport.js';
 import * as notifications from '../domain/notifications.js';
 import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exposure.js';
 import * as promotion from '../domain/promotion.js';
+import * as billing from '../payments/billing.js';
 import { resolveLocal } from '../otoroshi/vault-refs.js';
 
 const r = new Router();
@@ -586,6 +587,30 @@ r.get('/workspaces/:ws/apis/:api/snapshots/:snap', async ({ ctx, params }) => {
   return apis.getSnapshot((await apiOf(c, params)).id, params.snap);
 });
 
+// payments: the Stripe account a workspace sells its paid plans with (Stripe Connect), its events
+r.get('/workspaces/:ws/payments', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  return billing.status(c.workspace);
+});
+r.post('/workspaces/:ws/payments/connect', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return { url: billing.connectUrl(c, c.workspace) };
+});
+r.delete('/workspaces/:ws/payments', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return billing.disconnect(c, c.workspace);
+});
+r.get('/workspaces/:ws/payments/events', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return billing.events(c.workspace, pageParams(query, { defaultLimit: 50 }));
+});
+r.post('/workspaces/:ws/payments/reconcile', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  const res = await billing.reconcile({ workspaceId: c.workspace.id });
+  await audit(c, { action: 'payments.reconcile', workspaceId: c.workspace.id, entityKind: 'workspace', entityId: c.workspace.id, summary: `payments reconciled: ${res.checked} checked, ${res.changed.length} changed` });
+  return res;
+});
+
 // promotion: the same snapshot on the next installation. It carries the secrets of the plans: its
 // export is written in the audit trail
 r.get('/workspaces/:ws/apis/:api/snapshots/:snap/promotion', async ({ ctx, params }) => {
@@ -816,7 +841,6 @@ r.post('/workspaces/:ws/subscriptions/:sub/close', subAction((c, s) => subscript
 r.post('/workspaces/:ws/subscriptions/:sub/transfer', subAction((c, s, b) => subscriptions.transferSubscription(c, s, b, { initiator: 'producer' })));
 r.post('/workspaces/:ws/subscriptions/:sub/transfer/decision', subAction((c, s, b) => subscriptions.answerTransfer(c, s, b, { side: 'producer' })));
 r.post('/workspaces/:ws/subscriptions/:sub/resync', subAction((c, s) => subscriptions.resync(c, s)));
-r.post('/workspaces/:ws/subscriptions/:sub/payment', subAction((c, s, b) => subscriptions.confirmPayment(c, s, b)));
 r.put('/workspaces/:ws/subscriptions/:sub/metadata', subAction((c, s, b) => subscriptions.setSubscriptionMetadata(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/credentials/:cred/rotate', async ({ ctx, params }) => {
   const c = await ws(ctx, params);

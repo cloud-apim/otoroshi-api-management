@@ -319,6 +319,7 @@ async function consoleTour(page) {
     ['members', 'console-ws-members', 'Workspace settings — members and roles'],
     ['teams', 'console-ws-teams', 'Workspace settings — teams'],
     ['metadata', 'console-ws-metadata', 'Workspace settings — typed metadata fields'],
+    ['payments', 'console-ws-payments', 'Workspace settings — payments: the Stripe account the paid plans are sold with, and what Stripe said'],
     ['export', 'console-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);

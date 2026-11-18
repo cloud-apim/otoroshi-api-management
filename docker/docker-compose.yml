@@ -81,6 +81,8 @@ services:
       OTOROSHI_URL: http://otoroshi:8080
       APIM_INGEST_URL: http://apim:9000/ingest
       APIM_PUBLIC_URL: http://localhost:9000
+      # the fake Stripe of the development: a Checkout is a page of the product
+      APIM_PAYMENTS_PROVIDER: fake
     ports:
       - "9000:9000"
     volumes:

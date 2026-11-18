@@ -203,11 +203,7 @@ These belong to the portal:
 
 ## Pricing
 
-A plan is free or paid: amount, currency, interval, the provider's price reference and a
-grace period. The product decides access, a payment provider decides the money. A paid subscription
-waits in `pending_payment`, and its key is only projected once the payment is confirmed.
-
-:::note
-This prototype ships a **test payment connector** only: the portal and the console confirm a
-payment by hand. No provider is wired yet.
-:::
+A plan is free or paid: amount, currency, interval, optionally a price at Stripe (`price_…`), and a
+grace period. The product decides access, Stripe decides the money: a paid subscription waits in
+`pending_payment`, and its key is only projected once Stripe says it is paid. The pricing is frozen
+in the snapshot: changing a price is a publication. How the money goes: [Payments](../payments.mdx).

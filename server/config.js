@@ -77,6 +77,22 @@ export const config = {
     url: env.APIM_PORTAL_URL || null,
   },
 
+  // the payments of the paid plans: Stripe Connect — a workspace links its own Stripe account, the
+  // product keeps its id only. `fake` stands for Stripe in the development and the tests; `off` by
+  // default
+  payments: {
+    provider: env.APIM_PAYMENTS_PROVIDER || (env.APIM_STRIPE_CLIENT_ID ? 'stripe' : 'off'),
+    stripe: {
+      secretKey: env.APIM_STRIPE_SECRET_KEY || '',
+      clientId: env.APIM_STRIPE_CLIENT_ID || '',
+      webhookSecret: env.APIM_STRIPE_WEBHOOK_SECRET || '',
+      apiVersion: env.APIM_STRIPE_API_VERSION || '2025-03-31.basil',
+      apiUrl: env.APIM_STRIPE_API_URL || 'https://api.stripe.com',
+      connectUrl: env.APIM_STRIPE_CONNECT_URL || 'https://connect.stripe.com',
+    },
+    reconcileMs: parseInt(env.APIM_PAYMENTS_RECONCILE_MS || '3600000', 10),
+  },
+
   // the Kubernetes controller (role `controller`): a pass over its resources every resyncMs
   kube: {
     resyncMs: parseInt(env.APIM_KUBE_RESYNC_MS || '10000', 10),

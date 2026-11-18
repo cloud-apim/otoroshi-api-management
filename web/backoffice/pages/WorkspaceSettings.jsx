@@ -8,6 +8,7 @@ import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
+import { PaymentsSettings } from './Payments.jsx';
 
 // what a producer may read but not change: disabled, with the reason
 function ReadOnly({ when, children }) {
@@ -898,7 +899,7 @@ export function WorkspaceSettingsPage({ tab }) {
   const { slug, ws, isAdmin } = useWs();
   const { navigate } = useRouter();
   // a producer reads the settings it may not change; catalogs and the export are an administrator's
-  const tabs = isAdmin ? ['general', 'portal', 'members', 'teams', 'metadata', 'catalogs', 'export'] : ['general', 'portal', 'members', 'teams', 'metadata'];
+  const tabs = isAdmin ? ['general', 'portal', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'] : ['general', 'portal', 'members', 'teams', 'metadata', 'payments'];
   const allowed = tabs.includes(tab);
   return (
     <div className="page">
@@ -915,6 +916,7 @@ export function WorkspaceSettingsPage({ tab }) {
       {tab === 'members' && <Members />}
       {tab === 'teams' && <Teams />}
       {tab === 'metadata' && <MetadataSettings />}
+      {tab === 'payments' && <PaymentsSettings />}
       {tab === 'catalogs' && allowed && <Catalogs />}
       {tab === 'export' && allowed && <Exchange />}
       {!allowed && <Callout kind="info">{tr('The administrators of the workspace manage its remote catalogs and its export.')}</Callout>}

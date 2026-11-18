@@ -397,7 +397,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
       {section === 'pricing' && (
         <div>
           <Callout kind="info">
-            {tr('The product decides access; a payment provider decides the money. A paid subscription waits for the payment before its key is projected. Frozen in the snapshot: changing a price is a publication.')}
+            {tr('The product decides access; Stripe decides the money, on the Stripe account the workspace links (Workspace settings › Payments). A paid subscription waits for the payment before its key is projected. Frozen in the snapshot: changing a price is a publication.')}
           </Callout>
           <Setting label={tr('Pricing')}>
             <Select value={p.pricing.kind} onChange={(v) => setIn('pricing', { kind: v })} options={[{ value: 'free', label: tr('Free') }, { value: 'paid', label: tr('Paid') }]} />
@@ -412,7 +412,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
                   <Select value={p.pricing.interval} onChange={(v) => setIn('pricing', { interval: v })} options={['month', 'year']} style={{ width: 110 }} />
                 </div>
               </Setting>
-              <Setting label={tr('Provider price reference')} help={tr('e.g. a Stripe price id. The connector is a narrow interface; Stripe Checkout comes first.')}>
+              <Setting label={tr('Provider price reference')} help={tr('a price at Stripe (price_…): empty, Stripe is given the price of the plan — its amount, its currency, its interval')}>
                 <Input value={p.pricing.priceRef} onChange={(v) => setIn('pricing', { priceRef: v })} mono placeholder={tr('price_…')} />
               </Setting>
               <Setting label={tr('Grace period (days)')} help={tr('after a failed payment, before the key is disabled')}>

@@ -1,0 +1,87 @@
+---
+sidebar_position: 6.5
+title: Payments
+description: The paid plans, sold through Stripe — Stripe Connect, Checkout, webhooks, grace, reconciliation, the customer portal.
+---
+
+# Payments
+
+**The product decides access; Stripe decides the money.** The product takes no payment, computes
+no invoice, handles no tax and stores no means of payment. Nothing of it is in the request path:
+the gateway sees an apikey, enabled or disabled — if the product is down, the traffic flows, the
+one of a customer whose payment just failed included, until the next projection.
+
+## The Stripe account of a workspace
+
+A workspace sells its paid plans through **its own Stripe account**, linked by **Stripe Connect**:
+**Workspace settings › Payments › Link a Stripe account** sends one of its administrators to Stripe,
+who authorises the installation and comes back. The product keeps the id of the account, its name
+and whether it is live — never a key of it; it calls Stripe with the key of the installation, on
+behalf of the account. Unlinking is refused while paid subscriptions are open; an account that
+takes its authorisation back from Stripe is unlinked.
+
+The installation sets, once:
+
+| Variable | |
+|---|---|
+| `APIM_PAYMENTS_PROVIDER` | `stripe`, `fake` (the development and the tests) or `off` (the default without a Connect client id) |
+| `APIM_STRIPE_SECRET_KEY` | the secret key of the platform's Stripe account |
+| `APIM_STRIPE_CLIENT_ID` | the Connect client id (`ca_…`) |
+| `APIM_STRIPE_WEBHOOK_SECRET` | the secret of the Connect webhook endpoint (`whsec_…`) |
+| `APIM_STRIPE_API_VERSION` | the version of the Stripe api the product speaks, `2025-03-31.basil` |
+| `APIM_PAYMENTS_RECONCILE_MS` | how often the paid subscriptions are read again from Stripe, every hour |
+
+**The webhook**: one endpoint for every linked account, `<public url>/payments/stripe/webhook`,
+registered once in the Stripe dashboard of the platform as a **Connect** endpoint, with the events
+`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+and `account.application.deauthorized`.
+
+## Paying a plan
+
+1. On the portal, a consumer subscribes an application to a paid plan: the subscription waits in
+   `pending_payment`.
+2. **Pay** opens a **Stripe Checkout**, a page of Stripe, on the account of the workspace. The
+   price is the plan's — its amount, currency and interval — unless the plan names a price at
+   Stripe; the id of the subscription goes in the metadata.
+3. Stripe tells the product (`checkout.session.completed`): the subscription becomes active, and
+   only then its key is projected on the gateway.
+
+**The team pays.** Its billing account at Stripe — one per team and Stripe account — groups the
+invoices of its applications. **Invoices and card**, on the application in the portal, opens the
+**customer portal of Stripe**: invoices, means of payment, cancellation. The product has no screen
+for them.
+
+## What follows
+
+The subscription follows what Stripe says of its Stripe subscription:
+
+| At Stripe | The subscription | Its key |
+|---|---|---|
+| `active`, `trialing` | active, paid | enabled |
+| `past_due` — a payment failed, Stripe retries | active, past due | enabled, for the **grace period** of the plan at most |
+| past due beyond the grace period | **suspended** for want of payment | disabled |
+| `unpaid`, `incomplete_expired`, `paused` | suspended for want of payment | disabled |
+| paid again | resumed — what a producer suspended stays suspended | enabled |
+| `canceled` | closed | deleted |
+
+The other way round, **closing** a paid subscription in the product cancels it at Stripe, and a
+**move** between two paid plans changes its price at Stripe, prorated. A move from a free plan to a
+paid one goes through a payment: the consumer subscribes to the paid plan.
+
+## Lost webhooks, replayed ones
+
+A webhook is **checked by its signature** (and its age: five minutes, against a replay), **kept
+once** by its id — Stripe redelivers what it is not sure was received — and handled by the
+projection queue, so that a failure is retried. Every event and what it did is listed in
+**Workspace settings › Payments**.
+
+A webhook can also be lost: the product **reconciles** its paid subscriptions with Stripe every
+hour (and on demand, **Reconcile now**), the way it reconciles with the gateway.
+
+## In the development
+
+`APIM_PAYMENTS_PROVIDER=fake` — the default of the docker stack — stands for Stripe: linking an
+account answers at once, a Checkout is a page of the product that pays or cancels, and the events
+are the ones Stripe would send, signed, on the same endpoint. `mise run demo` links it to the
+default workspace. The product refuses to start with it when `NODE_ENV=production` — the setting
+of its image.

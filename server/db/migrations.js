@@ -427,6 +427,44 @@ create index applications_managed_by on applications(managed_by) where managed_b
 create index subscriptions_managed_by on subscriptions(managed_by) where managed_by is not null;
 `,
   },
+  {
+    version: '0011_payments',
+    sql: `
+-- the payment connector of a workspace: its provider, its credentials, the secret of its webhook
+alter table workspaces add column payments jsonb not null default '{}';
+-- the billing account of a team at a provider: the team pays, the invoice groups its applications
+create table payment_customers (
+  team_id text not null references teams(id) on delete cascade,
+  provider text not null,
+  customer_ref text not null,
+  created_at timestamptz not null default now(),
+  primary key (team_id, provider)
+);
+-- the events of a provider, each handled once: a provider redelivers what it is not sure was received
+create table payment_events (
+  id text not null,
+  provider text not null,
+  workspace_id text references workspaces(id) on delete cascade,
+  type text not null,
+  subscription_id text,
+  received_at timestamptz not null default now(),
+  outcome text,
+  error text,
+  data jsonb not null default '{}',
+  primary key (provider, id)
+);
+create index payment_events_workspace on payment_events(workspace_id, received_at desc);
+`,
+  },
+  {
+    version: '0012_payments_connect',
+    sql: `
+-- the payments go through Stripe Connect: a workspace links its own Stripe account (its id only),
+-- and the events of every linked account come on one endpoint
+alter table payment_events add column account text;
+alter table payment_events add column processed_at timestamptz;
+`,
+  },
 ];
 
 export const analyticsMigrations = [

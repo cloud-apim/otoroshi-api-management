@@ -184,6 +184,24 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                   </dd>
                 </>
               )}
+              {s.payment?.provider && (
+                <>
+                  <dt>{tr('Payment')}</dt>
+                  <dd>
+                    <div className="row gap-6 wrap">
+                      <StatusBadge status={s.payment.status === 'paid' ? 'active' : s.payment.status === 'past_due' ? 'drifted' : s.payment.status === 'canceled' ? 'closed' : 'pending'} label={tr(s.payment.status || 'awaiting_payment')} />
+                      {s.payment.stripe_status && <span className="faint small">{tr('Stripe: {0}', [s.payment.stripe_status])}</span>}
+                      {s.payment.current_period_end && <span className="faint small">{tr('paid until {0}', [fmtDate(s.payment.current_period_end)])}</span>}
+                      {s.payment.past_due_since && (
+                        <span className="warning-text small">{tr('past due since {0}, grace of {1} days', [fmtDate(s.payment.past_due_since), s.payment.grace_days ?? 7])}</span>
+                      )}
+                    </div>
+                    <div className="faint tiny mono">
+                      {[s.payment.account, s.payment.customer, s.payment.provider_subscription].filter(Boolean).join(' · ')}
+                    </div>
+                  </dd>
+                </>
+              )}
             </dl>
             {/* portal-only information, never projected */}
             <div className="panel col gap-6">
@@ -337,11 +355,6 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               {['active', 'suspended'].includes(s.status) && !s.managed_by && (
                 <button className="btn" disabled={busy} onClick={() => setTransfer(true)}>
                   <Icon name="swap" /> {tr('Transfer to another plan')}
-                </button>
-              )}
-              {s.status === 'pending_payment' && (
-                <button className="btn" disabled={busy} onClick={() => act('payment', {}, tr('Payment confirmed (test connector)'))}>
-                  {tr('Confirm payment (test)')}
                 </button>
               )}
               <button className="btn ghost" disabled={busy} onClick={() => act('resync', {}, tr('Projection replayed'))}>

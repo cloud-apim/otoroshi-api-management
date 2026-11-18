@@ -143,6 +143,12 @@ One installation drives one Otoroshi cluster, with an administration key.
 | `APIM_PORTAL_DOMAIN` | `portal.oto.tools` | the domain of the hostname mode |
 | `APIM_PORTAL_URL` | `APIM_PUBLIC_URL` | the public base of the portals; its scheme and port make the hostname URLs |
 
+### Payments
+
+The paid plans are sold through Stripe Connect: `APIM_PAYMENTS_PROVIDER`, `APIM_STRIPE_SECRET_KEY`,
+`APIM_STRIPE_CLIENT_ID`, `APIM_STRIPE_WEBHOOK_SECRET` — see [Payments](./payments.mdx). Off by
+default.
+
 ### Console authentication
 
 | Variable | Default | Meaning |

@@ -5,6 +5,7 @@
 //  - a gitops workspace with a remote catalog serving examples/catalog/apis.yaml, synchronised
 //  - the texts of the default portal, in English and French
 //  - the Otoroshi data exporter that feeds the ingester
+//  - a (fake) Stripe account linked to the default workspace, for its paid plans
 import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 
@@ -75,3 +76,13 @@ if (JSON.stringify(merged) !== JSON.stringify(Object.fromEntries(Object.keys(tex
 
 const exporter = await call('POST', '/gateway/exporter', {});
 console.log(`gateway   data exporter -> ${exporter.url}`);
+
+// the paid plans of the default workspace are sold through a Stripe account — the fake Stripe of the
+// development stack, linked the way an administrator links a real one
+const payments = await call('GET', '/workspaces/default/payments');
+if (payments.available && !payments.account) {
+  const { url } = await call('POST', '/workspaces/default/payments/connect');
+  const authorize = await fetch(url, { redirect: 'manual' });
+  await fetch(authorize.headers.get('location'), { redirect: 'manual' });
+  console.log(`default   payments through a ${payments.provider} Stripe account`);
+}

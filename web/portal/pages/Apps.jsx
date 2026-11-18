@@ -168,6 +168,8 @@ function AppDetailView({ id }) {
   const { navigate } = useRouter();
   const state = useLoad(() => api.get(`/applications/${id}`), [id]);
   const [form, setForm] = useState(null);
+  // back from the Checkout of Stripe
+  const checkout = new URLSearchParams(window.location.search).get('checkout');
   useEffect(() => {
     if (state.data) setForm({ name: state.data.name, description: state.data.description, client_id: state.data.client_id || '', certificates: state.data.certificates || [] });
   }, [state.data]);
@@ -207,6 +209,8 @@ function AppDetailView({ id }) {
             />
             <div className="pt-two-col">
               <div className="col gap-16">
+                {checkout === 'success' && <Callout kind="positive">{t('apps.checkout.success')}</Callout>}
+                {checkout === 'canceled' && <Callout kind="info">{t('apps.checkout.canceled')}</Callout>}
                 <div className="row">
                   <h2 className="grow">{t('apps.subscriptions')}</h2>
                   <Link to="/apis" className="btn sm">
@@ -453,15 +457,21 @@ function SubscriptionCard({ sub, app, onChange }) {
       toast(errorMessage(e), 'error');
     }
   };
+  // the payment is taken by Stripe, on a page of its own; the key is made once Stripe says it is paid
   const doPay = async () => {
     setPay(true);
     try {
-      await api.post(`/subscriptions/${sub.id}/pay`);
-      onChange();
+      window.location.href = (await api.post(`/subscriptions/${sub.id}/checkout`)).url;
     } catch (e) {
       toast(errorMessage(e), 'error');
-    } finally {
       setPay(false);
+    }
+  };
+  const billing = async () => {
+    try {
+      window.location.href = (await api.post(`/subscriptions/${sub.id}/billing`)).url;
+    } catch (e) {
+      toast(errorMessage(e), 'error');
     }
   };
   return (
@@ -531,6 +541,19 @@ function SubscriptionCard({ sub, app, onChange }) {
           </div>
         ))}
         {sub.status === 'active' && creds.length > 0 && <Quotas sub={sub} />}
+        {sub.payment?.status === 'past_due' && <Callout kind="warning">{t('subs.pastDue', { days: sub.payment.grace_days ?? 7 })}</Callout>}
+        {sub.payment?.suspended_for_payment && sub.status === 'suspended' && <Callout kind="negative">{t('subs.unpaid')}</Callout>}
+        {sub.payment?.customer && ['active', 'suspended'].includes(sub.status) && (
+          <div className="row gap-6 wrap">
+            <span className="muted small grow">
+              {t('subs.paid')}
+              {sub.payment.current_period_end ? ` · ${t('subs.paidUntil', { date: fmtDate(sub.payment.current_period_end) })}` : ''}
+            </span>
+            <button className="btn sm" onClick={billing}>
+              <Icon name="external" /> {t('subs.billing')}
+            </button>
+          </div>
+        )}
         <PendingTransfer sub={sub} onChange={onChange} />
         {closable && (
           <div className="row">

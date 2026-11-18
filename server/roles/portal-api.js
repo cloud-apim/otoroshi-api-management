@@ -16,6 +16,8 @@ import YAML from 'yaml';
 import { listFields } from '../domain/metadata.js';
 import * as notifications from '../domain/notifications.js';
 import { resolveLocal } from '../otoroshi/vault-refs.js';
+import * as billing from '../payments/billing.js';
+import { portalUrl } from '../portal-exposure.js';
 
 const r = new Router();
 
@@ -293,8 +295,13 @@ r.post('/notifications/read', async ({ ctx }) => {
   return { ok: true };
 });
 
-// test payment connector: stands for the provider's hosted checkout + webhook
-r.post('/subscriptions/:sub/pay', async ({ ctx, params }) => subscriptions.confirmPayment(ctx, await mySub(ctx, params.sub), {}));
+// a paid plan: the Checkout of Stripe, on the account of the workspace — the key is made once Stripe says it is paid
+r.post('/subscriptions/:sub/checkout', async ({ ctx, params }) => billing.checkout(ctx, ctx.workspace, await mySub(ctx, params.sub)));
+// the portal of Stripe: the invoices, the cards and the cancellation of the team's subscriptions
+r.post('/subscriptions/:sub/billing', async ({ ctx, params }) => {
+  const sub = await mySub(ctx, params.sub);
+  return billing.manage(ctx, ctx.workspace, sub, { back: `${portalUrl(ctx.workspace.slug).replace(/\/$/, '')}/apps/${sub.application_id}` });
+});
 
 r.post('/subscriptions/:sub/credentials/:cred/rotate', async ({ ctx, params }) =>
   subscriptions.rotateCredential(ctx, await mySub(ctx, params.sub), params.cred)

@@ -17,6 +17,7 @@ import { buildOtoroshiSubscription } from '../otoroshi/projection.js';
 import { checkValues } from './metadata.js';
 import { notify } from './notifications.js';
 import { requireUnmanaged } from './applications.js';
+import { config } from '../config.js';
 
 export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
 
@@ -56,7 +57,7 @@ export async function subscribablePlans(api) {
   return { snapshot: snap, plans: draft.plans };
 }
 
-async function findPlan(api, planId) {
+export async function findPlan(api, planId) {
   const { snapshot, plans } = await subscribablePlans(api);
   if (!snapshot) throw badRequest('this api is not deployed: there is nothing to subscribe to');
   const plan = plans.find((p) => p.id === planId);
@@ -95,6 +96,9 @@ export async function requestSubscription(ctx, workspaceId, input) {
   // the request form of the plan: the subscription-scoped fields asked to the requester
   const metadata = await checkValues(workspaceId, 'subscription', input.metadata || {}, { only: (f) => f.portal });
   const paid = plan.pricing?.kind === 'paid';
+  // a paid plan is sold through the Stripe account the workspace linked
+  if (paid && (config.payments.provider === 'off' || !(await db`select payments from workspaces where id = ${workspaceId}`)[0]?.payments?.account?.id))
+    throw badRequest(`${plan.name} is a paid plan, and this portal does not sell its plans yet: its administrators link a Stripe account first`);
   let status = plan.validation === 'manual' ? 'pending' : paid ? 'pending_payment' : 'active';
   const id = newId('sub');
   const dates = { created_at: now(), ...(status === 'active' ? { processed_at: now(), started_at: now() } : {}) };
@@ -189,18 +193,24 @@ export async function resumeSubscription(ctx, sub) {
 export async function closeSubscription(ctx, sub) {
   requireUnmanaged(ctx, sub, 'subscription');
   if (!OPEN_STATUSES.includes(sub.status)) throw badRequest(`a ${sub.status} subscription cannot be closed`);
-  return setStatus(ctx, sub, 'closed', { datesPatch: { closed_at: now() }, action: 'subscription.close', summary: `subscription ${sub.id} closed` });
+  const closed = await setStatus(ctx, sub, 'closed', { datesPatch: { closed_at: now() }, action: 'subscription.close', summary: `subscription ${sub.id} closed` });
+  // the provider stops charging: asynchronous, replayed until the provider answers
+  if (sub.payment?.provider_subscription && sub.payment.status !== 'canceled') await enqueue('payment_cancel', { subscription_id: sub.id }, { dedupeKey: `payment:${sub.id}` });
+  return closed;
 }
 
-// test payment connector: stands for Stripe's checkout.session.completed webhook
-export async function confirmPayment(ctx, sub, { providerRef } = {}) {
-  if (sub.status !== 'pending_payment') throw badRequest('this subscription is not waiting for a payment');
-  return setStatus(ctx, sub, 'active', {
-    datesPatch: { started_at: now() },
-    payment: { ...sub.payment, status: 'paid', provider_ref: providerRef || newId('pay_test'), paid_at: now() },
-    action: 'subscription.payment',
-    summary: `payment received for subscription ${sub.id}`,
-  });
+const isPaid = (plan) => plan?.pricing?.kind === 'paid';
+
+// what the payment provider says moves the subscription: paid, unpaid past its grace, cancelled.
+// The payment state is merged; a status change goes through the same path as every other
+export async function applyPayment(ctx, sub, { status = sub.status, payment = {}, datesPatch = {}, review, action, summary }) {
+  const merged = { ...(sub.payment || {}), ...payment };
+  if (status === sub.status) {
+    await db`update subscriptions set payment = ${merged}, updated_at = now() where id = ${sub.id}`;
+    await audit(ctx, { action, workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary });
+    return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+  }
+  return setStatus(ctx, sub, status, { payment: merged, datesPatch, review, action, summary });
 }
 
 // transfer to an equivalent plan (same auth mechanism). The key does not change, the
@@ -250,6 +260,8 @@ async function resolveTransfer(sub, { plan_id, api_id }) {
   if (!plansAreEquivalent(fromPlan, toPlan))
     throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer`);
   if (toPlan.status !== 'published') throw badRequest(`target plan is ${toPlan.status}`);
+  if (isPaid(toPlan) && !isPaid(fromPlan))
+    throw badRequest(`${toPlan.name} is a paid plan: moving to it goes through a payment — subscribe to it, then close this subscription`);
   return { fromApi, toApi, fromPlan, toPlan, reasons: degradations(fromPlan, toPlan), reason_codes: degradationCodes(fromPlan, toPlan) };
 }
 
@@ -269,6 +281,11 @@ async function applyTransfer(ctx, sub, t) {
     summary: `subscription ${sub.id} transferred from ${fromApi.name} ${fromApi.version}/${fromPlan.name} to ${toApi.name} ${toApi.version}/${toPlan.name}`,
   });
   await enqueue('sync_subscription', { subscription_id: sub.id }, { dedupeKey: `sub:${sub.id}` });
+  // the provider follows: the price of a paid plan changes, prorated; a free plan ends the payment
+  if (sub.payment?.provider_subscription && sub.payment.status !== 'canceled') {
+    if (isPaid(toPlan)) await enqueue('payment_change_price', { subscription_id: sub.id, price_ref: toPlan.pricing.priceRef }, { dedupeKey: `payment:${sub.id}` });
+    else await enqueue('payment_cancel', { subscription_id: sub.id }, { dedupeKey: `payment:${sub.id}` });
+  }
   await notifyConsumer(sub, { kind: 'subscription.transfer', title: `moved to ${toPlan.name}`, body: `Your key does not change. ${t.reasons.length ? `Accepted changes: ${t.reasons.join(', ')}.` : ''}` });
   return (await db`select * from subscriptions where id = ${sub.id}`)[0];
 }

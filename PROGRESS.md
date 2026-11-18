@@ -17,9 +17,8 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-7** — Stripe connector (D-36, Q-12).
-2. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-3. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+2. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -93,7 +92,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-7 | D-36, Q-12 | A **payment connector** behind a narrow interface, Stripe Checkout first: checkout session, idempotent signed webhooks (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` → grace → suspension, `customer.subscription.deleted`), periodic reconciliation with the provider, customer portal link — a test connector stands in today | L | |
+| R-47 | D-36, D-30 | A move from a **free plan to a paid one** through a Checkout, the subscription staying on its plan until it is paid — refused today: the consumer subscribes to the paid plan | S | |
 | R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
 
@@ -154,7 +153,7 @@ waits for the data plane rather than working around it.
 | D-32 MVP scope, captured events | 🟡 | GatewayEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
 | D-33 two storage paths | 🟡 | computed + raw with url masking ✅; retention, sampling, pseudonymisation: R-8 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
-| D-36 ready for monetisation | 🟡 | schema ✅, test connector ✅; Stripe: R-7, usage billing: R-34 |
+| D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move: R-47; usage billing: R-34 |
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
 | D-38 catalog-marked projection | ✅ | Otoroshi records each deployment |
 | D-39 hand-written CSS | ✅ | chart palette validated |

@@ -143,6 +143,9 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .right { text-align: right; }
 .center { text-align: center; }
 .nowrap { white-space: nowrap; }
+.positive-text { color: var(--positive-text); }
+.negative-text { color: var(--negative-text); }
+.warning-text { color: var(--warning-text); }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }

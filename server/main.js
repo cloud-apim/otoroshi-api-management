@@ -98,6 +98,20 @@ async function handleIngest(req) {
   return json(await ingest(events));
 }
 
+// Stripe: its webhook (Stripe Connect: every linked account), the way back of the link of an
+// account, and the pages of the fake provider of the development
+async function handlePayments(req, url) {
+  const billing = await import('./payments/billing.js');
+  const path = url.pathname;
+  if (path === '/payments/stripe/webhook' && req.method === 'POST') return json(await billing.receive(await req.text(), req.headers));
+  if (path === '/payments/stripe/callback') return redirect(await billing.connected({ code: url.searchParams.get('code'), state: url.searchParams.get('state'), error: url.searchParams.get('error') }));
+  if (path === '/payments/fake/authorize') return redirect(await billing.fakeAuthorize(url.searchParams));
+  const m = /^\/payments\/fake\/checkout\/([^/]+)(?:\/(pay|cancel))?$/.exec(path);
+  if (m && !m[2]) return new Response(billing.fakeCheckoutPage(m[1]), { headers: { 'content-type': 'text/html; charset=utf-8' } });
+  if (m && req.method === 'POST') return new Response(null, { status: 303, headers: { location: await billing.fakeCheckout(m[1], m[2]) } });
+  return json({ error: 'not found' }, 404);
+}
+
 async function handleAdminApi(req, path, server) {
   const auth = req.headers.get('authorization') || '';
   const token = auth.replace(/^Bearer\s+/i, '');
@@ -275,6 +289,7 @@ async function fetchHandler(req, server) {
     if (path === '/health') return json({ status: 'ok', roles: config.roles });
     if (path.startsWith('/ingest') && hasRole('ingester')) return await handleIngest(req);
     if (path.startsWith('/api/') && hasRole('api')) return await handleAdminApi(req, path.slice(4), server);
+    if (path.startsWith('/payments/') && hasRole('api')) return await handlePayments(req, url);
     if (hasRole('backoffice')) {
       if (path.startsWith('/backoffice/api/')) return await handleBackofficeApi(req, path.slice('/backoffice/api'.length), server);
       if (path === '/backoffice') return Response.redirect('/backoffice/', 302);
@@ -295,6 +310,7 @@ async function fetchHandler(req, server) {
 
 async function start() {
   checkConfig();
+  (await import('./payments/billing.js')).checkPaymentsConfig();
   await migrateAll();
   await identity.bootstrap();
   await identity.checkTenancy();
@@ -313,6 +329,10 @@ async function start() {
     const apisMod = await import('./domain/apis.js');
     const depsMod = await import('./domain/deployments.js');
     setInterval(() => syncDue({ apis: apisMod, deployments: depsMod }).catch((e) => console.error('[apim] catalogs failed', e.message)), 30000);
+    // the payments: the grace of an unpaid subscription every minute, Stripe read again every hour
+    const billing = await import('./payments/billing.js');
+    setInterval(() => billing.graceSweep().catch((e) => console.error('[apim] payment grace failed', e.message)), 60000);
+    setInterval(() => billing.reconcile().catch((e) => console.error('[apim] payment reconciliation failed', e.message)), config.payments.reconcileMs);
     const { deliverAll } = await import('./domain/auditExport.js');
     setInterval(() => deliverAll().catch((e) => console.error('[apim] audit export failed', e.message)), 5000);
     setTimeout(() => runDriftDetection().catch(() => null), 5000);

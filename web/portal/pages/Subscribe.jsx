@@ -72,16 +72,14 @@ export function SubscribeModal({ api: a, plan, onClose }) {
     }
   };
 
+  // the payment is taken by Stripe, on a page of its own: back on the application once paid
   const pay = async () => {
     setBusy(true);
     setError(null);
     try {
-      const sub = await api.post(`/subscriptions/${result.sub.id}/pay`);
-      const { creds } = await credentialsFor(result.app.id, sub.id);
-      setResult({ ...result, sub, creds });
+      window.location.href = (await api.post(`/subscriptions/${result.sub.id}/checkout`)).url;
     } catch (err) {
       setError(err);
-    } finally {
       setBusy(false);
     }
   };
