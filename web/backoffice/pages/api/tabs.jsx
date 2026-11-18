@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Link, useRouter } from '../../../shared/router.jsx';
 import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import {
-  Badge, Callout, Code, Empty, Field, Icon, Input, JsonBlock, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
+  Badge, Callout, Code, Empty, Field, Icon, Input, JsonBlock, Loader, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
   errorMessage, useConfirm, useLoad, useToast,
 } from '../../../shared/ui.jsx';
 import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 import { CodeEditor } from '../../../shared/code-editor.jsx';
+import { PluginForm, formFields } from './PluginForm.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const rid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -518,7 +519,19 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
   const [picking, setPicking] = useState(isNew);
   const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
+  // the form and the json edit the same configuration; the form is rebuilt when the
+  // configuration changes from outside it (another plugin, a reset, the json view)
+  const [view, setView] = useState('form');
+  const [formKey, setFormKey] = useState(0);
+  const replaceConfig = (text) => {
+    setConfig(text);
+    setFormKey((k) => k + 1);
+  };
   const meta = pluginOf(catalog, p.plugin);
+  const form = useLoad(() => (meta ? rootApi.get(`/gateway/plugins/${encodeURIComponent(meta.id)}`).catch(() => null) : Promise.resolve(null)), [meta?.id]);
+  const schema = form.data?.id === meta?.id ? form.data?.configSchema : null;
+  const hasForm = !!schema && formFields(schema).length > 0;
+  const shown = hasForm ? view : 'json';
   let parsed = null;
   let jsonError = null;
   try {
@@ -537,8 +550,9 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
     const previous = JSON.stringify(pluginOf(catalog, p.plugin)?.defaultConfig || {});
     const untouched = !jsonError && (!Object.keys(parsed).length || JSON.stringify(parsed) === previous);
     setP({ ...p, plugin: c.id });
-    if (untouched) setConfig(JSON.stringify(c.defaultConfig || {}, null, 2));
+    if (untouched) replaceConfig(JSON.stringify(c.defaultConfig || {}, null, 2));
   };
+  const outside = hasForm && !jsonError ? Object.keys(parsed).filter((k) => !(k in schema)) : [];
   return (
     <Modal
       title={isNew ? 'Add a plugin' : `Edit plugin — ${meta?.name || shortPluginId(p.plugin)}`}
@@ -592,16 +606,42 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
         )}
       </div>
       <div className="row">
-        <label className="bold small grow">Configuration (json)</label>
+        <label className="bold small grow">Configuration</label>
         {meta && (
-          <button className="btn ghost xs" onClick={() => setConfig(JSON.stringify(meta.defaultConfig || {}, null, 2))} disabled={!jsonError && JSON.stringify(parsed) === JSON.stringify(meta.defaultConfig || {})}>
+          <button className="btn ghost xs" onClick={() => replaceConfig(JSON.stringify(meta.defaultConfig || {}, null, 2))} disabled={!jsonError && JSON.stringify(parsed) === JSON.stringify(meta.defaultConfig || {})}>
             Reset to the default configuration
           </button>
         )}
+        {hasForm && (
+          <Seg
+            value={shown}
+            onChange={(v) => {
+              if (v === 'form' && jsonError) return;
+              setView(v);
+              setFormKey((k) => k + 1);
+            }}
+            options={[
+              { value: 'form', label: 'Form' },
+              { value: 'json', label: 'JSON' },
+            ]}
+          />
+        )}
       </div>
-      <Field error={jsonError} hint={meta && !meta.defaultConfig ? 'this plugin takes no configuration' : "the plugin's native configuration"}>
-        <CodeEditor value={config} onChange={setConfig} language="json" minHeight={160} maxHeight={380} ariaLabel="plugin configuration" />
-      </Field>
+      {shown === 'form' ? (
+        <div className="col gap-6">
+          <div className="panel">
+            <PluginForm key={formKey} schema={schema} flow={form.data.configFlow} value={parsed} onChange={(obj) => setConfig(JSON.stringify(obj, null, 2))} />
+          </div>
+          <div className="hint">
+            The form is generated from the description the gateway gives of this plugin; the JSON stays the reference.
+            {outside.length > 0 && ` Also in the configuration, kept as is: ${outside.join(', ')} (JSON view).`}
+          </div>
+        </div>
+      ) : (
+        <Field error={jsonError} hint={meta && !meta.defaultConfig ? 'this plugin takes no configuration' : "the plugin's native configuration"}>
+          <CodeEditor value={config} onChange={setConfig} language="json" minHeight={160} maxHeight={380} ariaLabel="plugin configuration" />
+        </Field>
+      )}
       <div className="grid-2">
         <Field label="Only on paths" hint="Java regular expressions on the full request path; empty = everywhere">
           <TagsInput value={p.include} onChange={(v) => setP({ ...p, include: v })} placeholder="/v1/admin/.*" />

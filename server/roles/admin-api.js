@@ -151,21 +151,40 @@ r.get('/gateway/references', async ({ ctx }) => {
   };
 });
 
+// the gateway's plugin catalog, kept a minute: the flows tab and the plugin editor read it often
+let pluginCatalog = { at: 0, list: null };
+async function gatewayPlugins() {
+  if (pluginCatalog.list && Date.now() - pluginCatalog.at < 60000) return pluginCatalog.list;
+  const all = await oto.pluginsCatalog().catch(() => null);
+  if (!all) return pluginCatalog.list || [];
+  const list = (Array.isArray(all) ? all : all.plugins || [])
+    .filter((p) => (p.plugin_type || p.pluginType) === 'ng' || String(p.id || '').startsWith('cp:otoroshi.next'))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  pluginCatalog = { at: Date.now(), list };
+  return list;
+}
+
+const pluginSummary = (p) => ({
+  id: p.id,
+  name: p.name,
+  description: p.description,
+  steps: p.plugin_steps || p.steps || [],
+  categories: p.plugin_categories || [],
+  defaultConfig: p.default_config ?? null,
+});
+
 r.get('/gateway/plugins', async ({ ctx }) => {
   identity.requireUser(ctx);
-  const all = (await oto.pluginsCatalog().catch(() => null)) || [];
-  const list = Array.isArray(all) ? all : all.plugins || [];
-  return list
-    .filter((p) => (p.plugin_type || p.pluginType) === 'ng' || String(p.id || '').startsWith('cp:otoroshi.next'))
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      steps: p.plugin_steps || p.steps || [],
-      categories: p.plugin_categories || [],
-      defaultConfig: p.default_config ?? null,
-    }))
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  return (await gatewayPlugins()).map(pluginSummary);
+});
+
+// one plugin with the description of its configuration form (`config_schema` / `config_flow`,
+// the description Otoroshi's own ui renders)
+r.get('/gateway/plugins/:plugin', async ({ ctx, params }) => {
+  identity.requireUser(ctx);
+  const p = (await gatewayPlugins()).find((x) => x.id === params.plugin);
+  if (!p) throw notFound(`plugin ${params.plugin} is not in the gateway's catalog`);
+  return { ...pluginSummary(p), configSchema: p.config_schema || null, configFlow: p.config_flow || [] };
 });
 
 // installs the data exporter that feeds the ingester. An exporter is infrastructure: this is a

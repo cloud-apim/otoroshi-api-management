@@ -33,9 +33,13 @@ plugin acts, and its default configuration.
 
 - **Add plugin** searches the catalog by name or description, filtered by category. Choosing a
   plugin fills in its default configuration, unless you already edited it.
-- **Configuration** is the plugin's native JSON, in a code editor that checks it as you type.
-  *Reset to the default configuration* restores the one from the catalog. A configuration that is
-  not a JSON object cannot be applied.
+- **Configuration** is the plugin's native JSON, edited as a **form** or as **JSON**. The form is
+  generated from the description the gateway gives of the plugin — the one Otoroshi's own ui
+  renders: switches, numbers, lists, maps, nested groups, lists of groups. The JSON view is a code
+  editor that checks it as you type. Both edit the same configuration: the form keeps every key it
+  does not describe, never changes the type of a value already there, and says which keys it
+  leaves to the JSON view. *Reset to the default configuration* restores the one from the
+  catalog; a configuration that is not a JSON object cannot be applied.
 - **Only on paths** and **Except paths** are Java regular expressions matched against the full
   request path, context path included: `/v1/pets.*`, not `/pets/*`. Empty means everywhere; an
   excluded path always wins.
@@ -47,7 +51,11 @@ plugin acts, and its default configuration.
 A plugin the gateway's catalog does not know — a custom plugin, or a gateway that does not run it —
 is shown as such and projected as is.
 
-![Editing a plugin: its native configuration, where it applies](/img/screens/console-api-plugin-edit.png)
+![Editing a plugin: a form generated from the description the gateway gives of it](/img/screens/console-api-plugin-edit.png)
+
+![The same configuration as JSON](/img/screens/console-api-plugin-json.png)
+
+![A generated form with nested groups](/img/screens/console-api-plugin-form.png)
 
 ![Adding a plugin: the gateway's catalog, and the default configuration of the plugin chosen](/img/screens/console-api-plugin-add.png)
 

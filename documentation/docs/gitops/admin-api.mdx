@@ -39,7 +39,7 @@ addressed by id or slug.
 |---|---|
 | you | `GET /me`, `GET POST DELETE /me/tokens` |
 | installation | `GET /settings`, `PUT /settings/{gateway,portal,ingest,auth}`, `GET POST PUT /users`, `GET /audit`, `GET POST PUT DELETE /audit/exporters`, `POST /audit/exporters/<id>/test` |
-| gateway | `GET /gateway/status`, `GET /gateway/tasks`, `POST /gateway/tasks/<id>/retry`, `GET /gateway/references`, `GET /gateway/plugins`, `POST /gateway/exporter`, `POST /gateway/drift`, `GET /gateway/unmanaged-apis` |
+| gateway | `GET /gateway/status`, `GET /gateway/tasks`, `POST /gateway/tasks/<id>/retry`, `GET /gateway/references`, `GET /gateway/plugins`, `GET /gateway/plugins/<id>` (with its form description), `POST /gateway/exporter`, `POST /gateway/drift`, `GET /gateway/unmanaged-apis` |
 | workspaces | `GET POST /workspaces`, `GET PUT DELETE /workspaces/<ws>`, `…/members`, `…/teams`, `…/teams/<team>/members` |
 | APIs | `GET POST …/apis`, `GET PUT DELETE …/apis/<api>`, `PUT …/draft`, `POST …/validate`, `POST …/lifecycle`, `POST …/versions`, `GET …/plans`, `GET …/document` |
 | documentation | `GET POST …/apis/<api>/pages`, `GET PUT DELETE …/pages/<page>` |

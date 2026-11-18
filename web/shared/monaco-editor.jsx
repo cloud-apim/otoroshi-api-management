@@ -29,12 +29,20 @@ function applyTheme() {
     base: dark ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [
+      { token: 'delimiter', foreground: fg('--ink') },
       { token: 'string.key.json', foreground: fg('--accent-text') },
       { token: 'string.value.json', foreground: fg('--positive-text') },
       { token: 'number', foreground: fg('--warning-text') },
       { token: 'keyword', foreground: fg('--negative-text') },
       { token: 'type', foreground: fg('--accent-text') },
       { token: 'string', foreground: fg('--positive-text') },
+      // markdown: headings and list marks are keywords there, not errors
+      { token: 'keyword.md', foreground: fg('--accent-text'), fontStyle: 'bold' },
+      { token: 'strong.md', fontStyle: 'bold' },
+      { token: 'emphasis.md', fontStyle: 'italic' },
+      { token: 'string.link.md', foreground: fg('--accent-text') },
+      { token: 'variable.md', foreground: fg('--warning-text') },
+      { token: 'variable.source.md', foreground: fg('--warning-text') },
     ],
     colors: {
       'editor.background': css('--surface'),
@@ -54,6 +62,9 @@ function applyTheme() {
       'editorHoverWidget.border': css('--border-strong'),
       'scrollbarSlider.background': css('--selected'),
       'scrollbarSlider.hoverBackground': css('--border-strong'),
+      // brackets in the text color: the console's palette has no rainbow
+      ...Object.fromEntries([1, 2, 3, 4, 5, 6].map((n) => [`editorBracketHighlight.foreground${n}`, css('--ink')])),
+      'editorBracketHighlight.unexpectedBracket.foreground': css('--negative-text'),
       focusBorder: '#00000000',
     },
   });
@@ -84,7 +95,6 @@ export default function MonacoEditor({ value, onChange, language = 'json', readO
       overviewRulerLanes: 0,
       hideCursorInOverviewRuler: true,
       stickyScroll: { enabled: false },
-      bracketPairColorization: { enabled: false },
       guides: { bracketPairs: false },
       scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8, alwaysConsumeMouseWheel: false },
       padding: { top: 8, bottom: 8 },
