@@ -78,6 +78,7 @@ waits for the data plane rather than working around it.
 | R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
+| R-43 | D-19 | The console **follows the rights** of the person: hide (or show read only) the workspace settings a producer cannot use, send a consumer who signs in to the console to its portal, and show the projection queue of one's own workspaces only (it is installation-wide today) — the admin api already refuses what is not allowed (`test/permissions.test.js`) | S | |
 
 ### Industrialisation (GitOps, environments, operations)
 
