@@ -65,6 +65,14 @@ bun cli/apim.js subscriptions list default --status pending
 bun cli/apim.js drift default
 ```
 
+## One executable
+
+```sh
+mise run build:binary            # dist/bin/otoroshi-apim: the server, the console, the portal and the command line
+dist/bin/otoroshi-apim           # the server, with the roles of APIM_ROLES
+dist/bin/otoroshi-apim apis list default
+```
+
 ## Architecture
 
 ```

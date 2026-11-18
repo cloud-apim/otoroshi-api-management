@@ -3,6 +3,8 @@
 // It only talks to the admin api: every action of the console replays from here.
 //
 //   APIM_URL=http://localhost:9000 APIM_TOKEN=... bun cli/apim.js <command>
+//
+// The compiled binary is the command line too: otoroshi-apim <command> (server/bin.js).
 
 import YAML from 'yaml';
 import { readFileSync } from 'node:fs';
@@ -10,6 +12,8 @@ import { readFileSync } from 'node:fs';
 const HELP = `apim — otoroshi-api-management command line
 
 Usage: apim <command> [args] [--flags]
+       otoroshi-apim <command> [args] [--flags]   the compiled binary: the same commands, and
+       otoroshi-apim [serve]                      the server, with the roles of APIM_ROLES
 
 Global flags / env:
   --url <url>        APIM_URL      (default http://localhost:9000)

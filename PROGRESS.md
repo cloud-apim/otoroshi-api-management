@@ -17,8 +17,8 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-49** — one compiled binary: the server, the two faces, the migrations and the command line.
-2. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+2. **R-50** — the container image built from the compiled executable.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -93,7 +93,7 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-47 | D-36, D-30 | A move from a **free plan to a paid one** through a Checkout, the subscription staying on its plan until it is paid — refused today: the consumer subscribes to the paid plan | S | |
 | R-48 | D-33 | **Apply a stricter privacy policy to what is already stored** (the calls and the raw events of the retention window), instead of waiting for their retention; a daily compaction of the hourly rollups past a few months | S | |
-| R-49 | D-14 | **One compiled binary** (`bun build --compile`): the server and its roles, the console and the portal, the migrations, and the command line as a sub-command; built for linux and macos, x64 and arm64 | S | |
+| R-50 | | The **container image** built from the compiled executable (a slim base with `git` and the certificates, no `node_modules`), and the executables attached to a release | S | |
 | R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
 
@@ -135,7 +135,7 @@ waits for the data plane rather than working around it.
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
 | D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages in English: R-45; metadata labels: R-22; more portal pages: R-42 |
 | D-12 light / dark / system | ✅ | console and portal |
-| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules derived; the gateway's own settings (TLS client auth, exposure routes): R-41 |
+| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the gateway's own settings (TLS client auth, exposure routes): R-41 |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
 | D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |

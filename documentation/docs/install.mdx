@@ -23,7 +23,29 @@ exposure — the public portal and the ingester do not have the same profile as 
 `/health` answers `{"status":"ok","roles":[…]}` on every instance.
 
 The background workers — the projection queue, the periodic drift detection, the remote catalog
-scheduler — run on instances carrying `api` or `backoffice`, unless `APIM_WORKERS_ENABLED=false`.
+scheduler, the payments — run on instances carrying `api` or `backoffice`, unless
+`APIM_WORKERS_ENABLED=false`; the rollups and the retention of the analytics run on the instances
+carrying `ingester`, one at a time.
+
+## The executable
+
+The product compiles into **one executable**: the server and its roles, the console and the portal
+(their files embedded), the migrations, and the command line. It needs nothing beside it but the
+two PostgreSQL databases, Otoroshi, and `git` for the git remote catalogs.
+
+```bash
+mise run build:binary          # dist/bin/otoroshi-apim, for this machine
+mise run build:binaries        # dist/bin/otoroshi-apim-{linux,darwin}-{x64,arm64}
+```
+
+```bash
+otoroshi-apim                  # the server, with the roles of APIM_ROLES — or: otoroshi-apim serve
+otoroshi-apim version
+otoroshi-apim apis list default        # the command line: the same commands as bun cli/apim.js
+```
+
+Cross-compiling makes bun download the runtime of each target. `mise run test:binary` starts the
+executable away from the repository and checks its faces, its health and its command line.
 
 ## The container image
 
@@ -165,6 +187,9 @@ default.
 See [Authentication](./authentication.mdx).
 
 ### Command line
+
+The command line is `bun cli/apim.js <command>` from the repository, or `otoroshi-apim <command>`
+with the executable.
 
 | Variable | Default | Meaning |
 |---|---|---|

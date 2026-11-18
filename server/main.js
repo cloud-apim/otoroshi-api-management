@@ -5,7 +5,8 @@
 //   portal     -> /, /front/api             (one portal per workspace)
 //   controller -> no route: reconciles the Kubernetes resources of the product (not a default role)
 
-import { join, normalize } from 'node:path';
+import { normalize } from 'node:path';
+import { uiFile } from './ui-files.js';
 import { config, hasRole } from './config.js';
 import { migrateAll } from './db/index.js';
 import { errorResponse, json, parseCookies, readJson, HttpError } from './http/router.js';
@@ -20,7 +21,6 @@ import { authorizeUrl, completeLogin } from './auth/oidc.js';
 import { verifyOtoroshiClaim } from './auth/otoroshi.js';
 import { checkConfig, currentForm, isBareDomain, match, portalHistory, portalUrl, recordPortalForm, redirectFrom } from './portal-exposure.js';
 
-const DIST = join(import.meta.dir, '..', 'dist');
 const BO_COOKIE = 'apim_bo';
 const PORTAL_COOKIE = 'apim_portal';
 
@@ -67,19 +67,20 @@ function checkCsrf(req) {
 
 // ---------------------------------------------------------------- static files
 
-async function serveStatic(root, relPath) {
-  const clean = normalize(relPath).replace(/^(\.\.[/\\])+/, '');
-  const file = Bun.file(join(root, clean));
-  if (clean && (await file.exists())) {
+// a face is 'backoffice' or 'portal': its files come from dist/, or from the binary (ui-files.js)
+async function serveStatic(face, relPath) {
+  const clean = normalize(relPath).replace(/^(\.\.[/\\])+/, '').replace(/^\/+/, '');
+  const file = clean ? await uiFile(face, clean) : null;
+  if (file) {
     const immutable = clean.startsWith('assets/');
-    return new Response(file, { headers: immutable ? { 'cache-control': 'public, max-age=31536000, immutable' } : {} });
+    return new Response(file, { headers: { 'content-type': file.type, ...(immutable ? { 'cache-control': 'public, max-age=31536000, immutable' } : {}) } });
   }
   return null;
 }
 
-async function spaIndex(root, inject) {
-  const file = Bun.file(join(root, 'index.html'));
-  if (!(await file.exists())) {
+async function spaIndex(face, inject) {
+  const file = await uiFile(face, 'index.html');
+  if (!file) {
     return new Response('ui not built: run `bun run build`', { status: 503 });
   }
   let html = await file.text();
@@ -279,7 +280,7 @@ async function handlePortal(req, url, server) {
     checkCsrf(req);
     return dispatch(portalRouter, req, path, ctx);
   }
-  return spaIndex(join(DIST, 'portal'), { workspace: ws.slug, base, exposure: currentForm().kind });
+  return spaIndex('portal', { workspace: ws.slug, base, exposure: currentForm().kind });
 }
 
 async function fetchHandler(req, server) {
@@ -294,12 +295,13 @@ async function fetchHandler(req, server) {
       if (path.startsWith('/backoffice/api/')) return await handleBackofficeApi(req, path.slice('/backoffice/api'.length), server);
       if (path === '/backoffice') return Response.redirect('/backoffice/', 302);
       if (path.startsWith('/backoffice/')) {
-        const root = join(DIST, 'backoffice');
-        return (await serveStatic(root, path.slice('/backoffice/'.length))) || (await spaIndex(root, { otoroshi: config.otoroshi.backofficeUrl }));
+        const rel = path.slice('/backoffice/'.length);
+        // a missing asset is a 404, not the page of the console
+        return (await serveStatic('backoffice', rel)) || (rel.startsWith('assets/') ? json({ error: 'not found' }, 404) : await spaIndex('backoffice', { otoroshi: config.otoroshi.backofficeUrl }));
       }
     }
     if (hasRole('portal')) {
-      if (path.startsWith('/_portal/')) return (await serveStatic(join(DIST, 'portal'), path.slice('/_portal/'.length))) || json({ error: 'not found' }, 404);
+      if (path.startsWith('/_portal/')) return (await serveStatic('portal', path.slice('/_portal/'.length))) || json({ error: 'not found' }, 404);
       return await handlePortal(req, url, server);
     }
     return json({ error: 'not found' }, 404);
@@ -347,7 +349,8 @@ async function start() {
   return server;
 }
 
-if (import.meta.main) {
+// started by itself (bun server/main.js), not imported by the binary (bin.js) or by a test
+if (import.meta.main && !globalThis.__APIM_BIN__) {
   start().catch((e) => {
     console.error('[apim] failed to start', e);
     process.exit(1);
