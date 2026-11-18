@@ -5,6 +5,7 @@ import { Empty, Field, Icon, Input, Loader, Modal, Select, Setting, TextArea, er
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { SubscriptionsTable } from './Subscriptions.jsx';
 import { AnalyticsDashboard } from './Observability.jsx';
 
@@ -60,6 +61,7 @@ export function ApplicationsPage() {
   const { wapi, slug } = useWs();
   const { navigate } = useRouter();
   const state = useLoad(() => wapi.get('/applications'), [slug]);
+  const page = useLocalPaging(state.data, { size: 25, text: (a) => `${a.name} ${a.description || ''} ${a.team_name || ''} ${a.client_id || ''} ${a.id}` });
   const [creating, setCreating] = useState(false);
   return (
     <div className="page">
@@ -72,10 +74,12 @@ export function ApplicationsPage() {
           </button>
         }
       />
+      <ListToolbar paging={page} placeholder="search applications, teams, client ids" onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(apps) =>
-          apps.length ? (
-            <div className="card table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -87,7 +91,7 @@ export function ApplicationsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {apps.map((a) => (
+                  {page.items.map((a) => (
                     <tr key={a.id} className="clickable" onClick={() => navigate(`/ws/${slug}/applications/${a.id}`)}>
                       <td>
                         <div className="bold">{a.name}</div>
@@ -110,11 +114,13 @@ export function ApplicationsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title="No application" icon="apps">
-                Consumers usually create their applications from the developer portal.
+              <Empty title={page.q ? 'No application matches' : 'No application'} icon="apps">
+                {page.q ? null : 'Consumers usually create their applications from the developer portal.'}
               </Empty>
             </div>
           )

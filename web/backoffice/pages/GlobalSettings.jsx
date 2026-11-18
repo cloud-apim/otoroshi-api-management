@@ -4,6 +4,7 @@ import { fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 
 function Workspaces() {
   const { session } = { session: useSession() };
@@ -65,6 +66,7 @@ function Workspaces() {
 
 function Users() {
   const state = useLoad(() => api.get('/users'), []);
+  const usersPage = useLocalPaging(state.data, { prefix: 'users', size: 25, text: (u) => `${u.name} ${u.email} ${(u.tags || []).join(' ')}` });
   const toast = useToast();
   const [f, setF] = useState({ email: '', name: '', password: '', is_admin: false });
   return (
@@ -93,12 +95,14 @@ function Users() {
           </button>
         </div>
       </div>
+      <ListToolbar paging={usersPage} placeholder="search people, emails, tags" onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(users) => (
-          <div className="card table-wrap">
+        {() => (
+          <div className="card">
+          <div className="table-wrap">
             <table className="table">
               <tbody>
-                {users.map((u) => (
+                {usersPage.items.map((u) => (
                   <tr key={u.id}>
                     <td>
                       <div className="bold">{u.name}</div>
@@ -117,6 +121,8 @@ function Users() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <Pager paging={usersPage} total={usersPage.total} />
           </div>
         )}
       </Loader>

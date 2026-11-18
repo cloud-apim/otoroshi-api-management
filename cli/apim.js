@@ -33,7 +33,7 @@ Commands:
   subscriptions transfer <ws> <id> --plan <plan> [--api <api>]
   applications list <ws>
   drift <ws>                            run drift detection and print the reports
-  audit <ws> [--limit n]
+  audit <ws> [--limit n] [--q text]
   export <ws>                           full export, re-importable
   import <ws> -f <file>
 `;
@@ -237,7 +237,7 @@ async function main() {
       ]);
     }
     case 'audit':
-      return print(await call('GET', `${ws(sub)}/audit?limit=${flags.limit || 50}`), [
+      return print((await call('GET', `${ws(sub)}/audit?limit=${flags.limit || 50}${flags.q ? `&q=${encodeURIComponent(flags.q)}` : ''}`)).items, [
         ['at', 'at'],
         ['actor', (e) => e.actor?.email],
         ['action', 'action'],

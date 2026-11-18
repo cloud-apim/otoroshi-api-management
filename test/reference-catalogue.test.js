@@ -371,7 +371,7 @@ describe('reference catalogue', () => {
 
   test('every action is audited', async () => {
     const events = await call('GET', ws('/audit?limit=200'));
-    const actions = new Set(events.map((e) => e.action));
+    const actions = new Set(events.items.map((e) => e.action));
     for (const a of ['api.create', 'api.publish', 'api.deploy', 'subscription.request', 'subscription.accept', 'subscription.transfer', 'subscription.close']) {
       expect(actions.has(a)).toBe(true);
     }

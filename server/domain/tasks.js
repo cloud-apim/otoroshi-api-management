@@ -2,6 +2,7 @@
 // gateway waits in this queue and runs when it comes back. Handlers are idempotent.
 
 import { db, newId } from '../db/index.js';
+import { likePattern } from '../http/paging.js';
 
 const handlers = new Map();
 
@@ -64,6 +65,18 @@ export async function workOnce() {
   } finally {
     running = false;
   }
+}
+
+// the task queue as a paged list, searched over the kind, the payload and the last error
+export async function searchTasks({ status, limit = 50, offset = 0, q = '' } = {}) {
+  const pattern = q ? likePattern(q) : null;
+  const where = () => db`(${status || null}::text is null or status = ${status || null})
+      and (${pattern}::text is null or kind ilike ${pattern} or payload::text ilike ${pattern} or coalesce(last_error, '') ilike ${pattern})`;
+  const [items, [{ total }]] = await Promise.all([
+    db`select * from tasks where ${where()} order by updated_at desc limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from tasks where ${where()}`,
+  ]);
+  return { items, total, limit, offset };
 }
 
 export async function listTasks({ status, limit = 100 } = {}) {

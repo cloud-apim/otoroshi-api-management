@@ -3,6 +3,7 @@
 // tokens (never in the series color), a table view behind every chart.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { fmtNumber } from './lib.js';
+import { MiniPager } from './lists.jsx';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)'];
 
@@ -203,12 +204,17 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
 }
 
 // a single-hue horizontal bar list, value at the tip
-export function BarList({ items = [], formatValue = (v) => fmtNumber(v), empty = 'No data' }) {
+// a ranked list of bars, ten per page (the bars keep the scale of the whole list)
+export function BarList({ items = [], formatValue = (v) => fmtNumber(v), empty = 'No data', pageSize = 10 }) {
+  const [page, setPage] = useState(1);
   const max = Math.max(1, ...items.map((i) => i.value || 0));
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(page, pages);
+  const shown = items.slice((current - 1) * pageSize, current * pageSize);
   if (!items.length) return <div className="muted small">{empty}</div>;
   return (
     <div className="col" style={{ gap: 10 }}>
-      {items.map((it, i) => (
+      {shown.map((it, i) => (
         <div key={i} title={`${it.label}: ${formatValue(it.value)}`}>
           <div className="row small" style={{ marginBottom: 4 }}>
             <span className="grow ellipsis">{it.label}</span>
@@ -222,6 +228,7 @@ export function BarList({ items = [], formatValue = (v) => fmtNumber(v), empty =
           </div>
         </div>
       ))}
+      <MiniPager page={current} pages={pages} onPage={setPage} from={(current - 1) * pageSize + 1} to={Math.min(current * pageSize, items.length)} total={items.length} />
     </div>
   );
 }

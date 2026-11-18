@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useRouter } from '../../shared/router.jsx';
+import { useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
-import { Callout, DiffView, Empty, Icon, Input, Loader, Setting, StatusBadge, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
+import { Callout, DiffView, Empty, Icon, Input, Loader, Select, Setting, StatusBadge, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { StatTile } from '../../shared/charts.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
@@ -10,7 +11,10 @@ import { PageHead } from '../layout.jsx';
 // drift live here, not in a "clusters" list
 function Status() {
   const st = useLoad(() => api.get('/gateway/status'), []);
-  const tasks = useLoad(() => api.get('/gateway/tasks'), []);
+  const paging = usePaging({ prefix: 'tasks', size: 25 });
+  const [params, setParams] = useQuery();
+  const status = params.get('tasks_status') || '';
+  const tasks = useLoad(() => api.get(`/gateway/tasks?${paging.query}${status ? `&status=${status}` : ''}`), [paging.key, status]);
   const toast = useToast();
   return (
     <Loader state={st}>
@@ -29,17 +33,26 @@ function Status() {
           <div className="card">
             <div className="card-head">
               <h3 className="grow">Projection queue</h3>
-              <button className="btn sm" onClick={tasks.reload}>
-                <Icon name="refresh" /> Refresh
-              </button>
+            </div>
+            <div className="card-body" style={{ paddingBottom: 0 }}>
+              <ListToolbar paging={paging} placeholder="search kinds, payloads, errors" onReload={tasks.reload} loading={tasks.loading}>
+                <Select
+                  value={status}
+                  onChange={(v) => setParams({ tasks_status: v, tasks_page: null })}
+                  options={[{ value: '', label: 'every status' }, 'pending', 'running', 'failed', 'done']}
+                  style={{ width: 160 }}
+                  aria-label="filter by status"
+                />
+              </ListToolbar>
             </div>
             <Loader state={tasks}>
-              {(list) =>
+              {({ items: list, total }) =>
                 list.length ? (
+                  <>
                   <div className="table-wrap">
                     <table className="table small">
                       <tbody>
-                        {list.slice(0, 50).map((t) => (
+                        {list.map((t) => (
                           <tr key={t.id}>
                             <td className="mono">{t.kind}</td>
                             <td>
@@ -68,8 +81,10 @@ function Status() {
                       </tbody>
                     </table>
                   </div>
+                  <Pager paging={paging} total={total} />
+                  </>
                 ) : (
-                  <Empty title="Nothing queued" icon="check" />
+                  <Empty title={paging.q || status ? 'No task matches' : 'Nothing queued'} icon="check" />
                 )
               }
             </Loader>
@@ -107,11 +122,33 @@ function Drift() {
           <Icon name="refresh" /> Run detection now
         </button>
       </div>
-      <Loader state={reports}>
-        {(list) =>
-          list.length ? (
+      <Loader state={reports}>{(list) => <DriftList list={list} reports={reports} />}</Loader>
+    </div>
+  );
+}
+
+// the reports of the installation, searched and paged here (the server sends them all)
+function DriftList({ list, reports }) {
+  const [params, setParams] = useQuery();
+  const status = params.get('drift_status') || '';
+  const page = useLocalPaging(
+    list.filter((r) => !status || r.status === status),
+    { prefix: 'drift', size: 25, text: (r) => `${r.label} ${r.entity_id} ${r.otoroshi_kind} ${r.otoroshi_id} ${r.status} ${JSON.stringify(r.diff || [])}` },
+  );
+  return (
+    <>
+      <ListToolbar paging={page} placeholder="search apis, subscriptions, ids, changes" onReload={reports.reload} loading={reports.loading}>
+        <Select
+          value={status}
+          onChange={(v) => setParams({ drift_status: v, drift_page: null })}
+          options={[{ value: '', label: 'every status' }, 'drifted', 'missing', 'unmanaged', 'in_sync']}
+          style={{ width: 160 }}
+          aria-label="filter by status"
+        />
+      </ListToolbar>
+      {page.items.length ? (
             <div className="card">
-              {list.map((r) => (
+              {page.items.map((r) => (
                 <div key={r.id} className="list-item" style={{ alignItems: 'flex-start' }}>
                   <StatusBadge status={r.status} />
                   <div className="grow" style={{ minWidth: 0 }}>
@@ -129,15 +166,14 @@ function Drift() {
                   <span className="faint small nowrap">{fmtRelative(r.checked_at)}</span>
                 </div>
               ))}
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title="No report yet" icon="gateway" />
+              <Empty title={page.q || status ? 'No report matches' : 'No report yet'} icon="gateway" />
             </div>
-          )
-        }
-      </Loader>
-    </div>
+          )}
+    </>
   );
 }
 

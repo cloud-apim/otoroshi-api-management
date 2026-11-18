@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Loader, Seg, Select, StatusBadge, useLoad } from '../../shared/ui.jsx';
+import { Loader, Modal, Seg, Select, StatusBadge, useLoad } from '../../shared/ui.jsx';
+import { CodeView } from '../../shared/code-editor.jsx';
+import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
 import { BarList, StatTile, TimeSeries } from '../../shared/charts.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
@@ -29,17 +31,20 @@ export function AnalyticsDashboard({ fixed = {} }) {
     return q.toString();
   };
   const state = useLoad(() => wapi.get(`/analytics?${qs()}`), [slug, range, apiFilter, appFilter]);
-  const calls = useLoad(() => wapi.get(`/analytics/calls?${qs()}&limit=50`), [slug, range, apiFilter, appFilter]);
+  const paging = usePaging({ prefix: 'calls', size: 25 });
+  const calls = useLoad(() => wapi.get(`/analytics/calls?${qs()}&${paging.query}`), [slug, range, apiFilter, appFilter, paging.key]);
+  const [open, setOpen] = useState(null);
+  const nameOf = (list, id) => (list.data || []).find((x) => x.id === id);
   const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
   const apps = useLoad(() => (fixed.application ? Promise.resolve([]) : wapi.get('/applications')), [slug]);
   return (
     <div className="col gap-16">
       <div className="row wrap">
-        <Seg value={range} onChange={(v) => setParams({ range: v })} options={RANGES} />
+        <Seg value={range} onChange={(v) => setParams({ range: v, calls_page: null })} options={RANGES} />
         {!fixed.api && (
           <Select
             value={apiFilter}
-            onChange={(v) => setParams({ api: v })}
+            onChange={(v) => setParams({ api: v, calls_page: null })}
             options={[{ value: '', label: 'All APIs' }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
             style={{ width: 220 }}
             aria-label="filter by api"
@@ -48,12 +53,20 @@ export function AnalyticsDashboard({ fixed = {} }) {
         {!fixed.application && (
           <Select
             value={appFilter}
-            onChange={(v) => setParams({ application: v })}
+            onChange={(v) => setParams({ application: v, calls_page: null })}
             options={[{ value: '', label: 'All applications' }, ...(apps.data || []).map((a) => ({ value: a.id, label: a.name }))]}
             style={{ width: 220 }}
             aria-label="filter by application"
           />
         )}
+        <span className="grow" />
+        <ReloadButton
+          onReload={() => {
+            state.reload();
+            calls.reload();
+          }}
+          loading={state.loading || calls.loading}
+        />
       </div>
       <Loader state={state}>
         {(d) => (
@@ -126,9 +139,13 @@ export function AnalyticsDashboard({ fixed = {} }) {
           <h3 className="grow">Recent calls</h3>
           <span className="faint small">reading request logs is traced in the audit trail</span>
         </div>
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <ListToolbar paging={paging} placeholder="search path, method, status, client id, address" onReload={calls.reload} loading={calls.loading} />
+        </div>
         <Loader state={calls}>
-          {(rows) =>
+          {({ items: rows, total }) =>
             rows.length ? (
+              <>
               <div className="table-wrap">
                 <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   <thead>
@@ -142,7 +159,7 @@ export function AnalyticsDashboard({ fixed = {} }) {
                   </thead>
                   <tbody>
                     {rows.map((r, i) => (
-                      <tr key={i}>
+                      <tr key={i} className="clickable" onClick={() => setOpen(r)}>
                         <td className="nowrap muted">{fmtDate(r.at)}</td>
                         <td className="mono">
                           {r.method} {r.path}
@@ -157,12 +174,26 @@ export function AnalyticsDashboard({ fixed = {} }) {
                   </tbody>
                 </table>
               </div>
+              <Pager paging={paging} total={total} />
+              </>
             ) : (
-              <div className="card-body muted small">No call in this period. Install the data exporter from the Gateway page to feed the ingester.</div>
+              <div className="card-body muted small">
+                {paging.q ? 'No call matches.' : 'No call in this period. Install the data exporter from the Gateway page to feed the ingester.'}
+              </div>
             )
           }
         </Loader>
       </div>
+      {open && (
+        <Modal title={`${open.method} ${open.path} — ${open.status}`} size="wide" onClose={() => setOpen(null)}>
+          <p className="muted small">
+            {fmtDate(open.at)} · {open.duration_ms} ms
+            {nameOf(apis, open.api_id) ? ` · ${nameOf(apis, open.api_id).name} ${nameOf(apis, open.api_id).version}` : ''}
+            {nameOf(apps, open.application_id) ? ` · ${nameOf(apps, open.application_id).name}` : ''}
+          </p>
+          <CodeView value={open} maxHeight={520} ariaLabel="call" />
+        </Modal>
+      )}
     </div>
   );
 }

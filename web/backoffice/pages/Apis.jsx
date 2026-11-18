@@ -4,6 +4,7 @@ import { fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, Select, StatusBadge, TagsInput, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { useWs, api } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
 
 export function deploymentLabel(a) {
@@ -146,9 +147,10 @@ function AdoptModal({ onClose, onAdopted }) {
 export function ApisPage() {
   const { wapi, slug } = useWs();
   const { navigate } = useRouter();
-  const [params, setParams] = useQuery();
-  const q = params.get('q') || '';
+  const paging = usePaging({ size: 25 });
+  const q = paging.q;
   const state = useLoad(() => wapi.get(`/apis${q ? `?q=${encodeURIComponent(q)}` : ''}`), [slug, q]);
+  const shown = (state.data || []).slice(paging.offset, paging.offset + paging.limit);
   const [creating, setCreating] = useState(false);
   const [adopting, setAdopting] = useState(false);
   return (
@@ -168,13 +170,12 @@ export function ApisPage() {
         }
       />
       <ApisTabs current="apis" />
-      <div className="row mb-16">
-        <input className="input" style={{ maxWidth: 360 }} placeholder="Filter by name, description or tag" value={q} onChange={(e) => setParams({ q: e.target.value })} aria-label="filter apis" />
-      </div>
+      <ListToolbar paging={paging} placeholder="search by name, description or tag" onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {(apis) =>
           apis.length ? (
-            <div className="card table-wrap">
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -188,7 +189,7 @@ export function ApisPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {apis.map((a) => (
+                  {shown.map((a) => (
                     <tr key={a.id} className="clickable" onClick={() => navigate(`/ws/${slug}/apis/${a.id}`)}>
                       <td>
                         <Link to={`/ws/${slug}/apis/${a.id}`} className="bold" onClick={(e) => e.stopPropagation()}>
@@ -229,6 +230,8 @@ export function ApisPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={paging} total={apis.length} />
             </div>
           ) : (
             <div className="card">

@@ -6,6 +6,7 @@ import { fmtRelative } from '../../shared/lib.js';
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 
 function General() {
   const { wapi, ws, session } = useWs();
@@ -165,6 +166,7 @@ function Members() {
   const { wapi, slug } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/members'), [slug]);
+  const membersPage = useLocalPaging(state.data, { prefix: 'members', size: 25, text: (m) => `${m.name} ${m.email} ${m.role} ${(m.tags || []).join(' ')}` });
   const [invite, setInvite] = useState({ email: '', role: 'producer' });
   return (
     <div className="col gap-16">
@@ -189,9 +191,11 @@ function Members() {
           </button>
         </div>
       </div>
+      <ListToolbar paging={membersPage} placeholder="search members, emails, roles, tags" onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(members) => (
-          <div className="card table-wrap">
+        {() => (
+          <div className="card">
+          <div className="table-wrap">
             <table className="table">
               <thead>
                 <tr>
@@ -202,7 +206,7 @@ function Members() {
                 </tr>
               </thead>
               <tbody>
-                {members.map((m) => (
+                {membersPage.items.map((m) => (
                   <tr key={m.id}>
                     <td>
                       <div className="bold">{m.name}</div>
@@ -242,6 +246,8 @@ function Members() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <Pager paging={membersPage} total={membersPage.total} />
           </div>
         )}
       </Loader>

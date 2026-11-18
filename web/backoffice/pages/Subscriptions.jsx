@@ -5,6 +5,7 @@ import { Badge, Callout, DiffView, Drawer, Empty, Field, Icon, Loader, Secret, S
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 
 export function SubscriptionsTable({ query = '', showApi = true, showApp = true, onChanged }) {
   const { wapi } = useWs();
@@ -12,12 +13,17 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
   const status = params.get('status') || '';
   const open = params.get('open');
   const state = useLoad(() => wapi.get(`/subscriptions?${query}${status ? `&status=${status}` : ''}`), [query, status]);
+  const page = useLocalPaging(state.data, {
+    prefix: 'subs',
+    size: 25,
+    text: (x) => `${x.application_name} ${x.team_name} ${x.api_name} ${x.api_version} ${x.request?.plan_name || x.plan_id} ${x.status} ${x.requested_by_email} ${x.id}`,
+  });
   return (
     <div className="col gap-16">
-      <div className="row">
+      <ListToolbar paging={page} placeholder="search applications, teams, apis, plans, people" onReload={state.reload} loading={state.loading}>
         <Select
           value={status}
-          onChange={(v) => setParams({ status: v })}
+          onChange={(v) => setParams({ status: v, subs_page: null })}
           options={[
             { value: '', label: 'All statuses' },
             ...['pending', 'pending_payment', 'active', 'suspended', 'rejected', 'closed'].map((s) => ({ value: s, label: s.replace('_', ' ') })),
@@ -25,11 +31,12 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
           aria-label="filter by status"
           style={{ width: 200 }}
         />
-      </div>
+      </ListToolbar>
       <Loader state={state}>
-        {(subs) =>
-          subs.length ? (
-            <div className="card table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -42,7 +49,7 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
                   </tr>
                 </thead>
                 <tbody>
-                  {subs.map((s) => (
+                  {page.items.map((s) => (
                     <tr key={s.id} className="clickable" onClick={() => setParams({ open: s.id })}>
                       {showApp && (
                         <td>
@@ -73,11 +80,13 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title="No subscription" icon="inbox">
-                Consumers subscribe to the published plans from the developer portal.
+              <Empty title={page.q ? 'No subscription matches' : 'No subscription'} icon="inbox">
+                {page.q ? null : 'Consumers subscribe to the published plans from the developer portal.'}
               </Empty>
             </div>
           )

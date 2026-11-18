@@ -52,6 +52,14 @@ addressed by id or slug.
 | GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
 | observability | `GET …/analytics`, `GET …/analytics/calls`, `GET …/audit`, `GET POST …/drift`, `GET …/search`, `GET …/home` |
 
+## Paged lists
+
+The lists that grow — the audit trail (`GET …/audit`, `GET /audit`), the request log
+(`GET …/analytics/calls`) and the task queue (`GET /gateway/tasks`) — are searched and paged on the
+server: `?q=` (free text), `?limit=` (up to 500) and `?offset=`, answered as
+`{ "items": […], "total": 1234, "limit": 50, "offset": 0 }`. The console keeps the search and the
+page in its url, so a filtered list is a link.
+
 ## A complete flow
 
 ```bash

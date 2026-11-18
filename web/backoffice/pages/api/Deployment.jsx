@@ -3,6 +3,7 @@ import { fmtDate, fmtRelative } from '../../../shared/lib.js';
 import { Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 
 function SnapshotView({ api, number, onClose }) {
   const { wapi } = useWs();
@@ -30,6 +31,8 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
   const snaps = useLoad(() => wapi.get(`/apis/${api.id}/snapshots`), [api.id]);
   const deps = useLoad(() => wapi.get(`/apis/${api.id}/deployments`), [api.id]);
   const projection = useLoad(() => wapi.get(`/apis/${api.id}/projection`), [api.id]);
+  const snapPage = useLocalPaging(snaps.data, { prefix: 'snaps', size: 10, text: (s) => `#${s.number} ${s.comment || ''} ${s.published_by_email || ''}` });
+  const depPage = useLocalPaging(deps.data?.history, { prefix: 'deps', size: 10, text: (x) => `#${x.snapshot_number} ${x.action} ${x.status} ${x.requested_by_email || ''} ${x.error || ''}` });
   const [viewing, setViewing] = useState(null);
   const current = api.deployment.current;
   const recheck = async () => {
@@ -123,13 +126,17 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
           <h3 className="grow">Snapshots</h3>
           <span className="muted small">immutable, append-only — rollback = redeploy an earlier one</span>
         </div>
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <ListToolbar paging={snapPage} placeholder="search numbers, comments, people" onReload={snaps.reload} loading={snaps.loading} />
+        </div>
         <Loader state={snaps}>
           {(list) =>
-            list.length ? (
+            snapPage.items.length ? (
+              <>
               <div className="table-wrap">
                 <table className="table">
                   <tbody>
-                    {list.map((s) => (
+                    {snapPage.items.map((s) => (
                       <tr key={s.id}>
                         <td className="bold">#{s.number}</td>
                         <td>{s.comment || <span className="faint">no comment</span>}</td>
@@ -152,8 +159,10 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                   </tbody>
                 </table>
               </div>
+              <Pager paging={snapPage} total={snapPage.total} />
+              </>
             ) : (
-              <div className="card-body muted small">No snapshot yet: publish the draft.</div>
+              <div className="card-body muted small">{list.length ? 'No snapshot matches.' : 'No snapshot yet: publish the draft.'}</div>
             )
           }
         </Loader>
@@ -163,12 +172,16 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
           <Icon name="audit" />
           <h3 className="grow">Deployment history</h3>
         </div>
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <ListToolbar paging={depPage} placeholder="search snapshots, statuses, people, errors" onReload={deps.reload} loading={deps.loading} />
+        </div>
         <Loader state={deps}>
-          {(d) => (
+          {() => (
+            <>
             <div className="table-wrap">
               <table className="table">
                 <tbody>
-                  {d.history.map((x) => (
+                  {depPage.items.map((x) => (
                     <tr key={x.id}>
                       <td>{x.action === 'undeploy' ? 'undeploy' : `snapshot #${x.snapshot_number}`}</td>
                       <td>
@@ -183,6 +196,8 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                 </tbody>
               </table>
             </div>
+            <Pager paging={depPage} total={depPage.total} />
+            </>
           )}
         </Loader>
       </div>

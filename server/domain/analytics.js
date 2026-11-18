@@ -1,6 +1,7 @@
 // Analytics read the computed path only. Dashboards speak the catalogue's vocabulary — apis, plans,
 // applications, subscriptions — not the infrastructure's.
 
+import { likePattern } from '../http/paging.js';
 import { adb, db } from '../db/index.js';
 
 function range({ from, to }) {
@@ -38,12 +39,12 @@ export async function overview(filter) {
     from calls where ${where} group by 1 order by 1`;
   const statuses = await adb`select (status / 100)::int * 100 as class, count(*)::int as calls from calls where ${where} group by 1 order by 1`;
   const byApi = await adb`select api_id, count(*)::int as calls, count(*) filter (where status >= 400 or err)::int as errors,
-      coalesce(avg(duration_ms), 0)::float8 as avg_ms from calls where ${where} group by api_id order by calls desc limit 10`;
+      coalesce(avg(duration_ms), 0)::float8 as avg_ms from calls where ${where} group by api_id order by calls desc limit 100`;
   const byApp = await adb`select application_id, count(*)::int as calls, count(*) filter (where status >= 400 or err)::int as errors
-    from calls where ${where} group by application_id order by calls desc limit 10`;
-  const byPlan = await adb`select api_id, plan_id, count(*)::int as calls from calls where ${where} group by api_id, plan_id order by calls desc limit 10`;
+    from calls where ${where} group by application_id order by calls desc limit 100`;
+  const byPlan = await adb`select api_id, plan_id, count(*)::int as calls from calls where ${where} group by api_id, plan_id order by calls desc limit 100`;
   const byPath = await adb`select method, path, count(*)::int as calls, coalesce(avg(duration_ms), 0)::float8 as avg_ms
-    from calls where ${where} group by method, path order by calls desc limit 10`;
+    from calls where ${where} group by method, path order by calls desc limit 100`;
   // resolve names from the catalogue
   const apiIds = [...new Set([...byApi, ...byPlan].map((r) => r.api_id).filter(Boolean))];
   const appIds = [...new Set(byApp.map((r) => r.application_id).filter(Boolean))];
@@ -70,17 +71,27 @@ export async function overview(filter) {
   };
 }
 
-export async function recentCalls(filter, limit = 50) {
+// the request log as a paged list; the search matches the path, the method, the status, the
+// client id and the caller's address
+export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {}) {
   const { start, end } = range(filter);
   const appsArr = filter.applicationIds ? '{' + filter.applicationIds.join(',') + '}' : null;
-  return adb`select at, req_id, method, path, status, duration_ms, api_id, plan_id, application_id, subscription_id, client_id, from_ip
-    from calls where at >= ${start} and at <= ${end}
+  const pattern = q ? likePattern(q) : null;
+  const status = /^\d{3}$/.test(q) ? parseInt(q, 10) : null;
+  const where = () => adb`at >= ${start} and at <= ${end}
       and (${filter.workspaceId || null}::text is null or workspace_id = ${filter.workspaceId || null})
       and (${filter.apiId || null}::text is null or api_id = ${filter.apiId || null})
       and (${filter.applicationId || null}::text is null or application_id = ${filter.applicationId || null})
       and (${filter.subscriptionId || null}::text is null or subscription_id = ${filter.subscriptionId || null})
       and (${appsArr}::text[] is null or application_id = any(${appsArr}::text[]))
-    order by at desc limit ${Math.min(limit, 500)}`;
+      and (${pattern}::text is null or path ilike ${pattern} or method ilike ${pattern} or client_id ilike ${pattern} or from_ip ilike ${pattern}
+           or (${status}::int is not null and status = ${status}))`;
+  const [items, [{ total }]] = await Promise.all([
+    adb`select at, req_id, method, path, status, duration_ms, api_id, plan_id, application_id, subscription_id, client_id, from_ip
+      from calls where ${where()} order by at desc limit ${limit} offset ${offset}`,
+    adb`select count(*)::int as total from calls where ${where()}`,
+  ]);
+  return { items, total, limit, offset };
 }
 
 export async function ingestStats() {

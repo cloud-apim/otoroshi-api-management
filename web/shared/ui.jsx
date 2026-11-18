@@ -52,6 +52,8 @@ const paths = {
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   swap: 'M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4',
   up: 'M12 19V5M5 12l7-7 7 7',
+  left: 'M15 18l-6-6 6-6',
+  right: 'M9 18l6-6-6-6',
   down: 'M12 5v14M19 12l-7 7-7-7',
 };
 
@@ -547,7 +549,7 @@ export function Callout({ kind = 'info', title, children, icon }) {
   );
 }
 
-export function Dropdown({ trigger, children, align = 'left' }) {
+export function Dropdown({ trigger, children, align = 'left', placement = 'down', width }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -560,7 +562,11 @@ export function Dropdown({ trigger, children, align = 'left' }) {
     <div ref={ref} style={{ position: 'relative' }}>
       {trigger({ open, toggle: () => setOpen(!open) })}
       {open && (
-        <div className="card" style={{ position: 'absolute', [align]: 0, top: 'calc(100% + 4px)', minWidth: 220, zIndex: 50, padding: 4 }} onClick={() => setOpen(false)}>
+        <div
+          className="card"
+          style={{ position: 'absolute', [align]: 0, [placement === 'up' ? 'bottom' : 'top']: 'calc(100% + 4px)', minWidth: 220, width, zIndex: 50, padding: 4 }}
+          onClick={() => setOpen(false)}
+        >
           {children}
         </div>
       )}

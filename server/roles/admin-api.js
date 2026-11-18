@@ -11,9 +11,10 @@ import * as deployments from '../domain/deployments.js';
 import * as applications from '../domain/applications.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import * as analytics from '../domain/analytics.js';
-import { listAudit, audit } from '../domain/audit.js';
+import { listAudit, searchAudit, audit } from '../domain/audit.js';
+import { pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
-import { listTasks, queueStats, enqueue } from '../domain/tasks.js';
+import { searchTasks, queueStats, enqueue } from '../domain/tasks.js';
 import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
 import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
@@ -128,7 +129,7 @@ r.get('/gateway/status', async ({ ctx }) => {
 
 r.get('/gateway/tasks', async ({ ctx, query }) => {
   identity.requireUser(ctx);
-  return listTasks({ status: query.get('status') });
+  return searchTasks({ status: query.get('status'), ...pageParams(query) });
 });
 
 r.post('/gateway/tasks/:id/retry', async ({ ctx, params }) => {
@@ -789,14 +790,14 @@ r.get('/workspaces/:ws/analytics', async ({ ctx, params, query }) => {
 
 r.get('/workspaces/:ws/analytics/calls', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
-  const rows = await analytics.recentCalls({
+  const rows = await analytics.searchCalls({
     workspaceId: c.workspace.id,
     apiId: query.get('api'),
     applicationId: query.get('application'),
     subscriptionId: query.get('subscription'),
     from: query.get('from'),
     to: query.get('to'),
-  }, parseInt(query.get('limit') || '100', 10));
+  }, pageParams(query));
   // reading request logs is a processing of personal data: it is traced
   await audit(c, { action: 'analytics.calls.read', entityKind: 'workspace', entityId: c.workspace.id, summary: 'request log consulted', data: { filter: Object.fromEntries(query) } });
   return rows;
@@ -804,12 +805,12 @@ r.get('/workspaces/:ws/analytics/calls', async ({ ctx, params, query }) => {
 
 r.get('/workspaces/:ws/audit', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params, ['admin', 'producer']);
-  return listAudit(c.workspace.id, { limit: query.get('limit'), before: query.get('before'), entityId: query.get('entity'), action: query.get('action') });
+  return searchAudit(c.workspace.id, { ...pageParams(query), entityId: query.get('entity'), action: query.get('action') });
 });
 
 r.get('/audit', async ({ ctx, query }) => {
   identity.requireAdmin(ctx);
-  return listAudit(null, { limit: query.get('limit'), before: query.get('before'), action: query.get('action') });
+  return searchAudit(null, { ...pageParams(query), action: query.get('action') });
 });
 
 // audit trail exporters (installation level)
