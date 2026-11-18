@@ -17,20 +17,18 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-2** — the "product down, traffic flows" test (D-4, D-9 n°4).
-2. **R-3** — hostname exposure of the portals, redirects, mono-tenant (D-20).
-3. **R-4** — promotion of a snapshot to the next installation (D-37).
-4. **R-5** — console in French (D-11).
-5. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
-6. **R-7** — Stripe connector (D-36, Q-12).
-7. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-8. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-3** — hostname exposure of the portals, redirects, mono-tenant (D-20).
+2. **R-4** — promotion of a snapshot to the next installation (D-37).
+3. **R-5** — console in French (D-11).
+4. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
+5. **R-7** — Stripe connector (D-36, Q-12).
+6. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+7. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
 ## Known issues
 
-- **Push blocked** since the machine restarted: the ssh key is not loaded (`ssh-add`). Commits pile up locally.
 - Demo data: the `default` workspace declares a required plan metadata field `sla` (a D-18 demonstration); the plans of Books and Petstore fill it.
 
 ---
@@ -50,6 +48,7 @@ waits for the data plane rather than working around it.
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
+| R-44 | D-4, G-18 | Warn when a plan id of a **jwt, mtls, oauth2-remote or keyless** plan is also used by another api of the installation: the gateway shares their consumers | S | G-18 |
 | R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
 | R-15 | D-6, G-4 | Require a **subscription on jwt / mtls / oauth2-remote / keyless plans** — today any valid token passes | — | G-4 |
 | R-16 | G-13 | Keep the consumers of a **deprecated plan** served (only published plans get an extractor) | — | G-13 |
@@ -110,7 +109,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-2 | D-4, D-9 n°4 | An executable test that **traffic flows while the product is down**, and that **uninstalling leaves a working Otoroshi configuration** | S | |
 | R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
 | R-37 | — | An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
 | R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
@@ -133,14 +131,14 @@ waits for the data plane rather than working around it.
 | D-1 Otoroshi's `Api` entity | ✅ | `server/otoroshi/projection.js`; reference catalogue test |
 | D-2 selective synchronisation | ✅ | docs, terms, usage statements, pricing, metadata never projected; `test/model.test.js` |
 | D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows: plugins named and configured from the gateway's catalog (default configuration, order, regex paths), plan flows; configuration as a form generated from the catalog's form description (`config_schema` / `config_flow`) or as JSON; JSON, YAML and Markdown (documentation pages, portal home) in a code editor (Monaco, bundled, loaded on first use) |
-| D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; a subscription waits until its api is deployed — explicit "product down" test: R-2 |
+| D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; `test/product-down.test.js`: with the product and its databases stopped, keys, tokens and quotas are enforced by the gateway alone; with the gateway unreachable, the portal serves its catalogue and a subscription waits, then is projected |
 | D-5 the policy lives in the plan | ✅ | plan editor; limits and filtering projected on the plan |
 | D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4 |
 | D-8 PostgreSQL ×2 | ✅ | `server/db/migrations.js` |
 | D-9 n°1 everything the UI does goes through the API | ✅ | the same router on `/api` and `/backoffice/api` |
 | D-9 n°2 escape hatch to the projected entity | ✅ | "Technical details", link to the Otoroshi backoffice |
 | D-9 n°3 nothing essential hidden | ✅ | warnings: open routes, any token passes, attributes not enforced, deprecated plans, resolution order |
-| D-9 n°4 reversibility | 🟡 | export / import ✅; uninstall leaves a working configuration: R-2 |
+| D-9 n°4 reversibility | ✅ | export / import ✅; uninstalling leaves a working configuration, taken over by hand with Otoroshi alone (revoke, subscribe, change a plan, remove the marker) — `test/product-down.test.js`, documented in *When the product is down* |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
 | D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅; console in English: R-5; metadata labels: R-22; more portal pages: R-42 |
@@ -214,4 +212,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-17), to be fixed in the data plane.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-18), to be fixed in the data plane.

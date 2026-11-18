@@ -90,6 +90,10 @@ afterAll(async () => {
     // the derived objects leave with the api
     if (state.authModuleId) expect(await otoroshi('GET', `/api/auths/${state.authModuleId}`)).toBeNull();
     for (const id of state.certIds || []) expect(await otoroshi('GET', `/api/certificates/${id}`)).toBeNull();
+    // the keys the gateway minted for the consumers of the api stay when it is deleted (G-18): the
+    // test removes the ones it caused
+    for (const k of (await otoroshi('GET', '/api/apikeys')) || [])
+      if (k.apiRef?.api === state.apiId && k.metadata?.created_by === 'apikey-extractor') await otoroshi('DELETE', `/api/apikeys/${k.clientId}`);
     await call('DELETE', `/workspaces/${WS}`);
   } catch (e) {
     console.error('cleanup', e.message);

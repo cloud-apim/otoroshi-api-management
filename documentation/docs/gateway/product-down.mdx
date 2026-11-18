@@ -1,0 +1,72 @@
+---
+sidebar_position: 4
+title: When the product is down
+description: What keeps working when the product or the gateway is down, how to take the configuration over by hand, and what uninstalling leaves.
+---
+
+# When the product is down
+
+The product describes the offer and projects it; Otoroshi enforces it. The product is never asked,
+call by call, whether a consumer may pass. What that means during an incident, and what is left
+once the product is uninstalled, is checked on a real stack by `test/product-down.test.js`
+(`mise run test:e2e`).
+
+## The product is down
+
+With its servers and its databases stopped, Otoroshi keeps serving everything deployed:
+
+- the keys of the subscriptions, the tokens checked by the derived JWT verifiers and auth modules,
+  the certificates trusted through the derived CA certificates;
+- the quotas and the rate limits of the plans: the gateway counts them on the keys;
+- the data exporter keeps trying to reach the ingester; the traffic does not wait for it.
+
+What stops with the product is the product itself: the console, the developer portal, the CLI, new
+subscriptions, the analytics, the drift detection.
+
+## The gateway is unreachable
+
+The product keeps working on its side:
+
+- the developer portal serves its catalogue and its documentation, and the console reads;
+- a subscription accepted meanwhile is recorded; its projection waits in the
+  [queue](./projection.mdx#asynchronous-and-replayable), retried with a backoff, and reaches the
+  gateway once it is back — its credentials appear then;
+- the **Gateway** page shows the gateway unreachable and the tasks that wait.
+
+## Taking the configuration over by hand
+
+With the product down, or gone, an Otoroshi administrator manages the configuration with Otoroshi
+alone, through its admin API or its backoffice:
+
+- **revoke a consumer**: disable its key;
+- **subscribe a consumer**: an `ApiSubscription` on an apikey or oauth2-local plan, and Otoroshi
+  mints its key from the plan;
+- **change the offer**: edit a plan of the `Api`, and Otoroshi carries its quotas to the keys of
+  its subscriptions.
+
+While an `Api` carries the marker of the product (`created_by: remote_catalog=otoroshi-apim-deployment`),
+Otoroshi takes each write that changes what is live for a catalog deploy, and records it in the
+deployment history of the API ([G-8](../otoroshi-gaps.mdx)). Remove `created_by` from its metadata to
+manage it through Otoroshi's own draft and deploy.
+
+Back, the product reports what was changed by hand as [drift](./drift-and-adopt.mdx), and puts its
+description back on demand, by redeploying the snapshot. What was created by hand — a subscription,
+its key — is not the product's: it is left alone.
+
+## Uninstalling
+
+Uninstalling the product is stopping it and dropping its two databases. The traffic needs nothing
+else. What stays on the gateway:
+
+| Left on the gateway | Marked with | After uninstalling |
+|---|---|---|
+| the `Api` entities | `created_by`, `apim_api_id`, `apim_snapshot_id` | served; remove `created_by` to manage them as any Otoroshi API |
+| the `ApiSubscription`s and their keys | `id_ref` (the application), `apim_subscription_id` | served, managed by hand |
+| the derived JWT verifiers, CA certificates, auth modules, application certificates | `created_by`, `apim_derived` | referenced by the plans: keep them |
+| the keys the gateway minted for the consumers of jwt, mtls, oauth2-remote and keyless plans | `created_by: apikey-extractor` | Otoroshi's own |
+| the data exporter `apim_ingester_exporter` | `apim_managed_by` | its ingester is gone: delete it |
+
+The markers left on the entities are inert: Otoroshi only reads `created_by` on an `Api`. To keep
+what only the product holds — documentation, snapshots, the catalogue, the applications — export
+each workspace before dropping the databases (`apim export <ws>`, see the [CLI](../gitops/cli.mdx),
+or **Workspace settings → Export / import**): the export is importable into another installation.

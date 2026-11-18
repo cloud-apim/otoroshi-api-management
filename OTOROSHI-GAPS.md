@@ -27,6 +27,7 @@ the product has to compensate, **low** = friction.
 | G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
 | G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
 | G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
+| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; the end-to-end tests remove the keys the gateway minted for them |
 
 ---
 
@@ -287,3 +288,27 @@ these plans, on the fly or by a subscription, carries the metadata `api_id`, `pl
 `access_mode` (`jwt`, `mtls`, `oauth2-remote`) and `plan_consumer: "true"`, written after the
 template's. G-4's "subscription required" then only turns `create_if_missing` off: an unknown
 client id has no key and is refused.
+
+## G-18 — consumers minted for a plan are keyed by the plan id alone — high
+
+**Observed.** The extractors of `jwt`, `mtls`, `oauth2-remote` and `keyless` plans mint their
+consumer as the apikey `<kind>_<planId>_<clientId>` — the prefix is set by `pluginsForPlan`
+(`next/models/Api.scala:1815`, `:1868`, `:1894`, `:1917`). A plan id is only unique within its
+Api. `ApikeyFromPlan.resolveOrCreate` resolves an existing key first, and `NgApiConsumerEnforcer`
+(`next/plugins/apimgmt.scala:757`) enforces its restrictions and quotas without checking that the
+key belongs to the api called (`authorizedOnApi` is not consulted). So two Apis with a plan of the
+same id share the keys of their consumers: a call to one is counted against the quotas, the
+restrictions and the `apiRef` of whichever Api minted the key first. Deleting an Api does not
+delete these keys either (the `Api` resource has no delete validator): they stay, and the next Api
+reusing the plan id picks them up. Seen on the development stack: the key
+`jwt_plan_partner_agency-north`, minted for an Api deleted since, served the next run of the
+reference test, on a new Api, with the old Api in its `apiRef`.
+
+**Product meanwhile.** Plan ids created in the console are prefixed uuids, unique; declarative
+documents choose theirs (`plan_petstore_discovery`), and nothing warns yet. The end-to-end tests
+remove the keys the gateway minted for their api.
+
+**Upstream fix.** The api id in the prefix (`<kind>_<apiId>_<planId>_`), or the extractor and the
+enforcer refusing a key whose `apiRef.api` is not the api called; deleting an Api deletes the keys
+minted for it (`apiRef.api`, `created_by: apikey-extractor`).
+

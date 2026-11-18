@@ -78,6 +78,10 @@ afterAll(async () => {
     if (state.apiId) await call('DELETE', ws(`/apis/${state.apiId}`));
     // deleting the api removed its derived verifier from the gateway
     if (state.verifierId) expect(await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).toBeNull();
+    // the keys the gateway minted for the consumers of the api stay when it is deleted (G-18): the
+    // test removes the ones it caused
+    for (const k of (await otoroshi('GET', '/api/apikeys')) || [])
+      if (k.apiRef?.api === state.apiId && k.metadata?.created_by === 'apikey-extractor') await otoroshi('DELETE', `/api/apikeys/${k.clientId}`);
     // leave nothing behind: the workspace, and the consumer the test created
     await call('DELETE', `/workspaces/${WS}`);
   } catch (e) {
@@ -254,7 +258,7 @@ describe('reference catalogue', () => {
   });
 
   test('approval 3 — form: Partner requires a usage statement and the terms', async () => {
-    const app = await call('POST', ws('/applications'), { name: 'Regional agency', team_id: state.teamId, client_id: 'agency-north' });
+    const app = await call('POST', ws('/applications'), { name: 'Regional agency', team_id: state.teamId, client_id: `agency-north-${RUN}` });
     await expect(call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_partner', application_id: app.id })).rejects.toThrow(/usage/);
     await expect(
       call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_partner', application_id: app.id, usage: 'reference data for our public dashboards' })
@@ -269,7 +273,7 @@ describe('reference catalogue', () => {
     expect(sub.status).toBe('active');
     expect(sub.request.usage).toBe('reference data for our public dashboards');
     // the jwt consumer calls with its own token, identified by the client_id of the application
-    const res = await gatewayCall('/documents/2026-0042', { headers: { Authorization: `Bearer ${jwt({ client_id: 'agency-north', iss: 'https://id.atlas.example' })}` }, expect: (r) => r.status === 200 });
+    const res = await gatewayCall('/documents/2026-0042', { headers: { Authorization: `Bearer ${jwt({ client_id: `agency-north-${RUN}`, iss: 'https://id.atlas.example' })}` }, expect: (r) => r.status === 200 });
     expect(res.status).toBe(200);
   });
 
