@@ -52,6 +52,8 @@ export const config = {
   // token the otoroshi data exporter must present to /ingest
   ingest: {
     token: env.APIM_INGEST_TOKEN || 'ingest-secret',
+    // the /ingest url as the gateway reaches it (the data exporter target)
+    url: env.APIM_INGEST_URL || null,
     storeRaw: bool(env.APIM_INGEST_STORE_RAW, true),
   },
 

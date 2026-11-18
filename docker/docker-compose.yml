@@ -2,6 +2,8 @@
 #  - postgres: one server, two databases (app data + analytics), as the product expects two connection urls
 #  - otoroshi: the gateway (18.x) the product drives, admin api on otoroshi-api.oto.tools:8080
 #  - echo: a demo backend for the apis created in the console
+#  - apim: the product itself, from the working copy (bun --watch), reachable by otoroshi as
+#    http://apim:9000 so that the data exporter can feed /ingest
 name: otoroshi-apim
 services:
   postgres:
@@ -45,6 +47,25 @@ services:
     environment:
       HTTP_PORT: 8080
       HTTPS_PORT: 8443
+
+  apim:
+    image: oven/bun:1.3.11
+    working_dir: /app
+    command: ["bun", "--watch", "server/main.js"]
+    environment:
+      APIM_DATABASE_URL: postgres://apim:apim@postgres:5432/apim
+      APIM_ANALYTICS_DATABASE_URL: postgres://apim:apim@postgres:5432/apim_analytics
+      OTOROSHI_URL: http://otoroshi:8080
+      APIM_INGEST_URL: http://apim:9000/ingest
+      APIM_PUBLIC_URL: http://localhost:9000
+    ports:
+      - "9000:9000"
+    volumes:
+      - ..:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["apim"]
 
 volumes:
   pgdata:

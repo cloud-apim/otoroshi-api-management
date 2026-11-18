@@ -74,7 +74,7 @@ r.get('/settings', async ({ ctx }) => {
   return {
     gateway: { ...gw, clientSecret: mask(gw.clientSecret) },
     portal: { exposure: config.portal.exposure, domain: config.portal.domain, ...(rows.find((x) => x.key === 'portal')?.value || {}) },
-    ingest: { storeRaw: config.ingest.storeRaw, url: `${config.publicUrl}/ingest`, ...(rows.find((x) => x.key === 'ingest')?.value || {}) },
+    ingest: { storeRaw: config.ingest.storeRaw, url: config.ingest.url || `${config.publicUrl}/ingest`, ...(rows.find((x) => x.key === 'ingest')?.value || {}) },
     drift: rows.find((x) => x.key === 'drift.last_run')?.value || null,
   };
 });
@@ -143,7 +143,7 @@ r.get('/gateway/plugins', async ({ ctx }) => {
 // helper, the product marks what it created and never touches other exporters.
 r.post('/gateway/exporter', async ({ ctx, body }) => {
   identity.requireAdmin(ctx);
-  const url = body.url || `${config.publicUrl.replace('localhost', 'host.docker.internal')}/ingest`;
+  const url = body.url || config.ingest.url || `${config.publicUrl.replace('localhost', 'host.docker.internal')}/ingest`;
   const entity = {
     _loc: { tenant: 'default', teams: ['default'] },
     type: 'webhook',
