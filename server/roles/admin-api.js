@@ -28,6 +28,8 @@ import * as catalogs from '../domain/catalogs.js';
 import * as auditExport from '../domain/auditExport.js';
 import * as notifications from '../domain/notifications.js';
 import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exposure.js';
+import * as promotion from '../domain/promotion.js';
+import { resolveLocal } from '../otoroshi/vault-refs.js';
 
 const r = new Router();
 
@@ -574,6 +576,23 @@ r.get('/workspaces/:ws/apis/:api/snapshots/:snap', async ({ ctx, params }) => {
   return apis.getSnapshot((await apiOf(c, params)).id, params.snap);
 });
 
+// promotion: the same snapshot on the next installation. It carries the secrets of the plans: its
+// export is written in the audit trail
+r.get('/workspaces/:ws/apis/:api/snapshots/:snap/promotion', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params, { manage: true });
+  // `deployed`: the snapshot that runs here, what a promotion usually sends on
+  const snapshot = params.snap === 'deployed' ? await deployments.deployedSnapshot(api.id) : await apis.getSnapshot(api.id, params.snap);
+  if (!snapshot) throw badRequest('this api is not deployed: name the snapshot to promote');
+  return promotion.exportSnapshot(c, c.workspace, api, snapshot);
+});
+r.post('/workspaces/:ws/promotions', async ({ ctx, params, body, query }) => {
+  const c = await ws(ctx, params);
+  const doc = body.document || body;
+  const flag = (k) => body[k] === true || query.get(k) === 'true';
+  return promotion.promote(c, c.workspace, doc, { dryRun: flag('dry_run'), deploy: flag('deploy'), replaceDraft: flag('replace_draft') });
+});
+
 // deployments: the described state is not the deployed state, and the diff comes first
 r.get('/workspaces/:ws/apis/:api/deployments', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
@@ -633,7 +652,7 @@ r.post('/workspaces/:ws/apis/:api/test', async ({ ctx, params, body }) => {
   const gw = await gatewaySettings();
   const cp = draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
   const path = `${cp}${(body.path || '/').startsWith('/') ? body.path || '/' : `/${body.path}`}`;
-  const headers = { ...(body.headers || {}), host: draft.entrypoint.domain };
+  const headers = { ...(body.headers || {}), host: await resolveLocal(draft.entrypoint.domain) };
   let credential = null;
   if (body.subscription_id) {
     // only the credentials the caller can see: the subscriptions of its own applications

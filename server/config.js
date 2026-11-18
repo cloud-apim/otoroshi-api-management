@@ -23,6 +23,9 @@ export const config = {
   // ingester, api, backoffice, portal
   roles: list(env.APIM_ROLES, ['ingester', 'api', 'backoffice', 'portal']),
   publicUrl: env.APIM_PUBLIC_URL || `http://localhost:${env.APIM_PORT || env.PORT || '9000'}`,
+  // the name of this installation — an environment, one per cluster: recette, production. It says
+  // where a promoted snapshot comes from
+  installationName: env.APIM_INSTALLATION_NAME || null,
 
   db: {
     app: env.APIM_DATABASE_URL || 'postgres://apim:apim@localhost:5442/apim',

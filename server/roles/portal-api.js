@@ -15,6 +15,7 @@ import { gatewaySettings, oto } from '../otoroshi/client.js';
 import YAML from 'yaml';
 import { listFields } from '../domain/metadata.js';
 import * as notifications from '../domain/notifications.js';
+import { resolveLocal } from '../otoroshi/vault-refs.js';
 
 const r = new Router();
 
@@ -24,7 +25,8 @@ export async function gatewayBaseUrl(draft) {
   const port = gw.publicPort ? String(gw.publicPort) : '';
   const defaultPort = (scheme === 'http' && port === '80') || (scheme === 'https' && port === '443');
   const cp = !draft.entrypoint.contextPath || draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
-  return `${scheme}://${draft.entrypoint.domain}${port && !defaultPort ? `:${port}` : ''}${cp}`;
+  // a domain that differs between environments is a vault reference the gateway resolves
+  return `${scheme}://${await resolveLocal(draft.entrypoint.domain)}${port && !defaultPort ? `:${port}` : ''}${cp}`;
 }
 
 // the catalogue: what is deployed, filtered by the visibility ACL (visibility is never projected)
@@ -346,7 +348,7 @@ export async function testProxy(req, ctx) {
     return new Response('invalid target', { status: 400 });
   }
   const list = await catalogue(ctx);
-  const hosts = new Set(list.map((e) => normalizeDraft(e.row.content.draft).entrypoint.domain));
+  const hosts = new Set(await Promise.all(list.map((e) => resolveLocal(normalizeDraft(e.row.content.draft).entrypoint.domain))));
   if (!hosts.has(t.hostname)) return new Response(`host ${t.hostname} is not an api of this portal`, { status: 403 });
   const gw = await gatewaySettings();
   const headers = new Headers();

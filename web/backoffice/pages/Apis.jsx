@@ -6,6 +6,7 @@ import { useWs, api } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
+import { PromoteModal } from './Promote.jsx';
 
 export function deploymentLabel(a) {
   const d = a.deployment;
@@ -153,6 +154,7 @@ export function ApisPage() {
   const shown = (state.data || []).slice(paging.offset, paging.offset + paging.limit);
   const [creating, setCreating] = useState(false);
   const [adopting, setAdopting] = useState(false);
+  const [promoting, setPromoting] = useState(false);
   return (
     <div className="page">
       <PageHead
@@ -160,6 +162,9 @@ export function ApisPage() {
         sub="Describe, publish and deploy APIs. Policy lives in the plans; routes are a projection detail."
         actions={
           <>
+            <button className="btn" onClick={() => setPromoting(true)}>
+              <Icon name="upload" /> Promote a snapshot
+            </button>
             <button className="btn" onClick={() => setAdopting(true)}>
               <Icon name="download" /> Adopt from gateway
             </button>
@@ -252,6 +257,7 @@ export function ApisPage() {
       </Loader>
       {creating && <CreateApiModal onClose={() => setCreating(false)} onCreated={(a) => navigate(`/ws/${slug}/apis/${a.id}`)} />}
       {adopting && <AdoptModal onClose={() => setAdopting(false)} onAdopted={(a) => navigate(`/ws/${slug}/apis/${a.id}`)} />}
+      {promoting && <PromoteModal onClose={() => setPromoting(false)} onDone={(r) => navigate(`/ws/${slug}/apis/${r.api.id}/deployment`)} />}
     </div>
   );
 }

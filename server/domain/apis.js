@@ -255,7 +255,7 @@ export async function lastSnapshot(apiId) {
 }
 
 export async function listSnapshots(apiId) {
-  return db`select s.id, s.api_id, s.number, s.comment, s.published_by, s.published_at, u.email as published_by_email
+  return db`select s.id, s.api_id, s.number, s.comment, s.published_by, s.published_at, s.origin, u.email as published_by_email
     from api_snapshots s left join users u on u.id = s.published_by where s.api_id = ${apiId} order by number desc`;
 }
 

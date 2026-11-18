@@ -27,6 +27,11 @@ Commands:
   apis deploy <ws> <api> [--snapshot n] [--dry-run]
   apis undeploy <ws> <api>
   apis snapshots <ws> <api>
+  apis export-snapshot <ws> <api> [--snapshot n]   a snapshot as a promotion document (default: the deployed one)
+  promote <ws> -f <file> [--dry-run] [--deploy] [--replace-draft]
+                                       take a promoted snapshot on this installation
+  promote <ws> <api> --to <url> --to-token <token> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy] [--replace-draft]
+                                       send a snapshot of this installation to the next one
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
   subscriptions list <ws> [--status s] [--api id]
   subscriptions accept|reject|suspend|resume|close <ws> <id> [--message m]
@@ -60,10 +65,12 @@ const URL_BASE = (flags.url || process.env.APIM_URL || 'http://localhost:9000').
 const TOKEN = flags.token || process.env.APIM_TOKEN;
 const OUTPUT = flags.output || 'table';
 
-async function call(method, path, body) {
-  const res = await fetch(`${URL_BASE}/api${path}`, {
+const call = (method, path, body) => callAt(URL_BASE, TOKEN, method, path, body);
+
+async function callAt(base, token, method, path, body) {
+  const res = await fetch(`${base}/api${path}`, {
     method,
-    headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' },
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -107,6 +114,28 @@ const need = (v, what) => {
   }
   return v;
 };
+
+function printPromotion(r) {
+  if (OUTPUT !== 'table') return print(r);
+  const s = r.source;
+  console.log(`${r.dryRun ? 'dry run: ' : ''}snapshot #${s.snapshot.number} of ${s.api.name} ${s.api.version}, from ${s.installation} (${r.digest.slice(0, 19)}…)`);
+  console.log(`  into the api ${r.api.slug} ${r.api.version}${r.api.created ? ', created by this promotion' : ''}${r.running ? `, where #${r.running.number} runs` : ', where nothing runs yet'}`);
+  if (r.already) console.log(`  already here as snapshot #${r.already.number}`);
+  else if (!r.dryRun) console.log(`  promoted as snapshot #${r.snapshot.number}`);
+  if (r.changes) {
+    console.log('changes compared with what runs here:');
+    r.changes.forEach((x) => console.log(`  ${x.op === 'add' ? '+' : x.op === 'remove' ? '-' : '~'} ${x.path}`));
+    if (!r.changes.length) console.log('  none');
+  }
+  console.log('gateway changes:');
+  (r.gateway?.changes || []).forEach((x) => console.log(`  ${x.op} ${x.path || 'the Api, new on this gateway'}`));
+  if (!r.gateway?.changes?.length) console.log('  none: the gateway already holds exactly this');
+  (r.vault_refs || []).forEach((v) => console.log(`vault reference ${v.ref}: ${v.status}`));
+  if (r.draft?.pending) console.log(r.draft.replaced ? 'the draft here had changes: replaced by the snapshot' : 'the draft here has changes that are not in a snapshot: --replace-draft to replace it');
+  (r.validation?.errors || []).forEach((x) => console.log(`error: ${x.message}`));
+  (r.warnings || []).forEach((x) => console.log(`warning: ${x.message}`));
+  if (r.deployment) console.log(`deployment: ${r.deployment.deployment?.status || r.deployment.status}`);
+}
 
 const deployLabel = (a) => (!a.last_snapshot ? 'draft only' : a.deployment?.action === 'deploy' && a.deployment?.status === 'deployed' ? 'deployed' : a.deployment?.status || 'not deployed');
 
@@ -173,6 +202,8 @@ async function main() {
         }
         case 'undeploy':
           return print(await call('POST', `${ws(w)}/apis/${need(api, '<api>')}/undeploy`));
+        case 'export-snapshot':
+          return console.log(JSON.stringify(await call('GET', `${ws(w)}/apis/${need(api, '<api>')}/snapshots/${flags.snapshot || 'deployed'}/promotion`), null, 2));
         case 'snapshots':
           return print(await call('GET', `${ws(w)}/apis/${need(api, '<api>')}/snapshots`), [
             ['number', 'number'],
@@ -243,6 +274,18 @@ async function main() {
         ['action', 'action'],
         ['summary', 'summary'],
       ]);
+    case 'promote': {
+      const opts = { dry_run: !!flags['dry-run'], deploy: !!flags.deploy, replace_draft: !!flags['replace-draft'] };
+      if (flags.file) {
+        const doc = JSON.parse(readFileSync(flags.file, 'utf8'));
+        return printPromotion(await call('POST', `${ws(sub)}/promotions`, { document: doc, ...opts }));
+      }
+      // from this installation to the next one
+      const to = need(flags.to, '--to <url of the next installation>').replace(/\/$/, '');
+      const doc = await call('GET', `${ws(sub)}/apis/${need(a1, '<api>')}/snapshots/${flags.snapshot || 'deployed'}/promotion`);
+      const target = `/workspaces/${flags['to-workspace'] || sub}/promotions`;
+      return printPromotion(await callAt(to, need(flags['to-token'] || process.env.APIM_TO_TOKEN, '--to-token (or APIM_TO_TOKEN)'), 'POST', target, { document: doc, ...opts }));
+    }
     case 'export':
       return console.log(JSON.stringify(await call('GET', `${ws(sub)}/export`), null, 2));
     case 'import': {

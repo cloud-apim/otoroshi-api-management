@@ -42,6 +42,9 @@ bun cli/apim.js help
 | `applications list <ws>` | |
 | `drift <ws>` | run drift detection and print the reports |
 | `audit <ws> [--limit n]` | the audit trail |
+| `apis export-snapshot <ws> <api> [--snapshot n]` | a snapshot as a [promotion](./promotion.mdx) document (default: the deployed one) |
+| `promote <ws> -f <file> [--dry-run] [--deploy] [--replace-draft]` | take a promoted snapshot on this installation |
+| `promote <ws> <api> --to <url> --to-token <t> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy]` | send a snapshot of this installation to the next one |
 | `export <ws>` | the full export, re-importable |
 | `import <ws> -f <file>` | |
 

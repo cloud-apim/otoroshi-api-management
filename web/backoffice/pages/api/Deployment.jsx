@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { fmtDate, fmtRelative } from '../../../shared/lib.js';
-import { Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
@@ -35,6 +35,18 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
   const depPage = useLocalPaging(deps.data?.history, { prefix: 'deps', size: 10, text: (x) => `#${x.snapshot_number} ${x.action} ${x.status} ${x.requested_by_email || ''} ${x.error || ''}` });
   const [viewing, setViewing] = useState(null);
   const current = api.deployment.current;
+  // the snapshot as a promotion document, for the next installation
+  const exportSnapshot = async (s) => {
+    try {
+      const doc = await wapi.get(`/apis/${api.id}/snapshots/${s.number}/promotion`);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }));
+      a.download = `${api.slug}-${api.version}-snapshot-${s.number}.json`;
+      a.click();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
   const recheck = async () => {
     try {
       await wapi.post('/drift');
@@ -138,7 +150,14 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                   <tbody>
                     {snapPage.items.map((s) => (
                       <tr key={s.id}>
-                        <td className="bold">#{s.number}</td>
+                        <td className="bold nowrap">
+                          #{s.number}{' '}
+                          {s.origin && (
+                            <Badge kind="info" title={`snapshot #${s.origin.number} of ${s.origin.installation}, ${s.origin.digest}`}>
+                              promoted
+                            </Badge>
+                          )}
+                        </td>
                         <td>{s.comment || <span className="faint">no comment</span>}</td>
                         <td className="muted small">
                           {fmtDate(s.published_at)} · {s.published_by_email || 'system'}
@@ -148,6 +167,11 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                           <button className="btn sm ghost" onClick={() => setViewing(s.number)}>
                             View
                           </button>
+                          {!readOnly && (
+                            <button className="btn sm ghost" title="the snapshot as a document for the next installation" onClick={() => exportSnapshot(s)}>
+                              Export for promotion
+                            </button>
+                          )}
                           {!readOnly && current?.snapshot_id !== s.id && (
                             <button className="btn sm" onClick={() => onDeploy(s.id)}>
                               {current && s.number < current.snapshot_number ? 'Roll back to it' : 'Deploy'}

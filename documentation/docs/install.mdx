@@ -57,6 +57,7 @@ console (*Gateway* and *Global settings*); stored values take precedence.
 | `APIM_PORT` (or `PORT`) | `9000` | listening port |
 | `APIM_ROLES` | `ingester,api,backoffice,portal` | roles of this instance |
 | `APIM_PUBLIC_URL` | `http://localhost:<port>` | public base url of the product |
+| `APIM_INSTALLATION_NAME` | the host of `APIM_PUBLIC_URL` | the name of this installation — an environment: `recette`, `production`. A [promoted](./gitops/promotion.mdx) snapshot says where it comes from |
 | `APIM_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim` | application database |
 | `APIM_ANALYTICS_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim_analytics` | events and analytics database |
 | `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |

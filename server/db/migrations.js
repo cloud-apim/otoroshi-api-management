@@ -391,6 +391,13 @@ create index notifications_team on notifications(team_id, created_at desc);
 alter table subscriptions add column pending_transfer jsonb;
 `,
   },
+  {
+    version: '0008_promotion',
+    sql: `
+-- a snapshot promoted from another installation: where it was published, and its digest
+alter table api_snapshots add column origin jsonb;
+`,
+  },
 ];
 
 export const analyticsMigrations = [

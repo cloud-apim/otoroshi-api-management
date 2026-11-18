@@ -17,12 +17,11 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-4** — promotion of a snapshot to the next installation (D-37).
-2. **R-5** — console in French (D-11).
-3. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
-4. **R-7** — Stripe connector (D-36, Q-12).
-5. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-6. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-5** — console in French (D-11).
+2. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
+3. **R-7** — Stripe connector (D-36, Q-12).
+4. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+5. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -77,7 +76,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-4 | D-37, D-35 | **Promotion**: publish the same immutable snapshot on the next installation (recette → production), with its diff and dry-run, through the export and the CLI | M | |
 | R-6 | D-28 | **Kubernetes**: deployment manifests and a Helm chart; **CRDs** for the product's own entities (Api document, applications, subscriptions) with a controller | L | |
 | R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
@@ -160,7 +158,7 @@ waits for the data plane rather than working around it.
 | D-33 two storage paths | 🟡 | computed + raw with url masking ✅; retention, sampling, pseudonymisation: R-8 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
 | D-36 ready for monetisation | 🟡 | schema ✅, test connector ✅; Stripe: R-7, usage billing: R-34 |
-| D-37 one installation, one cluster | ✅ | promotion to the next installation: R-4 |
+| D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
 | D-38 catalog-marked projection | ✅ | Otoroshi records each deployment |
 | D-39 hand-written CSS | ✅ | chart palette validated |
 | D-41 unit of measure of a plan | ✅ | tokens / budget refused without an LLM backend; projection: R-18 |

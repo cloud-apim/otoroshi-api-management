@@ -1,0 +1,80 @@
+---
+sidebar_position: 5
+title: Promotion
+description: Publish the same snapshot on the next installation — recette, then production — with its diff and its dry run.
+---
+
+# Promotion
+
+One installation drives one Otoroshi cluster, so an environment is an installation: a recette, a
+production. Promoting is publishing **the same snapshot** on the next one. A snapshot is
+immutable, so what runs in recette and what goes to production are the same document.
+
+## How it goes
+
+1. On the recette, export a snapshot as a **promotion document**: **API → Deployment → Export for
+   promotion**, or `apim apis export-snapshot <ws> <api> [--snapshot n]` (by default the snapshot
+   that runs there).
+2. On the production, **APIs → Promote a snapshot**, or `apim promote <ws> -f <file> --dry-run`:
+   a dry run says what would happen, and changes nothing.
+3. Promote it, and deploy it — at once (**Promote and deploy**, `--deploy`) or later, like any other
+   snapshot.
+
+From one installation to the next in one command, with a token of each:
+
+```sh
+APIM_URL=https://apim.recette.example.com APIM_TOKEN=… \
+  apim promote default petstore --to https://apim.example.com --to-token … --dry-run
+```
+
+## What the dry run says
+
+- where the snapshot comes from: its installation, its workspace, its number, who published it,
+  and its **digest**;
+- the API it lands in: the one with the same id (installations seeded by an
+  [import](./cli.mdx), or by an earlier promotion), else the same slug and version, else a **new
+  API**, created by the promotion for the team of the same name;
+- **what changes compared with what runs** on this installation, and **what changes on its
+  gateway** at the deployment;
+- the **vault references** of the snapshot, and whether this gateway resolves them (below);
+- whether it validates here (the [metadata fields](../concepts/metadata.mdx) of this installation
+  may require more), and the warnings: an access tag naming a team this workspace does not have, a
+  shared policy group it does not have.
+
+## The same document, every time
+
+What is promoted is the snapshot without what names the API in its installation — its id, its
+workspace, its team. Its **digest** (`sha256` of that document) travels with it: a document changed
+after its export is refused. On the production the snapshot gets the next number of the API there,
+and keeps where it comes from: the installation, its number there, the digest — the console marks
+it **promoted**. Promoting it again changes nothing; a snapshot promoted on from the production
+still says where it was first published.
+
+The draft of the API becomes the snapshot's, its documentation pages too, so nothing is pending
+after a promotion. If the draft here has changes that are not in a snapshot, the promotion stops:
+publish them first, or replace the draft (**Replace the draft with the snapshot**,
+`--replace-draft`). Subscriptions, applications and consumers are not promoted: they are the
+installation's.
+
+## What differs between environments
+
+The domain of an API, the hosts of its backends, a secret — what differs from one environment to
+the next is **not in the snapshot**: it names an Otoroshi vault reference, and each cluster
+resolves its own value.
+
+| Reference | Read from | Checked by the dry run |
+|---|---|---|
+| `${vault://local/<path>}` | the `env` object of the gateway's global config (`/api/globalconfig`) | yes: resolved or missing |
+| `${vault://env/<NAME>}` | an environment variable of the gateway nodes | no |
+| any other vault of the gateway | that vault | no |
+
+For example, a recette and a production holding in their global config
+
+```json
+{ "env": { "petstore": { "domain": "petstore.recette.example.com", "backend": "pets.recette.internal" } } }
+```
+
+and `{ "env": { "petstore": { "domain": "petstore.example.com", "backend": "pets.internal" } } }`,
+serve the same snapshot whose entrypoint is `${vault://local/petstore/domain}` and whose target is
+`${vault://local/petstore/backend}`. The console resolves the `local` references of a domain for
+what it shows — the base URL of an API, the host of a test call.

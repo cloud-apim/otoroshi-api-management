@@ -110,7 +110,19 @@ async function resolveSnapshot(api, snapshotRef) {
 export async function planDeployment(api, snapshotRef) {
   const snapshot = await resolveSnapshot(api, snapshotRef);
   const running = await deployedSnapshot(api.id);
-  const entity = buildOtoroshiApi(snapshot.content, { snapshotId: snapshot.id, snapshotNumber: snapshot.number, lifecycle: api.lifecycle });
+  const preview = await previewContent(api, snapshot.content, { snapshotId: snapshot.id, snapshotNumber: snapshot.number });
+  return {
+    snapshot: { id: snapshot.id, number: snapshot.number, published_at: snapshot.published_at, comment: snapshot.comment },
+    running: running ? { id: running.id, number: running.number } : null,
+    changes: running ? diff(running.content, snapshot.content) : null,
+    ...preview,
+  };
+}
+
+// what deploying a content would change on the gateway, and what the gateway's own settings make
+// of it — for a stored snapshot, or for one about to be promoted
+export async function previewContent(api, content, { snapshotId = null, snapshotNumber = null } = {}) {
+  const entity = buildOtoroshiApi(content, { snapshotId, snapshotNumber, lifecycle: api.lifecycle });
   let gateway = null;
   let gatewayError = null;
   try {
@@ -118,9 +130,9 @@ export async function planDeployment(api, snapshotRef) {
   } catch (e) {
     gatewayError = e.message;
   }
-  const validation = validateDraft(snapshot.content.draft);
+  const validation = validateDraft(content.draft);
   const gatewayChanges = diff(comparableApi(gateway), comparableApi(entity));
-  const derived = derivedEntities(snapshot.content);
+  const derived = derivedEntities(content);
   if (!gatewayError) {
     for (const d of derived) {
       const got = await oto.getEntity(d.path, d.id).catch(() => null);
@@ -128,11 +140,8 @@ export async function planDeployment(api, snapshotRef) {
       else diff(comparableDerived(got), comparableDerived(d.entity), `derived[${d.kind} ${d.entity.name}]`, gatewayChanges);
     }
   }
-  const warnings = [...validation.warnings, ...(gatewayError ? [] : await gatewayWarnings(snapshot.content, derived))];
+  const warnings = [...validation.warnings, ...(gatewayError ? [] : await gatewayWarnings(content, derived))];
   return {
-    snapshot: { id: snapshot.id, number: snapshot.number, published_at: snapshot.published_at, comment: snapshot.comment },
-    running: running ? { id: running.id, number: running.number } : null,
-    changes: running ? diff(running.content, snapshot.content) : null,
     gatewayChanges,
     derived: derived.map((d) => ({ kind: d.kind, id: d.id, name: d.entity.name })),
     gatewayExists: !!gateway,

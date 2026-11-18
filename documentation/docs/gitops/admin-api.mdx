@@ -38,12 +38,13 @@ addressed by id or slug.
 | Area | Endpoints |
 |---|---|
 | you | `GET /me`, `GET POST DELETE /me/tokens` |
-| installation | `GET /settings`, `PUT /settings/{gateway,portal,ingest,auth}`, `GET POST PUT /users`, `GET /audit`, `GET POST PUT DELETE /audit/exporters`, `POST /audit/exporters/<id>/test` |
+| installation | `GET /settings`, `PUT /settings/{gateway,ingest,auth}`, `GET POST PUT /users`, `GET /audit`, `GET POST PUT DELETE /audit/exporters`, `POST /audit/exporters/<id>/test` |
 | gateway | `GET /gateway/status`, `GET /gateway/tasks`, `POST /gateway/tasks/<id>/retry`, `GET /gateway/references`, `GET /gateway/plugins`, `GET /gateway/plugins/<id>` (with its form description), `POST /gateway/exporter`, `POST /gateway/drift`, `GET /gateway/unmanaged-apis` |
 | workspaces | `GET POST /workspaces`, `GET PUT DELETE /workspaces/<ws>`, `…/members`, `…/teams`, `…/teams/<team>/members` |
 | APIs | `GET POST …/apis`, `GET PUT DELETE …/apis/<api>`, `PUT …/draft`, `POST …/validate`, `POST …/lifecycle`, `POST …/versions`, `GET …/plans`, `GET …/document` |
 | documentation | `GET POST …/apis/<api>/pages`, `GET PUT DELETE …/pages/<page>` |
 | publication | `GET …/changes`, `POST …/publish`, `GET …/snapshots`, `GET …/snapshots/<n>` |
+| promotion | `GET …/apis/<api>/snapshots/<n \| deployed>/promotion`, `POST …/promotions` (`{"document": …, "dry_run": true, "deploy": true, "replace_draft": true}`) |
 | deployment | `GET …/deployments`, `POST …/deploy` (`{"snapshot": …, "dry_run": true}`), `POST …/undeploy`, `GET …/projection`, `POST …/test` |
 | applications | `GET POST …/applications`, `GET PUT DELETE …/applications/<app>` |
 | subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync,payment}`, `PUT …/metadata`, `POST …/credentials/<cred>/rotate` |
