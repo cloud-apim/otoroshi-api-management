@@ -5,7 +5,10 @@
 //
 // Needs the docker stack (bun run infra:up): postgres on 5442, otoroshi 18 on 8080, echo backend.
 
-import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
+import { describe, test, expect, beforeAll, afterAll, setDefaultTimeout } from 'bun:test';
+
+// the gateway takes a few seconds to pick up a new route or a new key
+setDefaultTimeout(40000);
 import { createHmac } from 'node:crypto';
 
 process.env.APIM_PORT = process.env.APIM_TEST_PORT || '9117';
@@ -43,7 +46,7 @@ async function call(method, path, body) {
 const ws = (p) => `/workspaces/${WS}${p}`;
 
 // the gateway takes a moment to pick up a new route or key in its proxy state
-async function gatewayCall(path, { headers = {}, expect: wanted, timeoutMs = 15000 } = {}) {
+async function gatewayCall(path, { headers = {}, expect: wanted, timeoutMs = 30000 } = {}) {
   const started = Date.now();
   let last;
   while (Date.now() - started < timeoutMs) {
@@ -295,7 +298,8 @@ describe('reference catalogue', () => {
     // the internal tier is not even visible to a consumer (restricted visibility, never projected)
     const view = await (await fetch(`${portal}/apis/${state.apiId}`, { headers: h })).json();
     expect(view.plans.map((p) => p.id)).not.toContain('plan_internal');
-    expect(view.plans.find((p) => p.id === 'plan_bulk').subscribable).toBe(true); // shown, but…
+    // the contract tier is shown in the catalogue, but marked out of self-service
+    expect(view.plans.find((p) => p.id === 'plan_bulk').subscribable).toBe(false);
     const r = await fetch(`${portal}/subscriptions`, { method: 'POST', headers: h, body: JSON.stringify({ api_id: state.apiId, plan_id: 'plan_starter', application_id: app.id }) });
     expect(r.status).toBe(200);
   });
