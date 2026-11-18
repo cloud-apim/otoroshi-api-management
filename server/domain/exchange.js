@@ -3,7 +3,8 @@
 // beside it and its snapshot history.
 
 import { db, newId } from '../db/index.js';
-import { badRequest } from '../http/router.js';
+import { badRequest, forbidden } from '../http/router.js';
+import { isTeamMember } from './identity.js';
 import { audit } from './audit.js';
 import { normalizeDraft } from './model.js';
 
@@ -127,7 +128,7 @@ export async function apiDocument(api) {
 
 // upsert by (workspace, slug, version). Writes the draft: publishing and deploying stay explicit
 // acts, unless the caller asks for them (the GitOps gesture).
-export async function applyApiDocument(ctx, ws, doc, { managedBy = null } = {}) {
+export async function applyApiDocument(ctx, ws, doc, { managedBy = null, checkManage = false } = {}) {
   if (doc?.kind !== API_KIND) throw badRequest(`expected kind ${API_KIND}`);
   const slug = doc.metadata?.name;
   const version = doc.metadata?.version || '1.0.0';
@@ -139,11 +140,13 @@ export async function applyApiDocument(ctx, ws, doc, { managedBy = null } = {}) 
     if (!t) throw badRequest(`unknown team ${spec.team}`);
     teamId = t.id;
   }
-  const { createApi, updateApi, createPage, updatePage } = await import('./apis.js');
+  const { createApi, updateApi, createPage, updatePage, requireManageApi } = await import('./apis.js');
   const existing = (await db`select * from apis where workspace_id = ${ws.id} and slug = ${slug} and version = ${version}`)[0];
   let api;
   let action;
   if (!existing) {
+    // as from the console: a producer creates apis for the teams it belongs to
+    if (checkManage && teamId && ctx.role === 'producer' && !(await isTeamMember(teamId, ctx.user.id))) throw forbidden(`you are not a member of the team ${spec.team}`);
     api = await createApi(ctx, ws.id, {
       name: spec.name || slug,
       slug,
@@ -159,6 +162,7 @@ export async function applyApiDocument(ctx, ws, doc, { managedBy = null } = {}) 
     });
     action = 'created';
   } else {
+    if (checkManage) await requireManageApi(ctx, existing);
     if (existing.managed_by && managedBy && existing.managed_by !== managedBy)
       throw badRequest(`this api is managed by ${existing.managed_by}, not ${managedBy}`);
     api = await updateApi(ctx, existing, {

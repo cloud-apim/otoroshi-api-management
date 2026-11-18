@@ -391,6 +391,7 @@ r.put('/workspaces/:ws/teams/:team', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const t = await identity.findTeam(c.workspace.id, params.team);
   if (!t) throw notFound('team not found');
+  await identity.requireManageTeam(c, t);
   return identity.updateTeam(c, t, body);
 });
 
@@ -406,6 +407,7 @@ r.post('/workspaces/:ws/teams/:team/members', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const t = await identity.findTeam(c.workspace.id, params.team);
   if (!t) throw notFound('team not found');
+  await identity.requireManageTeam(c, t);
   let userId = body.user_id;
   if (!userId && body.email) {
     const u = await identity.findUserByEmail(body.email);
@@ -420,6 +422,7 @@ r.delete('/workspaces/:ws/teams/:team/members/:user', async ({ ctx, params }) =>
   const c = await ws(ctx, params);
   const t = await identity.findTeam(c.workspace.id, params.team);
   if (!t) throw notFound('team not found');
+  await identity.requireManageTeam(c, t);
   await identity.removeTeamMember(c, t, params.user);
   return identity.teamMembers(t.id);
 });
@@ -997,8 +1000,10 @@ r.post('/workspaces/:ws/apply', async ({ ctx, params, body, query }) => {
   const docs = Array.isArray(body) ? body : body.items || [body];
   const results = [];
   for (const doc of docs) {
-    const res = await applyApiDocument(c, c.workspace, doc, { managedBy: query.get('managed_by') || null });
+    // an api that exists is changed by who can manage it, as from the console
+    const res = await applyApiDocument(c, c.workspace, doc, { managedBy: query.get('managed_by') || null, checkManage: true });
     const api = await apis.getApi(c.workspace.id, res.api.id);
+    if (query.get('publish') === 'true' || query.get('deploy') === 'true') await apis.requireManageApi(c, api);
     if (query.get('publish') === 'true') {
       const pending = await apis.pendingChanges(api);
       if (pending.hasChanges) {

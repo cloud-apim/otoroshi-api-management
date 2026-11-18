@@ -248,6 +248,19 @@ export async function removeTeamMember(ctx, team, userId) {
   await audit(ctx, { action: 'team.member.remove', workspaceId: team.workspace_id, entityKind: 'team', entityId: team.id, summary: `member removed from ${team.name}` });
 }
 
+// renaming a team and choosing its members: a workspace administrator, or an owner of the team —
+// otherwise anyone could join a team and manage what it owns
+export async function canManageTeam(ctx, team) {
+  if (ctx.user?.is_admin || ctx.role === 'admin') return true;
+  if (!ctx.user) return false;
+  const rows = await db`select 1 from team_members where team_id = ${team.id} and user_id = ${ctx.user.id} and role = 'owner'`;
+  return rows.length > 0;
+}
+
+export async function requireManageTeam(ctx, team) {
+  if (!(await canManageTeam(ctx, team))) throw forbidden('only an owner of the team or a workspace administrator manages it');
+}
+
 export async function isTeamMember(teamId, userId) {
   const rows = await db`select 1 from team_members where team_id = ${teamId} and user_id = ${userId}`;
   return rows.length > 0;
