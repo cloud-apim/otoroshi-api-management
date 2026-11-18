@@ -54,16 +54,34 @@ executable away from the repository and checks its faces, its health and its com
 
 ## The container image
 
+The image is the executable on a slim Debian: no Bun, no `node_modules`, `git` for the git
+[remote catalogs](./gitops/remote-catalogs.mdx) and the certificates of the https calls, run by an
+unprivileged user. Its entry point is the executable, `serve` by default:
+
 ```bash
-docker build -t otoroshi-api-management .
 docker run -p 9000:9000 \
   -e APIM_DATABASE_URL=postgres://… -e APIM_ANALYTICS_DATABASE_URL=postgres://… \
   -e OTOROSHI_URL=http://otoroshi:8080 -e OTOROSHI_CLIENT_ID=… -e OTOROSHI_CLIENT_SECRET=… \
-  otoroshi-api-management
+  ghcr.io/cloud-apim/otoroshi-api-management
+
+# the same image, for the setup of the gateway or a command of the cli
+docker run --rm -e APIM_DATABASE_URL=… -e APIM_ANALYTICS_DATABASE_URL=… -e OTOROSHI_URL=… \
+  ghcr.io/cloud-apim/otoroshi-api-management setup --admin-client-id … --admin-client-secret … --dry-run
 ```
 
-The image builds both UIs in a first stage and carries `git`, used by the git
-[remote catalogs](./gitops/remote-catalogs.mdx).
+`otoroshi-apim health` is its health check. On SIGTERM it stops taking requests, finishes the ones
+in flight, and exits — within ten seconds.
+
+`mise run image` builds it (`docker build -t otoroshi-api-management:dev .`); for several
+platforms, `docker buildx build --platform linux/amd64,linux/arm64 .` cross-compiles the executable.
+
+### Releases
+
+A tag `v<version>` — the version of `package.json` — publishes the executables for linux and
+macos, x64 and arm64, with their `SHA256SUMS`, on the GitHub release, and the image for
+`linux/amd64` and `linux/arm64` on `ghcr.io/cloud-apim/otoroshi-api-management` (tags `<version>`,
+`<major>.<minor>`, `latest`). The Kubernetes manifests and the Helm chart use that image; the chart
+defaults to its `appVersion`.
 
 ## On Kubernetes
 

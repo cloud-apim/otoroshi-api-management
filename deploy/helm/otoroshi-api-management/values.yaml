@@ -1,8 +1,9 @@
 # otoroshi-api-management — every value maps to a variable of the documentation › Install.
 
+# the image the release publishes; the tag defaults to the appVersion of the chart
 image:
-  repository: otoroshi-api-management
-  tag: latest
+  repository: ghcr.io/cloud-apim/otoroshi-api-management
+  tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []
 

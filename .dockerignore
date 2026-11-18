@@ -2,4 +2,10 @@ node_modules
 dist
 docker
 test
+documentation
+deploy
+examples
 .git
+.github
+*.log
+.env

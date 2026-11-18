@@ -19,6 +19,7 @@ resources:
   - apim.yaml
   - controller.yaml
 images:
+  # the image the release publishes (.github/workflows/release.yaml); `kustomize edit set image` pins another
   - name: otoroshi-api-management
-    newName: otoroshi-api-management
+    newName: ghcr.io/cloud-apim/otoroshi-api-management
     newTag: latest

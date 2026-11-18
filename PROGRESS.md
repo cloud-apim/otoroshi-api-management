@@ -17,7 +17,11 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-50** — the container image built from the compiled executable.
+1. **R-39** — the "via Otoroshi" console login end to end, behind the route and the auth module the setup makes.
+2. **R-30** — the roles split across instances, several instances of a role.
+3. **R-36** — secrets at rest.
+4. **R-13** — subscription expiry.
+5. **R-38** — UI tests.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -91,7 +95,6 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-47 | D-36, D-30 | A move from a **free plan to a paid one** through a Checkout, the subscription staying on its plan until it is paid — refused today: the consumer subscribes to the paid plan | S | |
 | R-48 | D-33 | A daily **compaction** of the hourly rollups past a few months, should their volume call for it | S | |
-| R-50 | | The **container image** built from the compiled executable (a slim base with `git` and the certificates, no `node_modules`), and the executables attached to a release | S | |
 | R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
 

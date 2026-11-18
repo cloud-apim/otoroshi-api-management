@@ -139,7 +139,7 @@ depends = ["build"]
 run = "bun scripts/build-binary.js --all"
 
 [tasks.image]
-description = "Build the production docker image"
+description = "Build the production docker image: the compiled executable on a slim Debian, with git"
 run = "docker build -t otoroshi-api-management:dev ."
 
 # ─── Quality ─────────────────────────────────────────────────────────

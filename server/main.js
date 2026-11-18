@@ -349,12 +349,29 @@ async function start() {
   return server;
 }
 
-// started by itself (bun server/main.js), not imported by the binary (bin.js) or by a test
-if (import.meta.main && !globalThis.__APIM_BIN__) {
-  start().catch((e) => {
-    console.error('[apim] failed to start', e);
-    process.exit(1);
-  });
+// on SIGTERM (a container stopped, a pod replaced) or SIGINT: no new request, the ones in flight
+// finished, then out — at most `graceMs`. A process 1 of a container that handles no signal is
+// killed at the end of the grace period
+function stopOnSignals(server, { graceMs = 10000 } = {}) {
+  const stop = (signal) => {
+    console.log(`[apim] ${signal}: stopping`);
+    setTimeout(() => process.exit(0), graceMs).unref();
+    Promise.resolve(server.stop())
+      .catch(() => null)
+      .finally(() => process.exit(0));
+  };
+  process.once('SIGTERM', () => stop('SIGTERM'));
+  process.once('SIGINT', () => stop('SIGINT'));
 }
 
-export { start, fetchHandler };
+// started by itself (bun server/main.js), not imported by the binary (bin.js) or by a test
+if (import.meta.main && !globalThis.__APIM_BIN__) {
+  start()
+    .then(stopOnSignals)
+    .catch((e) => {
+      console.error('[apim] failed to start', e);
+      process.exit(1);
+    });
+}
+
+export { start, fetchHandler, stopOnSignals };
