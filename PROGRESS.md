@@ -23,6 +23,8 @@ Last update: 2026-11-18.
 4. **R-13** — subscription expiry.
 5. **R-38** — UI tests.
 
+These do not depend on the projection: they go on while the gaps that change the contract are fixed in Otoroshi ([roadmap](./OTOROSHI-GAPS.md#roadmap)).
+
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
 ## Remaining effort at a glance
@@ -247,4 +249,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane — each with its upstream issue, the size of the fix and the item it unblocks.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane — each with its upstream issue, the size of the fix and the item it unblocks. Its [roadmap](./OTOROSHI-GAPS.md#roadmap): the gaps that change the contract first (G-1, G-2, G-13, G-15, G-17, G-18, G-4, G-3, G-7), the product meanwhile on what does not depend on the projection, then the product follows the fixes and requires the release that carries them.

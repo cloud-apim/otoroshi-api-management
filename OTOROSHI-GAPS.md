@@ -38,6 +38,44 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 
 Total: 9 S + 9 M + 3 L. Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
 
+## Roadmap
+
+Not everything in Otoroshi first: **the contract first**, the product meanwhile on what does not
+depend on it, the rest along the way.
+
+**Why not everything at once.**
+
+- 16 gaps out of 21 block nothing in the product: it has a workaround or a warning. Only five
+  unblock an item: G-4 (R-15), G-6 (R-14), G-7 (R-33), G-12 (R-24), G-13 (R-16).
+- The three large ones (G-6, G-11, G-19, about three weeks on their own) are the least blocking:
+  G-6 unblocks R-14, G-11 and G-19 nothing. Doing them first would freeze the product for little.
+- The other way round, going on with the product without Otoroshi means building on a contract
+  that is going to change, and doing it again.
+
+**1. The contract, in Otoroshi.** The high gaps that change what the product projects:
+G-1, G-2, G-13, G-15, then G-17, G-18, G-4 (in that order: G-4 builds on the identity G-17 gives
+the subscription, G-18 touches the same key prefix), then G-3, G-7. 5 S + 4 M, about two weeks by
+hand, about twelve hours with an agent. They are security holes for every user of the `Api`
+entity of Otoroshi 18, product or not: worth it anyway.
+
+**2. Meanwhile, the product on what does not depend on the projection:** R-39, R-30, R-13, R-36,
+R-38, R-47, R-27, R-22, R-23, R-42, R-20, R-34 — several days of work with no conflict.
+
+**3. Then the product follows the fixes.**
+
+- Its workarounds go: the order of deletion (G-2), the client id carried as metadata (G-17), the
+  warnings `any_token_passes`, `token_claims_not_checked`, `plan_id_shared`.
+- R-15 and R-16, unblocked.
+- The items that touch the projection: R-12, R-17, R-25, R-10.
+
+**4. The rest, along the way:** G-5, G-6, G-12, G-16, G-21, the low ones, then G-11 and G-19. G-20
+as well: nobody uses narrowed keys.
+
+**The minimum version.** One version of Otoroshi only: the product requires the release that
+carries the fixes of step 1, and drops its workarounds rather than keeping them for 18.0 — nothing
+depends on the product with 18.0 yet, and a gap is fixed in Otoroshi, not in the model. The version
+check of the setup moves from 18 to that release.
+
 ---
 
 ## G-1 — a pending subscription gets an enabled key — high
