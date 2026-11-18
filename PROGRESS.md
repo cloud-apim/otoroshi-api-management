@@ -29,7 +29,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (25)**
+**Doable (24)**
 
 | # | Effort | What |
 |---|---|---|
@@ -47,8 +47,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-36 | M | Secrets at rest encrypted or in a vault |
 | R-38 | M | UI tests (the screens tour only today) |
-| R-37 | M | Accessibility audit of both faces |
-| R-45 | M | Admin api messages in French |
+| R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-12 | M | One credential for several subscriptions |
 | R-17 | M | Adopt: take over the existing subscriptions and keys too |
 | R-20 | M | Catalogue as a discovery tool (categories, featured, reviews) |
@@ -67,7 +66,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
 
-**Total doable:** 12 S + 11 M + 2 L ≈ 19 M. Without R-18, R-10 and R-19 (out of the MVP or large): ≈ 14 M.
+**Total doable:** 12 S + 10 M + 2 L ≈ 18 M. Without R-18, R-37, R-10 and R-19 (out of the MVP, not a priority, or large): ≈ 12 M.
 
 ## Known issues
 
@@ -111,7 +110,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-45 | D-11 | The **messages of the admin api** in the language of the console: its errors and the validation warnings (plans, deployments, promotions) are in English | M | |
 | R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
@@ -147,7 +145,7 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
-| R-37 | — | An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
+| R-37 | — | Not a priority (owner). An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
 | R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
 | R-39 | D-25 | Test the **Otoroshi authentication mode** end to end behind a real route with an auth module (unit-tested only) | S | |
 
@@ -178,7 +176,7 @@ waits for the data plane rather than working around it.
 | D-9 n°4 reversibility | ✅ | export / import ✅; uninstalling leaves a working configuration, taken over by hand with Otoroshi alone (revoke, subscribe, change a plan, remove the marker) — `test/product-down.test.js`, documented in *When the product is down* |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
-| D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages in English: R-45; metadata labels: R-22; more portal pages: R-42 |
+| D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages stay in English (owner); metadata labels: R-22; more portal pages: R-42 |
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, G-21 |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
