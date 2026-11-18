@@ -320,6 +320,30 @@ create table metadata_fields (
 );
 `,
   },
+  {
+    version: '0005_remote_catalogs',
+    sql: `
+-- remote catalogs (D-28): an external source of truth for a set of apis
+create table remote_catalogs (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null,
+  kind text not null, -- http | git
+  url text not null,
+  ref text,           -- git branch or tag
+  path text,          -- git sub directory
+  headers jsonb not null default '{}',
+  mode text not null default 'draft', -- draft | publish | deploy
+  prune boolean not null default false,
+  interval_seconds int not null default 300,
+  enabled boolean not null default true,
+  last_sync jsonb,
+  last_sync_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

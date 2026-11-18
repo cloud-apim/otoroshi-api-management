@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
-import { Badge, Callout, Field, Icon, Input, Loader, Markdown, Modal, Select, Setting, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Empty, Field, Icon, Input, Loader, Markdown, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { fmtRelative } from '../../shared/lib.js';
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
@@ -496,6 +497,247 @@ function MetadataSettings() {
   );
 }
 
+// D-28: remote catalogs — an external source of truth for a set of apis
+function CatalogModal({ value, onClose, onSaved }) {
+  const { wapi } = useWs();
+  const toast = useToast();
+  const [c, setC] = useState(value);
+  const set = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
+  return (
+    <Modal
+      title={value.id ? `Catalog ${value.name}` : 'New remote catalog'}
+      size="wide"
+      onClose={onClose}
+      footer={
+        <button
+          className="btn primary"
+          disabled={!c.url}
+          onClick={async () => {
+            try {
+              const saved = c.id ? await wapi.put(`/catalogs/${c.id}`, c) : await wapi.post('/catalogs', c);
+              onSaved(saved);
+            } catch (e) {
+              toast(errorMessage(e), 'error');
+            }
+          }}
+        >
+          Save
+        </button>
+      }
+    >
+      <div className="grid-2">
+        <Field label="Name">
+          <Input value={c.name} onChange={set('name')} />
+        </Field>
+        <Field label="Kind">
+          <Select value={c.kind} onChange={set('kind')} options={[{ value: 'http', label: 'HTTP (one url, yaml or json)' }, { value: 'git', label: 'Git repository' }]} />
+        </Field>
+      </div>
+      <Field label="Url" hint={c.kind === 'git' ? 'https or file url of the repository' : 'a yaml (multi-document) or json file of api documents'}>
+        <Input value={c.url} onChange={set('url')} mono />
+      </Field>
+      {c.kind === 'git' && (
+        <div className="grid-2">
+          <Field label="Branch or tag">
+            <Input value={c.ref} onChange={set('ref')} mono placeholder="main" />
+          </Field>
+          <Field label="Directory">
+            <Input value={c.path} onChange={set('path')} mono placeholder="apis/" />
+          </Field>
+        </div>
+      )}
+      <Field label="What a sync does" hint="the open question of D-36 made explicit, per catalog">
+        <Select
+          value={c.mode}
+          onChange={set('mode')}
+          options={[
+            { value: 'draft', label: 'Write the drafts — publishing stays an explicit act in the console' },
+            { value: 'publish', label: 'Publish snapshots — deploying stays explicit' },
+            { value: 'deploy', label: 'Publish and deploy — the commit is the deployment (GitOps)' },
+          ]}
+        />
+      </Field>
+      <div className="grid-2">
+        <Field label="Interval (seconds)">
+          <NumberInput value={c.interval_seconds} onChange={set('interval_seconds')} />
+        </Field>
+        <Field label="Header (e.g. a token)">
+          <Input
+            value={Object.entries(c.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
+            onChange={(v) => {
+              const [k, ...rest] = v.split(':');
+              set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
+            }}
+            mono
+            placeholder="Authorization: Bearer …"
+          />
+        </Field>
+      </div>
+      <div className="row gap-24">
+        <Switch checked={c.enabled} onChange={set('enabled')} label="Scheduled sync" />
+        <Switch checked={c.prune} onChange={set('prune')} label="Delete the apis that leave the source" />
+      </div>
+    </Modal>
+  );
+}
+
+function PreviewModal({ cat, onClose, onSynced }) {
+  const { wapi } = useWs();
+  const toast = useToast();
+  const plan = useLoad(() => wapi.post(`/catalogs/${cat.id}/preview`), [cat.id]);
+  const [busy, setBusy] = useState(false);
+  const kind = { create: 'positive', update: 'warning', delete: 'negative', conflict: 'negative', orphaned: 'info', unchanged: '' };
+  return (
+    <Modal
+      title={`Preview — ${cat.name}`}
+      size="wide"
+      onClose={onClose}
+      footer={
+        <button
+          className="btn primary"
+          disabled={busy || plan.loading || !!plan.error}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const r = await wapi.post(`/catalogs/${cat.id}/sync`);
+              toast(r.ok ? 'Catalog synchronised' : `Sync finished with errors`, r.ok ? 'info' : 'error');
+              onSynced();
+            } catch (e) {
+              toast(errorMessage(e), 'error');
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          Sync now ({cat.mode})
+        </button>
+      }
+    >
+      <p className="muted small">A dry run: nothing is written. {cat.mode === 'deploy' ? 'This sync deploys: every change below reaches the gateway.' : ''}</p>
+      <Loader state={plan}>
+        {(p) => (
+          <>
+            {p.revision && <div className="small muted">revision <span className="mono">{String(p.revision).slice(0, 12)}</span>{p.ignored ? ` · ${p.ignored} non-api document(s) ignored` : ''}</div>}
+            {p.items.map((i) => (
+              <div key={`${i.slug}@${i.version}`} className="panel col gap-6">
+                <div className="row">
+                  <Badge kind={kind[i.action]}>{i.action}</Badge>
+                  <span className="bold">
+                    {i.slug} <span className="faint">{i.version}</span>
+                  </span>
+                  {i.adopt && <span className="badge info">will take over an api edited by hand</span>}
+                  {i.reason && <span className="small muted">{i.reason}</span>}
+                </div>
+                {i.changes?.length > 0 && <DiffView changes={i.changes} />}
+              </div>
+            ))}
+            {!p.items.length && <p className="muted small">The source carries no api document.</p>}
+          </>
+        )}
+      </Loader>
+    </Modal>
+  );
+}
+
+function Catalogs() {
+  const { wapi, slug } = useWs();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const state = useLoad(() => wapi.get('/catalogs'), [slug]);
+  const [editing, setEditing] = useState(null);
+  const [previewing, setPreviewing] = useState(null);
+  return (
+    <div className="col gap-16">
+      <div className="row">
+        <p className="muted small grow">
+          A remote catalog — an http file or a git repository of declarative api documents — becomes the source of truth of the apis it carries. They are marked as managed by it, and the console
+          refuses to edit them. Every sync can be previewed first.
+        </p>
+        <button className="btn primary" onClick={() => setEditing({ name: '', kind: 'git', url: '', ref: 'main', path: '', mode: 'draft', interval_seconds: 300, enabled: true, prune: false, headers: {} })}>
+          <Icon name="plus" /> Add catalog
+        </button>
+      </div>
+      <Loader state={state}>
+        {(list) =>
+          list.length ? (
+            <div className="card">
+              {list.map((c) => (
+                <div key={c.id} className="list-item" style={{ alignItems: 'flex-start' }}>
+                  <Icon name="git" />
+                  <div className="grow" style={{ minWidth: 0 }}>
+                    <div className="bold">
+                      {c.name} <Badge>{c.kind}</Badge> <Badge kind="accent">{c.mode}</Badge> {!c.enabled && <Badge>manual</Badge>}
+                    </div>
+                    <div className="mono tiny faint ellipsis">
+                      {c.url}
+                      {c.ref ? ` @ ${c.ref}` : ''}
+                      {c.path ? ` / ${c.path}` : ''}
+                    </div>
+                    {c.last_sync && (
+                      <div className="small mt-8">
+                        <StatusBadge status={c.last_sync.ok ? 'synced' : 'error'} /> {fmtRelative(c.last_sync_at)}
+                        {c.last_sync.error && <span className="negative-text"> — {c.last_sync.error}</span>}
+                        {c.last_sync.items?.length > 0 && (
+                          <span className="muted">
+                            {' '}
+                            — {c.last_sync.items.map((i) => `${i.slug} ${i.action}`).join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <button className="btn sm" onClick={() => setPreviewing(c)}>
+                    Preview & sync
+                  </button>
+                  <button className="btn ghost sm icon" onClick={() => setEditing(c)} aria-label="edit">
+                    <Icon name="edit" />
+                  </button>
+                  <button
+                    className="btn ghost sm icon"
+                    aria-label="delete"
+                    onClick={async () => {
+                      if (!(await confirm({ title: `Delete ${c.name}?`, message: 'Its apis stay, and become editable by hand again.', danger: true, confirmLabel: 'Delete' }))) return;
+                      await wapi.del(`/catalogs/${c.id}`);
+                      state.reload();
+                    }}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="card">
+              <Empty title="No remote catalog" icon="git" />
+            </div>
+          )
+        }
+      </Loader>
+      {editing && (
+        <CatalogModal
+          value={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            toast('Catalog saved');
+            state.reload();
+          }}
+        />
+      )}
+      {previewing && (
+        <PreviewModal
+          cat={previewing}
+          onClose={() => setPreviewing(null)}
+          onSynced={() => {
+            setPreviewing(null);
+            state.reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 // PX-07: a complete export, re-importable elsewhere
 function Exchange() {
   const { wapi, slug } = useWs();
@@ -559,7 +801,7 @@ function Exchange() {
 export function WorkspaceSettingsPage({ tab }) {
   const { slug, ws } = useWs();
   const { navigate } = useRouter();
-  const tabs = ['general', 'portal', 'members', 'teams', 'metadata', 'export'];
+  const tabs = ['general', 'portal', 'members', 'teams', 'metadata', 'catalogs', 'export'];
   return (
     <div className="page">
       <PageHead title="Workspace settings" sub={ws.name} />
@@ -575,6 +817,7 @@ export function WorkspaceSettingsPage({ tab }) {
       {tab === 'members' && <Members />}
       {tab === 'teams' && <Teams />}
       {tab === 'metadata' && <MetadataSettings />}
+      {tab === 'catalogs' && <Catalogs />}
       {tab === 'export' && <Exchange />}
     </div>
   );

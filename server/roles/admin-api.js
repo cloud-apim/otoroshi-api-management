@@ -22,6 +22,7 @@ import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
+import * as catalogs from '../domain/catalogs.js';
 
 const r = new Router();
 
@@ -729,6 +730,40 @@ r.get('/workspaces/:ws/export', async ({ ctx, params }) => {
 r.post('/workspaces/:ws/import', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   return importWorkspace(c, c.workspace, body);
+});
+
+// ---------------------------------------------------------------- remote catalogs (D-28)
+
+const hideHeaders = (c) => ({ ...c, headers: Object.fromEntries(Object.entries(c.headers || {}).map(([k, v]) => [k, /auth|token|key/i.test(k) ? '••••••' : v])) });
+
+r.get('/workspaces/:ws/catalogs', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return (await catalogs.listCatalogs(c.workspace.id)).map(hideHeaders);
+});
+r.post('/workspaces/:ws/catalogs', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return hideHeaders(await catalogs.createCatalog(c, c.workspace.id, body));
+});
+r.put('/workspaces/:ws/catalogs/:cat', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  const cat = await catalogs.getCatalog(c.workspace.id, params.cat);
+  const headers = body.headers ? Object.fromEntries(Object.entries(body.headers).map(([k, v]) => [k, v === '••••••' ? cat.headers?.[k] : v])) : cat.headers;
+  return hideHeaders(await catalogs.updateCatalog(c, cat, { ...body, headers }));
+});
+r.delete('/workspaces/:ws/catalogs/:cat', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  await catalogs.deleteCatalog(c, await catalogs.getCatalog(c.workspace.id, params.cat));
+  return { deleted: true };
+});
+// the dry run of a sync: what it would create, update, orphan or delete (spec §5)
+r.post('/workspaces/:ws/catalogs/:cat/preview', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  const { docs, ...plan } = await catalogs.preview(await catalogs.getCatalog(c.workspace.id, params.cat));
+  return plan;
+});
+r.post('/workspaces/:ws/catalogs/:cat/sync', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return catalogs.sync(c, await catalogs.getCatalog(c.workspace.id, params.cat), { apis, deployments });
 });
 
 // ---------------------------------------------------------------- typed metadata (D-18)

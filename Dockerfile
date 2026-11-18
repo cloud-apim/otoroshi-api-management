@@ -7,6 +7,8 @@ COPY web ./web
 RUN bun run build
 
 FROM oven/bun:1.3.11
+# git is used by the git remote catalogs (D-28)
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json bun.lock ./

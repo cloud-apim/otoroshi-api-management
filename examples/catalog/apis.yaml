@@ -1,0 +1,53 @@
+# A remote catalog source (D-28): several api documents in one file, served over http
+# (in the dev stack: http://catalog.oto.tools/catalog/apis.yaml), or a directory of a git repository.
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: weather
+  version: 1.0.0
+spec:
+  name: Weather
+  description: Forecasts, managed from a catalog.
+  tags: [gitops]
+  draft:
+    entrypoint: { domain: weather.oto.tools, contextPath: /v1 }
+    backends:
+      - { id: b_echo, name: echo, targets: [{ hostname: echo, port: 8080 }] }
+    flows:
+      - { id: f_default, name: Default flow, plugins: [{ plugin: cp:otoroshi.next.plugins.OverrideHost }] }
+    resources:
+      - { id: r_forecast, name: Forecast, path: /forecast, methods: [GET], backendId: b_echo, flowId: f_default }
+    plans:
+      - id: plan_weather_open
+        name: Open
+        status: published
+        auth: { kind: keyless }
+        rateLimit: { enabled: true, calls: 60, windowMs: 60000 }
+  pages:
+    - slug: overview
+      title: { en: Overview }
+      content: { en: "# Weather\nForecasts for everyone." }
+---
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: geocoding
+  version: 1.0.0
+spec:
+  name: Geocoding
+  description: Addresses to coordinates, managed from a catalog.
+  tags: [gitops]
+  draft:
+    entrypoint: { domain: geocoding.oto.tools, contextPath: / }
+    backends:
+      - { id: b_echo, name: echo, targets: [{ hostname: echo, port: 8080 }] }
+    flows:
+      - { id: f_default, name: Default flow, plugins: [{ plugin: cp:otoroshi.next.plugins.OverrideHost }] }
+    resources:
+      - { id: r_search, name: Search, path: /search, methods: [GET], backendId: b_echo, flowId: f_default }
+    plans:
+      - id: plan_geocoding_key
+        name: Standard
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 20, windowMs: 1000 }

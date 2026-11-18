@@ -286,6 +286,11 @@ async function start() {
   if (config.workers.enabled && (hasRole('api') || hasRole('backoffice'))) {
     setInterval(workOnce, config.workers.projectionIntervalMs);
     setInterval(() => runDriftDetection().catch((e) => console.error('[apim] drift detection failed', e.message)), config.workers.driftIntervalMs);
+    // remote catalogs, each on its own interval (D-28)
+    const { syncDue } = await import('./domain/catalogs.js');
+    const apisMod = await import('./domain/apis.js');
+    const depsMod = await import('./domain/deployments.js');
+    setInterval(() => syncDue({ apis: apisMod, deployments: depsMod }).catch((e) => console.error('[apim] catalogs failed', e.message)), 30000);
     setTimeout(() => runDriftDetection().catch(() => null), 5000);
   }
   return server;

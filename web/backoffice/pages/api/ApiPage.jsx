@@ -38,7 +38,10 @@ function ApiEditor({ api, tab, reload }) {
   const [order, setOrder] = useState(api.resolution_order);
   const [publishing, setPublishing] = useState(false);
   const [deploying, setDeploying] = useState(null);
-  const readOnly = !api.can_manage;
+  // an api owned by a remote catalog changes at its source (D-28); publishing and deploying stay
+  // operable, they are explicit acts when the catalog only writes drafts
+  const readOnly = !api.can_manage || !!api.managed_by;
+  const operable = api.can_manage;
 
   const setDraft = (updater) => {
     setDraftState((d) => (typeof updater === 'function' ? updater(d) : updater));
@@ -136,7 +139,7 @@ function ApiEditor({ api, tab, reload }) {
         }
         sub={identity.description}
         actions={
-          !readOnly && (
+          operable && (
             <>
               <button className="btn" disabled={dirty || !dep.latest_snapshot} onClick={() => setDeploying({ snapshot: dep.latest_snapshot?.id })} title={dirty ? 'save the draft first' : ''}>
                 <Icon name="rocket" /> Deploy
@@ -148,8 +151,14 @@ function ApiEditor({ api, tab, reload }) {
           )
         }
       />
-      <DeploymentBanner api={api} onDeploy={() => setDeploying({ snapshot: dep.latest_snapshot?.id })} onPublish={() => setPublishing(true)} readOnly={readOnly} dirty={dirty} />
-      {readOnly && <Callout kind="info">You can read this API but not change it: you are not a producer of its team.</Callout>}
+      <DeploymentBanner api={api} onDeploy={() => setDeploying({ snapshot: dep.latest_snapshot?.id })} onPublish={() => setPublishing(true)} readOnly={!operable} dirty={dirty} />
+      {api.managed_by ? (
+        <Callout kind="info" title={`Managed by ${api.managed_by.startsWith('catalog:') ? 'a remote catalog' : api.managed_by}`}>
+          Its source of truth is elsewhere: change it there, the next sync brings the change here. Deployment and subscriptions stay operable from the console.
+        </Callout>
+      ) : (
+        readOnly && <Callout kind="info">You can read this API but not change it: you are not a producer of its team.</Callout>
+      )}
       <div className="mb-16">
         <Tabs tabs={tabs} value={tab} onChange={go} />
       </div>
@@ -161,7 +170,7 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'documentation' && <DocsTab {...ctx} />}
       {tab === 'openapi' && <OpenApiTab {...ctx} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
-      {tab === 'deployment' && <DeploymentTab {...ctx} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
+      {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
       {tab === 'analytics' && <AnalyticsDashboard fixed={{ api: api.id }} />}
       {tab === 'settings' && <SettingsTab {...ctx} />}
 
