@@ -1,4 +1,4 @@
-// Portal UI strings (en + fr). The documentation content itself is multilingual in the model (D-11);
+// Portal UI strings (en + fr). The documentation content itself is multilingual in the model;
 // this file only covers the chrome of the portal.
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 

@@ -1,4 +1,4 @@
-// In-app notifications. D-30 asks for a systematic notification when a subscription changes; the
+// In-app notifications: every change of a subscription is notified to its consumers; the
 // review of a request and its decision follow the same path.
 
 import { db, newId } from '../db/index.js';

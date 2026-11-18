@@ -8,11 +8,11 @@ description: Applications group a consumer's identity; subscriptions bind an app
 
 ## Applications
 
-An application groups the subscriptions and the technical identity of a consumer (D-26): name,
+An application groups the subscriptions and the technical identity of a consumer: name,
 owning team, the **expected `client_id`** for `jwt`, `mtls` and `oauth2` plans, client certificates
 and [metadata](./metadata.mdx).
 
-It groups **identity, never counters** (D-31): each credential keeps its own quotas.
+It groups **identity, never counters**: each credential keeps its own quotas.
 
 **Whoever can see an application can see its credentials** — the members of its team, and the
 workspace administrators. Reading credentials is recorded in the audit trail.
@@ -30,14 +30,14 @@ request ─────────┤                                          
                                                     any open state ──▶ closed
 ```
 
-The approval workflow belongs to the product (D-1): Otoroshi carries the plan's validation as a
+The approval workflow belongs to the product: Otoroshi carries the plan's validation as a
 label only. At request time the product checks that the plan is published and subscribable, visible
 to the requester, that the usage statement and the terms are given when asked, that a `client_id`
 is declared for token-based plans, and that the application has no open subscription to that plan.
 
 ## Credentials
 
-A subscription becomes an Otoroshi apikey (D-6) — **only once it is active**. Otoroshi 18 would
+A subscription becomes an Otoroshi apikey — **only once it is active**. Otoroshi 18 would
 enable the key of a pending subscription, so pending subscriptions are never projected
 ([G-1](../otoroshi-gaps.mdx)).
 
@@ -54,7 +54,7 @@ console shows the projection state (`synced`, `waiting`, `error`) and offers to 
 
 ## Transfer
 
-A subscription can be **transferred to an equivalent plan** (D-30) — same auth mechanism — on the
+A subscription can be **transferred to an equivalent plan** — same auth mechanism — on the
 same API or on another version of it. The key does not change, the subscription keeps its identity
 and its history, and Otoroshi applies the target plan's limits to the existing key.
 
@@ -66,7 +66,7 @@ change, so it is a new subscription.
 ### Consent
 
 A transfer that degrades the conditions is a change of contract, so it needs the consumer's
-agreement (D-30). The product compares the two plans and treats as a degradation: a lower rate
+agreement. The product compares the two plans and treats as a degradation: a lower rate
 limit, a lower daily or monthly quota, a higher price, different terms of use, or access limited
 to fewer resources.
 

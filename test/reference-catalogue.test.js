@@ -1,7 +1,6 @@
-// End-to-end reference test:
-// the Atlas catalogue — 6 plans, 5 auth mechanisms, 4 approval modes, on a single API and a
-// single set of routes — is described, projected onto a real Otoroshi `Api` entity, reconciled,
-// and its drift detected.
+// End-to-end reference test: the catalogue of Atlas, a fictional open data service — 6 plans,
+// 5 auth mechanisms, 4 approval modes, on a single API and a single set of routes — is described,
+// projected onto a real Otoroshi `Api` entity, reconciled, and its drift detected.
 //
 // Needs the docker stack (bun run infra:up): postgres on 5442, otoroshi 18 on 8080, echo backend.
 
@@ -122,7 +121,7 @@ function catalogPlans() {
       name: 'Partner',
       status: 'published',
       // the plan describes how its tokens are validated; the product derives the Otoroshi JWT
-      // verifier from it and keeps it reconciled (D-15) — an HS256 stand-in for the Atlas ID provider
+      // verifier from it and keeps it reconciled — an HS256 stand-in for the Atlas ID provider
       auth: { kind: 'jwt', config: { clientIdPath: 'client_id', derive: { enabled: true, kind: 'hmac', secret: JWT_SECRET, size: 256, issuer: 'https://id.atlas.example' } } },
       rateLimit: perMinute(10000),
       validation: 'auto', // approval mode 3: a form (usage statement + terms)
@@ -147,7 +146,7 @@ function catalogPlans() {
       rateLimit: { enabled: false, calls: 0, windowMs: 1000 },
       visibility: 'restricted',
       acl: ['role:admin'],
-      subscribable: false, // R34: never offered in self-service
+      subscribable: false, // never offered in self-service
     },
   ];
 }
@@ -183,14 +182,14 @@ describe('reference catalogue', () => {
     expect(kinds.size).toBe(5);
     // the abstraction does not lie: the gaps of the data plane are surfaced, not hidden
     expect(saved.validation.warnings.some((w) => w.code === 'any_token_passes')).toBe(true);
-    // effective resolution order: credential based kinds first, keyless last (ADR-10)
+    // effective resolution order: credential based kinds first, keyless last
     const order = saved.resolution_order.map((o) => o.kind);
     expect(order[order.length - 1]).toBe('keyless');
     expect(order.indexOf('apikey')).toBeLessThan(order.indexOf('jwt'));
   });
 
   test('project: publish a snapshot and deploy it as a catalog-marked Api entity', async () => {
-    const res = await call('POST', ws(`/apis/${state.apiId}/publish`), { comment: 'Atlas catalogue', deploy: true });
+    const res = await call('POST', ws(`/apis/${state.apiId}/publish`), { comment: 'reference catalogue', deploy: true });
     expect(res.snapshot.number).toBe(1);
     expect(res.deployment.deployment.status).toBe('deployed');
     const entity = await oto.getApi(state.apiId);
@@ -203,16 +202,16 @@ describe('reference catalogue', () => {
     const starter = entity.plans.find((p) => p.id === 'plan_starter');
     expect(starter.rate_limiting.strategy.quota.window).toBe(600);
     expect(starter.rate_limiting.strategy.windowDurationMs).toBe(60000);
-    // otoroshi records the catalog write in its own deployment history (D-38)
+    // otoroshi records the catalog write in its own deployment history
     expect(entity.deployments.length).toBeGreaterThanOrEqual(1);
-    // the verifier of the Partner plan is derived, marked as the product's (D-15, D-24)
+    // the verifier of the Partner plan is derived, marked as the product's
     const verifierId = entity.plans.find((p) => p.id === 'plan_partner').access_mode_configuration.verifier;
     const verifier = await otoroshi('GET', `/api/verifiers/${verifierId}`);
     expect(verifier.metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
     expect(verifier.metadata.apim_api_id).toBe(state.apiId);
     expect(verifier.strategy.verificationSettings.fields.iss).toBe('https://id.atlas.example');
     state.verifierId = verifierId;
-    // selective synchronisation (D-2): neither documentation nor portal options reach the gateway
+    // selective synchronisation: neither documentation nor portal options reach the gateway
     expect(entity.documentation).toBeNull();
     expect(JSON.stringify(entity)).not.toContain('Which institution');
   });
@@ -230,7 +229,7 @@ describe('reference catalogue', () => {
     const key = await oto.getApikey(state.cred.client_id);
     expect(key.enabled).toBe(true);
     expect(key.apiRef).toEqual({ api: state.apiId, plan: 'plan_starter', sub: sub.id });
-    expect(key.metadata.id_ref).toBe(app.id); // the application, projected (D-26)
+    expect(key.metadata.id_ref).toBe(app.id); // the application, projected
     const res = await gatewayCall('/search?q=gdpr', {
       headers: { 'Otoroshi-Client-Id': state.cred.client_id, 'Otoroshi-Client-Secret': state.cred.client_secret },
       expect: (r) => r.status === 200,
@@ -342,7 +341,7 @@ describe('reference catalogue', () => {
     expect((await oto.getApikey(state.cred.client_id)).enabled).toBe(true);
   });
 
-  test('transfer (D-30): Starter -> Research keeps the key; apikey -> jwt is refused', async () => {
+  test('transfer: Starter -> Research keeps the key; apikey -> jwt is refused', async () => {
     await expect(call('POST', ws(`/subscriptions/${state.starterSub}/transfer`), { plan_id: 'plan_partner' })).rejects.toThrow(/not equivalent/);
     const moved = await call('POST', ws(`/subscriptions/${state.starterSub}/transfer`), { plan_id: 'plan_research' });
     expect(moved.plan_id).toBe('plan_research');

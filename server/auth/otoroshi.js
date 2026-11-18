@@ -1,4 +1,4 @@
-// "Via Otoroshi" authentication (D-25): the gateway authenticated the user upstream (an auth module
+// "Via Otoroshi" authentication: the gateway authenticated the user upstream (an auth module
 // on the route that exposes the console) and passes its identity in the Otoroshi info token
 // (`OtoroshiInfos` plugin, legacy version), a JWT signed with a secret shared with the route.
 // This mode is exclusive: with the identity coming from a header, there is no login form, and no

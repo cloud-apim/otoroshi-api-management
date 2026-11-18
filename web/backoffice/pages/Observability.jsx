@@ -13,7 +13,7 @@ const RANGES = [
   { value: '30d', label: '30 days', ms: 30 * 86400e3 },
 ];
 
-// dashboards speak the catalogue's vocabulary: apis, plans, applications — not routes (PX-08).
+// dashboards speak the catalogue's vocabulary: apis, plans, applications — not routes.
 // Filters live in the url, so a filtered view is a bookmark.
 export function AnalyticsDashboard({ fixed = {} }) {
   const { wapi, slug } = useWs();

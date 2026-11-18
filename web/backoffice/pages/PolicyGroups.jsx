@@ -6,7 +6,7 @@ import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { PluginModal } from './api/tabs.jsx';
 
-// shared policy groups (D-16): a named composition of Otoroshi plugins with its own lifecycle
+// shared policy groups: a named composition of Otoroshi plugins with its own lifecycle
 export function ApisTabs({ current }) {
   const { slug } = useWs();
   return (

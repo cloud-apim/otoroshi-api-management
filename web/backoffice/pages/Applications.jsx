@@ -39,7 +39,7 @@ function CreateAppModal({ onClose, onCreated }) {
         </>
       }
     >
-      <p className="muted small">An application groups the subscriptions and the technical identity of a consumer. It groups identity, never counters (D-31).</p>
+      <p className="muted small">An application groups the subscriptions and the technical identity of a consumer. It groups identity, never counters.</p>
       <Field label="Name">
         <Input value={form.name} onChange={set('name')} autoFocus />
       </Field>
@@ -161,11 +161,11 @@ export function ApplicationPage({ id }) {
                     <Setting label="Description">
                       <TextArea value={f.description} onChange={set('description')} rows={2} />
                     </Setting>
-                    <Setting label="Expected client_id" help="On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application (D-26).">
+                    <Setting label="Expected client_id" help="On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application.">
                       <Input value={f.client_id || ''} onChange={set('client_id')} mono />
                     </Setting>
                     {metaFields.length > 0 && (
-                      <Setting label="Metadata" help="typed fields of the workspace's applications (D-18); the ones marked for the portal are filled by the consumer">
+                      <Setting label="Metadata" help="typed fields of the workspace's applications; the ones marked for the portal are filled by the consumer">
                         <MetadataForm fields={metaFields} values={f.metadata} onChange={set('metadata')} />
                       </Setting>
                     )}

@@ -1,4 +1,4 @@
-// Authentication settings (D-25). Console: installation-level; portal: per workspace.
+// Authentication settings. Console: installation-level; portal: per workspace.
 //
 // | mode     | what                                            | composable |
 // |----------|-------------------------------------------------|------------|

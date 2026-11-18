@@ -29,20 +29,20 @@ export const config = {
     analytics: env.APIM_ANALYTICS_DATABASE_URL || 'postgres://apim:apim@localhost:5442/apim_analytics',
   },
 
-  // bootstrap administrators: in-memory identities that depend on nothing (D-25)
+  // bootstrap administrators: in-memory identities that depend on nothing
   bootstrap: {
     admins: list(env.APIM_BOOTSTRAP_ADMINS, ['admin@otoroshi.io']),
     password: env.APIM_BOOTSTRAP_PASSWORD || 'password',
     workspace: env.APIM_BOOTSTRAP_WORKSPACE || 'default',
   },
 
-  // the single Otoroshi cluster this installation drives (D-37). Editable later in global settings.
+  // the single Otoroshi cluster this installation drives. Editable later in global settings.
   otoroshi: {
     url: env.OTOROSHI_URL || 'http://localhost:8080',
     host: env.OTOROSHI_HOST || 'otoroshi-api.oto.tools',
     clientId: env.OTOROSHI_CLIENT_ID || 'apim-admin-client',
     clientSecret: env.OTOROSHI_CLIENT_SECRET || 'apim-admin-secret',
-    // the url of the otoroshi backoffice, used to link a projected entity (escape hatch, D-9/D-14)
+    // the url of the otoroshi backoffice, used to link a projected entity (escape hatch)
     backofficeUrl: env.OTOROSHI_BACKOFFICE_URL || 'http://otoroshi.oto.tools:8080',
     // how consumers reach the apis exposed by the gateway: <scheme>://<api domain>:<port>
     publicScheme: env.OTOROSHI_PUBLIC_SCHEME || 'http',
@@ -60,7 +60,7 @@ export const config = {
   // the admin api accepts a static bootstrap token, plus personal tokens stored in db
   adminToken: env.APIM_ADMIN_TOKEN || 'apim-admin-token',
 
-  // portal exposure pattern for the whole installation (D-20): 'path' or 'hostname'
+  // portal exposure pattern for the whole installation: 'path' or 'hostname'
   portal: {
     exposure: env.APIM_PORTAL_EXPOSURE || 'path',
     // in hostname mode: <workspace>.<domain>

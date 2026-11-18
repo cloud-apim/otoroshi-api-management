@@ -1,4 +1,4 @@
-// Users are global (D-19): one record per person, with memberships in several workspaces.
+// Users are global: one record per person, with memberships in several workspaces.
 // An administrator only sees the users who are members of its workspaces.
 
 import { db, newId, slugify } from '../db/index.js';
@@ -252,7 +252,7 @@ export async function isTeamMember(teamId, userId) {
   return rows.length > 0;
 }
 
-// the implicit one-person team (Q-1): an individual developer never has to create a team to get a key
+// the implicit one-person team: an individual developer never has to create a team to get a key
 export async function personalTeam(ctx, workspaceId, user) {
   const rows = await db`select t.* from teams t join team_members tm on tm.team_id = t.id
     where t.workspace_id = ${workspaceId} and t.personal = true and tm.user_id = ${user.id} and tm.role = 'owner' limit 1`;
@@ -284,7 +284,7 @@ export function requireRole(ctx, roles) {
   if (!roles.includes(ctx.role)) throw forbidden(`requires one of: ${roles.join(', ')}`);
 }
 
-// ACL by tags (spec §6): user:<email>, team:<id>, role:<name>
+// ACL by tags: user:<email>, team:<id>, role:<name>
 export async function userAclTags(user, workspaceId) {
   if (!user) return [];
   const tags = new Set(user.tags || []);

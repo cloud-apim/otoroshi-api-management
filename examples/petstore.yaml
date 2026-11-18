@@ -1,4 +1,4 @@
-# A declarative api-version: the api, its plans and its documentation in one document (Q-11).
+# A declarative api-version: the api, its plans and its documentation in one document.
 #   bun cli/apim.js apply default -f examples/petstore.yaml --publish --deploy
 apiVersion: otoroshi-apim.io/v1
 kind: Api

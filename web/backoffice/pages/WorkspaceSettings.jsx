@@ -13,10 +13,10 @@ function General() {
   return (
     <div className="card">
       <div className="card-body">
-        <Setting label="Name" help="the workspace is the tenant — the same word on every surface: console, api, cli, crds (D-19)">
+        <Setting label="Name" help="the workspace is the tenant — the same word on every surface: console, api, cli, crds">
           <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} />
         </Setting>
-        <Setting label="Slug" help="read from the url of its portal, never from a session (D-20)">
+        <Setting label="Slug" help="read from the url of its portal, never from a session">
           <Input value={ws.slug} disabled mono />
         </Setting>
         <Setting label="Description">
@@ -51,7 +51,7 @@ function Portal() {
   return (
     <div className="col gap-16">
       <Callout kind="info">
-        One portal per workspace (D-20), at <a className="link" href={`/${ws.slug}/`} target="_blank" rel="noreferrer">/{ws.slug}/</a>. Its exposure pattern — root path or hostname — is an installation setting.
+        One portal per workspace, at <a className="link" href={`/${ws.slug}/`} target="_blank" rel="noreferrer">/{ws.slug}/</a>. Its exposure pattern — root path or hostname — is an installation setting.
       </Callout>
       <div className="card">
         <div className="card-body">
@@ -77,7 +77,7 @@ function Portal() {
           <Setting label="Self signup" help="anyone can create an account and get a key on public plans">
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
           </Setting>
-          <Setting label="Identity provider" help={`One IdP per portal (D-25): the people of this workspace sign in with it and join as consumers. Redirect uri: ${window.location.origin}/${ws.slug}/front/api/auth/oidc/callback`}>
+          <Setting label="Identity provider" help={`One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: ${window.location.origin}/${ws.slug}/front/api/auth/oidc/callback`}>
             <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label="Sign in with an OpenID Connect provider" />
             {p.oidc?.enabled && (
               <>
@@ -315,7 +315,7 @@ function TeamMembers({ id, onClose }) {
   );
 }
 
-// D-18: one metadata mechanism, the scope as a parameter — same model, same screen, same api
+// one metadata mechanism, the scope as a parameter — same model, same screen, same api
 const SCOPES = [
   ['workspace', 'Workspace'],
   ['api', 'API'],
@@ -497,7 +497,7 @@ function MetadataSettings() {
   );
 }
 
-// D-28: remote catalogs — an external source of truth for a set of apis
+// remote catalogs — an external source of truth for a set of apis
 function CatalogModal({ value, onClose, onSaved }) {
   const { wapi } = useWs();
   const toast = useToast();
@@ -546,7 +546,7 @@ function CatalogModal({ value, onClose, onSaved }) {
           </Field>
         </div>
       )}
-      <Field label="What a sync does" hint="the open question of D-36 made explicit, per catalog">
+      <Field label="What a sync does" hint="chosen per catalog">
         <Select
           value={c.mode}
           onChange={set('mode')}
@@ -738,7 +738,7 @@ function Catalogs() {
   );
 }
 
-// PX-07: a complete export, re-importable elsewhere
+// a complete export, re-importable elsewhere
 function Exchange() {
   const { wapi, slug } = useWs();
   const toast = useToast();

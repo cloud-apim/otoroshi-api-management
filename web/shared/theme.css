@@ -1,4 +1,4 @@
-/* otoroshi-api-management — hand-written css (D-39): light + dark tokens, no framework.
+/* otoroshi-api-management — hand-written css: light + dark tokens, no framework.
    Themes are driven by data-theme on <html>: light | dark (system resolves to one of them). */
 
 :root {
@@ -199,7 +199,7 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
 .seg button + button { border-left: 1px solid var(--border); }
 .seg button.on { background: var(--accent-subtle); color: var(--accent-text); }
 
-/* settings card: label and explanation on the left, field on the right (AI Studio precedent) */
+/* settings card: label and explanation on the left, field on the right */
 .setting { display: grid; grid-template-columns: minmax(200px, 320px) 1fr; gap: 24px; padding: 16px 0; border-top: 1px solid var(--border); }
 .setting:first-child { border-top: 0; padding-top: 4px; }
 .setting .s-label { font-weight: 580; }

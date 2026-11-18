@@ -69,7 +69,7 @@ function Users() {
   const [f, setF] = useState({ email: '', name: '', password: '', is_admin: false });
   return (
     <div className="col gap-16">
-      <p className="muted small">Users are global — one record per person, with memberships in several workspaces (D-19). Bootstrap administrators come from APIM_BOOTSTRAP_ADMINS.</p>
+      <p className="muted small">Users are global — one record per person, with memberships in several workspaces. Bootstrap administrators come from APIM_BOOTSTRAP_ADMINS.</p>
       <div className="card">
         <div className="card-body row wrap">
           <Input value={f.email} onChange={(v) => setF({ ...f, email: v })} placeholder="email" />
@@ -124,7 +124,7 @@ function Users() {
   );
 }
 
-// everything the console does replays from the cli with a token (D-28)
+// everything the console does replays from the cli with a token
 function Tokens() {
   const state = useLoad(() => api.get('/me/tokens'), []);
   const toast = useToast();
@@ -190,7 +190,7 @@ function Tokens() {
   );
 }
 
-// D-25: one IdP for the console. local and oidc run in parallel; the otoroshi mode is exclusive.
+// one IdP for the console. local and oidc run in parallel; the otoroshi mode is exclusive.
 function Authentication() {
   const st = useLoad(() => api.get('/settings'), []);
   const toast = useToast();

@@ -1,10 +1,10 @@
-// The Otoroshi Admin API client. One installation drives one Otoroshi cluster (D-37), reached with
-// an administration key (D-24). The settings are installation-level and editable at runtime.
+// The Otoroshi Admin API client. One installation drives one Otoroshi cluster, reached with
+// an administration key. The settings are installation-level and editable at runtime.
 
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 
-export const OWNER_MARKER = 'remote_catalog=otoroshi-apim-deployment'; // D-38
+export const OWNER_MARKER = 'remote_catalog=otoroshi-apim-deployment';
 export const META = {
   createdBy: 'created_by',
   api: 'apim_api_id',
@@ -12,7 +12,7 @@ export const META = {
   snapshotNumber: 'apim_snapshot_number',
   workspace: 'apim_workspace',
   subscription: 'apim_subscription_id',
-  application: 'id_ref', // D-26: the application is projected as an id_ref metadata on the apikey
+  application: 'id_ref', // the application is projected as an id_ref metadata on the apikey
   managedBy: 'apim_managed_by',
 };
 
@@ -91,7 +91,7 @@ export const oto = {
   getApi: (id) => otoroshi('GET', `${API_BASE}/${id}`),
   listApis: () => otoroshi('GET', API_BASE),
   // a catalog-marked write is a deploy: production_readonly is lifted, the api may be created
-  // already published, and the write is recorded as an ApiDeployment (D-38). Otoroshi refuses a
+  // already published, and the write is recorded as an ApiDeployment. Otoroshi refuses a
   // PUT on an entity that does not exist yet, so a first projection is a POST.
   upsertApi: async (entity) => {
     const existing = await otoroshi('GET', `${API_BASE}/${entity.id}`);

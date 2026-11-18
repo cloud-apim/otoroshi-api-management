@@ -1,6 +1,6 @@
-// The developer portal API (/front/api). One portal per workspace (D-20): the workspace is resolved
+// The developer portal API (/front/api). One portal per workspace: the workspace is resolved
 // from the URL by the server, never from a session. The catalogue is served from the snapshots that
-// run on the gateway, so it stays readable during a gateway incident (D-4).
+// run on the gateway, so it stays readable during a gateway incident.
 
 import { Router, badRequest, forbidden, notFound, unauthorized } from '../http/router.js';
 import { db } from '../db/index.js';
@@ -26,7 +26,7 @@ export async function gatewayBaseUrl(draft) {
   return `${scheme}://${draft.entrypoint.domain}${port && !defaultPort ? `:${port}` : ''}${cp}`;
 }
 
-// the catalogue: what is deployed, filtered by the visibility ACL (D-2: visibility is never projected)
+// the catalogue: what is deployed, filtered by the visibility ACL (visibility is never projected)
 async function catalogue(ctx) {
   const rows = await db`select a.id, a.slug, a.team_id, a.lifecycle, a.previous_version_id, s.content, s.number, s.published_at
     from apis a
@@ -49,7 +49,7 @@ function publicPlan(p, draft) {
     validation: p.validation,
     subscribable: p.subscribable && p.status === 'published',
     rate_limit: p.rateLimit.enabled ? { calls: p.rateLimit.calls, window_ms: p.rateLimit.windowMs } : null,
-    // what really applies, never a theoretical total (D-9 n°3, D-31)
+    // what really applies, never a theoretical total
     quota: { daily: p.quota.daily, monthly: p.quota.monthly },
     resources:
       p.resourceFilter.mode === 'only'
@@ -178,7 +178,7 @@ r.get('/apis/:api/openapi', async ({ ctx, params }) => {
   return spec;
 });
 
-// ---------------------------------------------------------------- teams (an individual gets an implicit one, Q-1)
+// ---------------------------------------------------------------- teams (an individual gets an implicit one)
 
 r.get('/teams', async ({ ctx }) => {
   requireUser(ctx);
@@ -197,7 +197,7 @@ r.post('/teams/:team/members', async ({ ctx, params, body }) => {
   const team = await identity.findTeam(ctx.workspace.id, params.team);
   if (!team || !(await identity.isTeamMember(team.id, ctx.user.id))) throw notFound('team not found');
   if (team.personal) throw badRequest('a personal team cannot have other members: create a team');
-  // D-19: an invitation must not reveal whether an email exists elsewhere
+  // an invitation must not reveal whether an email exists elsewhere
   const user = await identity.findUserByEmail(body.email || '');
   if (!user || !(await identity.membership(ctx.workspace.id, user.id))) return { invited: true };
   await identity.setTeamMember(ctx, team, user.id, 'member');
@@ -260,7 +260,7 @@ const mySub = async (ctx, id) => {
 
 r.post('/subscriptions/:sub/close', async ({ ctx, params }) => subscriptions.closeSubscription(ctx, await mySub(ctx, params.sub)));
 
-// D-30 from the consumer's side: ask to move to an equivalent plan, or answer a proposal
+// from the consumer's side: ask to move to an equivalent plan, or answer a proposal
 r.post('/subscriptions/:sub/transfer', async ({ ctx, params, body }) => {
   const sub = await mySub(ctx, params.sub);
   const entry = await findEntry(ctx, body.api_id || sub.api_id);
@@ -280,7 +280,7 @@ r.post('/notifications/read', async ({ ctx }) => {
   return { ok: true };
 });
 
-// test payment connector: stands for the provider's hosted checkout + webhook (D-36)
+// test payment connector: stands for the provider's hosted checkout + webhook
 r.post('/subscriptions/:sub/pay', async ({ ctx, params }) => subscriptions.confirmPayment(ctx, await mySub(ctx, params.sub), {}));
 
 r.post('/subscriptions/:sub/credentials/:cred/rotate', async ({ ctx, params }) =>
@@ -321,7 +321,7 @@ r.get('/analytics', async ({ ctx, query }) => {
 
 export const portalRouter = r;
 
-// ---------------------------------------------------------------- try-it proxy (D-17, D-42)
+// ---------------------------------------------------------------- try-it proxy
 // Scalar sends its requests through `proxyUrl?scalar_url=<target>`. The proxy only talks to the hosts
 // of the workspace's deployed apis and never forwards the portal cookies.
 export async function tryItProxy(req, ctx) {

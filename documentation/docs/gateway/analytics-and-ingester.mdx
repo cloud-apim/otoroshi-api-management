@@ -7,7 +7,7 @@ description: The two storage paths of the ingester, attribution to the catalogue
 # Analytics and the ingester
 
 The ingester receives the events Otoroshi exports — `GatewayEvent`, `LLMUsageAudit` and
-`McpAudit` (D-32) — and stores them twice, for two purposes (D-33). Install the exporter as described
+`McpAudit` — and stores them twice, for two purposes. Install the exporter as described
 in [Install](../install.mdx#the-data-exporter).
 
 ## `/ingest`
@@ -61,8 +61,7 @@ Parameters whose names look like a secret (`*token*`, `*secret*`, `*password*`, 
 
 ## Dashboards
 
-They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's
-(PX-08).
+They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's.
 
 - **Console → Observability**, and the *Analytics* tab of each API and application: calls and errors
   over time, latency (average, p95, gateway overhead), data, status classes, calls by API, plan and

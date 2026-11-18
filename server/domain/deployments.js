@@ -1,6 +1,6 @@
-// Deployment: the described state is not the deployed state (D-22 rules 1-2). A deployment pushes a
-// frozen snapshot to the installation's single Otoroshi cluster (D-37) with a catalog-marked write
-// (D-38), and shows its diff before acting. Rollback is the redeployment of an earlier snapshot.
+// Deployment: the described state is not the deployed state. A deployment pushes a
+// frozen snapshot to the installation's single Otoroshi cluster with a catalog-marked write
+//, and shows its diff before acting. Rollback is the redeployment of an earlier snapshot.
 
 import { db, newId } from '../db/index.js';
 import { badRequest, notFound } from '../http/router.js';
@@ -52,7 +52,7 @@ async function resolveSnapshot(api, snapshotRef) {
 }
 
 // the diff of a deployment: between the snapshot that runs and the one about to be pushed, both
-// frozen (D-35), plus the gateway-level diff against what Otoroshi actually holds
+// frozen, plus the gateway-level diff against what Otoroshi actually holds
 export async function planDeployment(api, snapshotRef) {
   const snapshot = await resolveSnapshot(api, snapshotRef);
   const running = await deployedSnapshot(api.id);
@@ -136,7 +136,7 @@ registerTaskHandler('deploy_api', async ({ deployment_id }) => {
       otoroshi_deployments: (written?.deployments || []).length,
     };
     await db`update api_deployments set status = 'deployed', finished_at = now(), error = null, result = ${result} where id = ${dep.id}`;
-    // subscriptions that waited for the api (D-4) are projected now
+    // subscriptions that waited for the api are projected now
     const subs = await db`select id from subscriptions where api_id = ${api.id} and status in ('active', 'suspended')`;
     for (const s of subs) await enqueue('sync_subscription', { subscription_id: s.id }, { dedupeKey: `sub:${s.id}`, runNow: false });
     return result;

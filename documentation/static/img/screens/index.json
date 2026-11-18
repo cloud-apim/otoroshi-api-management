@@ -13,7 +13,7 @@
   },
   {
     "file": "console-04-workspace-selector.png",
-    "title": "The workspace selector opens the sidebar (D-27)"
+    "title": "The workspace selector opens the sidebar"
   },
   {
     "file": "console-05-notifications.png",
@@ -61,7 +61,7 @@
   },
   {
     "file": "console-17-api-plans.png",
-    "title": "API — plans: the policy lives here (D-5)"
+    "title": "API — plans: the policy lives here"
   },
   {
     "file": "console-18-plan-general.png",
@@ -77,15 +77,15 @@
   },
   {
     "file": "console-21-plan-catalogue.png",
-    "title": "Plan editor — catalogue and approval: never projected (D-2)"
+    "title": "Plan editor — catalogue and approval: never projected"
   },
   {
     "file": "console-22-plan-pricing.png",
-    "title": "Plan editor — pricing (D-36)"
+    "title": "Plan editor — pricing"
   },
   {
     "file": "console-23-api-docs.png",
-    "title": "API — multilingual documentation pages (D-11)"
+    "title": "API — multilingual documentation pages"
   },
   {
     "file": "console-24-api-openapi.png",
@@ -113,7 +113,7 @@
   },
   {
     "file": "console-30-api-out-of-sync.png",
-    "title": "The gap between the draft and what runs is always shown (D-22)"
+    "title": "The gap between the draft and what runs is always shown"
   },
   {
     "file": "console-31-publish.png",
@@ -121,11 +121,11 @@
   },
   {
     "file": "console-32-api-tryit.png",
-    "title": "Try it — replay a request through the gateway (D-17)"
+    "title": "Try it — replay a request through the gateway"
   },
   {
     "file": "console-33-api-analytics.png",
-    "title": "API — analytics, in the catalogue vocabulary (PX-08)"
+    "title": "API — analytics, in the catalogue vocabulary"
   },
   {
     "file": "console-34-api-settings.png",
@@ -133,7 +133,7 @@
   },
   {
     "file": "console-35-policy-groups.png",
-    "title": "Shared policy groups (D-16)"
+    "title": "Shared policy groups"
   },
   {
     "file": "console-36-policy-group.png",
@@ -149,7 +149,7 @@
   },
   {
     "file": "console-39-application-identity.png",
-    "title": "An application — expected client_id, certificates, metadata (D-26)"
+    "title": "An application — expected client_id, certificates, metadata"
   },
   {
     "file": "console-40-subscriptions.png",
@@ -189,15 +189,15 @@
   },
   {
     "file": "console-49-ws-metadata.png",
-    "title": "Workspace settings — typed metadata fields (D-18)"
+    "title": "Workspace settings — typed metadata fields"
   },
   {
     "file": "console-50-ws-export.png",
-    "title": "Workspace settings — export and import (PX-07)"
+    "title": "Workspace settings — export and import"
   },
   {
     "file": "console-51-ws-catalogs.png",
-    "title": "Workspace settings — remote catalogs (D-28)"
+    "title": "Workspace settings — remote catalogs"
   },
   {
     "file": "console-52-catalog-preview.png",
@@ -209,7 +209,7 @@
   },
   {
     "file": "console-54-gateway-status.png",
-    "title": "Gateway — health, projection queue, ingestion (D-37)"
+    "title": "Gateway — health, projection queue, ingestion"
   },
   {
     "file": "console-55-gateway-drift.png",
@@ -229,7 +229,7 @@
   },
   {
     "file": "console-59-global-auth.png",
-    "title": "Global settings — authentication (D-25)"
+    "title": "Global settings — authentication"
   },
   {
     "file": "console-60-global-audit-export.png",
@@ -265,7 +265,7 @@
   },
   {
     "file": "portal-05-reference.png",
-    "title": "Portal — API reference and try-it (Scalar, D-42)"
+    "title": "Portal — API reference and try-it (Scalar)"
   },
   {
     "file": "portal-06-plans.png",
@@ -289,7 +289,7 @@
   },
   {
     "file": "portal-11-app.png",
-    "title": "Portal — an application: credentials, live quotas, transfer consent (D-30)"
+    "title": "Portal — an application: credentials, live quotas, transfer consent"
   },
   {
     "file": "portal-12-change-plan.png",

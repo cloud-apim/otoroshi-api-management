@@ -1,4 +1,4 @@
-// Portal runtime: the workspace is resolved from the url by the server (D-20) and injected as
+// Portal runtime: the workspace is resolved from the url by the server and injected as
 // window.__APIM__; every call goes to <base>/front/api.
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { client } from '../shared/lib.js';

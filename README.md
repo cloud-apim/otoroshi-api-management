@@ -5,11 +5,9 @@
   Describe your APIs as products, publish them, let consumers subscribe — without ever opening the gateway.
 </p>
 
-> **Status: first prototype.** It implements the specification of
-> [`otoroshi-api-management-specs`](../otoroshi-api-management-specs) against a real Otoroshi 18.
-> The L0 exit criterion of the spec — the Atlas catalogue, 6 plans, 5 auth mechanisms, 4 approval
-> modes, on one API and one set of routes, projected, reconciled and its drift detected — passes as
-> an executable test (`test/reference-catalogue.test.js`).
+> **Status: first prototype**, running against a real Otoroshi 18. An end-to-end test describes a
+> reference catalogue — 6 plans, 5 auth mechanisms, 4 approval modes, on one API and one set of
+> routes — projects it, reconciles it and detects its drift (`test/reference-catalogue.test.js`).
 
 **Documentation:** <https://cloud-apim.github.io/otoroshi-api-management/> — sources in [`documentation/`](./documentation), built with Docusaurus and published to GitHub Pages by the `documentation` workflow on every push to `main`.
 
@@ -87,22 +85,22 @@ One binary, started with a comma-separated list of roles (`APIM_ROLES`, default 
 
 Two PostgreSQL databases: application data, and events + analytics.
 
-### How the spec lands in the code
+### Where things live
 
-| Decision | Where |
+| Concern | Where |
 |---|---|
-| Draft → immutable snapshot → deployment (D-35) | `server/domain/apis.js`, `deployments.js` |
-| Projection: catalog-marked `Api` write (D-38) | `server/otoroshi/projection.js`, `client.js` |
-| A subscription is an apikey with `apiRef`, the application an `id_ref` (D-6, D-26) | `server/domain/subscriptions.js` |
-| Selective sync: docs, terms, usage statements, pricing never projected (D-2) | `projection.js` |
-| Async and replayable operations (D-4) | `server/domain/tasks.js` |
+| Draft → immutable snapshot → deployment | `server/domain/apis.js`, `deployments.js` |
+| Projection: catalog-marked `Api` write | `server/otoroshi/projection.js`, `client.js` |
+| A subscription is an apikey with `apiRef`, the application an `id_ref` | `server/domain/subscriptions.js` |
+| Selective sync: docs, terms, usage statements, pricing never projected | `projection.js` |
+| Async and replayable operations | `server/domain/tasks.js` |
 | Drift detection, adopt mode | `server/otoroshi/drift.js` |
-| Transfer to an equivalent plan (D-30), new version = new api (D-29) | `subscriptions.js`, `apis.js` |
-| Two storage paths, url masking on the raw one (D-33) | `server/domain/ingest.js` |
-| One portal per workspace, resolved from the url (D-20) | `server/main.js`, `server/roles/portal-api.js` |
-| Hand-written CSS, light/dark/system (D-12, D-39) | `web/shared/theme.css` |
-| Scalar for OpenAPI and try-it, bundled, behind a proxy (D-42) | `web/portal`, `tryItProxy` |
-| GitOps: admin api + CLI + declarative documents (D-28) | `cli/apim.js`, `server/domain/exchange.js` |
+| Transfer to an equivalent plan, new version = new api | `subscriptions.js`, `apis.js` |
+| Two storage paths, url masking on the raw one | `server/domain/ingest.js` |
+| One portal per workspace, resolved from the url | `server/main.js`, `server/roles/portal-api.js` |
+| Hand-written CSS, light/dark/system | `web/shared/theme.css` |
+| Scalar for OpenAPI and try-it, bundled, behind a proxy | `web/portal`, `tryItProxy` |
+| GitOps: admin api + CLI + declarative documents | `cli/apim.js`, `server/domain/exchange.js` |
 
 ## Otoroshi gaps
 

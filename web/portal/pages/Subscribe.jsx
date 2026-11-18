@@ -30,7 +30,7 @@ export function SubscribeModal({ api: a, plan, onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null); // { sub, app, creds }
-  // the request form of the plans: subscription fields the workspace asks requesters (D-18)
+  // the request form of the plans: subscription fields the workspace asks requesters
   const [formFields, setFormFields] = useState([]);
   const [answers, setAnswers] = useState({});
   useEffect(() => {

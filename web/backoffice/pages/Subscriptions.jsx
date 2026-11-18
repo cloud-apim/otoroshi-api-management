@@ -175,7 +175,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                 </>
               )}
             </dl>
-            {/* portal-only information, never projected (D-2) */}
+            {/* portal-only information, never projected */}
             <div className="panel col gap-6">
               <div className="label">Request</div>
               {s.request?.usage ? <p style={{ whiteSpace: 'pre-wrap' }}>{s.request.usage}</p> : <p className="faint small">No usage statement.</p>}
@@ -278,7 +278,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
 
             {s.pending_transfer && (
               <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={`Move to ${s.pending_transfer.to.plan_name} — ${s.pending_transfer.status === 'requested' ? 'asked by the consumer' : "waiting for the consumer's consent"}`}>
-                {s.pending_transfer.reasons?.length > 0 && <div>The target plan brings {s.pending_transfer.reasons.join(', ')} (D-30: a change of contract needs the consumer's agreement).</div>}
+                {s.pending_transfer.reasons?.length > 0 && <div>The target plan brings {s.pending_transfer.reasons.join(', ')} (a change of contract needs the consumer's agreement).</div>}
                 {s.pending_transfer.status === 'requested' && (
                   <div className="row mt-8">
                     <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, 'Subscription transferred — the key does not change')}>
@@ -363,7 +363,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
   );
 }
 
-// D-30: only towards an equivalent plan (same auth mechanism), on this api or another version
+// only towards an equivalent plan (same auth mechanism), on this api or another version
 function TransferPanel({ sub, onDone, onCancel }) {
   const { wapi } = useWs();
   const toast = useToast();
@@ -385,7 +385,7 @@ function TransferPanel({ sub, onDone, onCancel }) {
         <h3>Transfer</h3>
         <p className="muted small">
           The key does not change; the subscription keeps its identity and history. Only plans with the same auth mechanism ({AUTH_LABELS[sub.auth_kind]}) are eligible. A move that degrades the
-          conditions — lower limits, a higher price, other terms, fewer resources — waits for the consumer's consent (D-30).
+          conditions — lower limits, a higher price, other terms, fewer resources — waits for the consumer's consent.
         </p>
         <Loader state={state}>
           {(options) => {

@@ -102,7 +102,7 @@ async function consoleTour(page) {
   await shot(page, 'console-03-search', 'Search (⌘K) — workspaces, pages and objects', { full: false });
   await page.keyboard.press('Escape');
   await click(page, 'switch workspace');
-  await shot(page, 'console-04-workspace-selector', 'The workspace selector opens the sidebar (D-27)', { full: false });
+  await shot(page, 'console-04-workspace-selector', 'The workspace selector opens the sidebar', { full: false });
   await page.keyboard.press('Escape');
   await go(page, W);
   await click(page, 'notifications');
@@ -133,21 +133,21 @@ async function consoleTour(page) {
   await shot(page, 'console-16-api-plugin-edit', 'API — a plugin of a flow, with the gateway catalog', { full: false });
 
   await go(page, `${A}/plans`);
-  await shot(page, 'console-17-api-plans', 'API — plans: the policy lives here (D-5)');
+  await shot(page, 'console-17-api-plans', 'API — plans: the policy lives here');
   await click(page, 'Edit');
   await shot(page, 'console-18-plan-general', 'Plan editor — general', { full: false });
   for (const [tab, name, title] of [
     ['Access', 'console-19-plan-access', 'Plan editor — access: auth mechanism, selection rule'],
     ['Limits', 'console-20-plan-limits', 'Plan editor — limits: rate, quotas, resources, failure strategies'],
-    ['Catalogue & approval', 'console-21-plan-catalogue', 'Plan editor — catalogue and approval: never projected (D-2)'],
-    ['Pricing', 'console-22-plan-pricing', 'Plan editor — pricing (D-36)'],
+    ['Catalogue & approval', 'console-21-plan-catalogue', 'Plan editor — catalogue and approval: never projected'],
+    ['Pricing', 'console-22-plan-pricing', 'Plan editor — pricing'],
   ]) {
     await click(page, tab, { selector: '[role=tab]' });
     await shot(page, name, title, { full: false });
   }
 
   await go(page, `${A}/documentation`);
-  await shot(page, 'console-23-api-docs', 'API — multilingual documentation pages (D-11)');
+  await shot(page, 'console-23-api-docs', 'API — multilingual documentation pages');
   await go(page, `${A}/openapi`);
   await shot(page, 'console-24-api-openapi', 'API — OpenAPI specification');
   await go(page, `${A}/subscriptions`);
@@ -168,7 +168,7 @@ async function consoleTour(page) {
   const original = books.description;
   await api(page, `/backoffice/api/workspaces/${WS}/apis/${books.id}`, 'PUT', { description: `${original} — reference API` });
   await go(page, A);
-  await shot(page, 'console-30-api-out-of-sync', 'The gap between the draft and what runs is always shown (D-22)', { full: false });
+  await shot(page, 'console-30-api-out-of-sync', 'The gap between the draft and what runs is always shown', { full: false });
   await click(page, 'Publish');
   await shot(page, 'console-31-publish', 'Publish — changes since the last snapshot, validation', { full: false });
   await api(page, `/backoffice/api/workspaces/${WS}/apis/${books.id}`, 'PUT', { description: original });
@@ -176,15 +176,15 @@ async function consoleTour(page) {
   await go(page, `${A}/tryit`);
   await click(page, 'Send');
   await sleep(800);
-  await shot(page, 'console-32-api-tryit', 'Try it — replay a request through the gateway (D-17)');
+  await shot(page, 'console-32-api-tryit', 'Try it — replay a request through the gateway');
   await go(page, `${A}/analytics?range=24h`);
-  await shot(page, 'console-33-api-analytics', 'API — analytics, in the catalogue vocabulary (PX-08)');
+  await shot(page, 'console-33-api-analytics', 'API — analytics, in the catalogue vocabulary');
   await go(page, `${A}/settings`);
   await click(page, 'Technical details', { selector: 'summary' });
   await shot(page, 'console-34-api-settings', 'API — settings, versions, technical details (the escape hatch), danger zone');
 
   await go(page, `${W}/policy-groups`);
-  await shot(page, 'console-35-policy-groups', 'Shared policy groups (D-16)');
+  await shot(page, 'console-35-policy-groups', 'Shared policy groups');
   if (groups[0]) {
     await go(page, `${W}/policy-groups/${groups[0].id}`);
     await shot(page, 'console-36-policy-group', 'A policy group — draft, versions, the apis that use it and lag behind');
@@ -196,7 +196,7 @@ async function consoleTour(page) {
     await go(page, `${W}/applications/${app.id}`);
     await shot(page, 'console-38-application', 'An application and its subscriptions');
     await click(page, 'Identity', { selector: 'button' });
-    await shot(page, 'console-39-application-identity', 'An application — expected client_id, certificates, metadata (D-26)');
+    await shot(page, 'console-39-application-identity', 'An application — expected client_id, certificates, metadata');
   }
   await go(page, `${W}/subscriptions?status=pending`);
   await shot(page, 'console-40-subscriptions', 'Subscriptions waiting for review');
@@ -218,14 +218,14 @@ async function consoleTour(page) {
     ['portal', 'console-46-ws-portal', 'Workspace settings — its developer portal, its identity provider'],
     ['members', 'console-47-ws-members', 'Workspace settings — members and roles'],
     ['teams', 'console-48-ws-teams', 'Workspace settings — teams'],
-    ['metadata', 'console-49-ws-metadata', 'Workspace settings — typed metadata fields (D-18)'],
-    ['export', 'console-50-ws-export', 'Workspace settings — export and import (PX-07)'],
+    ['metadata', 'console-49-ws-metadata', 'Workspace settings — typed metadata fields'],
+    ['export', 'console-50-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);
     await shot(page, name, title);
   }
   await go(page, '/backoffice/ws/gitops/settings/catalogs');
-  await shot(page, 'console-51-ws-catalogs', 'Workspace settings — remote catalogs (D-28)');
+  await shot(page, 'console-51-ws-catalogs', 'Workspace settings — remote catalogs');
   await click(page, 'Preview & sync');
   await sleep(800);
   await shot(page, 'console-52-catalog-preview', 'A catalog sync, previewed as a dry run', { full: false });
@@ -233,12 +233,12 @@ async function consoleTour(page) {
   await shot(page, 'console-53-managed-api', 'An api managed by a catalog: edited at its source, operable here', { full: false });
 
   for (const [path, name, title] of [
-    ['/backoffice/gateway/status', 'console-54-gateway-status', 'Gateway — health, projection queue, ingestion (D-37)'],
+    ['/backoffice/gateway/status', 'console-54-gateway-status', 'Gateway — health, projection queue, ingestion'],
     ['/backoffice/gateway/drift', 'console-55-gateway-drift', 'Gateway — drift reports'],
     ['/backoffice/gateway/connection', 'console-56-gateway-connection', 'Gateway — connection, data exporter, raw path'],
     ['/backoffice/settings/workspaces', 'console-57-global-workspaces', 'Global settings — workspaces, portal exposure'],
     ['/backoffice/settings/users', 'console-58-global-users', 'Global settings — users'],
-    ['/backoffice/settings/authentication', 'console-59-global-auth', 'Global settings — authentication (D-25)'],
+    ['/backoffice/settings/authentication', 'console-59-global-auth', 'Global settings — authentication'],
     ['/backoffice/settings/audit', 'console-60-global-audit-export', 'Global settings — audit trail exporters'],
     ['/backoffice/settings/tokens', 'console-61-global-tokens', 'Global settings — api tokens for the cli and ci'],
   ]) {
@@ -274,7 +274,7 @@ async function portalTour(page) {
   await shot(page, 'portal-04-docs', 'Portal — documentation, in the languages of the api');
   await go(page, `${P}/apis/books/reference`);
   await sleep(1500);
-  await shot(page, 'portal-05-reference', 'Portal — API reference and try-it (Scalar, D-42)');
+  await shot(page, 'portal-05-reference', 'Portal — API reference and try-it (Scalar)');
   await go(page, `${P}/apis/books/plans`);
   await shot(page, 'portal-06-plans', 'Portal — plans: what really applies, per credential');
   await go(page, `${P}/signin`);
@@ -292,7 +292,7 @@ async function portalTour(page) {
   await shot(page, 'portal-10-apps', 'Portal — my applications');
   if (app) {
     await go(page, `${P}/apps/${app.id}`);
-    await shot(page, 'portal-11-app', 'Portal — an application: credentials, live quotas, transfer consent (D-30)');
+    await shot(page, 'portal-11-app', 'Portal — an application: credentials, live quotas, transfer consent');
     // answer the pending proposal, so that the subscription can ask for a move itself
     const sub = (await api(page, `${P}/front/api/applications/${app.id}`)).subscriptions?.find((s) => s.pending_transfer?.status === 'awaiting_consent');
     if (sub) await api(page, `${P}/front/api/subscriptions/${sub.id}/transfer/consent`, 'POST', { accept: false });

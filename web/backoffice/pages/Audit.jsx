@@ -5,7 +5,7 @@ import { Badge, Empty, JsonBlock, Loader, Modal, useLoad } from '../../shared/ui
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 
-// audit is a first-level entry, without a padlock (D-27, E5)
+// audit is a first-level entry, without a padlock
 export function AuditPage() {
   const { wapi, slug } = useWs();
   const [params, setParams] = useQuery();

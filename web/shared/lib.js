@@ -35,7 +35,7 @@ export function client(base) {
   };
 }
 
-// ---------------------------------------------------------------- theme: light / dark / system (D-12)
+// ---------------------------------------------------------------- theme: light / dark / system
 
 const THEME_KEY = 'apim.theme';
 

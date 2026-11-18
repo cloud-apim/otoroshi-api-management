@@ -1,4 +1,4 @@
-// The ingester (D-33): receives GatewayEvent, LLMUsageAudit and McpAudit from an Otoroshi data
+// The ingester: receives GatewayEvent, LLMUsageAudit and McpAudit from an Otoroshi data
 // exporter, and stores them twice:
 //  - computed (mandatory, exhaustive): attributed to the catalogue — api, plan, subscription,
 //    application — at ingestion time. A quota, an attribution, a token count are counted, not sampled.
@@ -9,7 +9,7 @@ import { config } from '../config.js';
 
 const SECRET_QUERY = /^(.*token.*|.*secret.*|.*password.*|.*passwd.*|api[_-]?key|apikey|key|sig|signature|code|auth.*)$/i;
 
-// what Otoroshi does not mask at export (D-33): a secret in the url
+// what Otoroshi does not mask at export: a secret in the url
 export function maskUrl(url) {
   if (!url || !url.includes('?')) return url;
   try {
@@ -110,7 +110,7 @@ export async function ingest(events) {
       const otoApiId = e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref || null;
       const clientId = e.identity?.identityType === 'APIKEY' ? e.identity.identity : null;
       const attr = attribute(clientId, otoApiId);
-      // the key carries the subscription and the application itself (apiRef + id_ref, D-6, D-26)
+      // the key carries the subscription and the application itself (apiRef + id_ref)
       const md = e.identity?.metadata || {};
       if (!attr.subscription_id && md.apim_subscription_id) attr.subscription_id = md.apim_subscription_id;
       if (!attr.application_id && md.id_ref) attr.application_id = md.id_ref;

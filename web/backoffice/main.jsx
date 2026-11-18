@@ -101,7 +101,7 @@ function App() {
   if (me === undefined) return <Loading />;
   if (me === null) return <Login onLogged={load} />;
 
-  // the workspace is a session selector in the console (D-20), carried by the url
+  // the workspace is a session selector in the console, carried by the url
   const m = /^\/ws\/([^/]+)/.exec(path);
   const wsSlug = m?.[1];
   const workspaces = me.workspaces || [];

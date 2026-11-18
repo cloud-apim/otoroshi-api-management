@@ -1,6 +1,6 @@
-// Scalar renders the OpenAPI document and carries the try-it (D-42). It is bundled at a fixed version
+// Scalar renders the OpenAPI document and carries the try-it. It is bundled at a fixed version
 // rather than loaded from a CDN, and its requests go through the portal proxy, which only talks to
-// the hosts of this workspace's apis and never forwards the portal cookies (D-17).
+// the hosts of this workspace's apis and never forwards the portal cookies.
 import React, { useEffect, useMemo, useState } from 'react';
 import { ApiReferenceReact } from '@scalar/api-reference-react';
 import '@scalar/api-reference-react/style.css';

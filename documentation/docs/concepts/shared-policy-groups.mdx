@@ -8,7 +8,7 @@ description: A named composition of Otoroshi plugins with its own lifecycle, pin
 
 Otoroshi gets its power from composition — plugins chained in flows. The flip side is that a
 composition exists nowhere as an object: it is rebuilt by hand on thirty APIs, and nobody can point
-at "our company policy". A **shared policy group** names it and makes it governable (D-16).
+at "our company policy". A **shared policy group** names it and makes it governable.
 
 It creates no new gateway capability: a group is a chain of ordinary Otoroshi plugins, projected
 inline in the flows of the APIs that use it.
@@ -25,7 +25,7 @@ Like an API, a group has a **draft** and **published versions**, immutable and n
 
 An API references a group **at a version**. Its snapshot freezes the plugins of that version, and
 the projection expands them in place. Publishing v2 of the group changes nothing in production:
-snapshots are immutable (D-35).
+snapshots are immutable.
 
 The group page lists the APIs that use it and which ones are behind; the flow of each API shows
 *"v2 available · Upgrade"*. Upgrading is an edit of the API's draft, then a publication — what runs

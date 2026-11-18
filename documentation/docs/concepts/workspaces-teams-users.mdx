@@ -9,14 +9,14 @@ description: The tenant is a workspace, teams own APIs and applications, users a
 ## Workspaces
 
 The tenant is called a **workspace**, with the same word on every surface: console, admin API,
-CLI and declarative documents (D-19). Each workspace has its own APIs, applications, teams and its
+CLI and declarative documents. Each workspace has its own APIs, applications, teams and its
 own [developer portal](../developer-portal.mdx).
 
 A workspace is never an Otoroshi tenant: everything the product projects lands in the default
-location of the gateway (D-24). Tenancy lives in the product.
+location of the gateway. Tenancy lives in the product.
 
 - In the **console**, the workspace is a selector at the top of the sidebar: a session state,
-  bounded by your rights (D-20).
+  bounded by your rights.
 - On the **portal**, it is read from the URL — never from a session, because an anonymous visitor
   has none and an API URL must mean the same thing to everyone.
 

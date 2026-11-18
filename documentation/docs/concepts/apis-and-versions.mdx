@@ -21,12 +21,12 @@ An API is the published, documented, subscribable unit. It carries:
   [shared policy groups](./shared-policy-groups.mdx);
 - **[plans](./plans.mdx)**, where the policy lives;
 - **documentation pages** in as many languages as you want, and an **OpenAPI** specification;
-- catalogue attributes: tags (classification, never a governance axis — D-19), visibility, owning team,
+- catalogue attributes: tags (classification, never a governance axis), visibility, owning team,
   [metadata](./metadata.mdx).
 
 ## Draft, snapshot, deployment
 
-Three objects with three lifetimes (D-35):
+Three objects with three lifetimes:
 
 | Object | Mutable | Reaches the gateway |
 |---|---|---|
@@ -39,7 +39,7 @@ the pinned versions of the shared policy groups. Errors block it; warnings are s
 silent. The console always shows the gap between what is described and what runs: *"snapshot #3
 runs on the gateway · latest snapshot #4 is not deployed · the draft has 2 unpublished changes"*.
 
-**Deploying** shows its diff first (D-22): the catalogue changes between the snapshot that runs and
+**Deploying** shows its diff first: the catalogue changes between the snapshot that runs and
 the one about to be pushed, and the gateway changes against what Otoroshi actually holds. Then it
 writes the `Api` entity (see [projection](../gateway/projection.mdx)).
 
@@ -62,7 +62,7 @@ bun cli/apim.js apis deploy default books --snapshot 2 --dry-run
 
 ## Versions are new APIs
 
-A version is a **new API**, pre-filled from the previous one (D-29): its own routes, plans,
+A version is a **new API**, pre-filled from the previous one: its own routes, plans,
 documentation and lifecycle. No plan is shared between versions — the new version gets fresh plan
 ids, in `staging`. Subscriptions do not follow; they are [transferred](./applications-and-subscriptions.mdx#transfer)
 to an equivalent plan of the new version, keeping their key.

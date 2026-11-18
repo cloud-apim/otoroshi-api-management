@@ -3,8 +3,8 @@ import YAML from 'yaml';
 import { Callout, Empty, Field, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 
-// documentation stays in the product, never in the gateway (D-2), and is multilingual from the
-// start: the languages belong to the customer (D-11)
+// documentation stays in the product, never in the gateway, and is multilingual from the
+// start: the languages belong to the customer
 export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
   const { wapi } = useWs();
   const toast = useToast();
@@ -186,7 +186,7 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">
-        The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its try-it goes through the portal proxy with the consumer's own credentials (D-17, D-42).
+        The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its try-it goes through the portal proxy with the consumer's own credentials.
       </p>
       {!readOnly && (
         <div className="row">

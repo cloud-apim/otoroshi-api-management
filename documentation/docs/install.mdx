@@ -39,7 +39,7 @@ The image builds both UIs in a first stage and carries `git`, used by the git
 
 ## Databases
 
-Two PostgreSQL databases (D-8): the **application data** (workspaces, APIs, drafts, snapshots,
+Two PostgreSQL databases: the **application data** (workspaces, APIs, drafts, snapshots,
 subscriptions, audit…) and the **events and analytics**. They do not have the same write profile,
 retention or criticality, so they are two connection URLs — they may live on the same server.
 Migrations run at startup.
@@ -80,7 +80,7 @@ your laptop.
 
 ### The Otoroshi cluster
 
-One installation drives one Otoroshi cluster (D-37), with an administration key (D-24).
+One installation drives one Otoroshi cluster, with an administration key.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -139,12 +139,12 @@ curl -X POST http://localhost:9000/api/gateway/exporter \
 
 It creates (or updates) an Otoroshi `webhook` data exporter with the id `apim_ingester_exporter`,
 filtered on `GatewayEvent`, `LLMUsageAudit` and `McpAudit`, sending batches to `/ingest` with
-`Authorization: Bearer <APIM_INGEST_TOKEN>`. An exporter is gateway infrastructure (D-15): this
+`Authorization: Bearer <APIM_INGEST_TOKEN>`. An exporter is gateway infrastructure: this
 helper only creates the one it marks as its own and never touches the others.
 
 ## Portal exposure
 
-There is one portal per workspace and **no global portal** (D-20). The workspace is always read from
+There is one portal per workspace and **no global portal**. The workspace is always read from
 the URL, never from a session, so an API URL means the same thing to everyone:
 
 - **path** (default): `https://apis.example.com/<workspace>/` — no wildcard DNS or certificate per

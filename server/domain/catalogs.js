@@ -1,11 +1,10 @@
-// Remote catalogs (D-28): an external source — HTTP or git — becomes the source of truth of a set
+// Remote catalogs: an external source — HTTP or git — becomes the source of truth of a set
 // of apis, reconciled periodically, in the manner of Otoroshi's remote catalogs.
 //
-// - every api a catalog writes is marked `managed_by = catalog:<id>` (D-24 applied inside the
-//   product): the console refuses to edit it, the source is where it changes;
-// - what a sync does is explicit (the open question of D-36): `draft` writes the drafts only,
+// - every api a catalog writes is marked `managed_by = catalog:<id>`: the console refuses to edit it, the source is where it changes;
+// - what a sync does is explicit, per catalog: `draft` writes the drafts only,
 //   `publish` freezes snapshots, `deploy` also projects them on the gateway;
-// - a preview (dry run) shows what a sync would change before any mass projection (spec §5);
+// - a preview (dry run) shows what a sync would change before any mass projection;
 // - apis that disappeared from the source are reported, and only removed if the catalog prunes.
 
 import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';

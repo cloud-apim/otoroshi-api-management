@@ -170,7 +170,7 @@ function GatewayPill() {
   const pending = (st?.queue?.pending || 0) + (st?.queue?.failed || 0);
   const drift = (st?.drift?.drifted || 0) + (st?.drift?.missing || 0);
   return (
-    <Link to="/gateway" className="gw-pill" title="the installation's Otoroshi cluster (D-37)">
+    <Link to="/gateway" className="gw-pill" title="the installation's Otoroshi cluster">
       <span className={`gw-dot ${st ? (ok ? 'ok' : 'ko') : ''}`} />
       <span className="grow">Gateway {st ? (ok ? 'reachable' : 'unreachable') : '…'}</span>
       {pending > 0 && <span className="badge warning" title="projections waiting">{pending}</span>}
@@ -217,7 +217,7 @@ export function Layout({ children }) {
             <div className="brand-sub">Otoroshi</div>
           </div>
         </div>
-        {/* the workspace selector opens the sidebar: it sets the context of everything below (D-27) */}
+        {/* the workspace selector opens the sidebar: it sets the context of everything below */}
         {workspaces.length > 1 || user.is_admin ? (
           <Dropdown
             trigger={({ toggle }) => (

@@ -6,7 +6,7 @@ description: Where the policy lives — auth mechanism, limits, resource filteri
 
 # Plans
 
-The policy lives in the plan; the route is a projection detail (D-5). One API carries one set of
+The policy lives in the plan; the route is a projection detail. One API carries one set of
 resources and as many plans as it needs, each with its own auth mechanism — adding a tier never
 touches the infrastructure.
 
@@ -35,7 +35,7 @@ touches the infrastructure.
 Instead of referencing a verifier that already exists on the gateway, a `jwt` plan can describe how
 its tokens are validated — keys from a JWKS url, or an HMAC secret (a vault reference works), the
 expected issuer and audience, the header and its prefix. The product then **derives** the Otoroshi
-JWT verifier from the plan (D-15): written before the `Api` that references it, marked as the
+JWT verifier from the plan: written before the `Api` that references it, marked as the
 product's own, part of the deployment diff and of drift detection, and removed when the plan stops
 deriving it, on undeploy, or when the API is deleted.
 
@@ -48,7 +48,7 @@ auth:
 ```
 
 On `jwt`, `mtls` and `oauth2-remote` plans the application must declare its expected `client_id`:
-it is how the consumer seen by the gateway is reconciled with the catalogue (D-26).
+it is how the consumer seen by the gateway is reconciled with the catalogue.
 
 :::warning Any valid token passes
 On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, Otoroshi 18 mints the consumer itself on
@@ -59,7 +59,7 @@ it on the plan. See [G-4](../otoroshi-gaps.mdx).
 ## Resolution order
 
 When several plans are published, the gateway tries them in the order of its extractors — it is
-not freely chosen, so the console shows it rather than hiding it (ADR-10):
+not freely chosen, so the console shows it rather than hiding it:
 
 | Kind | Extractor index |
 |---|---|
@@ -78,11 +78,11 @@ publish.
 
 - **Rate limit**: N calls per second, minute, hour or day.
 - **Quotas**: daily and monthly, empty meaning unlimited.
-- **Unit of measure** (D-41): calls. Tokens and AI budgets are in the model, and refused at
+- **Unit of measure**: calls. Tokens and AI budgets are in the model, and refused at
   validation until LLM backends are supported.
 
 Limits are **per credential**: nothing is pooled between the subscriptions of an application or
-between plans (D-31). On an Otoroshi leader/worker cluster the quota is global, within a few seconds
+between plans. On an Otoroshi leader/worker cluster the quota is global, within a few seconds
 of synchronisation.
 
 They are projected as the throttling strategy of the keys:
@@ -123,7 +123,7 @@ only — projected as the plan's `flow_ref`. That is how a protection is put pla
 
 ## Catalogue and approval — never projected
 
-These belong to the portal (D-2):
+These belong to the portal:
 
 | Attribute | |
 |---|---|
@@ -136,7 +136,7 @@ These belong to the portal (D-2):
 
 ## Pricing
 
-A plan is free or paid (D-36): amount, currency, interval, the provider's price reference and a
+A plan is free or paid: amount, currency, interval, the provider's price reference and a
 grace period. The product decides access, a payment provider decides the money. A paid subscription
 waits in `pending_payment`, and its key is only projected once the payment is confirmed.
 

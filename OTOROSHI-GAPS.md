@@ -34,7 +34,7 @@ the product has to compensate, **low** = friction.
 `pending` (or any custom) status therefore yields an **enabled** key: projecting a subscription
 under review gives access before the review.
 
-**Product meanwhile.** The approval workflow is the product's (D-1): a subscription is only
+**Product meanwhile.** The approval workflow is the product's: a subscription is only
 projected once `active` (status `enabled`), `suspended` becomes `disabled`. Pending ones are
 never written to the gateway (`server/domain/subscriptions.js`, `sync_subscription`).
 
@@ -69,11 +69,11 @@ anyone.
 **Observed.** On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans the extractor mints the
 consumer itself on the first call (`createIfMissing`, e.g. `next/models/Api.scala:1870`). Any
 token signed by the verifier — or any certificate matching the DN regexes — is served and counted,
-whether a subscription exists or not. Verified in the L0 test: a JWT with an arbitrary
-`client_id` passes on the Partner plan.
+whether a subscription exists or not. Verified in the reference catalogue test: a JWT with an arbitrary
+`client_id` passes on its jwt plan.
 
 **Product meanwhile.** Warning `any_token_passes` on the plan; the application declares its
-expected `client_id` so that what the gateway sees can be reconciled (D-26), but nothing stops an
+expected `client_id` so that what the gateway sees can be reconciled, but nothing stops an
 unsubscribed caller.
 
 **Upstream fix.** A plan option "subscription required": the extractor resolves the minted
@@ -96,8 +96,7 @@ applied to the consumer it mints.
 
 **Observed.** `ApiPlan` has no field for: an expression that disambiguates two plans of the same
 kind whose extractors can both succeed; what to do when the distributed quota counter is
-unreachable (let pass / refuse); a circuit breaker per subscription instead of per api. The spec
-(§4) treats all three as enforcement, hence projected.
+unreachable (let pass / refuse); a circuit breaker per subscription instead of per api. All three are enforcement, hence projected.
 
 **Product meanwhile.** Stored in the plan, projected as `metadata.apim_selection_rule`,
 `apim_counter_failure`, `apim_circuit_breaker`, and flagged as not enforced.
@@ -113,7 +112,7 @@ keeps the last **5** entries (`:2187`). Nothing ties a gateway-side deployment t
 snapshot that produced it, and the plans are not in it.
 
 **Product meanwhile.** The snapshot id and number go into `Api.metadata`
-(`apim_snapshot_id`, `apim_snapshot_number`); the product keeps the full history itself (D-35).
+(`apim_snapshot_id`, `apim_snapshot_number`); the product keeps the full history itself.
 
 **Upstream fix.** An optional `ref` (external snapshot id) on `ApiDeployment`, filled from the
 write, and the plans in `deploymentDefinition`.
@@ -122,7 +121,7 @@ write, and the plans in `deploymentDefinition`.
 
 **Observed.** Any `Api` write whose `metadata.created_by` starts with `remote_catalog=` is a
 catalog deploy (`isWrittenByCatalog`, `next/models/Api.scala:2150`): `production_readonly` is
-lifted and the api may be created already published. The product uses it (D-38) with the id
+lifted and the api may be created already published. The product uses it with the id
 `otoroshi-apim-deployment`, which no real remote catalog may use.
 
 **Upstream fix.** A recognised marker for an external control plane (e.g.
@@ -170,7 +169,7 @@ request carrying `Otoroshi-Try-It-Request-Id` only when that id was enabled by
 `TryItController.call` (`next/controllers/tryit.scala`), routed as `POST /bo/api/tryit`
 (`conf/routes:97`) behind `BackOfficeActionAuth`. An Admin API key cannot reach it, so a control
 plane cannot replay a request through an api "in diagnostic mode, with the trace of the policies"
-— the console half of D-17.
+— the console half of the try-it.
 
 **Product meanwhile.** The console composer replays the request through the gateway (real
 routing, real plans, real keys) and shows status, headers, body and latency, and says that the

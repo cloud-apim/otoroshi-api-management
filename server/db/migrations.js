@@ -1,7 +1,7 @@
-// Schema of the two databases (D-8): application data, and Otoroshi events + analytics.
+// Schema of the two databases: application data, and Otoroshi events + analytics.
 //
 // The application side gets real tables because it carries heavy content, relations and reporting
-// queries. An API has three objects with three lifetimes (D-35): the draft (mutable, one per api),
+// queries. An API has three objects with three lifetimes: the draft (mutable, one per api),
 // the snapshots (immutable, append-only) and the deployment state (which snapshot runs on the gateway).
 
 export const appMigrations = [
@@ -13,9 +13,9 @@ create table users (
   email text not null unique,
   name text not null,
   password_hash text,
-  -- ACL tags: user:<email>, team:<id>, role:<name> (spec §6)
+  -- ACL tags: user:<email>, team:<id>, role:<name>
   tags jsonb not null default '[]',
-  -- installation administrator (bootstrap admins, D-25)
+  -- installation administrator (bootstrap admins)
   is_admin boolean not null default false,
   metadata jsonb not null default '{}',
   created_at timestamptz not null default now(),
@@ -41,20 +41,20 @@ create table api_tokens (
   expires_at timestamptz
 );
 
--- installation-level settings: the gateway (D-37), portal exposure (D-20), ingestion
+-- installation-level settings: the gateway, portal exposure, ingestion
 create table settings (
   key text primary key,
   value jsonb not null,
   updated_at timestamptz not null default now()
 );
 
--- the tenant (D-19): same word on every surface
+-- the tenant: same word on every surface
 create table workspaces (
   id text primary key,
   slug text not null unique,
   name text not null,
   description text not null default '',
-  -- the workspace portal: identity, theme, languages, self-signup (D-20)
+  -- the workspace portal: identity, theme, languages, self-signup
   portal jsonb not null default '{}',
   metadata jsonb not null default '{}',
   created_at timestamptz not null default now(),
@@ -74,7 +74,7 @@ create table teams (
   workspace_id text not null references workspaces(id) on delete cascade,
   name text not null,
   description text not null default '',
-  -- the implicit one-person team of an individual developer (Q-1)
+  -- the implicit one-person team of an individual developer
   personal boolean not null default false,
   metadata jsonb not null default '{}',
   created_at timestamptz not null default now(),
@@ -88,7 +88,7 @@ create table team_members (
   primary key (team_id, user_id)
 );
 
--- an api is a version (D-29): there is no level above it
+-- an api is a version: there is no level above it
 create table apis (
   id text primary key,
   workspace_id text not null references workspaces(id) on delete cascade,
@@ -98,18 +98,18 @@ create table apis (
   version text not null default '1.0.0',
   description text not null default '',
   tags jsonb not null default '[]',
-  -- catalogue visibility, never projected (D-2): public | authenticated | restricted
+  -- catalogue visibility, never projected: public | authenticated | restricted
   visibility text not null default 'public',
   -- restricted visibility ACL, as tags: user:<email>, team:<id>, role:<name>
   acl jsonb not null default '[]',
   -- created (never published) | published | deprecated | archived
   lifecycle text not null default 'created',
   previous_version_id text references apis(id) on delete set null,
-  -- the only editable object (D-35)
+  -- the only editable object
   draft jsonb not null,
   draft_updated_at timestamptz not null default now(),
   draft_updated_by text,
-  -- who owns the source of truth of this object (D-28): null = edited by hand
+  -- who owns the source of truth of this object: null = edited by hand
   managed_by text,
   metadata jsonb not null default '{}',
   created_at timestamptz not null default now(),
@@ -117,7 +117,7 @@ create table apis (
   unique (workspace_id, slug, version)
 );
 
--- multilingual documentation pages of the draft (D-11). Frozen into the snapshot at publication.
+-- multilingual documentation pages of the draft. Frozen into the snapshot at publication.
 create table api_doc_pages (
   id text primary key,
   api_id text not null references apis(id) on delete cascade,
@@ -131,7 +131,7 @@ create table api_doc_pages (
   unique (api_id, slug)
 );
 
--- immutable, dated, attributed publications (D-35). Append-only.
+-- immutable, dated, attributed publications. Append-only.
 create table api_snapshots (
   id text primary key,
   api_id text not null references apis(id) on delete cascade,
@@ -143,7 +143,7 @@ create table api_snapshots (
   unique (api_id, number)
 );
 
--- the deployment state references a snapshot, not an api (D-35). One row per deployment attempt.
+-- the deployment state references a snapshot, not an api. One row per deployment attempt.
 create table api_deployments (
   id text primary key,
   api_id text not null references apis(id) on delete cascade,
@@ -157,7 +157,7 @@ create table api_deployments (
   result jsonb not null default '{}'
 );
 
--- groups the identity of a consumer, never its counters (D-26, D-31)
+-- groups the identity of a consumer, never its counters
 create table applications (
   id text primary key,
   workspace_id text not null references workspaces(id) on delete cascade,
@@ -183,16 +183,16 @@ create table subscriptions (
   auth_kind text not null,
   -- pending | pending_payment | active | rejected | suspended | closed
   status text not null,
-  -- usage statement, terms acceptance, form answers: never projected (D-2)
+  -- usage statement, terms acceptance, form answers: never projected
   request jsonb not null default '{}',
   -- reviewer, decision, message to the requester
   review jsonb not null default '{}',
-  -- payment state and provider reference (D-36)
+  -- payment state and provider reference
   payment jsonb not null default '{}',
   dates jsonb not null default '{}',
   -- projection state on the gateway: status, otoroshi ids, error
   projection jsonb not null default '{}',
-  -- transfer history (D-30)
+  -- transfer history
   history jsonb not null default '[]',
   metadata jsonb not null default '{}',
   requested_by text,
@@ -215,7 +215,7 @@ create table credentials (
 );
 create index credentials_client_id on credentials(client_id);
 
--- lifecycle audit trail, written by the admin api itself (spec §8: changes and reads)
+-- lifecycle audit trail, written by the admin api itself (changes and reads)
 create table audit_events (
   id bigserial primary key,
   workspace_id text,
@@ -230,7 +230,7 @@ create table audit_events (
 );
 create index audit_events_ws_at on audit_events(workspace_id, at desc);
 
--- async, replayable product operations (D-4): a projection that cannot reach the gateway waits here
+-- async, replayable product operations: a projection that cannot reach the gateway waits here
 create table tasks (
   id text primary key,
   kind text not null,
@@ -263,7 +263,7 @@ create table drift_reports (
   {
     version: '0002_auth_states',
     sql: `
--- logins in flight (OIDC state, PKCE verifier, nonce): single use, short-lived (D-25)
+-- logins in flight (OIDC state, PKCE verifier, nonce): single use, short-lived
 create table auth_states (
   id text primary key,
   data jsonb not null,
@@ -274,8 +274,8 @@ create table auth_states (
   {
     version: '0003_policy_groups',
     sql: `
--- named compositions (D-16): a shared chain of Otoroshi plugins with its own lifecycle. The draft
--- is edited, a publication freezes an immutable version, and an api pins a version (D-35).
+-- named compositions: a shared chain of Otoroshi plugins with its own lifecycle. The draft
+-- is edited, a publication freezes an immutable version, and an api pins a version.
 create table policy_groups (
   id text primary key,
   workspace_id text not null references workspaces(id) on delete cascade,
@@ -301,8 +301,8 @@ create table policy_group_versions (
   {
     version: '0004_metadata_fields',
     sql: `
--- one metadata mechanism, the scope as a parameter (D-18): typed fields declared per workspace,
--- values stored on each object, never projected on the gateway (D-2)
+-- one metadata mechanism, the scope as a parameter: typed fields declared per workspace,
+-- values stored on each object, never projected on the gateway
 create table metadata_fields (
   id text primary key,
   workspace_id text not null references workspaces(id) on delete cascade,
@@ -323,7 +323,7 @@ create table metadata_fields (
   {
     version: '0005_remote_catalogs',
     sql: `
--- remote catalogs (D-28): an external source of truth for a set of apis
+-- remote catalogs: an external source of truth for a set of apis
 create table remote_catalogs (
   id text primary key,
   workspace_id text not null references workspaces(id) on delete cascade,
@@ -387,7 +387,7 @@ create table notifications (
 );
 create index notifications_team on notifications(team_id, created_at desc);
 
--- a transfer waiting for someone (D-30): the consumer's consent, or the producer's decision
+-- a transfer waiting for someone: the consumer's consent, or the producer's decision
 alter table subscriptions add column pending_transfer jsonb;
 `,
   },
@@ -397,7 +397,7 @@ export const analyticsMigrations = [
   {
     version: '0001_init',
     sql: `
--- the computed path (D-33): mandatory and exhaustive, attributed to the catalogue at ingestion
+-- the computed path: mandatory and exhaustive, attributed to the catalogue at ingestion
 create table calls (
   id bigserial primary key,
   at timestamptz not null,
@@ -427,7 +427,7 @@ create index calls_sub_at on calls(subscription_id, at);
 create index calls_app_at on calls(application_id, at);
 create index calls_ws_at on calls(workspace_id, at);
 
--- AI and MCP usage: collected from day one although the features are out of the MVP (D-32)
+-- AI and MCP usage: collected from day one although the features are out of the MVP
 create table ai_usage (
   id bigserial primary key,
   at timestamptz not null,
@@ -446,7 +446,7 @@ create table ai_usage (
 );
 create index ai_usage_at on ai_usage(at);
 
--- the raw path (D-33): optional, where sampling and masking belong
+-- the raw path: optional, where sampling and masking belong
 create table raw_events (
   id bigserial primary key,
   at timestamptz not null,

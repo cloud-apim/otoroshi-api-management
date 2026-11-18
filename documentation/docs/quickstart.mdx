@@ -93,9 +93,9 @@ API, the plan, the subscription and the application.
 
 ```bash
 bun test test/model.test.js      # unit tests, no infrastructure
-bun test                         # everything, including the L0 test against the real gateway
+bun test                         # everything, including the reference catalogue test against the real gateway
 ```
 
-The L0 test (`test/reference-catalogue.test.js`) is the exit criterion of the first milestone: the Atlas
-catalogue — 6 plans, 5 auth mechanisms, 4 approval modes on one API and one set of routes —
-projected, reconciled, and its drift detected and repaired.
+The reference catalogue test (`test/reference-catalogue.test.js`) describes a catalogue — 6 plans,
+5 auth mechanisms, 4 approval modes on one API and one set of routes — and checks that it is
+projected, reconciled, and that its drift is detected and repaired.

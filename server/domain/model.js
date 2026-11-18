@@ -1,6 +1,6 @@
-// The API description model: what a producer edits in the draft (D-35) and what a snapshot freezes.
+// The API description model: what a producer edits in the draft and what a snapshot freezes.
 //
-// Policy lives in the plan, the route is a projection detail (D-5): resources, backends and flows
+// Policy lives in the plan, the route is a projection detail: resources, backends and flows
 // are infrastructure; auth, rate limit, quota, resource filtering and visibility are the offer.
 
 import { newId } from '../db/index.js';
@@ -8,7 +8,7 @@ import { newId } from '../db/index.js';
 export const AUTH_KINDS = ['keyless', 'apikey', 'jwt', 'mtls', 'oauth2-local', 'oauth2-remote'];
 
 // the extractor index each kind gets in Otoroshi (next/models/Api.scala, pluginsForPlan): this is the
-// effective resolution order, it is not freely chosen, and the product shows it (ADR-10, D-9 n°3)
+// effective resolution order, it is not freely chosen, and the product shows it
 export const AUTH_KIND_ORDER = {
   apikey: 2.0,
   'oauth2-local': 2.0,
@@ -19,7 +19,7 @@ export const AUTH_KIND_ORDER = {
 };
 
 // kinds whose subscription carries a credential minted by the product. On the other kinds the
-// gateway builds the consumer at call time from a token or a certificate (D-6).
+// gateway builds the consumer at call time from a token or a certificate.
 export const CREDENTIAL_KINDS = ['apikey', 'oauth2-local'];
 
 export const PLAN_STATUSES = ['staging', 'published', 'deprecated', 'closed'];
@@ -72,7 +72,7 @@ export function defaultAuthConfig(kind) {
       return { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } };
     case 'jwt':
       // either a reference to an existing Otoroshi verifier, or a description the product derives
-      // the verifier from and keeps reconciled (D-15)
+      // the verifier from and keeps reconciled
       return {
         verifier: '',
         clientIdPath: 'client_id',
@@ -100,27 +100,27 @@ export function defaultPlan(overrides = {}) {
     description: '',
     status: 'staging',
     auth: { kind, config: defaultAuthConfig(kind) },
-    // EL expression that disambiguates two plans of the same kind (spec §4)
+    // EL expression that disambiguates two plans of the same kind
     selectionRule: '',
-    // calls | tokens | budget (D-41) — tokens and budget need an LLM backend, out of the MVP
+    // calls | tokens | budget — tokens and budget need an LLM backend, out of the MVP
     unit: 'calls',
     rateLimit: { enabled: true, calls: 10, windowMs: 1000 },
     quota: { daily: null, monthly: null },
-    // what to do when the distributed counter is unreachable (spec §4)
+    // what to do when the distributed counter is unreachable
     counterFailure: 'allow',
-    // per api or per subscription (spec §4)
+    // per api or per subscription
     circuitBreaker: 'api',
     resourceFilter: { mode: 'all', resources: [] },
     // plugins of the plan, by reference to a flow of the api (ApiPlanPlugins.flowRef)
     flowRef: null,
-    // catalogue: never projected (D-2)
+    // catalogue: never projected
     visibility: 'public',
     acl: [],
     subscribable: true,
     validation: 'auto', // auto | manual
     terms: { enabled: false, url: '', pageSlug: '' },
     usageStatement: { enabled: false, required: false, prompt: 'What do you plan to build with this API?' },
-    // D-36: free, or a price held by a payment provider. Frozen in the snapshot, never projected.
+    // free, or a price held by a payment provider. Frozen in the snapshot, never projected.
     pricing: { kind: 'free', amount: 0, currency: 'EUR', interval: 'month', provider: 'stripe', priceRef: '', graceDays: 7 },
     metadata: {},
     ...overrides,
@@ -170,7 +170,7 @@ export function normalizeDraft(input = {}) {
     id: f.id || newId('flow'),
     name: f.name || f.id || 'flow',
     plugins: asArray(f.plugins).map((p) =>
-      // a reference to a shared policy group, pinned to a published version (D-16)
+      // a reference to a shared policy group, pinned to a published version
       p.group
         ? { group: p.group, version: p.version ? parseInt(p.version, 10) : null }
         : {
@@ -208,7 +208,7 @@ export function normalizeDraft(input = {}) {
 }
 
 // Validation returns errors (block publication) and warnings (shown, never silent).
-// The abstraction does not promise what the gateway cannot hold (D-9 n°3).
+// The abstraction does not promise what the gateway cannot hold.
 export function validateDraft(draft) {
   const errors = [];
   const warnings = [];
@@ -258,7 +258,7 @@ export function validateDraft(draft) {
     if (p.unit !== 'calls')
       errors.push({
         path: `plans[${i}].unit`,
-        message: `plan "${p.name}" meters ${p.unit}: tokens and budget need an LLM backend (D-41), not available in this version`,
+        message: `plan "${p.name}" meters ${p.unit}: tokens and budget need an LLM backend, not available in this version`,
       });
     const derive = p.auth.kind === 'jwt' && p.auth.config.derive?.enabled ? p.auth.config.derive : null;
     if (derive) {
@@ -276,7 +276,7 @@ export function validateDraft(draft) {
         code: 'any_token_passes',
         message: `plan "${p.name}" (${p.auth.kind}): Otoroshi 18 mints the consumer itself on first call, so any valid ${
           p.auth.kind === 'keyless' ? 'caller' : 'token or certificate'
-        } passes, subscribed or not (upstream gap, D-6).`,
+        } passes, subscribed or not (upstream gap).`,
       });
     }
     if (p.selectionRule || p.counterFailure !== 'allow' || p.circuitBreaker !== 'api') {
@@ -287,7 +287,7 @@ export function validateDraft(draft) {
       });
     }
   });
-  // two plans of the same kind whose extractors can both succeed need a selection rule (spec §4)
+  // two plans of the same kind whose extractors can both succeed need a selection rule
   const byKind = {};
   active.forEach((p) => (byKind[p.auth.kind] = [...(byKind[p.auth.kind] || []), p]));
   Object.entries(byKind).forEach(([kind, plans]) => {
@@ -308,7 +308,7 @@ export function validateDraft(draft) {
   return { errors, warnings, ok: errors.length === 0 };
 }
 
-// effective plan resolution order, as the gateway will evaluate it (ADR-10)
+// effective plan resolution order, as the gateway will evaluate it
 export function resolutionOrder(draft) {
   const d = normalizeDraft(draft);
   return d.plans
@@ -317,7 +317,7 @@ export function resolutionOrder(draft) {
     .sort((a, b) => a.index - b.index);
 }
 
-// D-30: a transfer is only possible between plans of the same auth mechanism
+// a transfer is only possible between plans of the same auth mechanism
 export function plansAreEquivalent(a, b) {
   return a?.auth?.kind === b?.auth?.kind;
 }

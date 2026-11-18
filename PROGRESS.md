@@ -37,8 +37,8 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 ## What remains to implement
 
-Everything below is grounded in the spec (`specs.alive.md`, decisions `D-n`, open questions `Q-n`,
-§8 "not yet drafted") or in the owner's notes (`specs.owner-locked.md`). Items that depend on a
+Everything below is grounded in the product decisions (`D-n`), their open questions (`Q-n`) and the
+topics not drafted yet. Items that depend on a
 fix in Otoroshi cite the gap (`G-n`, see [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md)): the product
 waits for the data plane rather than working around it.
 
@@ -50,7 +50,7 @@ waits for the data plane rather than working around it.
 | R-9 | D-15, Q-6 | The **object-by-object inventory** of Otoroshi entities: derived from the api description, or infrastructure consumed as is — a written table checked against the Otoroshi source | S | |
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-11 | D-26, D-15 | Project the **client certificates** of an application (stored today, not projected) so that an mtls plan recognises them | M | R-1 |
-| R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for Atlas and its archive, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
+| R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
 | R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
 | R-15 | D-6, G-4 | Require a **subscription on jwt / mtls / oauth2-remote / keyless plans** — today any valid token passes | — | G-4 |
@@ -63,7 +63,7 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-3 | D-20 | **Hostname exposure** (`<workspace>.<domain>`): coded, never run; **redirects** from the old url form when the pattern changes; in **mono-tenant**, no prefix and no selector at all | M | |
-| R-19 | §8, owner notes | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
+| R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
 | R-21 | §8 | **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 | R-22 | D-11, D-18 | Metadata field **labels and help in several languages** (one language today) | S | |
@@ -73,7 +73,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-5 | D-11, PX-05 | The console **in French** (the portal is en/fr) — the strings are not extracted yet | M | |
+| R-5 | D-11 | The console **in French** (the portal is en/fr) — the strings are not extracted yet | M | |
 | R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
@@ -83,7 +83,7 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-4 | D-37, D-35 | **Promotion**: publish the same immutable snapshot on the next installation (recette → production), with its diff and dry-run, through the export and the CLI | M | |
-| R-6 | D-28, owner notes | **Kubernetes**: deployment manifests and a Helm chart; **CRDs** for the product's own entities (Api document, applications, subscriptions) with a controller | L | |
+| R-6 | D-28 | **Kubernetes**: deployment manifests and a Helm chart; **CRDs** for the product's own entities (Api document, applications, subscriptions) with a controller | L | |
 | R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
@@ -93,7 +93,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-8 | D-33, Q-8 | **Raw path**: retention, sampling, lightening policy; **pseudonymisation** of personal data (ip, email, identifiers); what the computed path aggregates and at which granularity (rollups) | M | or upstream in the exporters (OTO-6) |
+| R-8 | D-33, Q-8 | **Raw path**: retention, sampling, lightening policy; **pseudonymisation** of personal data (ip, email, identifiers); what the computed path aggregates and at which granularity (rollups) | M | or upstream in the data exporters |
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
 | R-32 | §8 | A **correlation id** carried beyond the gateway, to follow a request through the backends | S | |
 | R-33 | §8, G-7 | Tie Otoroshi's deployment history to the product snapshot from the gateway side | — | G-7 |
@@ -112,7 +112,7 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-2 | D-4, D-9 n°4 | An executable test that **traffic flows while the product is down**, and that **uninstalling leaves a working Otoroshi configuration** | S | |
 | R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
-| R-37 | PX-05 | An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
+| R-37 | — | An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
 | R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
 | R-39 | D-25 | Test the **Otoroshi authentication mode** end to end behind a real route with an auth module (unit-tested only) | S | |
 
@@ -130,7 +130,7 @@ waits for the data plane rather than working around it.
 
 | Decision | Status | Where / how it is verified |
 |---|---|---|
-| D-1 Otoroshi's `Api` entity | ✅ | `server/otoroshi/projection.js`; L0 test |
+| D-1 Otoroshi's `Api` entity | ✅ | `server/otoroshi/projection.js`; reference catalogue test |
 | D-2 selective synchronisation | ✅ | docs, terms, usage statements, pricing, metadata never projected; `test/model.test.js` |
 | D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows |
 | D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; a subscription waits until its api is deployed — explicit "product down" test: R-2 |
@@ -146,7 +146,7 @@ waits for the data plane rather than working around it.
 | D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅; console in English: R-5; metadata labels: R-22 |
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules: R-1 |
-| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — L0 test; certificates and auth modules: R-1; inventory: R-9 |
+| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; certificates and auth modules: R-1; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
 | D-17 try-it | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
@@ -202,9 +202,9 @@ waits for the data plane rather than working around it.
 | Q-11 declarative format | 🟡 implemented, to validate: R-28 |
 | Q-12 monetisation | ⬜ owner decision: R-35; connector: R-7 |
 
-## L0 exit criterion
+## Reference catalogue test
 
-✅ `test/reference-catalogue.test.js`: the Atlas catalogue (6 plans, 5 auth mechanisms, 4 approval modes, one api, one set of routes) projected on Otoroshi 18.0.1, reconciled, drift detected then repaired — including the JWT verifier derived from the Partner plan. 14 tests, stable; the test leaves nothing behind.
+✅ `test/reference-catalogue.test.js`: a reference catalogue (6 plans, 5 auth mechanisms, 4 approval modes, one api, one set of routes) projected on Otoroshi 18.0.1, reconciled, drift detected then repaired — including the JWT verifier derived from the Partner plan. 14 tests, stable; the test leaves nothing behind.
 
 ## Documentation
 

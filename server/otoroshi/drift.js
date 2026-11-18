@@ -1,4 +1,4 @@
-// Drift detection and adopt mode (spec §5). Both sides are administrable, so drift is certain, not
+// Drift detection and adopt mode. Both sides are administrable, so drift is certain, not
 // probable: it is detected periodically and rendered readably. Adopt mode takes over an existing
 // Otoroshi Api without overwriting it — without it the product is unusable for anyone already in
 // production.
@@ -27,7 +27,7 @@ export async function checkApi(api) {
   const expected = buildOtoroshiApi(dep.content, { snapshotId: dep.snapshot_id, snapshotNumber: dep.number, lifecycle: api.lifecycle });
   const actual = await oto.getApi(api.id);
   const changes = actual ? diff(comparableApi(expected), comparableApi(actual)) : [];
-  // the derived objects (D-15) drift too: they are the product's, even though they live apart
+  // the derived objects drift too: they are the product's, even though they live apart
   for (const d of derivedEntities(dep.content)) {
     const got = await oto.getEntity(d.path, d.id);
     if (!got) changes.push({ op: 'remove', path: `derived[${d.kind} ${d.id}]`, before: 'present' });

@@ -77,7 +77,7 @@ function LangMenu() {
   );
 }
 
-// what happened to my subscriptions (D-30: systematic notification)
+// what happened to my subscriptions (systematic notification)
 function NotificationsMenu() {
   const { t } = useI18n();
   const { navigate } = useRouter();

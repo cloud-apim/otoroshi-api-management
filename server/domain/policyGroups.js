@@ -1,9 +1,9 @@
-// Shared policy groups (D-16): the product names a composition of Otoroshi plugins so that it can
+// Shared policy groups: the product names a composition of Otoroshi plugins so that it can
 // be governed — "here is our company policy" — instead of being rebuilt by hand on thirty apis.
 //
 // It creates no gateway capability: a group is projected inline, in the flows of the apis that
 // use it. An api pins a published version; publishing a group never republishes the apis that
-// reference it — their snapshots are immutable (D-35). The console shows which apis lag behind.
+// reference it — their snapshots are immutable. The console shows which apis lag behind.
 
 import { db, newId } from '../db/index.js';
 import { badRequest, conflict, notFound } from '../http/router.js';

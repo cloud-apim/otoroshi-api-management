@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { client } from '../shared/lib.js';
 
-// the console consumes the very admin api the CLI uses (PX-02), through its session
+// the console consumes the very admin api the CLI uses, through its session
 export const api = client('/backoffice/api');
 
 export const SessionCtx = createContext(null);
@@ -25,7 +25,7 @@ export function useWs() {
   return { ws: s.workspace, slug: s.workspace?.slug, wapi: wsApi(s.workspace?.slug), session: s };
 }
 
-// the typed metadata fields of a scope (D-18)
+// the typed metadata fields of a scope
 export function useMetadataFields(scope) {
   const { wapi, slug } = useWs();
   const [fields, setFields] = useState([]);

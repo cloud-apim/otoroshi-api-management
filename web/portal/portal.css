@@ -1,4 +1,4 @@
-/* Developer portal — default template. Hand-written (D-39), on top of ../shared/theme.css tokens.
+/* Developer portal — default template. Hand-written, on top of ../shared/theme.css tokens.
    The workspace accent colour (portal settings) is injected as --brand and derives the accent tokens. */
 
 :root[data-brand] {

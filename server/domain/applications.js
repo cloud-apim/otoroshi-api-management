@@ -1,5 +1,5 @@
-// Application (D-26): groups the subscriptions and the technical identity of a consumer — its
-// expected client_id (oauth2, mtls) and client certificates. It groups identity, never counters (D-31).
+// Application: groups the subscriptions and the technical identity of a consumer — its
+// expected client_id (oauth2, mtls) and client certificates. It groups identity, never counters.
 // Whoever can see an application can see its credentials.
 
 import { db, newId } from '../db/index.js';

@@ -333,7 +333,7 @@ function ExampleCall({ sub, cred }) {
   return <Code>{snippets({ kind: sub.auth_kind, url, clientId: cred.client_id, clientSecret: cred.client_secret }).curl}</Code>;
 }
 
-// D-30 from the consumer's side: ask to move to an equivalent plan
+// from the consumer's side: ask to move to an equivalent plan
 function ChangePlanModal({ sub, onClose, onDone }) {
   const { t } = useI18n();
   const toast = useToast();

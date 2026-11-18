@@ -1,4 +1,4 @@
-# A remote catalog source (D-28): several api documents in one file, served over http
+# A remote catalog source: several api documents in one file, served over http
 # (in the dev stack: http://catalog.oto.tools/catalog/apis.yaml), or a directory of a git repository.
 apiVersion: otoroshi-apim.io/v1
 kind: Api

@@ -1,6 +1,6 @@
-// One metadata mechanism, with the scope as a parameter (D-18): same model, same screen, same api
+// One metadata mechanism, with the scope as a parameter: same model, same screen, same api
 // for a workspace, an api, a plan, a subscription or an application. Fields are typed — the type
-// drives rendering and validation — and values are never projected on the gateway (D-2).
+// drives rendering and validation — and values are never projected on the gateway.
 
 import { db, newId } from '../db/index.js';
 import { badRequest } from '../http/router.js';

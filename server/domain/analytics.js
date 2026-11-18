@@ -1,5 +1,5 @@
 // Analytics read the computed path only. Dashboards speak the catalogue's vocabulary — apis, plans,
-// applications, subscriptions — not the infrastructure's (PX-08).
+// applications, subscriptions — not the infrastructure's.
 
 import { adb, db } from '../db/index.js';
 

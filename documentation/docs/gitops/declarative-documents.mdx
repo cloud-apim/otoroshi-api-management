@@ -6,7 +6,7 @@ description: The Api document — one API-version with its plans and its documen
 
 # Declarative documents
 
-The declarative unit is the **API-version** (Q-11): since a version is an API (D-29), one document
+The declarative unit is the **API-version**: since a version is an API, one document
 carries an API and its plans, with its documentation pages beside them. `apis get` produces it,
 `apply` consumes it, and [remote catalogs](./remote-catalogs.mdx) reconcile it.
 
@@ -77,7 +77,7 @@ and deploying stay explicit acts unless asked for. A document applied twice chan
 (`snapshot unchanged`). Pages are upserted by slug.
 
 `--managed-by <source>` marks the API as owned by that source: the console then refuses to edit it
-by hand (D-28).
+by hand.
 
 Over HTTP: `POST /api/workspaces/<ws>/apply?publish=true&deploy=true` with one document, a list, or
 `{"items": […]}`.

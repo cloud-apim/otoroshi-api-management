@@ -1,4 +1,4 @@
-// Hand-made components — no component library (D-39).
+// Hand-made components — no component library.
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';

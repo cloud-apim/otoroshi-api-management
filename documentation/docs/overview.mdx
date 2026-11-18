@@ -20,8 +20,8 @@ creates an API end to end, routes and backends included. *No longer need to* is 
 able to*: every projected Otoroshi entity stays readable, reachable and reclaimable by hand.
 
 :::info Status
-This is a first prototype of the [product specification](https://github.com/cloud-apim/otoroshi-api-management-specs).
-Decisions of the specification are cited as `D-n` where they explain a behaviour.
+This is a first prototype. It runs against a real Otoroshi 18, and the gaps it found in the gateway
+are listed in [known limitations](./otoroshi-gaps.mdx).
 :::
 
 ## Four components, one binary
@@ -38,32 +38,32 @@ across instances. See [Install](./install.mdx).
 
 ## The principles
 
-**The product is never in the request path** (D-4). It projects policies into Otoroshi through its
+**The product is never in the request path**. It projects policies into Otoroshi through its
 Admin API; Otoroshi enforces them. It is never called per request to decide whether a consumer may
 pass. Product operations are asynchronous and replayable: a projection that cannot reach the gateway
 waits in a queue and runs when the gateway is back. *If the product is down, traffic still flows.*
 
-**Policy lives in the plan; the route is a projection detail** (D-5). Target, TLS, timeouts and load
+**Policy lives in the plan; the route is a projection detail**. Target, TLS, timeouts and load
 balancing belong to the route; auth mechanism, rate limit, quota, resource filtering and visibility
 belong to the plan. Adding a tier is a catalogue operation, never an infrastructure one.
 
-**You edit a draft, publish a snapshot, deploy the snapshot** (D-35). A draft never reaches the
+**You edit a draft, publish a snapshot, deploy the snapshot**. A draft never reaches the
 gateway. Publishing freezes an immutable snapshot; deploying projects it; rolling back is deploying
 an earlier one.
 
-**Synchronisation is selective** (D-2). Only what the gateway needs to *enforce* is pushed to it.
+**Synchronisation is selective**. Only what the gateway needs to *enforce* is pushed to it.
 Documentation, catalogue visibility, terms of use, usage statements, pricing and metadata stay in
 the product.
 
-**The abstraction is additive and transparent** (D-9). From any API you reach the Otoroshi entity it
+**The abstraction is additive and transparent**. From any API you reach the Otoroshi entity it
 projects; drift made by hand on the gateway is detected and shown; an existing Otoroshi API can be
 adopted without being overwritten.
 
-**Everything is administrable by program** (D-28). The console is a client of the admin API, so
+**Everything is administrable by program**. The console is a client of the admin API, so
 every action replays from the [CLI](./gitops/cli.mdx). APIs are [declarative documents](./gitops/declarative-documents.mdx),
 and [remote catalogs](./gitops/remote-catalogs.mdx) reconcile them from HTTP or git.
 
-**One installation drives one Otoroshi cluster** (D-37). Geography is carried by Otoroshi's own
+**One installation drives one Otoroshi cluster**. Geography is carried by Otoroshi's own
 leader/worker cluster; each environment is its own installation.
 
 ## Architecture

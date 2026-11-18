@@ -76,7 +76,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
               <dt>State</dt>
               <dd>{api.deployment.out_of_sync ? <StatusBadge status="drifted" label="out of sync" /> : <StatusBadge status="in_sync" label="up to date" />}</dd>
               <dt>Target</dt>
-              <dd>the installation's Otoroshi cluster (one per installation, D-37)</dd>
+              <dd>the installation's Otoroshi cluster (one per installation)</dd>
             </dl>
           </div>
         </div>

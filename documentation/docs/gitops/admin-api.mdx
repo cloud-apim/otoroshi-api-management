@@ -6,7 +6,7 @@ description: The only way to do anything in the product — the console and the 
 
 # Admin API
 
-Everything the console does goes through the admin API, without exception (D-9, PX-02): the very
+Everything the console does goes through the admin API, without exception: the very
 same router is served on two mounts.
 
 | Mount | Authentication | Used by |
@@ -14,7 +14,7 @@ same router is served on two mounts.
 | `/api` | `Authorization: Bearer <token>` | the CLI, CI, scripts |
 | `/backoffice/api` | the console's session cookie (mutations must be JSON) | the console |
 
-So a feature cannot exist only on screen: *every action of the console replays from the CLI* (D-28).
+So a feature cannot exist only on screen: *every action of the console replays from the CLI*.
 
 ## Tokens
 
@@ -95,5 +95,5 @@ event.
 
 `GET …/export` returns the whole workspace — teams, every API (one document per API-version, with
 its documentation pages and snapshot history), applications and subscriptions — and `POST …/import`
-re-imports it elsewhere (PX-07). Import is idempotent: objects are upserted by id, snapshots are
+re-imports it elsewhere. Import is idempotent: objects are upserted by id, snapshots are
 never rewritten, and nothing is deployed.

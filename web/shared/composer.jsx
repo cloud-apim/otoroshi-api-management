@@ -1,4 +1,4 @@
-// The request composer (D-17): one component, two execution contexts — the console replays a
+// The request composer: one component, two execution contexts — the console replays a
 // request through its own api, the portal tries an api with the consumer's credentials.
 import React, { useState } from 'react';
 import { Badge, Callout, Code, Field, Icon, Select, TextArea } from './ui.jsx';

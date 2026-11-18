@@ -1,7 +1,7 @@
 // Subscriptions: (application x plan) -> state + credentials. The approval workflow belongs entirely
-// to the product (D-1): Otoroshi 18 only carries `validation` as a label.
+// to the product: Otoroshi 18 only carries `validation` as a label.
 //
-// Projection rules learned from Otoroshi 18 (spec §5), fixed here by construction:
+// Projection rules learned from Otoroshi 18, fixed here by construction:
 //  - a pending subscription gets an enabled key in Otoroshi -> pending subscriptions are never projected
 //  - deleting a subscription revokes nothing -> keys are deleted explicitly before the subscription
 
@@ -86,12 +86,12 @@ export async function requestSubscription(ctx, workspaceId, input) {
     throw badRequest('this plan asks you to describe your intended usage');
   if (plan.terms?.enabled && !input.terms_accepted) throw badRequest('you must accept the terms of use of this plan');
   if (['oauth2-remote', 'jwt', 'mtls'].includes(plan.auth.kind) && !app.client_id)
-    throw badRequest(`a ${plan.auth.kind} plan identifies the consumer by its client_id: declare the expected client_id on the application first (D-26)`);
+    throw badRequest(`a ${plan.auth.kind} plan identifies the consumer by its client_id: declare the expected client_id on the application first`);
   const dup = await db`select id from subscriptions where application_id = ${app.id} and api_id = ${api.id} and plan_id = ${plan.id}
     and status = any(${'{' + OPEN_STATUSES.join(',') + '}'}::text[])`;
   if (dup.length) throw conflict('this application already has an open subscription to this plan');
 
-  // the request form of the plan: the subscription-scoped fields asked to the requester (D-18)
+  // the request form of the plan: the subscription-scoped fields asked to the requester
   const metadata = await checkValues(workspaceId, 'subscription', input.metadata || {}, { only: (f) => f.portal });
   const paid = plan.pricing?.kind === 'paid';
   let status = plan.validation === 'manual' ? 'pending' : paid ? 'pending_payment' : 'active';
@@ -133,7 +133,7 @@ async function setStatus(ctx, sub, status, { review, datesPatch = {}, action, su
   return (await db`select * from subscriptions where id = ${sub.id}`)[0] || rows[0];
 }
 
-// the team owning the application sees what happens to its subscriptions (D-30: systematic)
+// the team owning the application sees what happens to its subscriptions (systematic)
 async function notifyConsumer(sub, { kind, title, body = '', data = {} }) {
   const app = (await db`select team_id, name from applications where id = ${sub.application_id}`)[0];
   if (!app) return;
@@ -190,7 +190,7 @@ export async function closeSubscription(ctx, sub) {
   return setStatus(ctx, sub, 'closed', { datesPatch: { closed_at: now() }, action: 'subscription.close', summary: `subscription ${sub.id} closed` });
 }
 
-// test payment connector (D-36): stands for Stripe's checkout.session.completed webhook
+// test payment connector: stands for Stripe's checkout.session.completed webhook
 export async function confirmPayment(ctx, sub, { providerRef } = {}) {
   if (sub.status !== 'pending_payment') throw badRequest('this subscription is not waiting for a payment');
   return setStatus(ctx, sub, 'active', {
@@ -201,9 +201,9 @@ export async function confirmPayment(ctx, sub, { providerRef } = {}) {
   });
 }
 
-// D-30: transfer to an equivalent plan (same auth mechanism). The key does not change, the
-// subscription keeps its identity and its history. Works across versions (D-29).
-// D-30: how the target plan compares to the current one. A transfer that degrades the conditions —
+// transfer to an equivalent plan (same auth mechanism). The key does not change, the
+// subscription keeps its identity and its history. Works across versions.
+// how the target plan compares to the current one. A transfer that degrades the conditions —
 // lower limits, a higher price, other terms, fewer resources — is a change of contract.
 export const DEGRADATION_LABELS = {
   rate: 'a lower rate limit',
@@ -246,7 +246,7 @@ async function resolveTransfer(sub, { plan_id, api_id }) {
   const { plan: toPlan } = await findPlan(toApi, plan_id);
   if (toApi.id === sub.api_id && toPlan.id === sub.plan_id) throw badRequest('the subscription is already on this plan');
   if (!plansAreEquivalent(fromPlan, toPlan))
-    throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer (D-30)`);
+    throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer`);
   if (toPlan.status !== 'published') throw badRequest(`target plan is ${toPlan.status}`);
   return { fromApi, toApi, fromPlan, toPlan, reasons: degradations(fromPlan, toPlan), reason_codes: degradationCodes(fromPlan, toPlan) };
 }
@@ -284,7 +284,7 @@ function pending(ctx, t, status, extra = {}) {
   };
 }
 
-// D-30. A producer transfers: applied at once when nothing degrades, otherwise it waits for the
+// A producer transfers: applied at once when nothing degrades, otherwise it waits for the
 // consumer's consent. A consumer asks: the producer decides, the request carries the consent.
 export async function transferSubscription(ctx, sub, { plan_id, api_id }, { initiator = 'producer' } = {}) {
   const t = await resolveTransfer(sub, { plan_id, api_id });

@@ -11,7 +11,7 @@ description: The public face — catalogue, documentation, reference and try-it,
 ![The API reference, rendered by Scalar, its server pointing at the gateway](/img/screenshots/portal-reference.jpg)
 
 
-Each workspace has **its own portal** (D-20), carrying its identity, its catalogue and its identity
+Each workspace has **its own portal**, carrying its identity, its catalogue and its identity
 provider. It is served at `/<workspace>/` (or `<workspace>.<domain>/`, see
 [portal exposure](./install.mdx#portal-exposure)) and talks to `/<workspace>/front/api`.
 
@@ -27,7 +27,7 @@ follows the visitor's light / dark / system preference.
 The catalogue shows the APIs whose snapshot **runs on the gateway** — never a draft — in the
 `published` or `deprecated` lifecycle, filtered by their visibility: public APIs to anyone,
 `authenticated` ones to signed-in members, `restricted` ones by ACL tags. Because it is served from
-the product's own snapshots, it stays readable during a gateway incident (D-4).
+the product's own snapshots, it stays readable during a gateway incident.
 
 Search covers names, descriptions and tags.
 
@@ -37,12 +37,11 @@ Search covers names, descriptions and tags.
   JavaScript and Python snippets, filled with the visitor's own credentials when signed in — and the
   resources.
 - **Documentation**: the pages of the snapshot, with a language switcher over the languages the
-  producer wrote them in (D-11).
+  producer wrote them in.
 - **Reference**: when the API has an OpenAPI specification, rendered with
-  [Scalar](https://github.com/scalar/scalar), bundled in the portal (D-42). Its servers point at the
+  [Scalar](https://github.com/scalar/scalar), bundled in the portal. Its servers point at the
   gateway.
-- **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled
-  (D-31) — the resources a plan gives access to, terms, approval mode and price.
+- **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled — the resources a plan gives access to, terms, approval mode and price.
 - A version switcher when several versions of the API are in the catalogue.
 
 ### Try it
@@ -50,7 +49,7 @@ Search covers names, descriptions and tags.
 Scalar sends its requests through the portal's proxy, `/<workspace>/front/api/tryit?scalar_url=…`.
 The proxy only talks to the hosts of the workspace's deployed APIs, never forwards the portal's
 cookies, and reaches the gateway at its own address with the API's `Host` header — so the browser
-needs no CORS on the API. The consumer tries the API with its own credentials (D-17).
+needs no CORS on the API. The consumer tries the API with its own credentials.
 
 ## Subscribing
 
@@ -69,7 +68,7 @@ portal.
 
 The consumer's applications: their subscriptions with their status, the credentials (reveal, copy,
 **rotate**), the live quotas of each key as the gateway counts them, the expected `client_id`, and
-**close** a subscription. Whoever can see an application can see its credentials (D-26).
+**close** a subscription. Whoever can see an application can see its credentials.
 
 ## Usage
 

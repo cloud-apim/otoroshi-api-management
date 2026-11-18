@@ -1,4 +1,4 @@
-// Authentication (D-25): the Otoroshi info token, and OIDC id_token verification against a JWKS.
+// Authentication: the Otoroshi info token, and OIDC id_token verification against a JWKS.
 import { describe, expect, test } from 'bun:test';
 import { createHmac, generateKeyPairSync, createSign } from 'node:crypto';
 import { verifyOtoroshiClaim } from '../server/auth/otoroshi.js';

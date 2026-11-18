@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-// apim — the command line of otoroshi-api-management (D-28), in the manner of otoroshictl/kubectl.
+// apim — the command line of otoroshi-api-management, in the manner of otoroshictl/kubectl.
 // It only talks to the admin api: every action of the console replays from here.
 //
 //   APIM_URL=http://localhost:9000 APIM_TOKEN=... bun cli/apim.js <command>
@@ -34,7 +34,7 @@ Commands:
   applications list <ws>
   drift <ws>                            run drift detection and print the reports
   audit <ws> [--limit n]
-  export <ws>                           full export, re-importable (PX-07)
+  export <ws>                           full export, re-importable
   import <ws> -f <file>
 `;
 

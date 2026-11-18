@@ -102,7 +102,7 @@ export function OverviewTab({ api, draft, validation, order }) {
                   </span>
                 ))}
               </div>
-              <p className="hint mt-8">It follows the extractor index of each auth kind in Otoroshi, it is not freely chosen — the console shows it rather than hiding it (ADR-10).</p>
+              <p className="hint mt-8">It follows the extractor index of each auth kind in Otoroshi, it is not freely chosen — the console shows it rather than hiding it.</p>
             </div>
           )}
         </div>
@@ -140,7 +140,7 @@ export function OverviewTab({ api, draft, validation, order }) {
           <Link className="link" to={`/ws/${slug}/apis/${api.previous_version_id}`}>
             the previous version
           </Link>
-          . Subscriptions do not follow a new version: transfer them (D-30).
+          . Subscriptions do not follow a new version: transfer them.
         </p>
       )}
     </div>
@@ -360,7 +360,7 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
   };
   return (
     <div className="col gap-16">
-      <p className="muted small">Backends are infrastructure: targets, TLS, timeouts, load balancing. They belong to the route side, never to the offer (D-5).</p>
+      <p className="muted small">Backends are infrastructure: targets, TLS, timeouts, load balancing. They belong to the route side, never to the offer.</p>
       <div className="grid-2">
         {draft.backends.map((b) => (
           <div key={b.id} className="card">
@@ -411,7 +411,7 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
   );
 }
 
-// ---------------------------------------------------------------- flows: named compositions of otoroshi plugins (D-16)
+// ---------------------------------------------------------------- flows: named compositions of otoroshi plugins
 
 export function PluginModal({ value, catalog, onSave, onClose }) {
   const [p, setP] = useState(value);
@@ -672,13 +672,13 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
           <Setting label="Description" help="shown in the catalogue">
             <TextArea value={identity.description} onChange={(v) => setIdent({ description: v })} rows={3} disabled={readOnly} />
           </Setting>
-          <Setting label="Tags" help="business classification — domain, exposure, criticality — never a governance axis (D-19)">
+          <Setting label="Tags" help="business classification — domain, exposure, criticality — never a governance axis">
             <TagsInput value={identity.tags} onChange={(v) => setIdent({ tags: v })} />
           </Setting>
           <Setting label="Owning team" help="the producers of this team can edit the api">
             <Select value={identity.team_id || ''} onChange={(v) => setIdent({ team_id: v || null })} options={[{ value: '', label: 'no team' }, ...(teams.data || []).filter((t) => !t.personal).map((t) => ({ value: t.id, label: t.name }))]} disabled={readOnly} />
           </Setting>
-          <Setting label="Catalogue visibility" help="who sees the api on the portal. Never projected on the gateway (D-2).">
+          <Setting label="Catalogue visibility" help="who sees the api on the portal. Never projected on the gateway.">
             <Select
               value={identity.visibility}
               onChange={(v) => setIdent({ visibility: v })}
@@ -692,7 +692,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
             {identity.visibility === 'restricted' && <TagsInput value={identity.acl} onChange={(v) => setIdent({ acl: v })} placeholder="user:jane@corp.com, team:<id>, role:producer" />}
           </Setting>
           {metaFields.length > 0 && (
-            <Setting label="Metadata" help="typed fields declared for the workspace's apis — never projected on the gateway (D-18)">
+            <Setting label="Metadata" help="typed fields declared for the workspace's apis — never projected on the gateway">
               <MetadataForm fields={metaFields} values={identity.metadata} onChange={(v) => setIdent({ metadata: v })} disabled={readOnly} />
             </Setting>
           )}
@@ -711,7 +711,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
             <h3>Versions and lifecycle</h3>
           </div>
           <div className="card-body">
-            <Setting label="New version" help="A version is a new API pre-filled from this one: its own routes, plans, documentation and lifecycle. Subscriptions do not follow; transfer them (D-29, D-30).">
+            <Setting label="New version" help="A version is a new API pre-filled from this one: its own routes, plans, documentation and lifecycle. Subscriptions do not follow; transfer them.">
               <div className="row">
                 <Input value={version} onChange={setVersion} placeholder="2.0.0" />
                 <button
@@ -758,7 +758,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
         </div>
       )}
 
-      {/* the escape hatch, discreet but always there (D-9 n°2, D-14) */}
+      {/* the escape hatch, discreet but always there */}
       <details className="card">
         <summary className="card-head" style={{ cursor: 'pointer' }}>
           <Icon name="info" />

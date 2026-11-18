@@ -11,7 +11,7 @@ import { SubscriptionsTable } from '../Subscriptions.jsx';
 import { AnalyticsDashboard } from '../Observability.jsx';
 import { RequestComposer } from '../../../shared/composer.jsx';
 
-// D-17, console context: replay a request through this api on the gateway
+// console context: replay a request through this api on the gateway
 function TryItTab({ api, draft }) {
   const { wapi } = useWs();
   const subs = useLoad(() => wapi.get(`/subscriptions?api=${api.id}&status=active`), [api.id]);
@@ -63,7 +63,7 @@ function ApiEditor({ api, tab, reload }) {
   const [order, setOrder] = useState(api.resolution_order);
   const [publishing, setPublishing] = useState(false);
   const [deploying, setDeploying] = useState(null);
-  // an api owned by a remote catalog changes at its source (D-28); publishing and deploying stay
+  // an api owned by a remote catalog changes at its source; publishing and deploying stay
   // operable, they are explicit acts when the catalog only writes drafts
   const readOnly = !api.can_manage || !!api.managed_by;
   const operable = api.can_manage;
@@ -249,7 +249,7 @@ function ApiEditor({ api, tab, reload }) {
   );
 }
 
-// the described state is not the deployed state, and the gap is always shown (D-22 rule 1)
+// the described state is not the deployed state, and the gap is always shown
 function DeploymentBanner({ api, onDeploy, onPublish, readOnly, dirty }) {
   const dep = api.deployment;
   const pc = api.pending_changes;
@@ -350,7 +350,7 @@ function PublishModal({ api, onClose, onDone }) {
   );
 }
 
-// a deployment shows its diff before acting (D-22 rule 2): dry-run first, always
+// a deployment shows its diff before acting: dry-run first, always
 function DeployModal({ api, snapshot, onClose, onDone }) {
   const { wapi } = useWs();
   const toast = useToast();

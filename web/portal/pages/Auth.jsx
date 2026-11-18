@@ -68,7 +68,7 @@ export function SignIn() {
     >
       {next && <Callout kind="info">{t('auth.required')}</Callout>}
       {ssoError && <Callout kind="negative">{ssoError}</Callout>}
-      {/* the workspace's own identity provider (D-25: one IdP per portal) */}
+      {/* the workspace's own identity provider (one IdP per portal) */}
       {portal?.sso && (
         <>
           <a className="btn primary" href={`${runtime.base}/front/api/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`}>

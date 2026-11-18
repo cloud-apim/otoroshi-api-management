@@ -1,4 +1,4 @@
-// OpenID Connect, authorization code flow with PKCE (D-25: one IdP for the console, one per
+// OpenID Connect, authorization code flow with PKCE (one IdP for the console, one per
 // workspace portal). No library: discovery, token exchange and id_token verification against the
 // IdP's JWKS with WebCrypto.
 

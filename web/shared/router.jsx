@@ -1,4 +1,4 @@
-// A tiny pushState router with a base path. Filters live in the url (AI Studio precedent): a
+// A tiny pushState router with a base path. Filters live in the url: a
 // filtered view can be bookmarked and shared.
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 

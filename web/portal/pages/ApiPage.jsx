@@ -246,7 +246,7 @@ function Overview({ a }) {
   );
 }
 
-// ---------------------------------------------------------------- documentation (D-11: n languages)
+// ---------------------------------------------------------------- documentation (n languages)
 
 function orderPages(pages) {
   const byParent = {};
@@ -342,7 +342,7 @@ function DocPage({ page, docLang, fallback }) {
   );
 }
 
-// ---------------------------------------------------------------- reference (Scalar, D-42)
+// ---------------------------------------------------------------- reference (Scalar)
 
 function Reference({ a }) {
   const { t } = useI18n();

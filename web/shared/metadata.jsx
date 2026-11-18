@@ -1,4 +1,4 @@
-// One metadata mechanism, one screen (D-18): typed fields render the same way whatever their scope.
+// One metadata mechanism, one screen: typed fields render the same way whatever their scope.
 import React from 'react';
 import { Field, Input, NumberInput, Select, Switch, TextArea } from './ui.jsx';
 

@@ -85,7 +85,7 @@ export function PlansTab({ draft, setDraft, readOnly, order }) {
     <div className="col gap-16">
       <div className="row">
         <p className="muted small grow">
-          The policy lives in the plan (D-5): adding a tier is a catalogue operation, never an infrastructure one. One API, N plans, N auth mechanisms, on a single set of routes.
+          The policy lives in the plan: adding a tier is a catalogue operation, never an infrastructure one. One API, N plans, N auth mechanisms, on a single set of routes.
         </p>
         {!readOnly && (
           <button className="btn primary" onClick={() => setEditing(newPlan())}>
@@ -192,7 +192,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             <Select value={p.flowRef || ''} onChange={(v) => set({ flowRef: v || null })} options={[{ value: '', label: 'none' }, ...draft.flows.map((f) => ({ value: f.id, label: f.name }))]} />
           </Setting>
           {metaFields.length > 0 && (
-            <Setting label="Metadata" help="typed fields declared for the plans of this workspace — never projected (D-18)">
+            <Setting label="Metadata" help="typed fields declared for the plans of this workspace — never projected">
               <MetadataForm fields={metaFields} values={p.metadata} onChange={(v) => set({ metadata: v })} />
             </Setting>
           )}
@@ -224,7 +224,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             </>
           )}
           {p.auth.kind === 'jwt' && (
-            <Setting label="Token validation" help="describe how the tokens are validated and the product derives the Otoroshi JWT verifier, keeps it reconciled and removes it with the api (D-15) — or reference an existing one">
+            <Setting label="Token validation" help="describe how the tokens are validated and the product derives the Otoroshi JWT verifier, keeps it reconciled and removes it with the api — or reference an existing one">
               <Seg
                 value={p.auth.config.derive?.enabled ? 'derive' : 'reference'}
                 onChange={(v) => setAuthConfig({ derive: { kind: 'jwks', header: 'Authorization', prefix: 'Bearer ', size: 256, ...(p.auth.config.derive || {}), enabled: v === 'derive' } })}
@@ -252,7 +252,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           )}
           {(p.auth.kind === 'oauth2-remote' || (p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled)) && (
             <>
-              <Setting label={p.auth.kind === 'jwt' ? 'JWT verifier' : 'Auth module'} help="infrastructure of the gateway the plan references (D-15)">
+              <Setting label={p.auth.kind === 'jwt' ? 'JWT verifier' : 'Auth module'} help="infrastructure of the gateway the plan references">
                 <Select
                   value={p.auth.config.verifier}
                   onChange={(v) => setAuthConfig({ verifier: v })}
@@ -304,16 +304,16 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             {p.selectionRule && <Callout kind="warning">Recorded and projected as plan metadata, not yet enforced by Otoroshi 18 (upstream work).</Callout>}
           </Setting>
           {['jwt', 'mtls', 'oauth2-remote', 'keyless'].includes(p.auth.kind) && (
-            <Callout kind="warning">On Otoroshi 18 the gateway mints the consumer itself on the first call: any valid {p.auth.kind === 'keyless' ? 'caller' : 'token or certificate'} passes, subscribed or not (D-6, upstream gap).</Callout>
+            <Callout kind="warning">On Otoroshi 18 the gateway mints the consumer itself on the first call: any valid {p.auth.kind === 'keyless' ? 'caller' : 'token or certificate'} passes, subscribed or not (upstream gap G-4).</Callout>
           )}
         </div>
       )}
       {section === 'limits' && (
         <div>
-          <Setting label="Unit of measure" help="calls, tokens or an AI budget (D-41). Tokens and budget need an LLM backend, out of this version.">
+          <Setting label="Unit of measure" help="calls, tokens or an AI budget. Tokens and budget need an LLM backend, out of this version.">
             <Select value={p.unit} onChange={(v) => set({ unit: v })} options={[{ value: 'calls', label: 'Calls' }, { value: 'tokens', label: 'Tokens (LLM)' }, { value: 'budget', label: 'Budget (LLM)' }]} />
           </Setting>
-          <Setting label="Rate limit" help="per credential — a credential has its own quotas, nothing is pooled (D-31)">
+          <Setting label="Rate limit" help="per credential — a credential has its own quotas, nothing is pooled">
             <Switch checked={p.rateLimit.enabled} onChange={(v) => setIn('rateLimit', { enabled: v })} label="Limit the rate" />
             {p.rateLimit.enabled && (
               <div className="row">
@@ -362,7 +362,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
       )}
       {section === 'catalogue' && (
         <div>
-          <Callout kind="info">Nothing in this section is projected on the gateway (D-2): it belongs to the portal.</Callout>
+          <Callout kind="info">Nothing in this section is projected on the gateway: it belongs to the portal.</Callout>
           <Setting label="Visibility" help="who sees this plan on the portal">
             <Select value={p.visibility} onChange={(v) => set({ visibility: v })} options={[{ value: 'public', label: 'Public' }, { value: 'authenticated', label: 'Authenticated' }, { value: 'restricted', label: 'Restricted (ACL tags)' }]} />
             {p.visibility === 'restricted' && <TagsInput value={p.acl} onChange={(v) => set({ acl: v })} placeholder="user:…, team:…, role:…" />}
@@ -391,7 +391,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
       {section === 'pricing' && (
         <div>
           <Callout kind="info">
-            The product decides access; a payment provider decides the money (D-36). A paid subscription waits for the payment before its key is projected. Frozen in the snapshot: changing a price is a publication.
+            The product decides access; a payment provider decides the money. A paid subscription waits for the payment before its key is projected. Frozen in the snapshot: changing a price is a publication.
           </Callout>
           <Setting label="Pricing">
             <Select value={p.pricing.kind} onChange={(v) => setIn('pricing', { kind: v })} options={[{ value: 'free', label: 'Free' }, { value: 'paid', label: 'Paid' }]} />

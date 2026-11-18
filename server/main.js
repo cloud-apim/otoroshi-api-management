@@ -2,7 +2,7 @@
 //   ingester   -> /ingest
 //   api        -> /api                     (bearer token)
 //   backoffice -> /backoffice, /backoffice/api   (console session)
-//   portal     -> /, /front/api             (one portal per workspace, D-20)
+//   portal     -> /, /front/api             (one portal per workspace)
 
 import { join, normalize } from 'node:path';
 import { config, hasRole } from './config.js';
@@ -107,7 +107,7 @@ async function handleBackofficeApi(req, path, server) {
   const cookies = parseCookies(req);
   const auth = await consoleAuth();
   if (path === '/auth/config') return json(publicAuthConfig(auth));
-  // via Otoroshi (D-25): exclusive, the identity comes from the gateway on every request
+  // via Otoroshi: exclusive, the identity comes from the gateway on every request
   if (auth.mode === 'otoroshi') {
     if (path.startsWith('/auth/')) return json({ error: 'authentication is delegated to Otoroshi on this installation' }, 400);
     let user = null;
@@ -157,7 +157,7 @@ async function handleBackofficeApi(req, path, server) {
   return dispatch(adminRouter, req, path, { user, via: 'backoffice', ip: clientIp(req, server) });
 }
 
-// D-20: the workspace is read from the url — hostname or root path — never from a session
+// the workspace is read from the url — hostname or root path — never from a session
 async function resolvePortal(req, url) {
   if (config.portal.exposure === 'hostname') {
     const host = (req.headers.get('host') || '').split(':')[0];
@@ -286,7 +286,7 @@ async function start() {
   if (config.workers.enabled && (hasRole('api') || hasRole('backoffice'))) {
     setInterval(workOnce, config.workers.projectionIntervalMs);
     setInterval(() => runDriftDetection().catch((e) => console.error('[apim] drift detection failed', e.message)), config.workers.driftIntervalMs);
-    // remote catalogs, each on its own interval (D-28)
+    // remote catalogs, each on its own interval
     const { syncDue } = await import('./domain/catalogs.js');
     const apisMod = await import('./domain/apis.js');
     const depsMod = await import('./domain/deployments.js');

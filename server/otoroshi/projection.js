@@ -1,6 +1,6 @@
-// Projection: from a frozen snapshot (D-35) to the Otoroshi entities that enforce it.
+// Projection: from a frozen snapshot to the Otoroshi entities that enforce it.
 //
-// Synchronisation is selective, never 1:1 (D-2): only what the gateway needs to enforce is pushed.
+// Synchronisation is selective, never 1:1: only what the gateway needs to enforce is pushed.
 // Documentation, plan visibility, terms, usage statements, pricing and metadata stay in the product.
 
 import { normalizeDraft } from '../domain/model.js';
@@ -61,7 +61,7 @@ function clientJson(b) {
   };
 }
 
-// a policy group reference is expanded inline, from the version the snapshot froze (D-16)
+// a policy group reference is expanded inline, from the version the snapshot froze
 function expandGroups(plugins, groups = {}) {
   return plugins.flatMap((p) => {
     if (!p.group) return [p];
@@ -107,7 +107,7 @@ function routeJson(r) {
   };
 }
 
-// resource filtering of a plan (D-5) becomes apikey restrictions, on the full request path
+// resource filtering of a plan becomes apikey restrictions, on the full request path
 export function restrictionsFor(plan, draft) {
   if (plan.resourceFilter?.mode !== 'only') return { enabled: false, allowLast: true, allowed: [], forbidden: [], notFound: [] };
   const cp = contextPath(draft.entrypoint.contextPath);
@@ -198,7 +198,7 @@ export function planJson(plan, draft) {
     access_mode_configuration_type: plan.auth.kind,
     access_mode_configuration: accessModeConfiguration(plan, draft),
     rate_limiting: rateLimitingFor(plan),
-    // a label in Otoroshi 18, nothing reads it: the approval workflow is the product's (D-1)
+    // a label in Otoroshi 18, nothing reads it: the approval workflow is the product's
     validation: { kind: plan.validation === 'manual' ? 'manual' : 'auto', config: {} },
     visibility: { kind: 'public', config: {} },
     tags: [],
@@ -214,7 +214,7 @@ export function planJson(plan, draft) {
   };
 }
 
-// ---------------------------------------------------------------- derived objects (D-15)
+// ---------------------------------------------------------------- derived objects
 // Objects that follow from the description of an api are derived by the product, marked as its
 // own, reconciled with the api and removed with it. Today: the JWT verifiers of jwt plans that
 // describe how their tokens are validated instead of referencing an existing verifier.
@@ -269,7 +269,7 @@ export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecyc
   const draft = normalizeDraft(snapshot.draft);
   draft.__apiId = api.id;
   return {
-    _loc: { tenant: 'default', teams: ['default'] }, // D-24: never an otoroshi tenant
+    _loc: { tenant: 'default', teams: ['default'] }, // never an otoroshi tenant
     kind: 'Api',
     id: api.id,
     name: `${api.name} ${api.version}`,
@@ -301,7 +301,7 @@ export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecyc
     backends: draft.backends.map(backendJson),
     flows: draft.flows.map((f) => flowJson(f, snapshot.policyGroups)),
     clients_backend_config: draft.backends.map(clientJson),
-    // D-2: the documentation stays in the product, even though Otoroshi has ApiDocumentation
+    // the documentation stays in the product, even though Otoroshi has ApiDocumentation
     documentation: null,
     testing: { enabled: false, headerKey: 'X-OTOROSHI-TESTING' },
     clients: [],
@@ -313,8 +313,8 @@ function ms(d) {
   return d ? new Date(d).getTime() : Date.now();
 }
 
-// D-6: a subscription is always an Otoroshi apikey; on apikey / oauth2-local plans Otoroshi mints it
-// from the ApiSubscription. The application is projected as an id_ref metadata on the key (D-26).
+// a subscription is always an Otoroshi apikey; on apikey / oauth2-local plans Otoroshi mints it
+// from the ApiSubscription. The application is projected as an id_ref metadata on the key.
 export function buildOtoroshiSubscription(sub, { application }) {
   const enabled = sub.status === 'active';
   return {

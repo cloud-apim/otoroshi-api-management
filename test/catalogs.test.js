@@ -1,4 +1,4 @@
-// Remote catalogs (D-28): the git source reads every api document of a repository directory.
+// Remote catalogs: the git source reads every api document of a repository directory.
 import { describe, expect, test } from 'bun:test';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';

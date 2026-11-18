@@ -1,4 +1,4 @@
-// Product operations are asynchronous and replayable (D-4): a projection that cannot reach the
+// Product operations are asynchronous and replayable: a projection that cannot reach the
 // gateway waits in this queue and runs when it comes back. Handlers are idempotent.
 
 import { db, newId } from '../db/index.js';

@@ -6,7 +6,7 @@ description: Local accounts, OpenID Connect for the console and per portal, and 
 
 # Authentication
 
-One identity provider for the console, and one **per portal**, so one per workspace (D-25): the
+One identity provider for the console, and one **per portal**, so one per workspace: the
 console serves a customer's staff, the portal serves its consumers — two populations that have
 nothing in common.
 
@@ -16,7 +16,7 @@ nothing in common.
 | OpenID Connect | delegated to the customer's identity provider | yes, with local |
 | via Otoroshi | the identity is read in a header the gateway sets | **no: exclusive** |
 
-Users are global (D-19): an identity asserted by a provider is matched by email, and created on its
+Users are global: an identity asserted by a provider is matched by email, and created on its
 first login.
 
 ## Local accounts

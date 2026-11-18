@@ -47,7 +47,7 @@ function CreateApiModal({ onClose, onCreated }) {
       }
     >
       <p className="muted small">
-        An API is a version (D-29). The product creates it end to end — routes, frontends and backends — and nothing reaches the gateway before you publish and deploy.
+        An API is a version. The product creates it end to end — routes, frontends and backends — and nothing reaches the gateway before you publish and deploy.
       </p>
       <div className="grid-2">
         <Field label="Name">
@@ -71,7 +71,7 @@ function CreateApiModal({ onClose, onCreated }) {
           <Input value={form.contextPath} onChange={set('contextPath')} />
         </Field>
       </div>
-      <Field label="Tags" hint="business classification, not a governance axis (D-19)">
+      <Field label="Tags" hint="business classification, not a governance axis">
         <TagsInput value={form.tags} onChange={set('tags')} />
       </Field>
     </Modal>

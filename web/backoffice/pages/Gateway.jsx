@@ -6,7 +6,7 @@ import { StatTile } from '../../shared/charts.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 
-// one installation drives one Otoroshi cluster (D-37): its health, the projection queue and the
+// one installation drives one Otoroshi cluster: its health, the projection queue and the
 // drift live here, not in a "clusters" list
 function Status() {
   const st = useLoad(() => api.get('/gateway/status'), []);
@@ -24,7 +24,7 @@ function Status() {
           </div>
           <Callout kind="info">
             The product is never in the request path: if it is down, traffic still flows. Its operations are asynchronous and replayable — a projection that cannot reach the gateway waits in this
-            queue and runs when the gateway is back (D-4).
+            queue and runs when the gateway is back.
           </Callout>
           <div className="card">
             <div className="card-head">
@@ -165,7 +165,7 @@ function Connection() {
                 <Setting label="Admin API host" help="the Host header of the admin api">
                   <Input value={f.host} onChange={set('host')} mono />
                 </Setting>
-                <Setting label="Administration key" help="client id and secret of an Otoroshi admin apikey (D-24)">
+                <Setting label="Administration key" help="client id and secret of an Otoroshi admin apikey">
                   <Input value={f.clientId} onChange={set('clientId')} mono />
                   <Input value={f.clientSecret} onChange={set('clientSecret')} mono type="password" />
                 </Setting>
@@ -215,7 +215,7 @@ function Exporter({ ingest }) {
         <h3>Events → ingester</h3>
       </div>
       <div className="card-body">
-        <Setting label="Data exporter" help="An Otoroshi data exporter sends GatewayEvent, LLMUsageAudit and McpAudit to /ingest. An exporter is gateway infrastructure (D-15): this helper creates one, marked as managed, and touches no other.">
+        <Setting label="Data exporter" help="An Otoroshi data exporter sends GatewayEvent, LLMUsageAudit and McpAudit to /ingest. An exporter is gateway infrastructure: this helper creates one, marked as managed, and touches no other.">
           <Input value={url} onChange={setUrl} mono />
           <button
             className="btn"
@@ -232,7 +232,7 @@ function Exporter({ ingest }) {
             Install / update the exporter
           </button>
         </Setting>
-        <Setting label="Raw path" help="computed path: mandatory and exhaustive. Raw path: optional, where lightening and masking of url secrets belong (D-33).">
+        <Setting label="Raw path" help="computed path: mandatory and exhaustive. Raw path: optional, where lightening and masking of url secrets belong.">
           <div className="muted small">{ingest.storeRaw ? 'raw events are stored (lightened, url secrets masked)' : 'raw events are not stored'}</div>
           <button
             className="btn sm"

@@ -35,7 +35,7 @@ describe('validation', () => {
     expect(validateDraft(draft([key('a'), key('b')])).ok).toBe(true);
   });
 
-  test('a token or budget plan is refused without an llm backend (D-41)', () => {
+  test('a token or budget plan is refused without an llm backend', () => {
     const v = validateDraft(draft([defaultPlan({ status: 'published', unit: 'tokens' })]));
     expect(v.ok).toBe(false);
   });
@@ -57,7 +57,7 @@ describe('validation', () => {
     expect(order).toEqual(['a', 'j', 'k']);
   });
 
-  test('transfer equivalence is the auth mechanism (D-30)', () => {
+  test('transfer equivalence is the auth mechanism', () => {
     expect(plansAreEquivalent(defaultPlan({ auth: { kind: 'apikey' } }), defaultPlan({ auth: { kind: 'apikey' } }))).toBe(true);
     expect(plansAreEquivalent(defaultPlan({ auth: { kind: 'apikey' } }), defaultPlan({ auth: { kind: 'jwt' } }))).toBe(false);
   });
@@ -83,7 +83,7 @@ describe('projection', () => {
     expect(s).toEqual({ id: 'FixedWindowStrategyConfig', windowDurationMs: 60000, quota: { window: 500, daily: 1000, monthly: 10000000 } });
   });
 
-  test('the api entity is catalog-marked and never carries portal-only data (D-2, D-38)', () => {
+  test('the api entity is catalog-marked and never carries portal-only data', () => {
     const plan = defaultPlan({ id: 'p', status: 'published', usageStatement: { enabled: true, required: true, prompt: 'SECRET-PROMPT' }, pricing: { kind: 'paid', amount: 42 } });
     const d = draft([plan]);
     const e = buildOtoroshiApi({ api: { id: 'api_1', name: 'Pets', version: '1.0.0', workspace_id: 'ws', tags: [] }, draft: d }, { snapshotId: 'snap_1', snapshotNumber: 3 });
@@ -97,7 +97,7 @@ describe('projection', () => {
     expect(e.routes.map((r) => r.frontend.domains[0])).toEqual(['/pets', '/store']);
   });
 
-  test('a shared policy group is expanded inline from the version the snapshot froze (D-16)', () => {
+  test('a shared policy group is expanded inline from the version the snapshot froze', () => {
     const d = draft([defaultPlan({ status: 'published' })]);
     d.flows[0].plugins = [{ plugin: 'cp:a', config: {} }, { group: 'pg_1', version: 2 }];
     const groups = { 'pg_1@2': { name: 'company', plugins: [{ plugin: 'cp:headers', config: { v: 2 } }, { plugin: 'cp:cors', config: {} }] } };
@@ -130,7 +130,7 @@ describe('projection', () => {
 });
 
 describe('ingestion', () => {
-  test('secrets in the url are masked on the raw path (D-33)', () => {
+  test('secrets in the url are masked on the raw path', () => {
     expect(maskUrl('http://x.oto.tools/v1/books?page=2&api_key=abc&access_token=t')).toBe('http://x.oto.tools/v1/books?page=2&api_key=********&access_token=********');
     expect(maskUrl('/v1/books?q=x')).toBe('/v1/books?q=x');
   });

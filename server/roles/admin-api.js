@@ -1,4 +1,4 @@
-// The product's admin API. It is the only way to do anything in the product (D-9 n°1, PX-02): the
+// The product's admin API. It is the only way to do anything in the product: the
 // same router is served on /api (bearer token, CLI, CI) and on /backoffice/api (console session),
 // so every action of the console replays from the CLI by construction.
 
@@ -112,7 +112,7 @@ r.put('/settings/:key', async ({ ctx, params, body }) => {
   return { updated: params.key };
 });
 
-// ---------------------------------------------------------------- gateway (the single cluster, D-37)
+// ---------------------------------------------------------------- gateway (the single cluster)
 
 r.get('/gateway/status', async ({ ctx }) => {
   identity.requireUser(ctx);
@@ -136,7 +136,7 @@ r.post('/gateway/tasks/:id/retry', async ({ ctx, params }) => {
   return { retried: params.id };
 });
 
-// infrastructure the product references but does not own (D-15)
+// infrastructure the product references but does not own
 r.get('/gateway/references', async ({ ctx }) => {
   identity.requireUser(ctx);
   const [verifiers, auths, certs] = await Promise.all([
@@ -160,7 +160,7 @@ r.get('/gateway/plugins', async ({ ctx }) => {
     .map((p) => ({ id: p.id, name: p.name, description: p.description, steps: p.plugin_steps || p.steps || [], categories: p.plugin_categories || [] }));
 });
 
-// installs the data exporter that feeds the ingester. An exporter is infrastructure (D-15): this is a
+// installs the data exporter that feeds the ingester. An exporter is infrastructure: this is a
 // helper, the product marks what it created and never touches other exporters.
 r.post('/gateway/exporter', async ({ ctx, body }) => {
   identity.requireAdmin(ctx);
@@ -196,7 +196,7 @@ r.post('/gateway/drift', async ({ ctx }) => {
   return runDriftDetection();
 });
 
-// every report of the installation: the gateway is one cluster for all the workspaces (D-37)
+// every report of the installation: the gateway is one cluster for all the workspaces
 r.get('/gateway/drift-reports', async ({ ctx }) => {
   identity.requireUser(ctx);
   const reports = await driftReports(null);
@@ -210,7 +210,7 @@ r.get('/gateway/unmanaged-apis', async ({ ctx }) => {
   return unmanagedApis();
 });
 
-// ---------------------------------------------------------------- users (an admin only sees members of its workspaces, D-19)
+// ---------------------------------------------------------------- users (an admin only sees members of its workspaces)
 
 r.get('/users', async ({ ctx, query }) => {
   identity.requireUser(ctx);
@@ -463,7 +463,7 @@ r.delete('/workspaces/:ws/apis/:api/pages/:page', async ({ ctx, params }) => {
   return { deleted: true };
 });
 
-// snapshots & publication (D-35)
+// snapshots & publication
 r.get('/workspaces/:ws/apis/:api/changes', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   return apis.pendingChanges(await apiOf(c, params));
@@ -487,7 +487,7 @@ r.get('/workspaces/:ws/apis/:api/snapshots/:snap', async ({ ctx, params }) => {
   return apis.getSnapshot((await apiOf(c, params)).id, params.snap);
 });
 
-// deployments (D-22 rules 1-2, D-37, D-38)
+// deployments: the described state is not the deployed state, and the diff comes first
 r.get('/workspaces/:ws/apis/:api/deployments', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);
@@ -504,7 +504,7 @@ r.post('/workspaces/:ws/apis/:api/undeploy', async ({ ctx, params }) => {
   return deployments.undeploy(c, api);
 });
 
-// the escape hatch (D-9 n°2, D-14): the projected entity, as computed and as the gateway holds it
+// the escape hatch: the projected entity, as computed and as the gateway holds it
 r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);
@@ -519,7 +519,7 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   }
   const gw = await gatewaySettings();
   const report = (await db`select * from drift_reports where entity_kind = 'api' and entity_id = ${api.id}`)[0] || null;
-  // objects derived from the description of the api (D-15), and whether the gateway holds them
+  // objects derived from the description of the api, and whether the gateway holds them
   const derived = [];
   for (const d of snap ? derivedEntities(snap.content) : []) {
     const got = await oto.getEntity(d.path, d.id).catch(() => null);
@@ -535,7 +535,7 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   };
 });
 
-// D-17, console side: replay a request through the api on the gateway — real routing, real plans,
+// console side: replay a request through the api on the gateway — real routing, real plans,
 // real keys. The policy execution trace needs Otoroshi to expose its try-it (G-12).
 r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
@@ -549,7 +549,7 @@ r.post('/workspaces/:ws/apis/:api/tryit', async ({ ctx, params, body }) => {
   const headers = { ...(body.headers || {}), host: draft.entrypoint.domain };
   let credential = null;
   if (body.subscription_id) {
-    // only the credentials the caller can see (D-26): the subscriptions of its own applications
+    // only the credentials the caller can see: the subscriptions of its own applications
     const sub = await subscriptions.getSubscription(c.workspace.id, body.subscription_id);
     const app = await applications.getApplication(c.workspace.id, sub.application_id);
     await applications.requireSeeApplication(c, app);
@@ -728,7 +728,7 @@ r.get('/workspaces/:ws/analytics/calls', async ({ ctx, params, query }) => {
     from: query.get('from'),
     to: query.get('to'),
   }, parseInt(query.get('limit') || '100', 10));
-  // reading request logs is a processing of personal data: it is traced (spec §8)
+  // reading request logs is a processing of personal data: it is traced
   await audit(c, { action: 'analytics.calls.read', entityKind: 'workspace', entityId: c.workspace.id, summary: 'request log consulted', data: { filter: Object.fromEntries(query) } });
   return rows;
 });
@@ -828,7 +828,7 @@ r.get('/workspaces/:ws/home', async ({ ctx, params }) => {
   return { counts, pending: pending.slice(0, 10), recent, out_of_sync: outOfSync };
 });
 
-// ---------------------------------------------------------------- export / import (PX-07, D-28)
+// ---------------------------------------------------------------- export / import
 
 r.get('/workspaces/:ws/export', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);
@@ -841,7 +841,7 @@ r.post('/workspaces/:ws/import', async ({ ctx, params, body }) => {
   return importWorkspace(c, c.workspace, body);
 });
 
-// ---------------------------------------------------------------- remote catalogs (D-28)
+// ---------------------------------------------------------------- remote catalogs
 
 const hideHeaders = (c) => ({ ...c, headers: Object.fromEntries(Object.entries(c.headers || {}).map(([k, v]) => [k, /auth|token|key/i.test(k) ? '••••••' : v])) });
 
@@ -864,7 +864,7 @@ r.delete('/workspaces/:ws/catalogs/:cat', async ({ ctx, params }) => {
   await catalogs.deleteCatalog(c, await catalogs.getCatalog(c.workspace.id, params.cat));
   return { deleted: true };
 });
-// the dry run of a sync: what it would create, update, orphan or delete (spec §5)
+// the dry run of a sync: what it would create, update, orphan or delete
 r.post('/workspaces/:ws/catalogs/:cat/preview', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);
   const { docs, ...plan } = await catalogs.preview(await catalogs.getCatalog(c.workspace.id, params.cat));
@@ -875,7 +875,7 @@ r.post('/workspaces/:ws/catalogs/:cat/sync', async ({ ctx, params }) => {
   return catalogs.sync(c, await catalogs.getCatalog(c.workspace.id, params.cat), { apis, deployments });
 });
 
-// ---------------------------------------------------------------- typed metadata (D-18)
+// ---------------------------------------------------------------- typed metadata
 
 r.get('/workspaces/:ws/metadata-fields', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
@@ -886,7 +886,7 @@ r.put('/workspaces/:ws/metadata-fields', async ({ ctx, params, body }) => {
   return metadata.saveFields(c, c.workspace.id, body.fields || body);
 });
 
-// ---------------------------------------------------------------- shared policy groups (D-16)
+// ---------------------------------------------------------------- shared policy groups
 
 r.get('/workspaces/:ws/policy-groups', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
@@ -916,7 +916,7 @@ r.delete('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
   return { deleted: true };
 });
 
-// declarative api documents: the unit is the api-version (Q-11)
+// declarative api documents: the unit is the api-version
 r.get('/workspaces/:ws/apis/:api/document', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   return apiDocument(await apiOf(c, params));

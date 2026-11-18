@@ -1,4 +1,4 @@
-// APIs: one per version (D-29). Three objects with three lifetimes (D-35):
+// APIs: one per version. Three objects with three lifetimes:
 //  - the draft (the api row, its draft document and its documentation pages) — the only editable thing
 //  - the snapshots, immutable and append-only — what gets projected
 //  - the deployment state, which references a snapshot (see deployments.js)
@@ -99,7 +99,7 @@ export async function createApi(ctx, workspaceId, input) {
 const IDENTITY_FIELDS = ['name', 'description', 'tags', 'visibility', 'acl', 'team_id', 'metadata'];
 
 export async function updateApi(ctx, api, patch) {
-  if (api.managed_by && !patch.force) throw conflict(`this api is managed by ${api.managed_by}: edit it at its source of truth (D-28)`, { managed_by: api.managed_by });
+  if (api.managed_by && !patch.force) throw conflict(`this api is managed by ${api.managed_by}: edit it at its source of truth`, { managed_by: api.managed_by });
   const next = { ...api };
   IDENTITY_FIELDS.forEach((k) => {
     if (patch[k] !== undefined) next[k] = patch[k];
@@ -135,7 +135,7 @@ export async function deleteApiRow(ctx, api) {
   await audit(ctx, { action: 'api.delete', workspaceId: api.workspace_id, entityKind: 'api', entityId: api.id, summary: `api ${api.name} ${api.version} deleted` });
 }
 
-// ---------------------------------------------------------------- documentation pages (D-11)
+// ---------------------------------------------------------------- documentation pages
 
 export async function listPages(apiId, { withContent = false } = {}) {
   if (withContent) return db`select * from api_doc_pages where api_id = ${apiId} order by position, created_at`;
@@ -178,7 +178,7 @@ async function touchDraft(ctx, api) {
   await db`update apis set draft_updated_at = now(), draft_updated_by = ${ctx.user?.id || null} where id = ${api.id}`;
 }
 
-// ---------------------------------------------------------------- snapshots (D-35)
+// ---------------------------------------------------------------- snapshots
 
 function draftView(row) {
   return {
@@ -202,7 +202,7 @@ function draftView(row) {
 export async function composeDraft(api, { strict = false } = {}) {
   const pages = await listPages(api.id, { withContent: true });
   const view = draftView(api);
-  // the pinned versions of the shared policy groups are frozen into the snapshot (D-16, D-35)
+  // the pinned versions of the shared policy groups are frozen into the snapshot
   let policyGroups = {};
   try {
     policyGroups = await resolveGroups(view.draft);
@@ -218,7 +218,7 @@ export async function composeDraft(api, { strict = false } = {}) {
   };
 }
 
-// the typed metadata of the plans (D-18) is checked with the rest of the draft
+// the typed metadata of the plans is checked with the rest of the draft
 export async function validateWithMetadata(workspaceId, draft) {
   const v = validateDraft(draft);
   const fields = await listFields(workspaceId, 'plan');
@@ -277,12 +277,12 @@ export async function publish(ctx, api, { comment = '' } = {}) {
   return { snapshot: rows[0], warnings: validation.warnings };
 }
 
-// D-29: a new version is a new api, pre-filled from the previous one. Subscriptions do not follow:
-// that is what transfer (D-30) pays back.
+// a new version is a new api, pre-filled from the previous one. Subscriptions do not follow:
+// that is what transfer pays back.
 export async function newVersion(ctx, api, { version }) {
   if (!version) throw badRequest('version is required');
   const draft = normalizeDraft(api.draft);
-  // fresh plan ids: two versions share nothing (D-29)
+  // fresh plan ids: two versions share nothing
   draft.plans = draft.plans.map((p) => ({ ...p, id: newId('plan'), status: p.status === 'closed' ? 'closed' : 'staging' }));
   const pages = await listPages(api.id, { withContent: true });
   const created = await createApi(ctx, api.workspace_id, {

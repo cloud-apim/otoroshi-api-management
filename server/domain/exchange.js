@@ -1,5 +1,5 @@
-// Full export, re-importable elsewhere (PX-07, D-9 n°4). The declarative unit is the API-version
-// (Q-11, unblocked by D-29): one document per api, carrying its plans, with the documentation pages
+// Full export, re-importable elsewhere. The declarative unit is the API-version
+// (a version is an api): one document per api, carrying its plans, with the documentation pages
 // beside it and its snapshot history.
 
 import { db, newId } from '../db/index.js';
@@ -98,7 +98,7 @@ export async function importWorkspace(ctx, ws, doc) {
   return { imported: stats };
 }
 
-// ---------------------------------------------------------------- declarative documents (D-28, Q-11)
+// ---------------------------------------------------------------- declarative documents
 // The declarative unit is the api-version: one document carries the api and its plans, with its
 // documentation pages beside them. `apim get api -o yaml` and `apim apply -f` round-trip it.
 
@@ -126,7 +126,7 @@ export async function apiDocument(api) {
 }
 
 // upsert by (workspace, slug, version). Writes the draft: publishing and deploying stay explicit
-// acts, unless the caller asks for them (the GitOps gesture, D-36 "reste à instruire").
+// acts, unless the caller asks for them (the GitOps gesture).
 export async function applyApiDocument(ctx, ws, doc, { managedBy = null } = {}) {
   if (doc?.kind !== API_KIND) throw badRequest(`expected kind ${API_KIND}`);
   const slug = doc.metadata?.name;
