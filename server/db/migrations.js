@@ -398,6 +398,25 @@ alter table subscriptions add column pending_transfer jsonb;
 alter table api_snapshots add column origin jsonb;
 `,
   },
+  {
+    version: '0009_notification_states',
+    sql: `
+-- a notification addressed to a team is read, and done, by each of its members on their own
+create table notification_states (
+  notification_id text not null references notifications(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  read_at timestamptz,
+  done_at timestamptz,
+  primary key (notification_id, user_id)
+);
+-- what was read so far was read for everyone it was addressed to
+insert into notification_states (notification_id, user_id, read_at)
+  select n.id, n.user_id, n.read_at from notifications n where n.read_at is not null and n.user_id is not null
+  union
+  select n.id, m.user_id, n.read_at from notifications n join team_members m on m.team_id = n.team_id where n.read_at is not null
+on conflict do nothing;
+`,
+  },
 ];
 
 export const analyticsMigrations = [

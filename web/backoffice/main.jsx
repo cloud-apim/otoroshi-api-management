@@ -14,6 +14,7 @@ import { ApiPage } from './pages/api/ApiPage.jsx';
 import { ApplicationsPage, ApplicationPage } from './pages/Applications.jsx';
 import { ObservabilityPage } from './pages/Observability.jsx';
 import { AuditPage } from './pages/Audit.jsx';
+import { NotificationsPage } from './pages/Notifications.jsx';
 import { WorkspaceSettingsPage } from './pages/WorkspaceSettings.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
@@ -194,6 +195,7 @@ function App() {
             ['/ws/:ws/subscriptions', () => <SubscriptionsPage />],
             ['/ws/:ws/observability', () => <ObservabilityPage />],
             ['/ws/:ws/audit', () => <AuditPage />],
+            ['/ws/:ws/notifications', () => <NotificationsPage />],
             ['/ws/:ws/settings', () => <WorkspaceSettingsPage tab="general" />],
             ['/ws/:ws/settings/:tab', (p) => <WorkspaceSettingsPage tab={p.tab} />],
             ['/gateway', () => <GatewayPage tab="status" />],

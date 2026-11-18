@@ -146,7 +146,7 @@ run = "bun test test/model.test.js test/derived.test.js test/auth.test.js test/c
 
 [tasks."test:e2e"]
 description = "Run the reference catalogue test against the real gateway (needs the stack)"
-run = "bun test test/reference-catalogue.test.js test/derived-objects.test.js test/permissions.test.js test/product-down.test.js test/shared-plan-ids.test.js test/portal-forms.test.js test/promotion.test.js"
+run = "bun test test/reference-catalogue.test.js test/derived-objects.test.js test/permissions.test.js test/product-down.test.js test/shared-plan-ids.test.js test/portal-forms.test.js test/promotion.test.js test/queue-and-notifications.test.js"
 
 [tasks.ci]
 description = "Everything the repository checks: syntax, uis, unit and end-to-end tests, documentation build"

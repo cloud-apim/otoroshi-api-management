@@ -1,7 +1,9 @@
 // In-app notifications: every change of a subscription is notified to its consumers; the
-// review of a request and its decision follow the same path.
+// review of a request and its decision follow the same path. A notification is addressed to a
+// person or to a team, and each person reads it, and marks it done, on their own.
 
 import { db, newId } from '../db/index.js';
+import { likePattern } from '../http/paging.js';
 
 export async function notify({ workspaceId, teamId = null, userId = null, face = 'portal', kind, title, body = '', link = null, data = {} }) {
   if (!teamId && !userId) return;
@@ -9,21 +11,48 @@ export async function notify({ workspaceId, teamId = null, userId = null, face =
     values (${newId('ntf')}, ${workspaceId}, ${teamId}, ${userId}, ${face}, ${kind}, ${title}, ${body}, ${link}, ${data})`;
 }
 
+// the notifications of a person in a workspace, with their own read and done marks.
+// filter: 'open' (not done, the default), 'unread', 'done', 'all'
+export async function searchFor(user, workspaceId, face, { filter = 'open', limit = 50, offset = 0, q = '' } = {}) {
+  const pattern = q ? likePattern(q) : null;
+  const where = () => db`n.workspace_id = ${workspaceId} and n.face = ${face}
+    and (${pattern}::text is null or n.title ilike ${pattern} or n.body ilike ${pattern})
+    and (n.user_id = ${user.id} or n.team_id in (select team_id from team_members where user_id = ${user.id}))
+    and (${filter} = 'all' or (${filter} = 'done' and st.done_at is not null) or (${filter} = 'open' and st.done_at is null)
+      or (${filter} = 'unread' and st.read_at is null and st.done_at is null))`;
+  const [items, [{ total }]] = await Promise.all([
+    db`select n.id, n.workspace_id, n.team_id, n.user_id, n.face, n.kind, n.title, n.body, n.link, n.data, n.created_at, st.read_at, st.done_at
+      from notifications n left join notification_states st on st.notification_id = n.id and st.user_id = ${user.id}
+      where ${where()} order by n.created_at desc limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from notifications n left join notification_states st on st.notification_id = n.id and st.user_id = ${user.id} where ${where()}`,
+  ]);
+  return { items, total, limit, offset };
+}
+
 export async function listFor(user, workspaceId, face, { limit = 50 } = {}) {
-  return db`select n.* from notifications n
-    where n.workspace_id = ${workspaceId} and n.face = ${face}
-      and (n.user_id = ${user.id} or n.team_id in (select team_id from team_members where user_id = ${user.id}))
-    order by n.created_at desc limit ${limit}`;
+  return (await searchFor(user, workspaceId, face, { limit })).items;
 }
 
 export async function unreadCount(user, workspaceId, face) {
-  const rows = await db`select count(*)::int as c from notifications n
-    where n.workspace_id = ${workspaceId} and n.face = ${face} and n.read_at is null
-      and (n.user_id = ${user.id} or n.team_id in (select team_id from team_members where user_id = ${user.id}))`;
-  return rows[0].c;
+  return (await searchFor(user, workspaceId, face, { filter: 'unread', limit: 1 })).total;
 }
 
-export async function markRead(user, workspaceId, face) {
-  await db`update notifications set read_at = now() where workspace_id = ${workspaceId} and face = ${face} and read_at is null
-    and (user_id = ${user.id} or team_id in (select team_id from team_members where user_id = ${user.id}))`;
+// the notifications of a person among `ids`, or all of theirs in the workspace
+async function mine(user, workspaceId, face, ids) {
+  const rows = await db`select n.id from notifications n where n.workspace_id = ${workspaceId} and n.face = ${face}
+    and (n.user_id = ${user.id} or n.team_id in (select team_id from team_members where user_id = ${user.id}))`;
+  return rows.map((r) => r.id).filter((id) => !ids || ids.includes(id));
+}
+
+export async function markRead(user, workspaceId, face, ids = null) {
+  for (const id of await mine(user, workspaceId, face, ids))
+    await db`insert into notification_states (notification_id, user_id, read_at) values (${id}, ${user.id}, now())
+      on conflict (notification_id, user_id) do update set read_at = coalesce(notification_states.read_at, now())`;
+}
+
+// done: dealt with, out of the list — read too
+export async function markDone(user, workspaceId, face, ids, done = true) {
+  for (const id of await mine(user, workspaceId, face, ids))
+    await db`insert into notification_states (notification_id, user_id, read_at, done_at) values (${id}, ${user.id}, now(), ${done ? new Date() : null})
+      on conflict (notification_id, user_id) do update set read_at = coalesce(notification_states.read_at, now()), done_at = excluded.done_at`;
 }

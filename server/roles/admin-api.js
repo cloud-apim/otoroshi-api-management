@@ -14,7 +14,7 @@ import * as analytics from '../domain/analytics.js';
 import { listAudit, searchAudit, audit } from '../domain/audit.js';
 import { pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
-import { searchTasks, queueStats, enqueue } from '../domain/tasks.js';
+import { searchTasks, queueStats, enqueue, dismissTask } from '../domain/tasks.js';
 import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
 import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
@@ -150,7 +150,17 @@ r.get('/gateway/tasks', async ({ ctx, query }) => {
 r.post('/gateway/tasks/:id/retry', async ({ ctx, params }) => {
   identity.requireAdmin(ctx);
   await db`update tasks set status = 'pending', run_after = now(), attempts = 0 where id = ${params.id}`;
+  await audit(ctx, { action: 'gateway.task.retry', entityKind: 'task', entityId: params.id, summary: `task ${params.id} queued again` });
   return { retried: params.id };
+});
+
+// a failed task given up: it no longer counts as waiting for someone
+r.post('/gateway/tasks/:id/dismiss', async ({ ctx, params, body }) => {
+  identity.requireAdmin(ctx);
+  const task = await dismissTask(params.id, body.reason || `dismissed by ${ctx.user.email}`);
+  if (!task) throw badRequest('only a failed task can be dismissed');
+  await audit(ctx, { action: 'gateway.task.dismiss', entityKind: 'task', entityId: params.id, summary: `failed task ${task.kind} dismissed` });
+  return task;
 });
 
 // infrastructure the product references but does not own
@@ -881,14 +891,26 @@ r.post('/audit/exporters/:id/test', async ({ ctx, params }) => {
   return auditExport.testExporter(await auditExport.getExporter(params.id));
 });
 
-r.get('/workspaces/:ws/notifications', async ({ ctx, params }) => {
+// the notifications of the person signed in: each reads them, and marks them done, on their own.
+// filter: open (not done, the default) | unread | done | all
+r.get('/workspaces/:ws/notifications', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
-  return { unread: await notifications.unreadCount(ctx.user, c.workspace.id, 'console'), items: await notifications.listFor(ctx.user, c.workspace.id, 'console') };
+  const filter = ['open', 'unread', 'done', 'all'].includes(query.get('filter')) ? query.get('filter') : 'open';
+  const page = await notifications.searchFor(ctx.user, c.workspace.id, 'console', { filter, ...pageParams(query, { defaultLimit: 50 }) });
+  return { unread: await notifications.unreadCount(ctx.user, c.workspace.id, 'console'), ...page };
 });
-r.post('/workspaces/:ws/notifications/read', async ({ ctx, params }) => {
+const noteIds = (body) => (Array.isArray(body?.ids) ? body.ids.map(String) : null);
+// all of them, or the `ids` given
+r.post('/workspaces/:ws/notifications/read', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
-  await notifications.markRead(ctx.user, c.workspace.id, 'console');
-  return { ok: true };
+  await notifications.markRead(ctx.user, c.workspace.id, 'console', noteIds(body));
+  return { unread: await notifications.unreadCount(ctx.user, c.workspace.id, 'console') };
+});
+r.post('/workspaces/:ws/notifications/done', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  if (!noteIds(body)) throw badRequest('ids: the notifications to mark done');
+  await notifications.markDone(ctx.user, c.workspace.id, 'console', noteIds(body), body.done !== false);
+  return { unread: await notifications.unreadCount(ctx.user, c.workspace.id, 'console') };
 });
 
 r.get('/workspaces/:ws/drift', async ({ ctx, params }) => {

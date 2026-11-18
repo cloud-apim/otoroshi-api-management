@@ -106,8 +106,14 @@ while the gateway is unreachable. A refusal of the gateway (`4xx`) fails it at o
 attempts. A subscription accepted while the API is not deployed waits, and is projected at the
 deployment.
 
-The **Gateway** page of the console shows the queue and lets you retry a task. What keeps working
-while the gateway, or the product, is down: [When the product is down](./product-down.mdx).
+The **Gateway** page of the console shows the queue, and what each task works on. A task that
+**failed** — the gateway refused it, or it failed too many times — does not run again by itself:
+fix its cause and **retry** it, or **dismiss** it when it no longer applies (an installation
+administrator). A failed task whose object is gone — a subscription deleted since, a deployment
+of a deleted API — is dismissed by itself, saying why. At the bottom of the sidebar the gateway
+pill counts the failed projections (red), the waiting ones (orange) and the drift, and leads to
+the first of them. What keeps working while the gateway, or the product, is down:
+[When the product is down](./product-down.mdx).
 
 ## Never projected
 

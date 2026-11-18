@@ -53,7 +53,7 @@ of its teams. A team has **owners** — the person who creates it is one — and
 | Workspace settings — Remote catalogs, Export / import | — | — | ✓ | ✓ |
 | Gateway — status, run the detection | — | ✓ | ✓ | ✓ |
 | Gateway — projection queue, drift reports | — | its workspaces | its workspaces | all |
-| Gateway — retry a task, install the data exporter, connection | — | — | — | ✓ |
+| Gateway — retry or dismiss a task, install the data exporter, connection | — | — | — | ✓ |
 | Global settings — API tokens (one's own) | — | ✓ | ✓ | ✓ |
 | Global settings — Workspaces, Users, Authentication, Audit export | — | — | — | ✓ |
 | Create a workspace, delete a workspace | — | — | — | ✓ |
@@ -75,7 +75,7 @@ of its teams. A team has **owners** — the person who creates it is one — and
   administers; an installation administrator sees them all.
 - **The gateway pages** are the installation's: everyone signed in sees the gateway status, and
   the projection queue and the drift reports of their own workspaces (an installation
-  administrator sees all of them). The connection settings, the data exporter and the retry of a
+  administrator sees all of them). The connection settings, the data exporter and the retry or the dismissal of a
   task are an installation administrator's.
 - **The audit trail** of a workspace is open to its producers and administrators. The audit of the
   whole installation is read through the API (`GET /api/audit`), by an installation administrator.

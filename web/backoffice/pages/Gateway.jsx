@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery, useRouter } from '../../shared/router.jsx';
+import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
 import { Callout, DiffView, Empty, Icon, Input, Loader, Select, Setting, StatusBadge, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
@@ -31,6 +31,21 @@ function Status() {
             The product is never in the request path: if it is down, traffic still flows. Its operations are asynchronous and replayable — a projection that cannot reach the gateway waits in this
             queue and runs when the gateway is back.
           </Callout>
+          {s.queue.failed > 0 && (
+            <Callout kind="negative" title={`${s.queue.failed} projection${s.queue.failed > 1 ? 's' : ''} failed`}>
+              <div className="col gap-6">
+                <span>
+                  The gateway refused {s.queue.failed > 1 ? 'them' : 'it'}, or {s.queue.failed > 1 ? 'they' : 'it'} failed too many times: a failed projection does not run again by itself. Read its error, fix
+                  the cause — often in the object it projects — and retry it, or dismiss it if it no longer applies.
+                </span>
+                {status !== 'failed' && (
+                  <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setParams({ tasks_status: 'failed', tasks_page: null })}>
+                    Show {s.queue.failed > 1 ? 'them' : 'it'}
+                  </button>
+                )}
+              </div>
+            </Callout>
+          )}
           <div className="card">
             <div className="card-head">
               <h3 className="grow">Projection queue</h3>
@@ -40,7 +55,7 @@ function Status() {
                 <Select
                   value={status}
                   onChange={(v) => setParams({ tasks_status: v, tasks_page: null })}
-                  options={[{ value: '', label: 'every status' }, 'pending', 'running', 'failed', 'done']}
+                  options={[{ value: '', label: 'every status' }, 'pending', 'running', 'failed', 'dismissed', 'done']}
                   style={{ width: 160 }}
                   aria-label="filter by status"
                 />
@@ -55,25 +70,57 @@ function Status() {
                       <tbody>
                         {list.map((t) => (
                           <tr key={t.id}>
-                            <td className="mono">{t.kind}</td>
+                            <td>
+                              <div className="mono">{t.kind}</div>
+                              {t.target &&
+                                (t.target.link ? (
+                                  <Link to={t.target.link} className="link tiny">
+                                    {t.target.label}
+                                  </Link>
+                                ) : (
+                                  <span className="faint tiny">{t.target.label}</span>
+                                ))}
+                            </td>
                             <td>
                               <StatusBadge status={t.status} />
                             </td>
                             <td className="muted">
                               {t.attempts} attempt(s) · {fmtRelative(t.updated_at)}
                             </td>
-                            <td className="negative-text">{t.last_error}</td>
+                            <td>
+                              {t.last_error && <div className="negative-text">{t.last_error}</div>}
+                              {t.payload?.dismissed && <div className="faint tiny">dismissed: {t.payload.dismissed}</div>}
+                            </td>
                             <td className="actions">
-                              {t.status !== 'done' && user.is_admin && (
+                              {t.status !== 'done' && t.status !== 'running' && user.is_admin && (
                                 <button
                                   className="btn xs"
                                   onClick={async () => {
                                     await api.post(`/gateway/tasks/${t.id}/retry`);
                                     toast('Task queued again');
                                     tasks.reload();
+                                    st.reload();
                                   }}
                                 >
                                   Retry
+                                </button>
+                              )}
+                              {t.status === 'failed' && user.is_admin && (
+                                <button
+                                  className="btn xs ghost"
+                                  title="it no longer counts as something to do"
+                                  onClick={async () => {
+                                    try {
+                                      await api.post(`/gateway/tasks/${t.id}/dismiss`, {});
+                                      toast('Task dismissed');
+                                      tasks.reload();
+                                      st.reload();
+                                    } catch (e) {
+                                      toast(errorMessage(e), 'error');
+                                    }
+                                  }}
+                                >
+                                  Dismiss
                                 </button>
                               )}
                             </td>

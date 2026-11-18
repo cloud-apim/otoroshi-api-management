@@ -144,6 +144,8 @@ async function consoleTour(page) {
   await shot(page, 'console-user-menu', 'The menu of the person signed in — notifications (with their indicator), theme, tokens, sign out', { full: false });
   await page.keyboard.press('Escape');
   await page.mouse.click(900, 450);
+  await go(page, `${W}/notifications?filter=all`);
+  await shot(page, 'console-notifications', 'Notifications — read and marked done by each person, even those addressed to a team');
 
   await go(page, `${W}/apis`);
   await shot(page, 'console-apis', 'APIs — lifecycle, deployment state, plans and subscriptions');
@@ -152,6 +154,17 @@ async function consoleTour(page) {
   await go(page, `${W}/apis`);
   await click(page, 'Adopt from gateway');
   await shot(page, 'console-adopt', 'Adopt mode — take over an Api that already runs on the gateway', { full: false });
+  // promotion: the deployed snapshot of Petstore, taken by another workspace as by the next
+  // installation — the dry run only
+  const promotion = await api(page, `/backoffice/api/workspaces/${WS}/apis/petstore/snapshots/deployed/promotion`);
+  const promotionFile = join(OUT, '..', 'petstore-promotion.json');
+  await writeFile(promotionFile, JSON.stringify(promotion));
+  await go(page, '/backoffice/ws/gitops/apis');
+  await click(page, 'Promote a snapshot');
+  await (await page.$('.modal input[type=file]')).uploadFile(promotionFile);
+  await sleep(1500);
+  await shot(page, 'console-promote', 'Promotion — the same snapshot on the next installation, after its dry run', { full: false });
+  await (await import('node:fs/promises')).unlink(promotionFile);
 
   const A = `${W}/apis/${books.id}`;
   await go(page, A);

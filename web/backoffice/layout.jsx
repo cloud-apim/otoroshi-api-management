@@ -36,6 +36,7 @@ function SearchPalette({ onClose }) {
           { kind: 'page', name: 'Audit', to: `/ws/${ws}/audit` },
           { kind: 'page', name: 'Workspace settings', to: `/ws/${ws}/settings` },
           { kind: 'page', name: 'Developer portal settings', to: `/ws/${ws}/settings/portal` },
+          { kind: 'page', name: 'Notifications', to: `/ws/${ws}/notifications` },
           { kind: 'page', name: 'Gateway', to: `/gateway` },
           { kind: 'page', name: 'Global settings', to: `/settings` },
         ]
@@ -98,16 +99,22 @@ function SearchPalette({ onClose }) {
   );
 }
 
-// in-app notifications of the producers (requests to review, transfers to decide), polled
-function useNotifications(ws) {
+// in-app notifications of the producers (requests to review, transfers to decide), polled. Each
+// person reads them and marks them done on their own
+export function useNotifications(ws) {
   const [data, setData] = useState({ unread: 0, items: [] });
-  const load = () => ws && wsApi(ws).get('/notifications').then(setData).catch(() => {});
+  const load = () => ws && wsApi(ws).get('/notifications?limit=8').then(setData).catch(() => {});
   useEffect(() => {
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
   }, [ws]);
-  return { ...data, markRead: () => data.unread && wsApi(ws).post('/notifications/read').then(load) };
+  return {
+    ...data,
+    reload: load,
+    markRead: (ids) => wsApi(ws).post('/notifications/read', ids ? { ids } : {}).then(load),
+    markDone: (ids) => wsApi(ws).post('/notifications/done', { ids }).then(load),
+  };
 }
 
 // the person signed in: notifications, theme, tokens, sign out — one menu at the bottom left
@@ -123,11 +130,7 @@ function UserMenu({ user, ws, logout }) {
         <button
           className="ws-switch"
           style={{ border: 0, marginTop: 4 }}
-          onClick={() => {
-            toggle();
-            // shown as unread this time, read from now on
-            if (!open) setTimeout(notes.markRead, 1500);
-          }}
+          onClick={toggle}
           aria-label={notes.unread ? `user menu, ${notes.unread} unread notifications` : 'user menu'}
           aria-haspopup="menu"
         >
@@ -152,23 +155,55 @@ function UserMenu({ user, ws, logout }) {
           <div className="row menu-title">
             <Icon name="inbox" size={14} />
             <span className="grow">Notifications</span>
-            {notes.unread > 0 && <span className="badge warning">{notes.unread} new</span>}
+            {notes.unread > 0 && (
+              <button
+                className="btn xs ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  notes.markRead();
+                }}
+              >
+                Mark all read
+              </button>
+            )}
           </div>
           <div style={{ maxHeight: 260, overflow: 'auto' }}>
             {notes.items.length ? (
-              notes.items.slice(0, 8).map((n) => (
-                <button key={n.id} className="menu-note" onClick={() => n.link && navigate(`/ws/${ws}${n.link}`)}>
-                  <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
-                  {n.body && <span className="faint tiny">{n.body}</span>}
-                  <span className="faint tiny">{fmtRelative(n.created_at)}</span>
-                </button>
+              notes.items.map((n) => (
+                <div key={n.id} className={`menu-note-row ${n.read_at ? '' : 'unread'}`}>
+                  <button
+                    className="menu-note"
+                    onClick={() => {
+                      if (!n.read_at) notes.markRead([n.id]);
+                      if (n.link) navigate(`/ws/${ws}${n.link}`);
+                    }}
+                  >
+                    <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
+                    {n.body && <span className="faint tiny">{n.body}</span>}
+                    <span className="faint tiny">{fmtRelative(n.created_at)}</span>
+                  </button>
+                  <button
+                    className="btn xs ghost icon"
+                    title="done: out of the list"
+                    aria-label={`mark "${n.title}" done`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      notes.markDone([n.id]);
+                    }}
+                  >
+                    <Icon name="check" size={14} />
+                  </button>
+                </div>
               ))
             ) : (
               <div className="muted small" style={{ padding: '6px 10px' }}>
-                Nothing new.
+                Nothing to deal with.
               </div>
             )}
           </div>
+          <MenuItem icon="inbox" onClick={() => navigate(`/ws/${ws}/notifications`)}>
+            All notifications{notes.total > notes.items.length ? ` (${notes.total})` : ''}
+          </MenuItem>
         </div>
       )}
       <div className="menu-section row" onClick={(e) => e.stopPropagation()}>
@@ -202,14 +237,19 @@ function GatewayPill() {
     };
   }, []);
   const ok = st?.health?.ok;
-  const pending = (st?.queue?.pending || 0) + (st?.queue?.failed || 0);
+  const waiting = (st?.queue?.pending || 0) + (st?.queue?.running || 0);
+  const failed = st?.queue?.failed || 0;
   const drift = (st?.drift?.drifted || 0) + (st?.drift?.missing || 0);
+  // it leads to what needs looking at first: a failed projection, a waiting one, then the drift
+  const to = failed ? '/gateway?tasks_status=failed' : waiting ? '/gateway?tasks_status=pending' : drift ? '/gateway/drift' : '/gateway';
+  const said = [failed && `${failed} projection${failed > 1 ? 's' : ''} failed`, waiting && `${waiting} waiting for the gateway`, drift && `${drift} drifted on the gateway`].filter(Boolean);
   return (
-    <Link to="/gateway" className="gw-pill" title="the installation's Otoroshi cluster">
+    <Link to={to} className="gw-pill" title={said.length ? said.join(' · ') : "the installation's Otoroshi cluster"}>
       <span className={`gw-dot ${st ? (ok ? 'ok' : 'ko') : ''}`} />
       <span className="grow">Gateway {st ? (ok ? 'reachable' : 'unreachable') : '…'}</span>
-      {pending > 0 && <span className="badge warning" title="projections waiting">{pending}</span>}
-      {drift > 0 && <span className="badge negative" title="drift detected">{drift}</span>}
+      {failed > 0 && <span className="badge negative" title={`${failed} projection(s) failed: open the queue`}>{failed}</span>}
+      {waiting > 0 && <span className="badge warning" title={`${waiting} projection(s) waiting for the gateway`}>{waiting}</span>}
+      {drift > 0 && <span className="badge negative" title={`${drift} object(s) drifted on the gateway`}>{drift}</span>}
     </Link>
   );
 }

@@ -110,7 +110,15 @@ the move waits for the consumer.
 Consumers are notified of what happens to their subscriptions — accepted, rejected, suspended,
 resumed, closed, moved, a move to agree to — and producers of what they have to decide — a
 request waiting for review, a move asked by a consumer. Notifications are addressed to teams:
-every member sees them.
+every member sees them, and **each reads them and marks them done on their own** — one member
+dealing with a request does not hide it from the others.
+
+In the console, the menu of the person signed in shows the unread ones (a dot on the avatar, their
+count); opening the menu reads nothing. A notification is read when it is opened or marked read,
+and **done** when dealt with: it leaves the list. **All notifications** lists them, to deal with,
+unread, done, or all. The admin API serves the same: `GET …/notifications?filter=open|unread|done|all`,
+`POST …/notifications/read` (`{"ids": […]}`, all of them without), `POST …/notifications/done`
+(`{"ids": […], "done": true}`).
 
 ## Reviewing
 
