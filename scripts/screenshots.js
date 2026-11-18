@@ -347,6 +347,12 @@ async function consoleTour(page) {
   await shot(page, 'console-dark-plugin-edit', 'Dark theme — the plugin editor, its code editor following the theme', { full: false });
   await page.setViewport({ width: 1440, height: 900 });
   await theme(page, 'light');
+  // a consumer who signs in to the console is sent to its portal
+  await api(page, '/backoffice/api/auth/logout', 'POST', {});
+  await api(page, '/backoffice/api/auth/login', 'POST', CONSUMER);
+  await go(page, '/backoffice/');
+  await shot(page, 'console-consumer', 'A consumer signed in to the console: its place is the developer portal', { full: false });
+  await api(page, '/backoffice/api/auth/logout', 'POST', {});
 }
 
 async function portalTour(page) {

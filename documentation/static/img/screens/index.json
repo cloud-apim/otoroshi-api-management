@@ -280,6 +280,10 @@
     "title": "Dark theme — the plugin editor, its code editor following the theme"
   },
   {
+    "file": "console-consumer.png",
+    "title": "A consumer signed in to the console: its place is the developer portal"
+  },
+  {
     "file": "portal-home.png",
     "title": "Portal — home of a workspace portal (anonymous visitor)"
   },
