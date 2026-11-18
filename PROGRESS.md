@@ -51,7 +51,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-12 | M | One credential for several subscriptions |
 | R-17 | M | Adopt: take over the existing subscriptions and keys too |
 | R-20 | M | Catalogue as a discovery tool (categories, featured, reviews) |
-| R-21 | M | Dynamic client registration at the IdP |
+| R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-25 | M | Threat protection per plan, and its events in observability |
 | R-34 | M | Usage-based billing (Stripe Billing Meters) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
@@ -66,7 +66,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
 
-**Total doable:** 12 S + 10 M + 2 L ≈ 18 M. Without R-18, R-37, R-10 and R-19 (out of the MVP, not a priority, or large): ≈ 12 M.
+**Total doable:** 12 S + 10 M + 2 L ≈ 18 M. Without R-18, R-37, R-21 and R-19 (out of the MVP, or not a priority): ≈ 13 M.
 
 ## Known issues
 
@@ -101,7 +101,7 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
-| R-21 | §8 | **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
+| R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 | R-22 | D-11, D-18 | Metadata field **labels and help in several languages** (one language today) | S | |
 | R-23 | D-17 | Testing on the portal is Scalar's; D-17 wants **one composer** for both faces — use the shared composer on the portal for apis without an OpenAPI specification | S | |
 | R-42 | D-11 | **Pages of the portal** beyond its home: pages a workspace writes (multilingual markdown, like the home and the documentation pages), in the portal's navigation | S | |
@@ -223,7 +223,7 @@ waits for the data plane rather than working around it.
 | Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; correlation id: R-32 |
 | Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
 | The catalogue as a discovery system | 🟡 search and tags: R-20 |
-| IdP integration beyond validation | ⬜ R-21 |
+| IdP integration beyond validation | ⬜ R-21, not a priority (owner) |
 | Deployment history tied to the snapshot | 🟡 through the `Api` metadata: R-33 |
 
 ## Open questions of the spec
