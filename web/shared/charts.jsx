@@ -2,8 +2,9 @@
 // hairline grid, crosshair + one tooltip listing every series, legend for >= 2 series, text in ink
 // tokens (never in the series color), a table view behind every chart.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { fmtNumber } from './lib.js';
+import { fmtDate, fmtNumber } from './lib.js';
 import { MiniPager } from './lists.jsx';
+import { language, tr } from './i18n.jsx';
 
 const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)'];
 
@@ -17,8 +18,8 @@ function niceMax(v) {
 
 function fmtTick(t, bucket) {
   const d = new Date(t);
-  if (bucket === 'day') return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  if (bucket === 'day') return d.toLocaleDateString(language() === 'fr' ? 'fr-FR' : undefined, { month: 'short', day: 'numeric' });
+  return d.toLocaleTimeString(language() === 'fr' ? 'fr-FR' : undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
 // series: [{ key, label }]; data: [{ t, [key]: number }]
@@ -63,12 +64,12 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
     setHover(best);
   };
 
-  if (!points.length) return <div className="empty small">No traffic in this period</div>;
+  if (!points.length) return <div className="empty small">{tr('No traffic in this period')}</div>;
   const hp = hover !== null ? points[hover] : null;
   return (
     <div className="col gap-6">
       {series.length > 1 && (
-        <div className="row gap-16 small muted" aria-label="legend">
+        <div className="row gap-16 small muted" aria-label={tr('legend')}>
           {series.map((s, i) => (
             <span key={s.key} className="row gap-6">
               <svg width="16" height="4" aria-hidden="true">
@@ -79,7 +80,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
           ))}
           <span className="spacer" />
           <button className="btn ghost xs" onClick={() => setShowTable(!showTable)}>
-            {showTable ? 'Chart' : 'Table'}
+            {showTable ? tr('Chart') : tr('Table')}
           </button>
         </div>
       )}
@@ -88,7 +89,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
           <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
             <thead>
               <tr>
-                <th>Time</th>
+                <th>{tr('Time')}</th>
                 {series.map((s) => (
                   <th key={s.key} className="right">
                     {s.label}
@@ -99,7 +100,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
             <tbody>
               {points.map((p) => (
                 <tr key={p.ts}>
-                  <td>{new Date(p.ts).toLocaleString()}</td>
+                  <td>{fmtDate(p.ts)}</td>
                   {series.map((s) => (
                     <td key={s.key} className="right">
                       {formatValue(p[s.key])}
@@ -120,7 +121,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
             onPointerMove={onMove}
             onPointerLeave={() => setHover(null)}
             role="img"
-            aria-label={`${series.map((s) => s.label).join(' and ')} over time`}
+            aria-label={tr('{0} over time', [series.map((s) => s.label).join(' and ')])}
             style={{ display: 'block', overflow: 'visible' }}
           >
             {ticks.map((t) => (
@@ -185,7 +186,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
                 boxShadow: 'var(--shadow-lg)',
               }}
             >
-              <div className="faint tiny">{new Date(hp.ts).toLocaleString()}</div>
+              <div className="faint tiny">{fmtDate(hp.ts)}</div>
               {series.map((s, i) => (
                 <div key={s.key} className="row gap-6" style={{ marginTop: 4 }}>
                   <svg width="12" height="4" aria-hidden="true">
@@ -205,7 +206,7 @@ export function TimeSeries({ data = [], series, bucket = 'hour', height = 220, f
 
 // a single-hue horizontal bar list, value at the tip
 // a ranked list of bars, ten per page (the bars keep the scale of the whole list)
-export function BarList({ items = [], formatValue = (v) => fmtNumber(v), empty = 'No data', pageSize = 10 }) {
+export function BarList({ items = [], formatValue = (v) => fmtNumber(v), empty = tr('No data'), pageSize = 10 }) {
   const [page, setPage] = useState(1);
   const max = Math.max(1, ...items.map((i) => i.value || 0));
   const pages = Math.max(1, Math.ceil(items.length / pageSize));

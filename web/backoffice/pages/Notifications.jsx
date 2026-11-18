@@ -7,12 +7,13 @@ import { Empty, Icon, Loader, errorMessage, useLoad, useToast } from '../../shar
 import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { tr } from '../../shared/i18n.jsx';
 
-const FILTERS = [
-  ['open', 'To deal with'],
-  ['unread', 'Unread'],
-  ['done', 'Done'],
-  ['all', 'All'],
+const FILTERS = () => [
+  ['open', tr('To deal with')],
+  ['unread', tr('Unread')],
+  ['done', tr('Done')],
+  ['all', tr('All')],
 ];
 
 export function NotificationsPage() {
@@ -34,25 +35,25 @@ export function NotificationsPage() {
   return (
     <div className="page">
       <PageHead
-        title="Notifications"
-        sub="What happened to the subscriptions and the requests of your teams. You read them, and mark them done, for yourself."
+        title={tr('Notifications')}
+        sub={tr('What happened to the subscriptions and the requests of your teams. You read them, and mark them done, for yourself.')}
         actions={
           state.data?.unread > 0 && (
-            <button className="btn" onClick={act('read', {}, 'Everything marked read')}>
-              <Icon name="check" /> Mark all read
+            <button className="btn" onClick={act('read', {}, tr('Everything marked read'))}>
+              <Icon name="check" /> {tr('Mark all read')}
             </button>
           )
         }
       />
       <div className="tabs mb-16">
-        {FILTERS.map(([id, label]) => (
+        {FILTERS().map(([id, label]) => (
           <button key={id} className={filter === id ? 'on' : ''} onClick={() => setParams({ filter: id === 'open' ? null : id, notes_page: null })}>
             {label}
             {id === 'unread' && state.data?.unread > 0 && <span className="badge warning" style={{ marginLeft: 6 }}>{state.data.unread}</span>}
           </button>
         ))}
       </div>
-      <ListToolbar paging={paging} placeholder="search titles and texts" onReload={state.reload} loading={state.loading} />
+      <ListToolbar paging={paging} placeholder={tr('search titles and texts')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {({ items, total }) =>
           items.length ? (
@@ -64,27 +65,27 @@ export function NotificationsPage() {
                     {n.body && <span className="muted small">{n.body}</span>}
                     <span className="faint tiny" title={fmtDate(n.created_at)}>
                       {fmtRelative(n.created_at)}
-                      {n.done_at ? ` · done ${fmtRelative(n.done_at)}` : ''}
+                      {n.done_at ? tr(' · done {0}', [fmtRelative(n.done_at)]) : ''}
                     </span>
                   </div>
                   <div className="row gap-6">
                     {n.link && (
                       <Link to={`/ws/${slug}${n.link}`} className="btn sm" onClick={() => !n.read_at && wapi.post('/notifications/read', { ids: [n.id] })}>
-                        Open
+                        {tr('Open')}
                       </Link>
                     )}
                     {!n.read_at && (
                       <button className="btn sm ghost" onClick={act('read', { ids: [n.id] })}>
-                        Mark read
+                        {tr('Mark read')}
                       </button>
                     )}
                     {n.done_at ? (
                       <button className="btn sm ghost" onClick={act('done', { ids: [n.id], done: false })}>
-                        Not done
+                        {tr('Not done')}
                       </button>
                     ) : (
                       <button className="btn sm" onClick={act('done', { ids: [n.id] })}>
-                        <Icon name="check" /> Done
+                        <Icon name="check" /> {tr('Done')}
                       </button>
                     )}
                   </div>
@@ -93,7 +94,7 @@ export function NotificationsPage() {
               <Pager paging={paging} total={total} />
             </div>
           ) : (
-            <Empty title={filter === 'open' ? 'Nothing to deal with' : filter === 'unread' ? 'Nothing unread' : filter === 'done' ? 'Nothing done yet' : 'No notification'} icon="check" />
+            <Empty title={filter === 'open' ? tr('Nothing to deal with') : filter === 'unread' ? tr('Nothing unread') : filter === 'done' ? tr('Nothing done yet') : tr('No notification')} icon="check" />
           )
         }
       </Loader>

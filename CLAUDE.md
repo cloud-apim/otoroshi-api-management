@@ -71,3 +71,7 @@ ingester when the product runs inside the compose stack (`http://apim:9000/inges
 - Postgres via `Bun.SQL`: pass objects and arrays directly for jsonb columns; jsonb does not keep
   key order, so compare documents with `diff()` / `stable()` from `server/domain/diff.js`.
 - Ids are prefixed uuidv7 (`api_…`, `plan_…`, `sub_…`); the Otoroshi `Api` id is the product api id.
+- The console's texts go through `tr()` / `<Tr>` (`web/shared/i18n.jsx`), the English text being the
+  key; French in `web/backoffice/fr.json` and, for shared components, `web/shared/fr.json`.
+  `bun scripts/i18n.js wrap <file>` wraps the texts of a new file, `mise run i18n` lists the texts
+  without French, and `mise run check` fails on them.

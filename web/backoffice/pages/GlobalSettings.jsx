@@ -5,8 +5,9 @@ import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberI
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
-const FORM_TITLES = { path: 'by root path', hostname: 'by hostname', root: 'one workspace, at the root' };
+const FORM_TITLES = () => ({ path: tr('by root path'), hostname: tr('by hostname'), root: tr('one workspace, at the root') });
 
 function formUrl(form, url) {
   if (form.kind === 'hostname') return `${new URL(url).protocol}//<workspace>.${form.domain}/`;
@@ -18,32 +19,26 @@ function formUrl(form, url) {
 function Exposure({ portal }) {
   const { form, url, history } = portal;
   return (
-    <Callout kind="info" title={`Portal exposure: ${FORM_TITLES[form.kind]}`}>
+    <Callout kind="info" title={tr('Portal exposure: {0}', [FORM_TITLES()[form.kind]])}>
       <div className="col gap-6">
         <span>
-          {form.kind === 'root' ? (
+          <Tr text={'{0} The form holds for the whole installation and changes every public url: it is set at installation (APIM_TENANCY, APIM_PORTAL_EXPOSURE, APIM_PORTAL_DOMAIN, APIM_PORTAL_URL).'} args={[form.kind === 'root' ? (
             <>
-              This installation serves the single workspace <span className="mono">{form.workspace}</span> at <span className="mono">{formUrl(form, url)}</span>: no prefix, no workspace
-              selector.
+              <Tr text={'This installation serves the single workspace {0} at {1}: no prefix, no workspace selector.'} args={[<span className="mono">{form.workspace}</span>, <span className="mono">{formUrl(form, url)}</span>]} />
             </>
           ) : (
             <>
-              Each workspace portal is served at <span className="mono">{formUrl(form, url)}</span>
-              {form.kind === 'hostname' ? ', which takes a wildcard DNS entry and a wildcard certificate.' : '.'} There is no global portal.
+              <Tr text={'Each workspace portal is served at {0}{1} There is no global portal.'} args={[<span className="mono">{formUrl(form, url)}</span>, form.kind === 'hostname' ? tr(', which takes a wildcard DNS entry and a wildcard certificate.') : '.']} />
             </>
-          )}{' '}
-          The form holds for the whole installation and changes every public url: it is set at installation (APIM_TENANCY, APIM_PORTAL_EXPOSURE, APIM_PORTAL_DOMAIN, APIM_PORTAL_URL).
+          )]} />
         </span>
         {history.previous.length > 0 && (
           <span>
-            The urls of the forms served before are redirected to the same pages:{' '}
-            {history.previous.map((f, i) => (
+            <Tr text={'The urls of the forms served before are redirected to the same pages: {0}.'} args={[history.previous.map((f, i) => (
               <span key={i}>
-                {i > 0 && ', '}
-                <span className="mono">{formUrl(f, url)}</span> (until {fmtDate(f.until)})
+                <Tr text={'{0}{1} (until {2})'} args={[i > 0 && ', ', <span className="mono">{formUrl(f, url)}</span>, fmtDate(f.until)]} />
               </span>
-            ))}
-            .
+            ))]} />
           </span>
         )}
       </div>
@@ -64,8 +59,8 @@ function Workspaces() {
       <Loader state={settings}>{(s) => <Exposure portal={s.portal} />}</Loader>
       <div className="card" hidden={single}>
         <div className="card-body row wrap">
-          <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder="workspace name" />
-          <Input value={f.slug} onChange={(v) => setF({ ...f, slug: v })} placeholder="slug (optional)" mono />
+          <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder={tr('workspace name')} />
+          <Input value={f.slug} onChange={(v) => setF({ ...f, slug: v })} placeholder={tr('slug (optional)')} mono />
           <button
             className="btn primary"
             disabled={!f.name}
@@ -79,7 +74,7 @@ function Workspaces() {
               }
             }}
           >
-            Create workspace
+            {tr('Create workspace')}
           </button>
         </div>
       </div>
@@ -92,10 +87,10 @@ function Workspaces() {
               <div className="faint tiny mono">{w.slug}</div>
             </div>
             <a className="link small" href={w.portal_url} target="_blank" rel="noreferrer">
-              portal
+              {tr('portal')}
             </a>
             <button className="btn sm" onClick={() => navigate(`/ws/${w.slug}`)}>
-              Open
+              {tr('Open')}
             </button>
           </div>
         ))}
@@ -111,13 +106,13 @@ function Users() {
   const [f, setF] = useState({ email: '', name: '', password: '', is_admin: false });
   return (
     <div className="col gap-16">
-      <p className="muted small">Users are global — one record per person, with memberships in several workspaces. Bootstrap administrators come from APIM_BOOTSTRAP_ADMINS.</p>
+      <p className="muted small">{tr('Users are global — one record per person, with memberships in several workspaces. Bootstrap administrators come from APIM_BOOTSTRAP_ADMINS.')}</p>
       <div className="card">
         <div className="card-body row wrap">
-          <Input value={f.email} onChange={(v) => setF({ ...f, email: v })} placeholder="email" />
-          <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder="name" />
-          <Input value={f.password} onChange={(v) => setF({ ...f, password: v })} placeholder="password" type="password" />
-          <Switch checked={f.is_admin} onChange={(v) => setF({ ...f, is_admin: v })} label="admin" />
+          <Input value={f.email} onChange={(v) => setF({ ...f, email: v })} placeholder={tr('email')} />
+          <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} placeholder={tr('name')} />
+          <Input value={f.password} onChange={(v) => setF({ ...f, password: v })} placeholder={tr('password')} type="password" />
+          <Switch checked={f.is_admin} onChange={(v) => setF({ ...f, is_admin: v })} label={tr('admin')} />
           <button
             className="btn primary"
             disabled={!f.email}
@@ -131,11 +126,11 @@ function Users() {
               }
             }}
           >
-            Create user
+            {tr('Create user')}
           </button>
         </div>
       </div>
-      <ListToolbar paging={usersPage} placeholder="search people, emails, tags" onReload={state.reload} loading={state.loading} />
+      <ListToolbar paging={usersPage} placeholder={tr('search people, emails, tags')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {() => (
           <div className="card">
@@ -148,7 +143,7 @@ function Users() {
                       <div className="bold">{u.name}</div>
                       <div className="faint tiny">{u.email}</div>
                     </td>
-                    <td>{u.is_admin && <Badge kind="accent">installation admin</Badge>}</td>
+                    <td>{u.is_admin && <Badge kind="accent">{tr('installation admin')}</Badge>}</td>
                     <td className="small">
                       {(u.tags || []).map((t) => (
                         <span key={t} className="tag" style={{ marginRight: 4 }}>
@@ -178,10 +173,10 @@ function Tokens() {
   const [created, setCreated] = useState(null);
   return (
     <div className="col gap-16">
-      <p className="muted small">Personal tokens for the admin api (/api), the CLI and CI. Every action of the console is an admin api call, so every action replays from them.</p>
+      <p className="muted small">{tr('Personal tokens for the admin api (/api), the CLI and CI. Every action of the console is an admin api call, so every action replays from them.')}</p>
       <div className="card">
         <div className="card-body row">
-          <Input value={name} onChange={setName} placeholder="token name (e.g. ci)" />
+          <Input value={name} onChange={setName} placeholder={tr('token name (e.g. ci)')} />
           <button
             className="btn primary"
             onClick={async () => {
@@ -194,12 +189,12 @@ function Tokens() {
               }
             }}
           >
-            Create token
+            {tr('Create token')}
           </button>
         </div>
       </div>
       {created && (
-        <Callout kind="positive" title="Copy this token now: it is not shown again">
+        <Callout kind="positive" title={tr('Copy this token now: it is not shown again')}>
           <Code>{created.token}</Code>
           <div className="mt-8">
             <Code>{`APIM_URL=${window.location.origin} APIM_TOKEN=${created.token} bun cli/apim.js apis list default`}</Code>
@@ -216,10 +211,10 @@ function Tokens() {
                   <div className="bold">{t.name}</div>
                   <div className="faint tiny mono">{t.prefix}…</div>
                 </div>
-                <span className="muted small">created {fmtDate(t.created_at)} · used {t.last_used_at ? fmtRelative(t.last_used_at) : 'never'}</span>
+                <span className="muted small"><Tr text={'created {0} · used {1}'} args={[fmtDate(t.created_at), t.last_used_at ? fmtRelative(t.last_used_at) : tr('never')]} /></span>
                 <button
                   className="btn ghost sm icon"
-                  aria-label="revoke"
+                  aria-label={tr('revoke')}
                   onClick={async () => {
                     await api.del(`/me/tokens/${t.id}`);
                     state.reload();
@@ -251,18 +246,18 @@ function Authentication() {
           <div className="col gap-16">
             <div className="card">
               <div className="card-body">
-                <Setting label="Mode" help="local accounts and an OIDC provider compose; the Otoroshi mode reads the identity in a header set by the gateway and is exclusive.">
+                <Setting label={tr('Mode')} help={tr('local accounts and an OIDC provider compose; the Otoroshi mode reads the identity in a header set by the gateway and is exclusive.')}>
                   <Select
                     value={f.mode}
                     onChange={(v) => setForm({ ...f, mode: v })}
                     options={[
-                      { value: 'local', label: 'Local accounts + optional OIDC provider' },
-                      { value: 'otoroshi', label: 'Via Otoroshi (exclusive)' },
+                      { value: 'local', label: tr('Local accounts + optional OIDC provider') },
+                      { value: 'otoroshi', label: tr('Via Otoroshi (exclusive)') },
                     ]}
                   />
                   {f.mode === 'otoroshi' && (
-                    <Callout kind="warning" title="No fallback entry">
-                      The identity comes from the gateway: a gateway outage locks the console — the very tool you need to diagnose it. A defensible trade-off when the gateway is already the single entry point of the organisation.
+                    <Callout kind="warning" title={tr('No fallback entry')}>
+                      {tr('The identity comes from the gateway: a gateway outage locks the console — the very tool you need to diagnose it. A defensible trade-off when the gateway is already the single entry point of the organisation.')}
                     </Callout>
                   )}
                 </Setting>
@@ -271,47 +266,47 @@ function Authentication() {
             {f.mode === 'local' ? (
               <div className="card">
                 <div className="card-head">
-                  <h3>OpenID Connect provider</h3>
+                  <h3>{tr('OpenID Connect provider')}</h3>
                 </div>
                 <div className="card-body">
-                  <Setting label="Enabled">
+                  <Setting label={tr('Enabled')}>
                     <Switch checked={f.oidc.enabled} onChange={(v) => setO({ enabled: v })} />
                   </Setting>
-                  <Setting label="Button label">
+                  <Setting label={tr('Button label')}>
                     <Input value={f.oidc.label} onChange={(v) => setO({ label: v })} />
                   </Setting>
-                  <Setting label="Issuer" help="discovery at <issuer>/.well-known/openid-configuration">
+                  <Setting label={tr('Issuer')} help={tr('discovery at <issuer>/.well-known/openid-configuration')}>
                     <Input value={f.oidc.issuer} onChange={(v) => setO({ issuer: v })} mono />
                   </Setting>
-                  <Setting label="Client" help={`register this redirect uri at the provider: ${s.auth.callback}`}>
-                    <Input value={f.oidc.clientId} onChange={(v) => setO({ clientId: v })} mono placeholder="client id" />
-                    <Input value={f.oidc.clientSecret} onChange={(v) => setO({ clientSecret: v })} mono type="password" placeholder="client secret" />
+                  <Setting label={tr('Client')} help={tr('register this redirect uri at the provider: {0}', [s.auth.callback])}>
+                    <Input value={f.oidc.clientId} onChange={(v) => setO({ clientId: v })} mono placeholder={tr('client id')} />
+                    <Input value={f.oidc.clientSecret} onChange={(v) => setO({ clientSecret: v })} mono type="password" placeholder={tr('client secret')} />
                   </Setting>
-                  <Setting label="Scopes and claims">
+                  <Setting label={tr('Scopes and claims')}>
                     <Input value={f.oidc.scopes} onChange={(v) => setO({ scopes: v })} mono />
                     <div className="row">
-                      <Input value={f.oidc.emailClaim} onChange={(v) => setO({ emailClaim: v })} mono placeholder="email claim" />
-                      <Input value={f.oidc.nameClaim} onChange={(v) => setO({ nameClaim: v })} mono placeholder="name claim" />
+                      <Input value={f.oidc.emailClaim} onChange={(v) => setO({ emailClaim: v })} mono placeholder={tr('email claim')} />
+                      <Input value={f.oidc.nameClaim} onChange={(v) => setO({ nameClaim: v })} mono placeholder={tr('name claim')} />
                     </div>
                   </Setting>
-                  <Setting label="Local accounts" help="when off, only the bootstrap administrators keep the local form">
-                    <Switch checked={f.oidc.localLogin} onChange={(v) => setO({ localLogin: v })} label="Keep the local sign-in form" />
+                  <Setting label={tr('Local accounts')} help={tr('when off, only the bootstrap administrators keep the local form')}>
+                    <Switch checked={f.oidc.localLogin} onChange={(v) => setO({ localLogin: v })} label={tr('Keep the local sign-in form')} />
                   </Setting>
                 </div>
               </div>
             ) : (
               <div className="card">
                 <div className="card-head">
-                  <h3>Otoroshi info token</h3>
+                  <h3>{tr('Otoroshi info token')}</h3>
                 </div>
                 <div className="card-body">
-                  <Setting label="Header" help="set by the Otoroshi info. token plugin (legacy version) on the route exposing the console, behind an auth module">
+                  <Setting label={tr('Header')} help={tr('set by the Otoroshi info. token plugin (legacy version) on the route exposing the console, behind an auth module')}>
                     <Input value={f.otoroshi.header} onChange={(v) => setX({ header: v })} mono />
                   </Setting>
-                  <Setting label="Secret" help="the HMAC secret of the token, shared with the route">
+                  <Setting label={tr('Secret')} help={tr('the HMAC secret of the token, shared with the route')}>
                     <Input value={f.otoroshi.secret} onChange={(v) => setX({ secret: v })} mono type="password" />
                   </Setting>
-                  <Setting label="Issuer" help="optional check of the iss claim">
+                  <Setting label={tr('Issuer')} help={tr('optional check of the iss claim')}>
                     <Input value={f.otoroshi.issuer} onChange={(v) => setX({ issuer: v })} mono />
                   </Setting>
                 </div>
@@ -325,14 +320,14 @@ function Authentication() {
                   try {
                     await api.put('/settings/auth', { mode: form.mode, oidc: form.oidc, otoroshi: form.otoroshi });
                     setForm(null);
-                    toast('Authentication settings saved');
+                    toast(tr('Authentication settings saved'));
                     st.reload();
                   } catch (e) {
                     toast(errorMessage(e), 'error');
                   }
                 }}
               >
-                Save
+                {tr('Save')}
               </button>
             </div>
           </div>
@@ -354,11 +349,10 @@ function AuditExport() {
     <div className="col gap-16">
       <div className="row">
         <p className="muted small grow">
-          Every write of the admin api, and the reads of credentials and request logs, are in the audit trail. An exporter sends it in batches to a webhook (a SIEM, a log pipeline), in order and
-          at least once: it keeps a cursor, so nothing is lost while the target is down.
+          {tr('Every write of the admin api, and the reads of credentials and request logs, are in the audit trail. An exporter sends it in batches to a webhook (a SIEM, a log pipeline), in order and at least once: it keeps a cursor, so nothing is lost while the target is down.')}
         </p>
         <button className="btn primary" onClick={() => setEditing({ name: '', url: '', headers: {}, actions: [], workspace_id: '', enabled: true, batch_size: 100, from_beginning: false })}>
-          <Icon name="plus" /> Add exporter
+          <Icon name="plus" /> {tr('Add exporter')}
         </button>
       </div>
       <Loader state={state}>
@@ -370,32 +364,30 @@ function AuditExport() {
                   <Icon name="upload" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="bold">
-                      {e.name} {!e.enabled && <Badge>disabled</Badge>}
+                      {e.name} {!e.enabled && <Badge>{tr('disabled')}</Badge>}
                     </div>
                     <div className="mono tiny faint ellipsis">{e.url}</div>
                     <div className="small mt-8">
-                      <StatusBadge status={e.last_error ? 'error' : 'synced'} label={e.last_error ? 'failing' : 'delivering'} /> {e.delivered} delivered · {e.lag || 0} behind
-                      {e.actions?.length ? ` · ${e.actions.join(', ')}` : ' · every action'}
-                      {e.last_error && <span className="negative-text"> — {e.last_error}</span>}
+                      <StatusBadge status={e.last_error ? 'error' : 'synced'} label={e.last_error ? tr('failing') : tr('delivering')} /> <Tr text={'{0} delivered · {1} behind{2}{3}'} args={[e.delivered, e.lag || 0, e.actions?.length ? ` · ${e.actions.join(', ')}` : tr(' · every action'), e.last_error && <span className="negative-text"> — {e.last_error}</span>]} />
                     </div>
                   </div>
                   <button
                     className="btn sm"
                     onClick={async () => {
                       const r = await api.post(`/audit/exporters/${e.id}/test`);
-                      toast(r.ok ? 'Test event delivered' : `Test failed: ${r.error}`, r.ok ? 'info' : 'error');
+                      toast(r.ok ? tr('Test event delivered') : tr('Test failed: {0}', [r.error]), r.ok ? 'info' : 'error');
                     }}
                   >
-                    Test
+                    {tr('Test')}
                   </button>
-                  <button className="btn ghost sm icon" onClick={() => setEditing({ ...e, workspace_id: e.workspace_id || '' })} aria-label="edit">
+                  <button className="btn ghost sm icon" onClick={() => setEditing({ ...e, workspace_id: e.workspace_id || '' })} aria-label={tr('edit')}>
                     <Icon name="edit" />
                   </button>
                   <button
                     className="btn ghost sm icon"
-                    aria-label="delete"
+                    aria-label={tr('delete')}
                     onClick={async () => {
-                      if (!(await confirm({ title: `Delete ${e.name}?`, danger: true, confirmLabel: 'Delete' }))) return;
+                      if (!(await confirm({ title: tr('Delete {0}?', [e.name]), danger: true, confirmLabel: tr('Delete') }))) return;
                       await api.del(`/audit/exporters/${e.id}`);
                       state.reload();
                     }}
@@ -407,14 +399,14 @@ function AuditExport() {
             </div>
           ) : (
             <div className="card">
-              <Empty title="No audit exporter" icon="audit" />
+              <Empty title={tr('No audit exporter')} icon="audit" />
             </div>
           )
         }
       </Loader>
       {editing && (
         <Modal
-          title={editing.id ? `Exporter ${editing.name}` : 'New audit exporter'}
+          title={editing.id ? tr('Exporter {0}', [editing.name]) : tr('New audit exporter')}
           onClose={() => setEditing(null)}
           footer={
             <button
@@ -426,24 +418,24 @@ function AuditExport() {
                   if (editing.id) await api.put(`/audit/exporters/${editing.id}`, body);
                   else await api.post('/audit/exporters', body);
                   setEditing(null);
-                  toast('Exporter saved');
+                  toast(tr('Exporter saved'));
                   state.reload();
                 } catch (e) {
                   toast(errorMessage(e), 'error');
                 }
               }}
             >
-              Save
+              {tr('Save')}
             </button>
           }
         >
-          <Field label="Name">
+          <Field label={tr('Name')}>
             <Input value={editing.name} onChange={set('name')} />
           </Field>
-          <Field label="Webhook url" hint="receives POST batches of ApimAuditEvent as a json array">
+          <Field label={tr('Webhook url')} hint={tr('receives POST batches of ApimAuditEvent as a json array')}>
             <Input value={editing.url} onChange={set('url')} mono />
           </Field>
-          <Field label="Header (e.g. a token)">
+          <Field label={tr('Header (e.g. a token)')}>
             <Input
               value={Object.entries(editing.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
               onChange={(v) => {
@@ -451,23 +443,23 @@ function AuditExport() {
                 set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
               }}
               mono
-              placeholder="Authorization: Bearer …"
+              placeholder={tr('Authorization: Bearer …')}
             />
           </Field>
           <div className="grid-2">
-            <Field label="Workspace">
-              <Select value={editing.workspace_id} onChange={set('workspace_id')} options={[{ value: '', label: 'every workspace' }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]} />
+            <Field label={tr('Workspace')}>
+              <Select value={editing.workspace_id} onChange={set('workspace_id')} options={[{ value: '', label: tr('every workspace') }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]} />
             </Field>
-            <Field label="Batch size">
+            <Field label={tr('Batch size')}>
               <NumberInput value={editing.batch_size} onChange={set('batch_size')} />
             </Field>
           </div>
-          <Field label="Actions" hint="prefixes, e.g. subscription. or credential.read — empty: everything">
+          <Field label={tr('Actions')} hint={tr('prefixes, e.g. subscription. or credential.read — empty: everything')}>
             <TagsInput value={editing.actions} onChange={set('actions')} />
           </Field>
           <div className="row gap-24">
-            <Switch checked={editing.enabled} onChange={set('enabled')} label="Enabled" />
-            {!editing.id && <Switch checked={editing.from_beginning} onChange={set('from_beginning')} label="Replay the whole trail" />}
+            <Switch checked={editing.enabled} onChange={set('enabled')} label={tr('Enabled')} />
+            {!editing.id && <Switch checked={editing.from_beginning} onChange={set('from_beginning')} label={tr('Replay the whole trail')} />}
           </div>
         </Modal>
       )}
@@ -481,11 +473,11 @@ export function GlobalSettingsPage({ tab }) {
   const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'audit', 'tokens'] : ['tokens'];
   return (
     <div className="page">
-      <PageHead title="Global settings" sub="Installation-level: workspaces, users, access tokens." />
+      <PageHead title={tr('Global settings')} sub={tr('Installation-level: workspaces, users, access tokens.')} />
       <div className="tabs mb-16">
         {tabs.map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/settings/${t}`)}>
-            {t === 'tokens' ? 'API tokens' : t === 'audit' ? 'Audit export' : t[0].toUpperCase() + t.slice(1)}
+            {t === 'tokens' ? tr('API tokens') : t === 'audit' ? tr('Audit export') : tr(t[0].toUpperCase() + t.slice(1))}
           </button>
         ))}
       </div>

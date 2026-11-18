@@ -17,11 +17,10 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-5** — console in French (D-11).
-2. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
-3. **R-7** — Stripe connector (D-36, Q-12).
-4. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
-5. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
+1. **R-6** — Kubernetes: manifests, Helm chart, CRDs (D-28).
+2. **R-7** — Stripe connector (D-36, Q-12).
+3. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+4. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -67,7 +66,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-5 | D-11 | The console **in French** (the portal is en/fr) — the strings are not extracted yet | M | |
+| R-45 | D-11 | The **messages of the admin api** in the language of the console: its errors and the validation warnings (plans, deployments, promotions) are in English | M | |
 | R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
@@ -136,7 +135,7 @@ waits for the data plane rather than working around it.
 | D-9 n°4 reversibility | ✅ | export / import ✅; uninstalling leaves a working configuration, taken over by hand with Otoroshi alone (revoke, subscribe, change a plan, remove the marker) — `test/product-down.test.js`, documented in *When the product is down* |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
-| D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅; console in English: R-5; metadata labels: R-22; more portal pages: R-42 |
+| D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages in English: R-45; metadata labels: R-22; more portal pages: R-42 |
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules derived; the gateway's own settings (TLS client auth, exposure routes): R-41 |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |

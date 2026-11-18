@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { getThemePref, setThemePref } from './lib.js';
 import { Icon } from './ui.jsx';
+import { tr } from './i18n.jsx';
 
 const CHOICES = [
   { value: 'light', icon: 'sun' },
@@ -10,7 +11,7 @@ const CHOICES = [
   { value: 'system', icon: 'monitor' },
 ];
 
-export function ThemeSwitch({ labels = { light: 'Light', dark: 'Dark', system: 'System' }, label = 'Theme' }) {
+export function ThemeSwitch({ labels = { light: tr('Light'), dark: tr('Dark'), system: tr('System') }, label = tr('Theme') }) {
   const [pref, setPref] = useState(getThemePref());
   return (
     <div className="seg theme-switch" role="radiogroup" aria-label={label}>

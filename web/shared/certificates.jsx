@@ -4,27 +4,29 @@ import React, { useState } from 'react';
 import { fmtDate } from './lib.js';
 import { Badge, Callout, Field, Icon, Modal, Setting, errorMessage, useLoad } from './ui.jsx';
 import { CodeEditor } from './code-editor.jsx';
+import { tr, Tr } from './i18n.jsx';
 
-const EN = {
-  ca: 'CA',
-  notCa: 'not a CA',
-  selfSigned: 'self-signed',
-  validUntil: 'valid until',
-  issuerAs: 'Otoroshi sees the issuer of what it signs as',
-  unpredictable: 'its subject cannot be predicted in Otoroshi’s form: give the issuer patterns',
-  identifiedAs: 'the plans that read the CN identify the application as',
-  useAsClientId: 'use as the expected client_id',
-  issuedBy: 'issued by',
-  remove: 'remove',
-  cancel: 'Cancel',
-  add: 'Add',
-  incomplete: 'paste the whole certificate, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----',
-};
+// the defaults, in the language of the console; the portal gives its own
+const EN = () => ({
+  ca: tr('CA'),
+  notCa: tr('not a CA'),
+  selfSigned: tr('self-signed'),
+  validUntil: tr('valid until'),
+  issuerAs: tr('Otoroshi sees the issuer of what it signs as'),
+  unpredictable: tr('its subject cannot be predicted in Otoroshi’s form: give the issuer patterns'),
+  identifiedAs: tr('the plans that read the CN identify the application as'),
+  useAsClientId: tr('use as the expected client_id'),
+  issuedBy: tr('issued by'),
+  remove: tr('remove'),
+  cancel: tr('Cancel'),
+  add: tr('Add'),
+  incomplete: tr('paste the whole certificate, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----'),
+});
 
 const cnOf = (subject) => /CN=([^,]+)/.exec(subject || '')?.[1] || null;
 
 export function CertificateFacts({ info, mode = 'ca', labels = {}, clientId, onClientId }) {
-  const L = { ...EN, ...labels };
+  const L = { ...EN(), ...labels };
   if (!info) return null;
   if (info.error) return <Callout kind="negative">{info.error}</Callout>;
   const cn = cnOf(info.subject);
@@ -36,7 +38,7 @@ export function CertificateFacts({ info, mode = 'ca', labels = {}, clientId, onC
         {info.subject === info.issuer && <Badge>{L.selfSigned}</Badge>}
       </div>
       <div className="faint tiny">
-        {L.validUntil} {fmtDate(info.validTo)} · sha-256 {info.fingerprint.slice(0, 23)}…{mode === 'client' && info.subject !== info.issuer ? ` · ${L.issuedBy} ${info.issuer}` : ''}
+        <Tr text={'{0} {1} · sha-256 {2}…{3}'} args={[L.validUntil, fmtDate(info.validTo), info.fingerprint.slice(0, 23), mode === 'client' && info.subject !== info.issuer ? ` · ${L.issuedBy} ${info.issuer}` : '']} />
       </div>
       {mode === 'ca' ? (
         <div className="faint tiny">
@@ -67,7 +69,7 @@ export function CertificateFacts({ info, mode = 'ca', labels = {}, clientId, onC
 }
 
 function AddCertificate({ inspect, mode, labels, title, help, onAdd, onClose }) {
-  const L = { ...EN, ...labels };
+  const L = { ...EN(), ...labels };
   const [pem, setPem] = useState('');
   const complete = /-----END CERTIFICATE-----\s*$/.test(pem);
   const info = useLoad(() => (complete ? inspect(pem).catch((e) => ({ error: errorMessage(e) })) : Promise.resolve(null)), [pem]);
@@ -88,7 +90,7 @@ function AddCertificate({ inspect, mode, labels, title, help, onAdd, onClose }) 
       }
     >
       <p className="muted small">{help}</p>
-      <CodeEditor value={pem} onChange={setPem} language="plaintext" minHeight={200} maxHeight={360} ariaLabel={title} placeholder="-----BEGIN CERTIFICATE-----" />
+      <CodeEditor value={pem} onChange={setPem} language="plaintext" minHeight={200} maxHeight={360} ariaLabel={title} placeholder={tr('-----BEGIN CERTIFICATE-----')} />
       {pem.trim() && !complete && <div className="hint">{L.incomplete}</div>}
       <CertificateFacts info={info.data} mode={mode} labels={labels} />
     </Modal>
@@ -98,7 +100,7 @@ function AddCertificate({ inspect, mode, labels, title, help, onAdd, onClose }) 
 // label / help: of the setting; addLabel, addTitle, addHelp: of the button and its modal
 // layout: 'setting' (a label on the left, the console) or 'field' (a label above, the portal)
 export function CertificateList({ value = [], onChange, inspect, mode = 'ca', label, help, addLabel, addTitle, addHelp, labels = {}, readOnly = false, clientId, onClientId, layout = 'setting' }) {
-  const L = { ...EN, ...labels };
+  const L = { ...EN(), ...labels };
   const [adding, setAdding] = useState(false);
   const infos = useLoad(() => Promise.all(value.map((pem) => inspect(pem).catch((e) => ({ error: errorMessage(e) })))), [value.join('|')]);
   const Wrap = layout === 'field' ? FieldWrap : Setting;

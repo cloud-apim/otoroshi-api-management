@@ -7,14 +7,15 @@ import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
 import { PromoteModal } from './Promote.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 export function deploymentLabel(a) {
   const d = a.deployment;
-  if (!a.last_snapshot) return <StatusBadge status="created" label="draft only" />;
-  if (!d || d.action === 'undeploy') return <StatusBadge status="none" label="not deployed" />;
-  if (d.status === 'pending') return <StatusBadge status="pending" label="deploying" />;
-  if (d.status === 'failed') return <StatusBadge status="failed" label="deploy failed" />;
-  return <StatusBadge status="deployed" label="deployed" />;
+  if (!a.last_snapshot) return <StatusBadge status="created" label={tr('draft only')} />;
+  if (!d || d.action === 'undeploy') return <StatusBadge status="none" label={tr('not deployed')} />;
+  if (d.status === 'pending') return <StatusBadge status="pending" label={tr('deploying')} />;
+  if (d.status === 'failed') return <StatusBadge status="failed" label={tr('deploy failed')} />;
+  return <StatusBadge status="deployed" label={tr('deployed')} />;
 }
 
 function CreateApiModal({ onClose, onCreated }) {
@@ -27,7 +28,7 @@ function CreateApiModal({ onClose, onCreated }) {
   const submit = async () => {
     try {
       const created = await wapi.post('/apis', { ...form, domain: form.domain || suggestedDomain, team_id: form.team_id || teams.data?.[0]?.id });
-      toast('API created — it is a draft until you publish it');
+      toast(tr('API created — it is a draft until you publish it'));
       onCreated(created);
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -35,45 +36,45 @@ function CreateApiModal({ onClose, onCreated }) {
   };
   return (
     <Modal
-      title="New API"
+      title={tr('New API')}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button className="btn primary" onClick={submit} disabled={!form.name}>
-            Create draft
+            {tr('Create draft')}
           </button>
         </>
       }
     >
       <p className="muted small">
-        An API is a version. The product creates it end to end — routes, frontends and backends — and nothing reaches the gateway before you publish and deploy.
+        {tr('An API is a version. The product creates it end to end — routes, frontends and backends — and nothing reaches the gateway before you publish and deploy.')}
       </p>
       <div className="grid-2">
-        <Field label="Name">
-          <Input value={form.name} onChange={set('name')} autoFocus placeholder="Payments" />
+        <Field label={tr('Name')}>
+          <Input value={form.name} onChange={set('name')} autoFocus placeholder={tr('Payments')} />
         </Field>
-        <Field label="Version">
+        <Field label={tr('Version')}>
           <Input value={form.version} onChange={set('version')} />
         </Field>
       </div>
-      <Field label="Description">
+      <Field label={tr('Description')}>
         <Input value={form.description} onChange={set('description')} />
       </Field>
-      <Field label="Owning team">
+      <Field label={tr('Owning team')}>
         <Select value={form.team_id || teams.data?.[0]?.id || ''} onChange={set('team_id')} options={(teams.data || []).map((t) => ({ value: t.id, label: t.name }))} />
       </Field>
       <div className="grid-2">
-        <Field label="Domain" hint="where the gateway exposes the api">
+        <Field label={tr('Domain')} hint={tr('where the gateway exposes the api')}>
           <Input value={form.domain} onChange={set('domain')} placeholder={suggestedDomain} />
         </Field>
-        <Field label="Context path">
+        <Field label={tr('Context path')}>
           <Input value={form.contextPath} onChange={set('contextPath')} />
         </Field>
       </div>
-      <Field label="Tags" hint="business classification, not a governance axis">
+      <Field label={tr('Tags')} hint={tr('business classification, not a governance axis')}>
         <TagsInput value={form.tags} onChange={set('tags')} />
       </Field>
     </Modal>
@@ -85,10 +86,9 @@ function AdoptModal({ onClose, onAdopted }) {
   const toast = useToast();
   const state = useLoad(() => api.get('/gateway/unmanaged-apis'), []);
   return (
-    <Modal title="Adopt an API from the gateway" onClose={onClose} size="wide">
+    <Modal title={tr('Adopt an API from the gateway')} onClose={onClose} size="wide">
       <Callout kind="info">
-        Adopt mode takes over an existing Otoroshi <code>Api</code> without overwriting it: it becomes a draft in the product, and nothing is written to the gateway until you
-        publish and deploy. The ids are kept, so the first deployment updates the entity in place.
+        <Tr text={'Adopt mode takes over an existing Otoroshi {0} without overwriting it: it becomes a draft in the product, and nothing is written to the gateway until you publish and deploy. The ids are kept, so the first deployment updates the entity in place.'} args={[<code>Api</code>]} />
       </Callout>
       <Loader state={state}>
         {(list) =>
@@ -97,9 +97,9 @@ function AdoptModal({ onClose, onAdopted }) {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Otoroshi API</th>
-                    <th>Entrypoint</th>
-                    <th>Plans</th>
+                    <th>{tr('Otoroshi API')}</th>
+                    <th>{tr('Entrypoint')}</th>
+                    <th>{tr('Plans')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -121,14 +121,14 @@ function AdoptModal({ onClose, onAdopted }) {
                           onClick={async () => {
                             try {
                               const created = await wapi.post('/adopt', { otoroshi_api_id: a.id });
-                              toast('API adopted as a draft');
+                              toast(tr('API adopted as a draft'));
                               onAdopted(created);
                             } catch (e) {
                               toast(errorMessage(e), 'error');
                             }
                           }}
                         >
-                          Adopt
+                          {tr('Adopt')}
                         </button>
                       </td>
                     </tr>
@@ -137,7 +137,7 @@ function AdoptModal({ onClose, onAdopted }) {
               </table>
             </div>
           ) : (
-            <Empty title="No unmanaged API on the gateway" />
+            <Empty title={tr('No unmanaged API on the gateway')} />
           )
         }
       </Loader>
@@ -158,24 +158,24 @@ export function ApisPage() {
   return (
     <div className="page">
       <PageHead
-        title="APIs"
-        sub="Describe, publish and deploy APIs. Policy lives in the plans; routes are a projection detail."
+        title={tr('APIs')}
+        sub={tr('Describe, publish and deploy APIs. Policy lives in the plans; routes are a projection detail.')}
         actions={
           <>
             <button className="btn" onClick={() => setPromoting(true)}>
-              <Icon name="upload" /> Promote a snapshot
+              <Icon name="upload" /> {tr('Promote a snapshot')}
             </button>
             <button className="btn" onClick={() => setAdopting(true)}>
-              <Icon name="download" /> Adopt from gateway
+              <Icon name="download" /> {tr('Adopt from gateway')}
             </button>
             <button className="btn primary" onClick={() => setCreating(true)}>
-              <Icon name="plus" /> New API
+              <Icon name="plus" /> {tr('New API')}
             </button>
           </>
         }
       />
       <ApisTabs current="apis" />
-      <ListToolbar paging={paging} placeholder="search by name, description or tag" onReload={state.reload} loading={state.loading} />
+      <ListToolbar paging={paging} placeholder={tr('search by name, description or tag')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {(apis) =>
           apis.length ? (
@@ -184,13 +184,13 @@ export function ApisPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>API</th>
-                    <th>Entrypoint</th>
-                    <th>Lifecycle</th>
-                    <th>Gateway</th>
-                    <th className="right">Plans</th>
-                    <th className="right">Subscriptions</th>
-                    <th>Updated</th>
+                    <th>{tr('API')}</th>
+                    <th>{tr('Entrypoint')}</th>
+                    <th>{tr('Lifecycle')}</th>
+                    <th>{tr('Gateway')}</th>
+                    <th className="right">{tr('Plans')}</th>
+                    <th className="right">{tr('Subscriptions')}</th>
+                    <th>{tr('Updated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -207,7 +207,7 @@ export function ApisPage() {
                               {t}
                             </span>
                           ))}
-                          {a.managed_by && <Badge kind="info">managed by {a.managed_by}</Badge>}
+                          {a.managed_by && <Badge kind="info"><Tr text={'managed by {0}'} args={[a.managed_by]} /></Badge>}
                         </div>
                       </td>
                       <td className="mono small muted">
@@ -219,14 +219,14 @@ export function ApisPage() {
                       </td>
                       <td>
                         {deploymentLabel(a)}
-                        {a.last_snapshot ? <div className="faint tiny mt-8">snapshot #{a.last_snapshot}</div> : null}
+                        {a.last_snapshot ? <div className="faint tiny mt-8"><Tr text={'snapshot #{0}'} args={[a.last_snapshot]} /></div> : null}
                       </td>
                       <td className="right">{a.plans_count}</td>
                       <td className="right">
                         {a.active_subscriptions}
                         {a.pending_subscriptions > 0 && (
                           <span className="badge warning" style={{ marginLeft: 6 }}>
-                            {a.pending_subscriptions} pending
+                            <Tr text={'{0} pending'} args={[a.pending_subscriptions]} />
                           </span>
                         )}
                       </td>
@@ -241,15 +241,15 @@ export function ApisPage() {
           ) : (
             <div className="card">
               <Empty
-                title={q ? 'No matching API' : 'No API yet'}
+                title={q ? tr('No matching API') : tr('No API yet')}
                 icon="api"
                 action={
                   <button className="btn primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" /> New API
+                    <Icon name="plus" /> {tr('New API')}
                   </button>
                 }
               >
-                Create an API, or adopt one that already runs on the gateway.
+                {tr('Create an API, or adopt one that already runs on the gateway.')}
               </Empty>
             </div>
           )

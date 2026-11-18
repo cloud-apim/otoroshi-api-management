@@ -6,6 +6,7 @@ import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 export function SubscriptionsTable({ query = '', showApi = true, showApp = true, onChanged }) {
   const { wapi } = useWs();
@@ -20,15 +21,15 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
   });
   return (
     <div className="col gap-16">
-      <ListToolbar paging={page} placeholder="search applications, teams, apis, plans, people" onReload={state.reload} loading={state.loading}>
+      <ListToolbar paging={page} placeholder={tr('search applications, teams, apis, plans, people')} onReload={state.reload} loading={state.loading}>
         <Select
           value={status}
           onChange={(v) => setParams({ status: v, subs_page: null })}
           options={[
-            { value: '', label: 'All statuses' },
-            ...['pending', 'pending_payment', 'active', 'suspended', 'rejected', 'closed'].map((s) => ({ value: s, label: s.replace('_', ' ') })),
+            { value: '', label: tr('All statuses') },
+            ...['pending', 'pending_payment', 'active', 'suspended', 'rejected', 'closed'].map((s) => ({ value: s, label: tr(s.replace('_', ' ')) })),
           ]}
-          aria-label="filter by status"
+          aria-label={tr('filter by status')}
           style={{ width: 200 }}
         />
       </ListToolbar>
@@ -40,12 +41,12 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
               <table className="table">
                 <thead>
                   <tr>
-                    {showApp && <th>Application</th>}
-                    {showApi && <th>API</th>}
-                    <th>Plan</th>
-                    <th>Status</th>
-                    <th>Gateway</th>
-                    <th>Requested</th>
+                    {showApp && <th>{tr('Application')}</th>}
+                    {showApi && <th>{tr('API')}</th>}
+                    <th>{tr('Plan')}</th>
+                    <th>{tr('Status')}</th>
+                    <th>{tr('Gateway')}</th>
+                    <th>{tr('Requested')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -64,7 +65,7 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
                       )}
                       <td>
                         <div>{s.request?.plan_name || s.plan_id}</div>
-                        <div className="faint tiny">{AUTH_LABELS[s.auth_kind]}</div>
+                        <div className="faint tiny">{tr(AUTH_LABELS[s.auth_kind])}</div>
                       </td>
                       <td>
                         <StatusBadge status={s.status} />
@@ -85,8 +86,8 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
             </div>
           ) : (
             <div className="card">
-              <Empty title={page.q ? 'No subscription matches' : 'No subscription'} icon="inbox">
-                {page.q ? null : 'Consumers subscribe to the published plans from the developer portal.'}
+              <Empty title={page.q ? tr('No subscription matches') : tr('No subscription')} icon="inbox">
+                {page.q ? null : tr('Consumers subscribe to the published plans from the developer portal.')}
               </Empty>
             </div>
           )
@@ -121,7 +122,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
     setBusy(true);
     try {
       await wapi.post(`/subscriptions/${id}/${action}`, body);
-      toast(label || `Subscription ${action}ed`);
+      toast(label || tr('Subscription updated'));
       setMessage('');
       state.reload();
       onChanged?.();
@@ -133,74 +134,74 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
   };
 
   return (
-    <Drawer title="Subscription" subtitle={id} onClose={onClose}>
+    <Drawer title={tr('Subscription')} subtitle={id} onClose={onClose}>
       <Loader state={state}>
         {(s) => (
           <>
             <div className="row wrap">
               <StatusBadge status={s.status} />
-              <Badge>{AUTH_LABELS[s.auth_kind]}</Badge>
-              <span className="muted small">gateway: </span>
+              <Badge>{tr(AUTH_LABELS[s.auth_kind])}</Badge>
+              <span className="muted small">{tr('gateway:')} </span>
               <StatusBadge status={s.projection?.status || 'none'} />
             </div>
-            {s.projection?.error && <Callout kind="warning" title="Projection">{s.projection.error}</Callout>}
+            {s.projection?.error && <Callout kind="warning" title={tr('Projection')}>{s.projection.error}</Callout>}
             <dl className="kv">
-              <dt>Application</dt>
+              <dt>{tr('Application')}</dt>
               <dd>
                 <Link to={`/ws/${slug}/applications/${s.application_id}`} className="link">
                   {s.application_name}
                 </Link>
               </dd>
-              <dt>API</dt>
+              <dt>{tr('API')}</dt>
               <dd>
                 <Link to={`/ws/${slug}/apis/${s.api_id}/subscriptions`} className="link">
                   {s.api_name} {s.api_version}
                 </Link>
               </dd>
-              <dt>Plan</dt>
+              <dt>{tr('Plan')}</dt>
               <dd>
                 {s.request?.plan_name} <span className="faint mono">{s.plan_id}</span>
               </dd>
-              <dt>Requested</dt>
+              <dt>{tr('Requested')}</dt>
               <dd>{fmtDate(s.created_at)}</dd>
               {s.dates?.processed_at && (
                 <>
-                  <dt>Processed</dt>
+                  <dt>{tr('Processed')}</dt>
                   <dd>{fmtDate(s.dates.processed_at)}</dd>
                 </>
               )}
               {s.dates?.suspended_at && (
                 <>
-                  <dt>Suspended</dt>
+                  <dt>{tr('Suspended')}</dt>
                   <dd>{fmtDate(s.dates.suspended_at)}</dd>
                 </>
               )}
               {s.review?.decision && (
                 <>
-                  <dt>Review</dt>
+                  <dt>{tr('Review')}</dt>
                   <dd>
-                    {s.review.decision} by {s.review.by} {s.review.message ? `— “${s.review.message}”` : ''}
+                    <Tr text={'{0} by {1} {2}'} args={[s.review.decision, s.review.by, s.review.message ? `— “${s.review.message}”` : '']} />
                   </dd>
                 </>
               )}
             </dl>
             {/* portal-only information, never projected */}
             <div className="panel col gap-6">
-              <div className="label">Request</div>
-              {s.request?.usage ? <p style={{ whiteSpace: 'pre-wrap' }}>{s.request.usage}</p> : <p className="faint small">No usage statement.</p>}
+              <div className="label">{tr('Request')}</div>
+              {s.request?.usage ? <p style={{ whiteSpace: 'pre-wrap' }}>{s.request.usage}</p> : <p className="faint small">{tr('No usage statement.')}</p>}
               {s.request?.terms_accepted && (
                 <p className="small positive-text">
-                  <Icon name="check" size={13} /> Terms accepted {s.request.terms_url ? `(${s.request.terms_url})` : ''} on {fmtDate(s.request.accepted_at)}
+                  <Icon name="check" size={13} /> <Tr text={'Terms accepted {0} on {1}'} args={[s.request.terms_url ? `(${s.request.terms_url})` : '', fmtDate(s.request.accepted_at)]} />
                 </p>
               )}
             </div>
 
-            {!s.can_manage && <Callout kind="info">Read only: the team of the API decides on its subscriptions.</Callout>}
+            {!s.can_manage && <Callout kind="info">{tr('Read only: the team of the API decides on its subscriptions.')}</Callout>}
             <fieldset disabled={!s.can_manage} className="ro-fieldset col gap-16">
             {metaFields.length > 0 && (
               <div className="panel col gap-6">
-                <div className="label">Metadata</div>
-                <p className="faint small">The fields marked for the portal form the request form of the plans; the others are filled here.</p>
+                <div className="label">{tr('Metadata')}</div>
+                <p className="faint small">{tr('The fields marked for the portal form the request form of the plans; the others are filled here.')}</p>
                 <MetadataForm fields={metaFields} values={meta || s.metadata} onChange={setMeta} />
                 {meta && (
                   <button
@@ -210,14 +211,14 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                       try {
                         await wapi.put(`/subscriptions/${id}/metadata`, meta);
                         setMeta(null);
-                        toast('Metadata saved');
+                        toast(tr('Metadata saved'));
                         state.reload();
                       } catch (e) {
                         toast(errorMessage(e), 'error');
                       }
                     }}
                   >
-                    Save metadata
+                    {tr('Save metadata')}
                   </button>
                 )}
               </div>
@@ -226,15 +227,15 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             {s.status === 'pending' && (
               <div className="card flat">
                 <div className="card-body col">
-                  <Field label="Message to the requester" hint="optional, sent with the decision">
+                  <Field label={tr('Message to the requester')} hint={tr('optional, sent with the decision')}>
                     <TextArea value={message} onChange={setMessage} rows={2} />
                   </Field>
                   <div className="row">
-                    <button className="btn primary" disabled={busy} onClick={() => act('accept', { message }, 'Subscription accepted')}>
-                      <Icon name="check" /> Accept
+                    <button className="btn primary" disabled={busy} onClick={() => act('accept', { message }, tr('Subscription accepted'))}>
+                      <Icon name="check" /> {tr('Accept')}
                     </button>
-                    <button className="btn danger" disabled={busy} onClick={() => act('reject', { message }, 'Subscription rejected')}>
-                      <Icon name="x" /> Reject
+                    <button className="btn danger" disabled={busy} onClick={() => act('reject', { message }, tr('Subscription rejected'))}>
+                      <Icon name="x" /> {tr('Reject')}
                     </button>
                   </div>
                 </div>
@@ -243,7 +244,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             </fieldset>
 
             <div className="col gap-6">
-              <div className="label">Credentials</div>
+              <div className="label">{tr('Credentials')}</div>
               {s.credentials.length ? (
                 s.credentials.map((c) => (
                   <div key={c.id} className="panel col gap-6">
@@ -255,24 +256,24 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                         <button
                           className="btn xs"
                           onClick={async () => {
-                            if (!(await confirm({ title: 'Rotate the secret?', message: 'The current secret stops working immediately on the gateway.', confirmLabel: 'Rotate' }))) return;
+                            if (!(await confirm({ title: tr('Rotate the secret?'), message: tr('The current secret stops working immediately on the gateway.'), confirmLabel: tr('Rotate') }))) return;
                             try {
                               await wapi.post(`/subscriptions/${id}/credentials/${c.id}/rotate`);
-                              toast('Secret rotated');
+                              toast(tr('Secret rotated'));
                               state.reload();
                             } catch (e) {
                               toast(errorMessage(e), 'error');
                             }
                           }}
                         >
-                          <Icon name="refresh" /> Rotate secret
+                          <Icon name="refresh" /> {tr('Rotate secret')}
                         </button>
                       )}
                     </div>
                     <dl className="kv">
-                      <dt>Client id</dt>
+                      <dt>{tr('Client id')}</dt>
                       <dd className="mono">{c.client_id}</dd>
-                      <dt>Client secret</dt>
+                      <dt>{tr('Client secret')}</dt>
                       <dd>
                         <Secret value={c.client_secret} />
                       </dd>
@@ -282,22 +283,22 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               ) : (
                 <p className="faint small">
                   {['apikey', 'oauth2-local'].includes(s.auth_kind)
-                    ? 'The key is minted on the gateway when the subscription becomes active.'
-                    : 'On this plan the consumer calls with its own token or certificate; the gateway identifies it by the client_id declared on the application.'}
+                    ? tr('The key is minted on the gateway when the subscription becomes active.')
+                    : tr('On this plan the consumer calls with its own token or certificate; the gateway identifies it by the client_id declared on the application.')}
                 </p>
               )}
             </div>
 
             {s.pending_transfer && (
-              <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={`Move to ${s.pending_transfer.to.plan_name} — ${s.pending_transfer.status === 'requested' ? 'asked by the consumer' : "waiting for the consumer's consent"}`}>
-                {s.pending_transfer.reasons?.length > 0 && <div>The target plan brings {s.pending_transfer.reasons.join(', ')} (a change of contract needs the consumer's agreement).</div>}
+              <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={tr('Move to {0} — {1}', [s.pending_transfer.to.plan_name, s.pending_transfer.status === 'requested' ? tr('asked by the consumer') : tr("waiting for the consumer's consent")])}>
+                {s.pending_transfer.reasons?.length > 0 && <div><Tr text={"The target plan brings {0} (a change of contract needs the consumer's agreement)."} args={[s.pending_transfer.reasons.join(', ')]} /></div>}
                 {s.pending_transfer.status === 'requested' && s.can_manage && (
                   <div className="row mt-8">
-                    <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, 'Subscription transferred — the key does not change')}>
-                      Apply the move
+                    <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, tr('Subscription transferred — the key does not change'))}>
+                      {tr('Apply the move')}
                     </button>
-                    <button className="btn sm" disabled={busy} onClick={() => act('transfer/decision', { accept: false }, 'Request declined')}>
-                      Decline
+                    <button className="btn sm" disabled={busy} onClick={() => act('transfer/decision', { accept: false }, tr('Request declined'))}>
+                      {tr('Decline')}
                     </button>
                   </div>
                 )}
@@ -306,17 +307,17 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
 
             {s.history?.length > 0 && (
               <div className="col gap-6">
-                <div className="label">Transfers</div>
+                <div className="label">{tr('Transfers')}</div>
                 {s.history.map((h, i) => (
                   <div key={i} className="small muted">
-                    {fmtDate(h.at)} — {h.from.plan_name} → {h.to.plan_name} by {h.by}
+                    <Tr text={'{0} — {1} → {2} by {3}'} args={[fmtDate(h.at), h.from.plan_name, h.to.plan_name, h.by]} />
                   </div>
                 ))}
               </div>
             )}
 
             {s.drift && s.drift.status !== 'in_sync' && (
-              <Callout kind="warning" title={`Gateway drift: ${s.drift.status}`}>
+              <Callout kind="warning" title={tr('Gateway drift: {0}', [s.drift.status])}>
                 <DiffView changes={s.drift.diff} />
               </Callout>
             )}
@@ -324,27 +325,27 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             <hr />
             <fieldset disabled={!s.can_manage} className="ro-fieldset row wrap">
               {s.status === 'active' && (
-                <button className="btn" disabled={busy} onClick={() => act('suspend', {}, 'Subscription suspended')}>
-                  <Icon name="pause" /> Suspend
+                <button className="btn" disabled={busy} onClick={() => act('suspend', {}, tr('Subscription suspended'))}>
+                  <Icon name="pause" /> {tr('Suspend')}
                 </button>
               )}
               {s.status === 'suspended' && (
-                <button className="btn" disabled={busy} onClick={() => act('resume', {}, 'Subscription resumed')}>
-                  <Icon name="play" /> Resume
+                <button className="btn" disabled={busy} onClick={() => act('resume', {}, tr('Subscription resumed'))}>
+                  <Icon name="play" /> {tr('Resume')}
                 </button>
               )}
               {['active', 'suspended'].includes(s.status) && (
                 <button className="btn" disabled={busy} onClick={() => setTransfer(true)}>
-                  <Icon name="swap" /> Transfer to another plan
+                  <Icon name="swap" /> {tr('Transfer to another plan')}
                 </button>
               )}
               {s.status === 'pending_payment' && (
-                <button className="btn" disabled={busy} onClick={() => act('payment', {}, 'Payment confirmed (test connector)')}>
-                  Confirm payment (test)
+                <button className="btn" disabled={busy} onClick={() => act('payment', {}, tr('Payment confirmed (test connector)'))}>
+                  {tr('Confirm payment (test)')}
                 </button>
               )}
-              <button className="btn ghost" disabled={busy} onClick={() => act('resync', {}, 'Projection replayed')}>
-                <Icon name="refresh" /> Replay projection
+              <button className="btn ghost" disabled={busy} onClick={() => act('resync', {}, tr('Projection replayed'))}>
+                <Icon name="refresh" /> {tr('Replay projection')}
               </button>
               <span className="spacer" />
               {['pending', 'pending_payment', 'active', 'suspended'].includes(s.status) && (
@@ -354,16 +355,16 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                   onClick={async () => {
                     if (
                       await confirm({
-                        title: 'Close this subscription?',
-                        message: 'Its keys are deleted from the gateway: the consumer gets 401 from now on.',
+                        title: tr('Close this subscription?'),
+                        message: tr('Its keys are deleted from the gateway: the consumer gets 401 from now on.'),
                         danger: true,
-                        confirmLabel: 'Close subscription',
+                        confirmLabel: tr('Close subscription'),
                       })
                     )
-                      act('close', {}, 'Subscription closed');
+                      act('close', {}, tr('Subscription closed'));
                   }}
                 >
-                  Close
+                  {tr('Close')}
                 </button>
               )}
             </fieldset>
@@ -394,10 +395,9 @@ function TransferPanel({ sub, onDone, onCancel }) {
   return (
     <div className="card flat">
       <div className="card-body col">
-        <h3>Transfer</h3>
+        <h3>{tr('Transfer')}</h3>
         <p className="muted small">
-          The key does not change; the subscription keeps its identity and history. Only plans with the same auth mechanism ({AUTH_LABELS[sub.auth_kind]}) are eligible. A move that degrades the
-          conditions — lower limits, a higher price, other terms, fewer resources — waits for the consumer's consent.
+          <Tr text={"The key does not change; the subscription keeps its identity and history. Only plans with the same auth mechanism ({0}) are eligible. A move that degrades the conditions — lower limits, a higher price, other terms, fewer resources — waits for the consumer's consent."} args={[tr(AUTH_LABELS[sub.auth_kind])]} />
         </p>
         <Loader state={state}>
           {(options) => {
@@ -407,7 +407,7 @@ function TransferPanel({ sub, onDone, onCancel }) {
                 <Select
                   value={target}
                   onChange={setTarget}
-                  options={[{ value: '', label: 'Choose a target plan…' }, ...eligible.map((o) => ({ value: `${o.api.id}|${o.plan.id}`, label: `${o.api.name} ${o.api.version} — ${o.plan.name}` }))]}
+                  options={[{ value: '', label: tr('Choose a target plan…') }, ...eligible.map((o) => ({ value: `${o.api.id}|${o.plan.id}`, label: `${o.api.name} ${o.api.version} — ${o.plan.name}` }))]}
                 />
                 <div className="row">
                   <button
@@ -417,22 +417,22 @@ function TransferPanel({ sub, onDone, onCancel }) {
                       const [api_id, plan_id] = target.split('|');
                       try {
                         const r = await wapi.post(`/subscriptions/${sub.id}/transfer`, { api_id, plan_id });
-                        toast(r.pending_transfer ? `Proposed: it degrades the conditions (${r.pending_transfer.reasons.join(', ')}), so it waits for the consumer's consent` : 'Subscription transferred — the key does not change');
+                        toast(r.pending_transfer ? tr("Proposed: it degrades the conditions ({0}), so it waits for the consumer's consent", [r.pending_transfer.reasons.join(', ')]) : tr('Subscription transferred — the key does not change'));
                         onDone();
                       } catch (e) {
                         toast(errorMessage(e), 'error');
                       }
                     }}
                   >
-                    Transfer
+                    {tr('Transfer')}
                   </button>
                   <button className="btn" onClick={onCancel}>
-                    Cancel
+                    {tr('Cancel')}
                   </button>
                 </div>
               </>
             ) : (
-              <p className="faint small">No equivalent published plan is deployed.</p>
+              <p className="faint small">{tr('No equivalent published plan is deployed.')}</p>
             );
           }}
         </Loader>
@@ -444,7 +444,7 @@ function TransferPanel({ sub, onDone, onCancel }) {
 export function SubscriptionsPage() {
   return (
     <div className="page">
-      <PageHead title="Subscriptions" sub="Every request on the plans of this workspace. The approval workflow belongs to the product: Otoroshi only enforces what is accepted." />
+      <PageHead title={tr('Subscriptions')} sub={tr('Every request on the plans of this workspace. The approval workflow belongs to the product: Otoroshi only enforces what is accepted.')} />
       <SubscriptionsTable />
     </div>
   );

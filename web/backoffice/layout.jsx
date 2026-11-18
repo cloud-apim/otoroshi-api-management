@@ -4,6 +4,7 @@ import { Dropdown, Icon, MenuItem, Modal } from '../shared/ui.jsx';
 import { ThemeSwitch } from '../shared/theme-switch.jsx';
 import { fmtRelative } from '../shared/lib.js';
 import { api, useSession, wsApi } from './context.jsx';
+import { chooseLanguage, language, LANGUAGES, tr, Tr } from '../shared/i18n.jsx';
 
 function NavLink({ to, icon, children, exact = false, count, also = [] }) {
   const { path } = useRouter();
@@ -28,17 +29,17 @@ function SearchPalette({ onClose }) {
     const ws = workspace?.slug;
     const pages = ws
       ? [
-          { kind: 'page', name: 'Home', to: `/ws/${ws}` },
-          { kind: 'page', name: 'APIs', to: `/ws/${ws}/apis` },
-          { kind: 'page', name: 'Applications', to: `/ws/${ws}/applications` },
-          { kind: 'page', name: 'Subscriptions to review', to: `/ws/${ws}/subscriptions?status=pending` },
-          { kind: 'page', name: 'Observability', to: `/ws/${ws}/observability` },
-          { kind: 'page', name: 'Audit', to: `/ws/${ws}/audit` },
-          { kind: 'page', name: 'Workspace settings', to: `/ws/${ws}/settings` },
-          { kind: 'page', name: 'Developer portal settings', to: `/ws/${ws}/settings/portal` },
-          { kind: 'page', name: 'Notifications', to: `/ws/${ws}/notifications` },
-          { kind: 'page', name: 'Gateway', to: `/gateway` },
-          { kind: 'page', name: 'Global settings', to: `/settings` },
+          { kind: 'page', name: tr('Home'), to: `/ws/${ws}` },
+          { kind: 'page', name: tr('APIs'), to: `/ws/${ws}/apis` },
+          { kind: 'page', name: tr('Applications'), to: `/ws/${ws}/applications` },
+          { kind: 'page', name: tr('Subscriptions to review'), to: `/ws/${ws}/subscriptions?status=pending` },
+          { kind: 'page', name: tr('Observability'), to: `/ws/${ws}/observability` },
+          { kind: 'page', name: tr('Audit'), to: `/ws/${ws}/audit` },
+          { kind: 'page', name: tr('Workspace settings'), to: `/ws/${ws}/settings` },
+          { kind: 'page', name: tr('Developer portal settings'), to: `/ws/${ws}/settings/portal` },
+          { kind: 'page', name: tr('Notifications'), to: `/ws/${ws}/notifications` },
+          { kind: 'page', name: tr('Gateway'), to: `/gateway` },
+          { kind: 'page', name: tr('Global settings'), to: `/settings` },
         ]
       : [];
     const wsItems = workspaces.map((w) => ({ kind: 'workspace', name: w.name, to: `/ws/${w.slug}` }));
@@ -72,11 +73,11 @@ function SearchPalette({ onClose }) {
     navigate(r.to);
   };
   return (
-    <Modal title="Search" onClose={onClose} size="palette">
+    <Modal title={tr('Search')} onClose={onClose} size="palette">
       <input
         className="input"
         autoFocus
-        placeholder="Search apis, plans, applications, subscriptions, client ids…"
+        placeholder={tr('Search apis, plans, applications, subscriptions, client ids…')}
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
@@ -84,16 +85,16 @@ function SearchPalette({ onClose }) {
           if (e.key === 'ArrowUp') setSel((s) => Math.max(s - 1, 0));
           if (e.key === 'Enter' && results[sel]) go(results[sel]);
         }}
-        aria-label="search"
+        aria-label={tr('search')}
       />
       <div style={{ maxHeight: 380, overflow: 'auto' }}>
         {results.map((r, i) => (
           <div key={i} className={`palette-item ${i === sel ? 'on' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => go(r)}>
-            <span className="badge">{r.kind}</span>
+            <span className="badge">{tr(r.kind)}</span>
             <span className="grow ellipsis">{r.name}</span>
           </div>
         ))}
-        {!results.length && <div className="muted small" style={{ padding: 12 }}>No result</div>}
+        {!results.length && <div className="muted small" style={{ padding: 12 }}>{tr('No result')}</div>}
       </div>
     </Modal>
   );
@@ -117,7 +118,31 @@ export function useNotifications(ws) {
   };
 }
 
-// the person signed in: notifications, theme, tokens, sign out — one menu at the bottom left
+// the language of the console, remembered in this browser; every text is read again in it
+function LanguageSwitch() {
+  return (
+    <div className="seg" role="radiogroup" aria-label={tr('Language')}>
+      {LANGUAGES.map(([l, name]) => (
+        <button
+          key={l}
+          role="radio"
+          aria-checked={language() === l}
+          className={language() === l ? 'on' : ''}
+          title={name}
+          onClick={() => {
+            if (language() === l) return;
+            chooseLanguage(l);
+            window.location.reload();
+          }}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// the person signed in: notifications, theme, language, tokens, sign out — one menu at the bottom left
 function UserMenu({ user, ws, logout }) {
   const { navigate } = useRouter();
   const notes = useNotifications(ws);
@@ -131,7 +156,7 @@ function UserMenu({ user, ws, logout }) {
           className="ws-switch"
           style={{ border: 0, marginTop: 4 }}
           onClick={toggle}
-          aria-label={notes.unread ? `user menu, ${notes.unread} unread notifications` : 'user menu'}
+          aria-label={notes.unread ? tr('user menu, {0} unread notifications', [notes.unread]) : tr('user menu')}
           aria-haspopup="menu"
         >
           <span className="ws-avatar avatar-with-dot" style={{ borderRadius: '50%' }}>
@@ -154,7 +179,7 @@ function UserMenu({ user, ws, logout }) {
         <div className="menu-section">
           <div className="row menu-title">
             <Icon name="inbox" size={14} />
-            <span className="grow">Notifications</span>
+            <span className="grow">{tr('Notifications')}</span>
             {notes.unread > 0 && (
               <button
                 className="btn xs ghost"
@@ -163,7 +188,7 @@ function UserMenu({ user, ws, logout }) {
                   notes.markRead();
                 }}
               >
-                Mark all read
+                {tr('Mark all read')}
               </button>
             )}
           </div>
@@ -184,8 +209,8 @@ function UserMenu({ user, ws, logout }) {
                   </button>
                   <button
                     className="btn xs ghost icon"
-                    title="done: out of the list"
-                    aria-label={`mark "${n.title}" done`}
+                    title={tr('done: out of the list')}
+                    aria-label={tr('mark "{0}" done', [n.title])}
                     onClick={(e) => {
                       e.stopPropagation();
                       notes.markDone([n.id]);
@@ -197,24 +222,28 @@ function UserMenu({ user, ws, logout }) {
               ))
             ) : (
               <div className="muted small" style={{ padding: '6px 10px' }}>
-                Nothing to deal with.
+                {tr('Nothing to deal with.')}
               </div>
             )}
           </div>
           <MenuItem icon="inbox" onClick={() => navigate(`/ws/${ws}/notifications`)}>
-            All notifications{notes.total > notes.items.length ? ` (${notes.total})` : ''}
+            <Tr text={'All notifications{0}'} args={[notes.total > notes.items.length ? ` (${notes.total})` : '']} />
           </MenuItem>
         </div>
       )}
       <div className="menu-section row" onClick={(e) => e.stopPropagation()}>
-        <span className="small muted grow">Theme</span>
+        <span className="small muted grow">{tr('Theme')}</span>
         <ThemeSwitch />
       </div>
+      <div className="menu-section row" onClick={(e) => e.stopPropagation()}>
+        <span className="small muted grow">{tr('Language')}</span>
+        <LanguageSwitch />
+      </div>
       <MenuItem icon="key" onClick={() => navigate('/settings/tokens')}>
-        API tokens
+        {tr('API tokens')}
       </MenuItem>
       <MenuItem icon="logout" onClick={logout}>
-        Sign out
+        {tr('Sign out')}
       </MenuItem>
     </Dropdown>
   );
@@ -242,14 +271,14 @@ function GatewayPill() {
   const drift = (st?.drift?.drifted || 0) + (st?.drift?.missing || 0);
   // it leads to what needs looking at first: a failed projection, a waiting one, then the drift
   const to = failed ? '/gateway?tasks_status=failed' : waiting ? '/gateway?tasks_status=pending' : drift ? '/gateway/drift' : '/gateway';
-  const said = [failed && `${failed} projection${failed > 1 ? 's' : ''} failed`, waiting && `${waiting} waiting for the gateway`, drift && `${drift} drifted on the gateway`].filter(Boolean);
+  const said = [failed && tr('{0} projection(s) failed', [failed]), waiting && tr('{0} waiting for the gateway', [waiting]), drift && tr('{0} drifted on the gateway', [drift])].filter(Boolean);
   return (
-    <Link to={to} className="gw-pill" title={said.length ? said.join(' · ') : "the installation's Otoroshi cluster"}>
+    <Link to={to} className="gw-pill" title={said.length ? said.join(' · ') : tr("the installation's Otoroshi cluster")}>
       <span className={`gw-dot ${st ? (ok ? 'ok' : 'ko') : ''}`} />
-      <span className="grow">Gateway {st ? (ok ? 'reachable' : 'unreachable') : '…'}</span>
-      {failed > 0 && <span className="badge negative" title={`${failed} projection(s) failed: open the queue`}>{failed}</span>}
-      {waiting > 0 && <span className="badge warning" title={`${waiting} projection(s) waiting for the gateway`}>{waiting}</span>}
-      {drift > 0 && <span className="badge negative" title={`${drift} object(s) drifted on the gateway`}>{drift}</span>}
+      <span className="grow"><Tr text={'Gateway {0}'} args={[st ? (ok ? tr('reachable') : tr('unreachable')) : '…']} /></span>
+      {failed > 0 && <span className="badge negative" title={tr('{0} projection(s) failed: open the queue', [failed])}>{failed}</span>}
+      {waiting > 0 && <span className="badge warning" title={tr('{0} projection(s) waiting for the gateway', [waiting])}>{waiting}</span>}
+      {drift > 0 && <span className="badge negative" title={tr('{0} object(s) drifted on the gateway', [drift])}>{drift}</span>}
     </Link>
   );
 }
@@ -284,13 +313,13 @@ export function Layout({ children }) {
   };
   return (
     <div className="app">
-      <aside className="sidebar" aria-label="main navigation">
+      <aside className="sidebar" aria-label={tr('main navigation')}>
         {/* the brand leads home: the home of the current workspace */}
-        <Link to={ws ? `/ws/${ws}` : '/'} className="brand" aria-label="home">
-          <div className="brand-mark">O</div>
+        <Link to={ws ? `/ws/${ws}` : '/'} className="brand" aria-label={tr('home')}>
+          <div className="brand-mark">{tr('O')}</div>
           <div>
-            <div className="brand-name">API Management</div>
-            <div className="brand-sub">Otoroshi</div>
+            <div className="brand-name">{tr('API Management')}</div>
+            <div className="brand-sub">{tr('Otoroshi')}</div>
           </div>
         </Link>
         {/* the workspace selector opens the sidebar: it sets the context of everything below. A
@@ -298,14 +327,14 @@ export function Layout({ children }) {
         {!single && (workspaces.length > 1 || user.is_admin) ? (
           <Dropdown
             trigger={({ toggle }) => (
-              <button className="ws-switch" onClick={toggle} aria-label="switch workspace">
+              <button className="ws-switch" onClick={toggle} aria-label={tr('switch workspace')}>
                 <span className="ws-avatar">{(workspace?.name || '?').slice(0, 1).toUpperCase()}</span>
                 <span className="grow">
                   <span className="tiny faint" style={{ display: 'block' }}>
-                    Workspace
+                    {tr('Workspace')}
                   </span>
                   <span className="bold ellipsis" style={{ display: 'block' }}>
-                    {workspace?.name || 'Select…'}
+                    {workspace?.name || tr('Select…')}
                   </span>
                 </span>
                 <Icon name="chevronDown" />
@@ -319,7 +348,7 @@ export function Layout({ children }) {
             ))}
             {user.is_admin && (
               <MenuItem icon="plus" onClick={() => navigate('/settings/workspaces')}>
-                New workspace
+                {tr('New workspace')}
               </MenuItem>
             )}
           </Dropdown>
@@ -327,33 +356,33 @@ export function Layout({ children }) {
         <button className="search-trigger" onClick={() => setSearch(true)}>
           <Icon name="search" />
           <span className="grow" style={{ textAlign: 'left' }}>
-            Search
+            {tr('Search')}
           </span>
-          <span className="kbd">⌘K</span>
+          <span className="kbd">{tr('⌘K')}</span>
         </button>
         {ws && (
           <>
             <NavLink to={`/ws/${ws}`} icon="home" exact>
-              Home
+              {tr('Home')}
             </NavLink>
             <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} also={[`/ws/${ws}/policy-groups`]}>
-              APIs
+              {tr('APIs')}
             </NavLink>
             <NavLink to={`/ws/${ws}/applications`} icon="apps">
-              Applications
+              {tr('Applications')}
             </NavLink>
             <NavLink to={`/ws/${ws}/observability`} icon="chart">
-              Observability
+              {tr('Observability')}
             </NavLink>
             <NavLink to={`/ws/${ws}/audit`} icon="audit">
-              Audit
+              {tr('Audit')}
             </NavLink>
             <NavLink to={`/ws/${ws}/settings`} icon="settings">
-              Workspace settings
+              {tr('Workspace settings')}
             </NavLink>
             <a className="navlink" href={workspace.portal_url} target="_blank" rel="noreferrer">
               <Icon name="external" />
-              <span>Developer portal</span>
+              <span>{tr('Developer portal')}</span>
             </a>
           </>
         )}
@@ -361,7 +390,7 @@ export function Layout({ children }) {
           <GatewayPill />
           {user.is_admin && (
             <NavLink to="/settings" icon="settings">
-              Global settings
+              {tr('Global settings')}
             </NavLink>
           )}
           <UserMenu user={user} ws={ws} logout={logout} />

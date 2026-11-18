@@ -133,8 +133,8 @@ run = "docker build -t otoroshi-api-management:dev ."
 # ─── Quality ─────────────────────────────────────────────────────────
 
 [tasks.check]
-description = "Syntax-check every server, cli, script and test file"
-run = "bun scripts/check.js"
+description = "Syntax-check every server, cli, script and test file; every text of the console has its French"
+run = ["bun scripts/check.js", "bun scripts/i18n.js check"]
 
 [tasks.test]
 description = "Run every test: unit tests, and the reference catalogue test against the real gateway (needs the stack)"
@@ -204,3 +204,7 @@ echo "admin api $APIM_URL/api   (Authorization: Bearer $APIM_TOKEN)"
 echo "otoroshi  http://otoroshi.oto.tools:8080   (admin@otoroshi.io / password)"
 echo "dev idp   http://oidc.oto.tools:8090/default/.well-known/openid-configuration"
 """
+
+[tasks.i18n]
+description = "The texts of the console without French, as JSON to fill (scripts/i18n.js)"
+run = "bun scripts/i18n.js missing"

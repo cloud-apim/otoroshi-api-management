@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from './router.jsx';
 import { fmtNumber } from './lib.js';
 import { Icon } from './ui.jsx';
+import { tr, Tr } from './i18n.jsx';
 
 const SIZES = [10, 25, 50, 100];
 
@@ -56,7 +57,7 @@ export function SearchInput({ value, onChange, placeholder = 'search' }) {
       <Icon name="search" size={14} />
       <input value={text} onChange={(e) => change(e.target.value)} placeholder={placeholder} aria-label={placeholder} />
       {text && (
-        <button type="button" className="btn ghost xs icon" onClick={() => change('')} aria-label="clear the search">
+        <button type="button" className="btn ghost xs icon" onClick={() => change('')} aria-label={tr('clear the search')}>
           <Icon name="x" size={12} />
         </button>
       )}
@@ -66,8 +67,8 @@ export function SearchInput({ value, onChange, placeholder = 'search' }) {
 
 export function ReloadButton({ onReload, loading }) {
   return (
-    <button type="button" className="btn sm" onClick={onReload} disabled={loading} title="reload">
-      <Icon name="refresh" className={loading ? 'spinning' : ''} /> Reload
+    <button type="button" className="btn sm" onClick={onReload} disabled={loading} title={tr('reload')}>
+      <Icon name="refresh" className={loading ? 'spinning' : ''} /> {tr('Reload')}
     </button>
   );
 }
@@ -92,26 +93,25 @@ export function Pager({ paging, total, sizes = SIZES }) {
   return (
     <div className="pager">
       <span className="muted small">
-        {fmtNumber(from)}–{fmtNumber(to)} of {fmtNumber(total)}
+        <Tr text={'{0}–{1} of {2}'} args={[fmtNumber(from), fmtNumber(to), fmtNumber(total)]} />
       </span>
       <span className="grow" />
       <label className="row muted small" style={{ gap: 6 }}>
-        per page
-        <select className="select sm" value={paging.limit} onChange={(e) => paging.setSize(parseInt(e.target.value, 10))} aria-label="page size">
+        <Tr text={'per page{0}'} args={[<select className="select sm" value={paging.limit} onChange={(e) => paging.setSize(parseInt(e.target.value, 10))} aria-label={tr('page size')}>
           {sizes.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-        </select>
+        </select>]} />
       </label>
-      <button type="button" className="btn sm icon" disabled={paging.page <= 1} onClick={() => paging.setPage(paging.page - 1)} aria-label="previous page">
+      <button type="button" className="btn sm icon" disabled={paging.page <= 1} onClick={() => paging.setPage(paging.page - 1)} aria-label={tr('previous page')}>
         <Icon name="left" />
       </button>
       <span className="small" style={{ fontVariantNumeric: 'tabular-nums' }}>
         {paging.page} / {pages}
       </span>
-      <button type="button" className="btn sm icon" disabled={paging.page >= pages} onClick={() => paging.setPage(paging.page + 1)} aria-label="next page">
+      <button type="button" className="btn sm icon" disabled={paging.page >= pages} onClick={() => paging.setPage(paging.page + 1)} aria-label={tr('next page')}>
         <Icon name="right" />
       </button>
     </div>
@@ -124,12 +124,12 @@ export function MiniPager({ page, pages, onPage, from, to, total }) {
   return (
     <div className="row small muted" style={{ marginTop: 10 }}>
       <span className="grow" style={{ fontVariantNumeric: 'tabular-nums' }}>
-        {from}–{to} of {total}
+        <Tr text={'{0}–{1} of {2}'} args={[from, to, total]} />
       </span>
-      <button type="button" className="btn xs icon" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="previous page">
+      <button type="button" className="btn xs icon" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={tr('previous page')}>
         <Icon name="left" size={12} />
       </button>
-      <button type="button" className="btn xs icon" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="next page">
+      <button type="button" className="btn xs icon" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label={tr('next page')}>
         <Icon name="right" size={12} />
       </button>
     </div>

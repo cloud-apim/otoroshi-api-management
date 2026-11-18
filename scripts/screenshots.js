@@ -114,6 +114,8 @@ async function consoleTour(page) {
   const W = `/backoffice/ws/${WS}`;
   await go(page, '/backoffice/');
   await theme(page, 'light');
+  // the tour is in English, whatever the language of the browser that takes it
+  await page.evaluate(() => localStorage.setItem('apim.console.lang', 'en'));
   await api(page, '/backoffice/api/auth/logout', 'POST', {});
   await go(page, '/backoffice/');
   await shot(page, 'console-login', 'Console — sign in (local accounts and the OIDC provider)', { full: false });
@@ -360,6 +362,11 @@ async function consoleTour(page) {
   await shot(page, 'console-dark-plugin-edit', 'Dark theme — the plugin editor, its code editor following the theme', { full: false });
   await page.setViewport({ width: 1440, height: 900 });
   await theme(page, 'light');
+  await page.evaluate(() => localStorage.setItem('apim.console.lang', 'fr'));
+  await go(page, `${A}/plans`);
+  await click(page, 'Modifier');
+  await shot(page, 'console-french', 'The console in French — the language of the browser, or the one chosen in the user menu', { full: false });
+  await page.evaluate(() => localStorage.setItem('apim.console.lang', 'en'));
   // a consumer who signs in to the console is sent to its portal
   await api(page, '/backoffice/api/auth/logout', 'POST', {});
   await api(page, '/backoffice/api/auth/login', 'POST', CONSUMER);

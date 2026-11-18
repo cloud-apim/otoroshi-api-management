@@ -1,3 +1,5 @@
+// the language first: every module reads its texts in it
+import './boot-i18n.js';
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../shared/theme.css';
@@ -20,6 +22,7 @@ import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
 import { SubscriptionsPage } from './pages/Subscriptions.jsx';
 import { PolicyGroupsPage, PolicyGroupPage } from './pages/PolicyGroups.jsx';
+import { tr, Tr } from '../shared/i18n.jsx';
 
 initTheme();
 
@@ -35,21 +38,20 @@ function PortalsOnly({ user, portals, onSignedOut }) {
       <div className="card" style={{ maxWidth: 460 }}>
         <div className="card-body col gap-16">
           <div className="brand" style={{ padding: 0 }}>
-            <div className="brand-mark">O</div>
+            <div className="brand-mark">{tr('O')}</div>
             <div>
-              <div className="brand-name">API Management</div>
-              <div className="brand-sub">for Otoroshi</div>
+              <div className="brand-name">{tr('API Management')}</div>
+              <div className="brand-sub">{tr('for Otoroshi')}</div>
             </div>
           </div>
-          <h2 style={{ margin: 0 }}>Your place is the developer portal</h2>
+          <h2 style={{ margin: 0 }}>{tr('Your place is the developer portal')}</h2>
           <p className="muted small" style={{ margin: 0 }}>
-            The console is for the administrators and the producers of a workspace. {user.name || user.email}, you use the APIs of {portals.length > 1 ? 'these workspaces' : 'this workspace'} from
-            {portals.length > 1 ? ' their' : ' its'} developer portal: your applications, your keys, your consumption.
+            <Tr text={'The console is for the administrators and the producers of a workspace. {0}, you use the APIs of {1} from{2} developer portal: your applications, your keys, your consumption.'} args={[user.name || user.email, portals.length > 1 ? tr('these workspaces') : tr('this workspace'), portals.length > 1 ? tr(' their') : tr(' its')]} />
           </p>
           <div className="col gap-6">
             {portals.map((w) => (
               <a key={w.id} className="btn primary" href={w.portal_url}>
-                {w.name} — developer portal
+                <Tr text={'{0} — developer portal'} args={[w.name]} />
               </a>
             ))}
           </div>
@@ -60,7 +62,7 @@ function PortalsOnly({ user, portals, onSignedOut }) {
               onSignedOut();
             }}
           >
-            Sign out
+            {tr('Sign out')}
           </button>
         </div>
       </div>
@@ -98,37 +100,37 @@ function Login({ onLogged }) {
       <form className="card" onSubmit={submit}>
         <div className="card-body col gap-16">
           <div className="brand" style={{ padding: 0 }}>
-            <div className="brand-mark">O</div>
+            <div className="brand-mark">{tr('O')}</div>
             <div>
-              <div className="brand-name">API Management</div>
-              <div className="brand-sub">for Otoroshi</div>
+              <div className="brand-name">{tr('API Management')}</div>
+              <div className="brand-sub">{tr('for Otoroshi')}</div>
             </div>
           </div>
-          <h1>Sign in to the console</h1>
+          <h1>{tr('Sign in to the console')}</h1>
           {auth.mode === 'otoroshi' && (
-            <div className="callout warning">Authentication is delegated to Otoroshi: open the console through the gateway route that protects it.</div>
+            <div className="callout warning">{tr('Authentication is delegated to Otoroshi: open the console through the gateway route that protects it.')}</div>
           )}
           {auth.oidc && (
             <a className="btn primary" href="/backoffice/api/auth/oidc/login">
-              Continue with {auth.oidc.label}
+              <Tr text={'Continue with {0}'} args={[auth.oidc.label]} />
             </a>
           )}
-          {auth.oidc && auth.local && <div className="center faint small">or with a local account</div>}
+          {auth.oidc && auth.local && <div className="center faint small">{tr('or with a local account')}</div>}
           {auth.local && (
           <>
-          <Field label="Email">
+          <Field label={tr('Email')}>
             <Input type="email" autoComplete="username" value={email} onChange={setEmail} autoFocus required />
           </Field>
-          <Field label="Password">
+          <Field label={tr('Password')}>
             <Input type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
           </Field>
           <button className={`btn ${auth.oidc ? '' : 'primary'}`} disabled={busy} type="submit">
-            {busy ? 'Signing in…' : 'Sign in'}
+            {busy ? tr('Signing in…') : tr('Sign in')}
           </button>
           </>
           )}
           {error && <div className="callout negative">{error}</div>}
-          <p className="faint small">Bootstrap administrators are declared by environment variable (APIM_BOOTSTRAP_ADMINS) and keep a local entry that depends on nothing.</p>
+          <p className="faint small">{tr('Bootstrap administrators are declared by environment variable (APIM_BOOTSTRAP_ADMINS) and keep a local entry that depends on nothing.')}</p>
         </div>
       </form>
     </div>
@@ -206,7 +208,7 @@ function App() {
           fallback={
             <div className="page">
               <div className="empty">
-                <h3>{workspaces.length ? 'Page not found' : 'You are not a member of any workspace'}</h3>
+                <h3>{workspaces.length ? tr('Page not found') : tr('You are not a member of any workspace')}</h3>
               </div>
             </div>
           }

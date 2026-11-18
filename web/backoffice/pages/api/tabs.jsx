@@ -9,6 +9,7 @@ import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 import { CodeEditor, CodeView } from '../../../shared/code-editor.jsx';
 import { PluginForm, formFields } from './PluginForm.jsx';
+import { tr, Tr } from '../../../shared/i18n.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const rid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -44,18 +45,18 @@ export function OverviewTab({ api, draft, validation, order }) {
         <div className="card">
           <div className="card-head">
             <Icon name="globe" />
-            <h3>How to call it</h3>
+            <h3>{tr('How to call it')}</h3>
           </div>
           <div className="card-body col">
-            <Field label="Base URL">
+            <Field label={tr('Base URL')}>
               <div className="secret" style={{ width: '100%' }}>
                 <span className="grow ellipsis">{base}</span>
               </div>
             </Field>
             <ol className="small muted" style={{ margin: 0, paddingLeft: 18 }}>
-              <li>Create an application on the developer portal.</li>
-              <li>Subscribe it to a plan{plan ? ` (e.g. ${plan.name})` : ''}.</li>
-              <li>Call the API with the credentials of the subscription.</li>
+              <li>{tr('Create an application on the developer portal.')}</li>
+              <li><Tr text={'Subscribe it to a plan{0}.'} args={[plan ? tr(' (e.g. {0})', [plan.name]) : '']} /></li>
+              <li>{tr('Call the API with the credentials of the subscription.')}</li>
             </ol>
             <div className="seg" style={{ alignSelf: 'flex-start' }}>
               {['curl', 'javascript', 'python'].map((l) => (
@@ -70,9 +71,9 @@ export function OverviewTab({ api, draft, validation, order }) {
         <div className="card">
           <div className="card-head">
             <Icon name="layers" />
-            <h3 className="grow">Plans</h3>
+            <h3 className="grow">{tr('Plans')}</h3>
             <Link className="link small" to={`/ws/${slug}/apis/${api.id}/plans`}>
-              Edit plans
+              {tr('Edit plans')}
             </Link>
           </div>
           {draft.plans.length ? (
@@ -81,30 +82,28 @@ export function OverviewTab({ api, draft, validation, order }) {
                 <div className="grow">
                   <div className="bold">{p.name}</div>
                   <div className="muted small">
-                    {AUTH_LABELS[p.auth.kind]} · {p.rateLimit.enabled ? `${fmtNumber(p.rateLimit.calls)} calls / ${fmtWindow(p.rateLimit.windowMs)}` : 'no rate limit'}
-                    {p.quota.daily ? ` · ${fmtNumber(p.quota.daily)}/day` : ''}
-                    {p.quota.monthly ? ` · ${fmtNumber(p.quota.monthly)}/month` : ''} · {p.validation} approval
+                    <Tr text={'{0} · {1}{2}{3} · {4} approval'} args={[tr(AUTH_LABELS[p.auth.kind]), p.rateLimit.enabled ? tr('{0} calls / {1}', [fmtNumber(p.rateLimit.calls), fmtWindow(p.rateLimit.windowMs)]) : tr('no rate limit'), p.quota.daily ? tr(' · {0}/day', [fmtNumber(p.quota.daily)]) : '', p.quota.monthly ? tr(' · {0}/month', [fmtNumber(p.quota.monthly)]) : '', tr(p.validation)]} />
                   </div>
                 </div>
                 <StatusBadge status={p.status} />
               </div>
             ))
           ) : (
-            <Empty title="No plan" icon="layers">
-              Without a published plan the gateway serves the routes to anyone.
+            <Empty title={tr('No plan')} icon="layers">
+              {tr('Without a published plan the gateway serves the routes to anyone.')}
             </Empty>
           )}
           {order.length > 0 && (
             <div className="card-body" style={{ borderTop: '1px solid var(--border)' }}>
-              <div className="label mb-8">Effective resolution order on the gateway</div>
+              <div className="label mb-8">{tr('Effective resolution order on the gateway')}</div>
               <div className="row wrap gap-6">
                 {order.map((o, i) => (
-                  <span key={o.id} className="order-chip" title={`extractor index ${o.index}`}>
+                  <span key={o.id} className="order-chip" title={tr('extractor index {0}', [o.index])}>
                     <span className="bold">{i + 1}</span> {o.name} <span className="faint">{o.kind}</span>
                   </span>
                 ))}
               </div>
-              <p className="hint mt-8">It follows the extractor index of each auth kind in Otoroshi, it is not freely chosen — the console shows it rather than hiding it.</p>
+              <p className="hint mt-8">{tr('It follows the extractor index of each auth kind in Otoroshi, it is not freely chosen — the console shows it rather than hiding it.')}</p>
             </div>
           )}
         </div>
@@ -112,7 +111,7 @@ export function OverviewTab({ api, draft, validation, order }) {
       <div className="card">
         <div className="card-head">
           <Icon name="api" />
-          <h3 className="grow">Resources</h3>
+          <h3 className="grow">{tr('Resources')}</h3>
           <span className="muted small">
             {draft.entrypoint.domain}
             {draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath}
@@ -129,7 +128,7 @@ export function OverviewTab({ api, draft, validation, order }) {
                     {r.exact ? '' : '*'}
                   </td>
                   <td className="small muted">→ {draft.backends.find((b) => b.id === r.backendId)?.name}</td>
-                  <td className="small muted">{draft.flows.find((f) => f.id === r.flowId)?.name || 'no flow'}</td>
+                  <td className="small muted">{draft.flows.find((f) => f.id === r.flowId)?.name || tr('no flow')}</td>
                 </tr>
               ))}
             </tbody>
@@ -138,11 +137,9 @@ export function OverviewTab({ api, draft, validation, order }) {
       </div>
       {api.previous_version_id && (
         <p className="muted small">
-          This version was created from{' '}
-          <Link className="link" to={`/ws/${slug}/apis/${api.previous_version_id}`}>
-            the previous version
-          </Link>
-          . Subscriptions do not follow a new version: transfer them.
+          <Tr text={'This version was created from {0}. Subscriptions do not follow a new version: transfer them.'} args={[<Link className="link" to={`/ws/${slug}/apis/${api.previous_version_id}`}>
+            {tr('the previous version')}
+          </Link>]} />
         </p>
       )}
     </div>
@@ -156,32 +153,32 @@ function ResourceModal({ value, draft, onSave, onClose }) {
   const set = (k) => (v) => setR((x) => ({ ...x, [k]: v }));
   return (
     <Modal
-      title={value.name ? `Resource ${value.name}` : 'New resource'}
+      title={value.name ? tr('Resource {0}', [value.name]) : tr('New resource')}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button className="btn primary" onClick={() => onSave(r)}>
-            Apply
+            {tr('Apply')}
           </button>
         </>
       }
     >
-      <p className="muted small">A resource is an endpoint or a group of endpoints; it is projected as a route of the Otoroshi <code>Api</code>, relative to the entrypoint.</p>
+      <p className="muted small"><Tr text={'A resource is an endpoint or a group of endpoints; it is projected as a route of the Otoroshi {0}, relative to the entrypoint.'} args={[<code>Api</code>]} /></p>
       <div className="grid-2">
-        <Field label="Name">
+        <Field label={tr('Name')}>
           <Input value={r.name} onChange={set('name')} autoFocus />
         </Field>
-        <Field label="Path" hint={r.exact ? 'exact match' : 'matches this path and below'}>
+        <Field label={tr('Path')} hint={r.exact ? tr('exact match') : tr('matches this path and below')}>
           <Input value={r.path} onChange={set('path')} mono />
         </Field>
       </div>
-      <Field label="Description">
+      <Field label={tr('Description')}>
         <Input value={r.description} onChange={set('description')} />
       </Field>
-      <Field label="Methods" hint="none selected = every method">
+      <Field label={tr('Methods')} hint={tr('none selected = every method')}>
         <div className="row wrap">
           {METHODS.map((m) => (
             <label key={m} className="checkbox small">
@@ -192,17 +189,17 @@ function ResourceModal({ value, draft, onSave, onClose }) {
         </div>
       </Field>
       <div className="grid-2">
-        <Field label="Backend">
+        <Field label={tr('Backend')}>
           <Select value={r.backendId} onChange={set('backendId')} options={draft.backends.map((b) => ({ value: b.id, label: b.name }))} />
         </Field>
-        <Field label="Policy flow" hint="plugins applied on this resource">
-          <Select value={r.flowId || ''} onChange={(v) => set('flowId')(v || null)} options={[{ value: '', label: 'none' }, ...draft.flows.map((f) => ({ value: f.id, label: f.name }))]} />
+        <Field label={tr('Policy flow')} hint={tr('plugins applied on this resource')}>
+          <Select value={r.flowId || ''} onChange={(v) => set('flowId')(v || null)} options={[{ value: '', label: tr('none') }, ...draft.flows.map((f) => ({ value: f.id, label: f.name }))]} />
         </Field>
       </div>
       <div className="row gap-24">
-        <Switch checked={r.exact} onChange={set('exact')} label="Exact path" />
-        <Switch checked={r.stripPath} onChange={set('stripPath')} label="Strip path" />
-        <Switch checked={r.enabled} onChange={set('enabled')} label="Enabled" />
+        <Switch checked={r.exact} onChange={set('exact')} label={tr('Exact path')} />
+        <Switch checked={r.stripPath} onChange={set('stripPath')} label={tr('Strip path')} />
+        <Switch checked={r.enabled} onChange={set('enabled')} label={tr('Enabled')} />
       </div>
     </Modal>
   );
@@ -218,23 +215,23 @@ export function ResourcesTab({ draft, setDraft, readOnly }) {
     <div className="col gap-16">
       <div className="card">
         <div className="card-head">
-          <h3 className="grow">Entrypoint</h3>
+          <h3 className="grow">{tr('Entrypoint')}</h3>
         </div>
         <div className="card-body grid-2">
-          <Field label="Domain" hint="the hostname the gateway serves this api on">
+          <Field label={tr('Domain')} hint={tr('the hostname the gateway serves this api on')}>
             <Input value={draft.entrypoint.domain} disabled={readOnly} onChange={(v) => setDraft((d) => ({ ...d, entrypoint: { ...d.entrypoint, domain: v } }))} mono />
           </Field>
-          <Field label="Context path" hint="prefix of every resource">
+          <Field label={tr('Context path')} hint={tr('prefix of every resource')}>
             <Input value={draft.entrypoint.contextPath} disabled={readOnly} onChange={(v) => setDraft((d) => ({ ...d, entrypoint: { ...d.entrypoint, contextPath: v } }))} mono />
           </Field>
         </div>
       </div>
       <div className="card">
         <div className="card-head">
-          <h3 className="grow">Resources</h3>
+          <h3 className="grow">{tr('Resources')}</h3>
           {!readOnly && (
             <button className="btn sm" onClick={() => setEditing({ id: rid('res'), name: '', description: '', path: '/', methods: [], exact: false, stripPath: true, backendId: draft.backends[0]?.id, flowId: draft.flows[0]?.id || null, enabled: true })}>
-              <Icon name="plus" /> Add resource
+              <Icon name="plus" /> {tr('Add resource')}
             </button>
           )}
         </div>
@@ -242,10 +239,10 @@ export function ResourcesTab({ draft, setDraft, readOnly }) {
           <table className="table">
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Match</th>
-                <th>Backend</th>
-                <th>Flow</th>
+                <th>{tr('Name')}</th>
+                <th>{tr('Match')}</th>
+                <th>{tr('Backend')}</th>
+                <th>{tr('Flow')}</th>
                 <th />
               </tr>
             </thead>
@@ -258,17 +255,17 @@ export function ResourcesTab({ draft, setDraft, readOnly }) {
                   </td>
                   <td className="mono small">
                     {(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}
-                    {r.exact ? '' : '*'} {!r.enabled && <Badge>disabled</Badge>}
+                    {r.exact ? '' : '*'} {!r.enabled && <Badge>{tr('disabled')}</Badge>}
                   </td>
-                  <td className="small">{draft.backends.find((b) => b.id === r.backendId)?.name || <span className="negative-text">unknown</span>}</td>
+                  <td className="small">{draft.backends.find((b) => b.id === r.backendId)?.name || <span className="negative-text">{tr('unknown')}</span>}</td>
                   <td className="small">{draft.flows.find((f) => f.id === r.flowId)?.name || '—'}</td>
                   <td className="actions">
                     {!readOnly && (
                       <>
-                        <button className="btn ghost sm icon" onClick={() => setEditing(r)} aria-label="edit">
+                        <button className="btn ghost sm icon" onClick={() => setEditing(r)} aria-label={tr('edit')}>
                           <Icon name="edit" />
                         </button>
-                        <button className="btn ghost sm icon" onClick={() => setDraft((d) => ({ ...d, resources: d.resources.filter((x) => x.id !== r.id) }))} aria-label="delete">
+                        <button className="btn ghost sm icon" onClick={() => setDraft((d) => ({ ...d, resources: d.resources.filter((x) => x.id !== r.id) }))} aria-label={tr('delete')}>
                           <Icon name="trash" />
                         </button>
                       </>
@@ -293,63 +290,63 @@ function BackendModal({ value, onSave, onClose }) {
   const setTarget = (i, patch) => setB((x) => ({ ...x, targets: x.targets.map((t, j) => (j === i ? { ...t, ...patch } : t)) }));
   return (
     <Modal
-      title={value.name ? `Backend ${value.name}` : 'New backend'}
+      title={value.name ? tr('Backend {0}', [value.name]) : tr('New backend')}
       size="wide"
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button className="btn primary" onClick={() => onSave(b)}>
-            Apply
+            {tr('Apply')}
           </button>
         </>
       }
     >
       <div className="grid-2">
-        <Field label="Name">
+        <Field label={tr('Name')}>
           <Input value={b.name} onChange={set('name')} />
         </Field>
-        <Field label="Load balancing">
+        <Field label={tr('Load balancing')}>
           <Select value={b.loadBalancing} onChange={set('loadBalancing')} options={['RoundRobin', 'Random', 'Sticky', 'IpAddressHash', 'BestResponseTime', 'WeightedBestResponseTime', 'LeastConnections']} />
         </Field>
       </div>
-      <div className="label">Targets</div>
+      <div className="label">{tr('Targets')}</div>
       {b.targets.map((t, i) => (
         <div key={i} className="row">
-          <Input value={t.hostname} onChange={(v) => setTarget(i, { hostname: v })} placeholder="hostname" mono />
+          <Input value={t.hostname} onChange={(v) => setTarget(i, { hostname: v })} placeholder={tr('hostname')} mono />
           <NumberInput value={t.port} onChange={(v) => setTarget(i, { port: v })} style={{ width: 110 }} />
-          <Switch checked={t.tls} onChange={(v) => setTarget(i, { tls: v })} label="TLS" />
-          <NumberInput value={t.weight} onChange={(v) => setTarget(i, { weight: v })} style={{ width: 80 }} title="weight" />
-          <button className="btn ghost sm icon" onClick={() => setB((x) => ({ ...x, targets: x.targets.filter((_, j) => j !== i) }))} aria-label="remove target">
+          <Switch checked={t.tls} onChange={(v) => setTarget(i, { tls: v })} label={tr('TLS')} />
+          <NumberInput value={t.weight} onChange={(v) => setTarget(i, { weight: v })} style={{ width: 80 }} title={tr('weight')} />
+          <button className="btn ghost sm icon" onClick={() => setB((x) => ({ ...x, targets: x.targets.filter((_, j) => j !== i) }))} aria-label={tr('remove target')}>
             <Icon name="trash" />
           </button>
         </div>
       ))}
       <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setB((x) => ({ ...x, targets: [...x.targets, { hostname: '', port: 443, tls: true, weight: 1 }] }))}>
-        <Icon name="plus" /> Add target
+        <Icon name="plus" /> {tr('Add target')}
       </button>
       <div className="grid-2">
-        <Field label="Root path" hint="prefix added on the backend side">
+        <Field label={tr('Root path')} hint={tr('prefix added on the backend side')}>
           <Input value={b.root} onChange={set('root')} mono />
         </Field>
-        <Field label="Retries">
+        <Field label={tr('Retries')}>
           <NumberInput value={b.retries} onChange={set('retries')} />
         </Field>
       </div>
       <div className="grid-3">
-        <Field label="Call timeout (ms)">
+        <Field label={tr('Call timeout (ms)')}>
           <NumberInput value={b.timeouts.callMs} onChange={(v) => setB((x) => ({ ...x, timeouts: { ...x.timeouts, callMs: v } }))} />
         </Field>
-        <Field label="Connection timeout (ms)">
+        <Field label={tr('Connection timeout (ms)')}>
           <NumberInput value={b.timeouts.connectionMs} onChange={(v) => setB((x) => ({ ...x, timeouts: { ...x.timeouts, connectionMs: v } }))} />
         </Field>
-        <Field label="Idle timeout (ms)">
+        <Field label={tr('Idle timeout (ms)')}>
           <NumberInput value={b.timeouts.idleMs} onChange={(v) => setB((x) => ({ ...x, timeouts: { ...x.timeouts, idleMs: v } }))} />
         </Field>
       </div>
-      <Switch checked={b.rewrite} onChange={set('rewrite')} label="Rewrite the path (use named path params in the root)" />
+      <Switch checked={b.rewrite} onChange={set('rewrite')} label={tr('Rewrite the path (use named path params in the root)')} />
     </Modal>
   );
 }
@@ -362,7 +359,7 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
   };
   return (
     <div className="col gap-16">
-      <p className="muted small">Backends are infrastructure: targets, TLS, timeouts, load balancing. They belong to the route side, never to the offer.</p>
+      <p className="muted small">{tr('Backends are infrastructure: targets, TLS, timeouts, load balancing. They belong to the route side, never to the offer.')}</p>
       <div className="grid-2">
         {draft.backends.map((b) => (
           <div key={b.id} className="card">
@@ -371,13 +368,13 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
               <h3 className="grow">{b.name}</h3>
               {!readOnly && (
                 <>
-                  <button className="btn ghost sm icon" onClick={() => setEditing(b)} aria-label="edit">
+                  <button className="btn ghost sm icon" onClick={() => setEditing(b)} aria-label={tr('edit')}>
                     <Icon name="edit" />
                   </button>
                   <button
                     className="btn ghost sm icon"
                     disabled={draft.resources.some((r) => r.backendId === b.id)}
-                    title={draft.resources.some((r) => r.backendId === b.id) ? 'used by a resource' : 'delete'}
+                    title={draft.resources.some((r) => r.backendId === b.id) ? tr('used by a resource') : tr('delete')}
                     onClick={() => setDraft((d) => ({ ...d, backends: d.backends.filter((x) => x.id !== b.id) }))}
                   >
                     <Icon name="trash" />
@@ -388,12 +385,12 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
             <div className="card-body col gap-6">
               {b.targets.map((t, i) => (
                 <div key={i} className="mono small">
-                  {t.tls ? 'https' : 'http'}://{t.hostname}:{t.port}
-                  {b.root !== '/' ? b.root : ''} <span className="faint">w{t.weight}</span>
+                  {t.tls ? tr('https') : tr('http')}://{t.hostname}:{t.port}
+                  {b.root !== '/' ? b.root : ''} <span className="faint"><Tr text={'w{0}'} args={[t.weight]} /></span>
                 </div>
               ))}
               <div className="faint tiny">
-                {b.loadBalancing} · timeout {b.timeouts.callMs} ms · {b.retries} retries · used by {draft.resources.filter((r) => r.backendId === b.id).length} resource(s)
+                <Tr text={'{0} · timeout {1} ms · {2} retries · used by {3} resource(s)'} args={[b.loadBalancing, b.timeouts.callMs, b.retries, draft.resources.filter((r) => r.backendId === b.id).length]} />
               </div>
             </div>
           </div>
@@ -405,7 +402,7 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
           style={{ alignSelf: 'flex-start' }}
           onClick={() => setEditing({ id: rid('backend'), name: 'backend', targets: [{ hostname: '', port: 443, tls: true, weight: 1 }], root: '/', rewrite: false, loadBalancing: 'RoundRobin', timeouts: { callMs: 30000, connectionMs: 10000, idleMs: 60000 }, retries: 1 })}
         >
-          <Icon name="plus" /> Add backend
+          <Icon name="plus" /> {tr('Add backend')}
         </button>
       )}
       {editing && <BackendModal value={editing} onSave={save} onClose={() => setEditing(null)} />}
@@ -441,10 +438,10 @@ export function moveItem(list, i, delta) {
 function MoveButtons({ index, count, onMove }) {
   return (
     <>
-      <button className="btn ghost sm icon" disabled={index === 0} onClick={() => onMove(-1)} aria-label="move up" title="run earlier">
+      <button className="btn ghost sm icon" disabled={index === 0} onClick={() => onMove(-1)} aria-label={tr('move up')} title={tr('run earlier')}>
         <Icon name="up" />
       </button>
-      <button className="btn ghost sm icon" disabled={index === count - 1} onClick={() => onMove(1)} aria-label="move down" title="run later">
+      <button className="btn ghost sm icon" disabled={index === count - 1} onClick={() => onMove(1)} aria-label={tr('move down')} title={tr('run later')}>
         <Icon name="down" />
       </button>
     </>
@@ -467,17 +464,17 @@ export function PluginRow({ index, count, plugin: p, catalog, readOnly, onEdit, 
         </div>
         <div className="faint tiny ellipsis">
           {where}
-          {p.exclude?.length ? ` · except ${p.exclude.join(', ')}` : ''} · {summary || 'default configuration'}
+          {p.exclude?.length ? tr(' · except {0}', [p.exclude.join(', ')]) : ''} · {summary || tr('default configuration')}
         </div>
       </div>
-      {!p.enabled && <Badge>disabled</Badge>}
+      {!p.enabled && <Badge>{tr('disabled')}</Badge>}
       {!readOnly && (
         <>
           <MoveButtons index={index} count={count} onMove={onMove} />
-          <button className="btn ghost sm icon" onClick={onEdit} aria-label="edit">
+          <button className="btn ghost sm icon" onClick={onEdit} aria-label={tr('edit')}>
             <Icon name="edit" />
           </button>
-          <button className="btn ghost sm icon" onClick={onRemove} aria-label="remove">
+          <button className="btn ghost sm icon" onClick={onRemove} aria-label={tr('remove')}>
             <Icon name="trash" />
           </button>
         </>
@@ -489,8 +486,8 @@ export function PluginRow({ index, count, plugin: p, catalog, readOnly, onEdit, 
 function PluginCard({ meta, id }) {
   if (!meta)
     return id ? (
-      <Callout kind="warning" title="Not in the gateway's catalog">
-        <span className="mono small">{id}</span> — a custom plugin, or a gateway that does not run it. It is projected as is.
+      <Callout kind="warning" title={tr("Not in the gateway's catalog")}>
+        <Tr text={'{0} — a custom plugin, or a gateway that does not run it. It is projected as is.'} args={[<span className="mono small">{id}</span>]} />
       </Callout>
     ) : null;
   return (
@@ -555,29 +552,29 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
   const outside = hasForm && !jsonError ? Object.keys(parsed).filter((k) => !(k in schema)) : [];
   return (
     <Modal
-      title={isNew ? 'Add a plugin' : `Edit plugin — ${meta?.name || shortPluginId(p.plugin)}`}
+      title={isNew ? tr('Add a plugin') : tr('Edit plugin — {0}', [meta?.name || shortPluginId(p.plugin)])}
       size="wide"
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button className="btn primary" disabled={!p.plugin || !!jsonError} onClick={() => onSave({ ...p, config: parsed })}>
-            {isNew ? 'Add to the flow' : 'Apply'}
+            {isNew ? tr('Add to the flow') : tr('Apply')}
           </button>
         </>
       }
     >
-      <p className="muted small">The plugins are Otoroshi's own — no product-specific plugin. The configuration is the plugin's native one, and it reaches the gateway as is.</p>
+      <p className="muted small">{tr("The plugins are Otoroshi's own — no product-specific plugin. The configuration is the plugin's native one, and it reaches the gateway as is.")}</p>
       {catalog?.length > 0 && picking && (
         <div className="panel col gap-6">
           <div className="row">
             <div className="grow">
-              <Input value={q} onChange={setQ} placeholder={`search the gateway's ${catalog.length} plugins`} aria-label="search plugins" autoFocus />
+              <Input value={q} onChange={setQ} placeholder={tr("search the gateway's {0} plugins", [catalog.length])} aria-label={tr('search plugins')} autoFocus />
             </div>
             <div style={{ width: 220 }}>
-              <Select value={category} onChange={setCategory} options={[{ value: '', label: 'all categories' }, ...categories]} aria-label="category" />
+              <Select value={category} onChange={setCategory} options={[{ value: '', label: tr('all categories') }, ...categories]} aria-label={tr('category')} />
             </div>
           </div>
           <div style={{ maxHeight: 220, overflow: 'auto' }}>
@@ -588,28 +585,28 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
                 <span className="faint tiny nowrap">{(c.categories || [])[0]}</span>
               </div>
             ))}
-            {!matches.length && <div className="muted small" style={{ padding: 12 }}>No plugin matches.</div>}
+            {!matches.length && <div className="muted small" style={{ padding: 12 }}>{tr('No plugin matches.')}</div>}
           </div>
         </div>
       )}
       <PluginCard meta={meta} id={p.plugin} />
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <div className="grow">
-          <Field label="Plugin id">
-            <Input value={p.plugin} onChange={(v) => setP({ ...p, plugin: v })} mono placeholder="cp:otoroshi.next.plugins.…" />
+          <Field label={tr('Plugin id')}>
+            <Input value={p.plugin} onChange={(v) => setP({ ...p, plugin: v })} mono placeholder={tr('cp:otoroshi.next.plugins.…')} />
           </Field>
         </div>
         {catalog?.length > 0 && !picking && (
           <button className="btn" onClick={() => setPicking(true)}>
-            <Icon name="search" /> Change plugin
+            <Icon name="search" /> {tr('Change plugin')}
           </button>
         )}
       </div>
       <div className="row">
-        <label className="bold small grow">Configuration</label>
+        <label className="bold small grow">{tr('Configuration')}</label>
         {meta && (
           <button className="btn ghost xs" onClick={() => replaceConfig(JSON.stringify(meta.defaultConfig || {}, null, 2))} disabled={!jsonError && JSON.stringify(parsed) === JSON.stringify(meta.defaultConfig || {})}>
-            Reset to the default configuration
+            {tr('Reset to the default configuration')}
           </button>
         )}
         {hasForm && (
@@ -621,8 +618,8 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
               setFormKey((k) => k + 1);
             }}
             options={[
-              { value: 'form', label: 'Form' },
-              { value: 'json', label: 'JSON' },
+              { value: 'form', label: tr('Form') },
+              { value: 'json', label: tr('JSON') },
             ]}
           />
         )}
@@ -633,24 +630,23 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
             <PluginForm key={formKey} schema={schema} flow={form.data.configFlow} value={parsed} onChange={(obj) => setConfig(JSON.stringify(obj, null, 2))} />
           </div>
           <div className="hint">
-            The form is generated from the description the gateway gives of this plugin; the JSON stays the reference.
-            {outside.length > 0 && ` Also in the configuration, kept as is: ${outside.join(', ')} (JSON view).`}
+            <Tr text={'The form is generated from the description the gateway gives of this plugin; the JSON stays the reference.{0}'} args={[outside.length > 0 && tr(' Also in the configuration, kept as is: {0} (JSON view).', [outside.join(', ')])]} />
           </div>
         </div>
       ) : (
-        <Field error={jsonError} hint={meta && !meta.defaultConfig ? 'this plugin takes no configuration' : "the plugin's native configuration"}>
-          <CodeEditor value={config} onChange={setConfig} language="json" minHeight={160} maxHeight={380} ariaLabel="plugin configuration" />
+        <Field error={jsonError} hint={meta && !meta.defaultConfig ? tr('this plugin takes no configuration') : tr("the plugin's native configuration")}>
+          <CodeEditor value={config} onChange={setConfig} language="json" minHeight={160} maxHeight={380} ariaLabel={tr('plugin configuration')} />
         </Field>
       )}
       <div className="grid-2">
-        <Field label="Only on paths" hint="Java regular expressions on the full request path; empty = everywhere">
-          <TagsInput value={p.include} onChange={(v) => setP({ ...p, include: v })} placeholder="/v1/admin/.*" />
+        <Field label={tr('Only on paths')} hint={tr('Java regular expressions on the full request path; empty = everywhere')}>
+          <TagsInput value={p.include} onChange={(v) => setP({ ...p, include: v })} placeholder={tr('/v1/admin/.*')} />
         </Field>
-        <Field label="Except paths" hint="evaluated after the include list">
-          <TagsInput value={p.exclude} onChange={(v) => setP({ ...p, exclude: v })} placeholder="/v1/health" />
+        <Field label={tr('Except paths')} hint={tr('evaluated after the include list')}>
+          <TagsInput value={p.exclude} onChange={(v) => setP({ ...p, exclude: v })} placeholder={tr('/v1/health')} />
         </Field>
       </div>
-      <Switch checked={p.enabled} onChange={(v) => setP({ ...p, enabled: v })} label="Enabled" />
+      <Switch checked={p.enabled} onChange={(v) => setP({ ...p, enabled: v })} label={tr('Enabled')} />
     </Modal>
   );
 }
@@ -660,12 +656,12 @@ function AddGroupModal({ groups, onAdd, onClose }) {
   const published = groups.filter((g) => g.last_version);
   return (
     <Modal
-      title="Add a shared policy group"
+      title={tr('Add a shared policy group')}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button
             className="btn primary"
@@ -675,16 +671,16 @@ function AddGroupModal({ groups, onAdd, onClose }) {
               onAdd({ group: g.id, version: g.last_version });
             }}
           >
-            Pin latest version
+            {tr('Pin latest version')}
           </button>
         </>
       }
     >
-      <p className="muted small">The flow pins a published version of the group. Publishing a new version of the group changes nothing here until you upgrade — snapshots are immutable.</p>
+      <p className="muted small">{tr('The flow pins a published version of the group. Publishing a new version of the group changes nothing here until you upgrade — snapshots are immutable.')}</p>
       {published.length ? (
-        <Select value={sel} onChange={setSel} options={[{ value: '', label: 'Choose a group…' }, ...published.map((g) => ({ value: g.id, label: `${g.name} — v${g.last_version}` }))]} />
+        <Select value={sel} onChange={setSel} options={[{ value: '', label: tr('Choose a group…') }, ...published.map((g) => ({ value: g.id, label: tr('{0} — v{1}', [g.name, g.last_version]) }))]} />
       ) : (
-        <Callout kind="info">No published policy group yet.</Callout>
+        <Callout kind="info">{tr('No published policy group yet.')}</Callout>
       )}
     </Modal>
   );
@@ -701,8 +697,7 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">
-        A flow is a named chain of Otoroshi plugins, run in this order within each step of the request. A resource runs one flow; a plan can add its own flow (merged with the flow of
-        the current route) to put a policy plan by plan. Shared policy groups are expanded in place.
+        {tr('A flow is a named chain of Otoroshi plugins, run in this order within each step of the request. A resource runs one flow; a plan can add its own flow (merged with the flow of the current route) to put a policy plan by plan. Shared policy groups are expanded in place.')}
       </p>
       {draft.flows.map((f) => {
         const resources = draft.resources.filter((r) => r.flowId === f.id);
@@ -717,17 +712,17 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
           <div key={f.id} className="card">
             <div className="card-head">
               <Icon name="layers" />
-              <input className="input" style={{ maxWidth: 280, fontWeight: 600 }} value={f.name} disabled={readOnly} onChange={(e) => updateFlow(f.id, { name: e.target.value })} aria-label="flow name" />
-              <span className="faint small grow ellipsis">{usage.length ? `runs for ${usage.join(' · ')}` : 'not used yet'}</span>
+              <input className="input" style={{ maxWidth: 280, fontWeight: 600 }} value={f.name} disabled={readOnly} onChange={(e) => updateFlow(f.id, { name: e.target.value })} aria-label={tr('flow name')} />
+              <span className="faint small grow ellipsis">{usage.length ? tr('runs for {0}', [usage.join(' · ')]) : tr('not used yet')}</span>
               {!readOnly && (
                 <>
                   <button className="btn sm" onClick={() => setEditing({ flowId: f.id, index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
-                    <Icon name="plus" /> Add plugin
+                    <Icon name="plus" /> {tr('Add plugin')}
                   </button>
                   <button className="btn sm" onClick={() => setAddingGroup(f.id)}>
-                    <Icon name="layers" /> Add policy group
+                    <Icon name="layers" /> {tr('Add policy group')}
                   </button>
-                  <button className="btn ghost sm icon" disabled={usedBy + usedByPlans > 0} title={usedBy + usedByPlans > 0 ? 'in use' : 'delete flow'} onClick={() => setDraft((d) => ({ ...d, flows: d.flows.filter((x) => x.id !== f.id) }))}>
+                  <button className="btn ghost sm icon" disabled={usedBy + usedByPlans > 0} title={usedBy + usedByPlans > 0 ? tr('in use') : tr('delete flow')} onClick={() => setDraft((d) => ({ ...d, flows: d.flows.filter((x) => x.id !== f.id) }))}>
                     <Icon name="trash" />
                   </button>
                 </>
@@ -743,16 +738,16 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                     <Icon name="layers" />
                     <div className="grow">
                       <div className="bold small">
-                        {groupOf(p.group)?.name || p.group} <span className="badge">v{p.version}</span>
+                        {groupOf(p.group)?.name || p.group} <span className="badge"><Tr text={'v{0}'} args={[p.version]} /></span>
                       </div>
-                      <div className="faint tiny">shared policy group, expanded inline at projection</div>
+                      <div className="faint tiny">{tr('shared policy group, expanded inline at projection')}</div>
                     </div>
                     {groupOf(p.group)?.last_version > p.version && (
                       <>
-                        <span className="badge warning">v{groupOf(p.group).last_version} available</span>
+                        <span className="badge warning"><Tr text={'v{0} available'} args={[groupOf(p.group).last_version]} /></span>
                         {!readOnly && (
                           <button className="btn xs" onClick={() => updateFlow(f.id, { plugins: f.plugins.map((x, j) => (j === i ? { ...x, version: groupOf(p.group).last_version } : x)) })}>
-                            Upgrade
+                            {tr('Upgrade')}
                           </button>
                         )}
                       </>
@@ -760,7 +755,7 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                     {!readOnly && (
                       <>
                         <MoveButtons index={i} count={f.plugins.length} onMove={move} />
-                        <button className="btn ghost sm icon" onClick={remove} aria-label="remove">
+                        <button className="btn ghost sm icon" onClick={remove} aria-label={tr('remove')}>
                           <Icon name="trash" />
                         </button>
                       </>
@@ -781,14 +776,14 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                 );
               })
             ) : (
-              <div className="card-body muted small">No plugin.</div>
+              <div className="card-body muted small">{tr('No plugin.')}</div>
             )}
           </div>
         );
       })}
       {!readOnly && (
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setDraft((d) => ({ ...d, flows: [...d.flows, { id: rid('flow'), name: 'New flow', plugins: [] }] }))}>
-          <Icon name="plus" /> Add flow
+          <Icon name="plus" /> {tr('Add flow')}
         </button>
       )}
       {addingGroup && (
@@ -833,7 +828,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
   const lifecycle = async (l) => {
     try {
       await wapi.post(`/apis/${api.id}/lifecycle`, { lifecycle: l });
-      toast(`API ${l}`);
+      toast(tr('API {0}', [l]));
       reload();
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -843,40 +838,40 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
     <div className="col gap-24">
       <div className="card">
         <div className="card-body">
-          <Setting label="Name">
+          <Setting label={tr('Name')}>
             <Input value={identity.name} onChange={(v) => setIdent({ name: v })} disabled={readOnly} />
           </Setting>
-          <Setting label="Description" help="shown in the catalogue">
+          <Setting label={tr('Description')} help={tr('shown in the catalogue')}>
             <TextArea value={identity.description} onChange={(v) => setIdent({ description: v })} rows={3} disabled={readOnly} />
           </Setting>
-          <Setting label="Tags" help="business classification — domain, exposure, criticality — never a governance axis">
+          <Setting label={tr('Tags')} help={tr('business classification — domain, exposure, criticality — never a governance axis')}>
             <TagsInput value={identity.tags} onChange={(v) => setIdent({ tags: v })} />
           </Setting>
-          <Setting label="Owning team" help="the producers of this team can edit the api">
-            <Select value={identity.team_id || ''} onChange={(v) => setIdent({ team_id: v || null })} options={[{ value: '', label: 'no team' }, ...(teams.data || []).filter((t) => !t.personal).map((t) => ({ value: t.id, label: t.name }))]} disabled={readOnly} />
+          <Setting label={tr('Owning team')} help={tr('the producers of this team can edit the api')}>
+            <Select value={identity.team_id || ''} onChange={(v) => setIdent({ team_id: v || null })} options={[{ value: '', label: tr('no team') }, ...(teams.data || []).filter((t) => !t.personal).map((t) => ({ value: t.id, label: t.name }))]} disabled={readOnly} />
           </Setting>
-          <Setting label="Catalogue visibility" help="who sees the api on the portal. Never projected on the gateway.">
+          <Setting label={tr('Catalogue visibility')} help={tr('who sees the api on the portal. Never projected on the gateway.')}>
             <Select
               value={identity.visibility}
               onChange={(v) => setIdent({ visibility: v })}
               disabled={readOnly}
               options={[
-                { value: 'public', label: 'Public — anyone, including anonymous visitors' },
-                { value: 'authenticated', label: 'Authenticated — signed-in members of the portal' },
-                { value: 'restricted', label: 'Restricted — by ACL tags' },
+                { value: 'public', label: tr('Public — anyone, including anonymous visitors') },
+                { value: 'authenticated', label: tr('Authenticated — signed-in members of the portal') },
+                { value: 'restricted', label: tr('Restricted — by ACL tags') },
               ]}
             />
-            {identity.visibility === 'restricted' && <TagsInput value={identity.acl} onChange={(v) => setIdent({ acl: v })} placeholder="user:jane@corp.com, team:<id>, role:producer" />}
+            {identity.visibility === 'restricted' && <TagsInput value={identity.acl} onChange={(v) => setIdent({ acl: v })} placeholder={tr('user:jane@corp.com, team:<id>, role:producer')} />}
           </Setting>
           {metaFields.length > 0 && (
-            <Setting label="Metadata" help="typed fields declared for the workspace's apis — never projected on the gateway">
+            <Setting label={tr('Metadata')} help={tr("typed fields declared for the workspace's apis — never projected on the gateway")}>
               <MetadataForm fields={metaFields} values={identity.metadata} onChange={(v) => setIdent({ metadata: v })} disabled={readOnly} />
             </Setting>
           )}
-          <Setting label="Gateway capture" help="Otoroshi settings of the projected api">
-            <Switch checked={draft.settings.capture} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, capture: v } }))} label="Capture request/response bodies" disabled={readOnly} />
-            <Switch checked={draft.settings.debugFlow} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, debugFlow: v } }))} label="Debug flow" disabled={readOnly} />
-            <Switch checked={draft.settings.exportReporting} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, exportReporting: v } }))} label="Export reporting" disabled={readOnly} />
+          <Setting label={tr('Gateway capture')} help={tr('Otoroshi settings of the projected api')}>
+            <Switch checked={draft.settings.capture} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, capture: v } }))} label={tr('Capture request/response bodies')} disabled={readOnly} />
+            <Switch checked={draft.settings.debugFlow} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, debugFlow: v } }))} label={tr('Debug flow')} disabled={readOnly} />
+            <Switch checked={draft.settings.exportReporting} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, exportReporting: v } }))} label={tr('Export reporting')} disabled={readOnly} />
           </Setting>
         </div>
       </div>
@@ -885,10 +880,10 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
         <div className="card">
           <div className="card-head">
             <Icon name="git" />
-            <h3>Versions and lifecycle</h3>
+            <h3>{tr('Versions and lifecycle')}</h3>
           </div>
           <div className="card-body">
-            <Setting label="New version" help="A version is a new API pre-filled from this one: its own routes, plans, documentation and lifecycle. Subscriptions do not follow; transfer them.">
+            <Setting label={tr('New version')} help={tr('A version is a new API pre-filled from this one: its own routes, plans, documentation and lifecycle. Subscriptions do not follow; transfer them.')}>
               <div className="row">
                 <Input value={version} onChange={setVersion} placeholder="2.0.0" />
                 <button
@@ -897,36 +892,36 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   onClick={async () => {
                     try {
                       const created = await wapi.post(`/apis/${api.id}/versions`, { version });
-                      toast(`Version ${version} created as a draft`);
+                      toast(tr('Version {0} created as a draft', [version]));
                       navigate(`/ws/${slug}/apis/${created.id}`);
                     } catch (e) {
                       toast(errorMessage(e), 'error');
                     }
                   }}
                 >
-                  Create version
+                  {tr('Create version')}
                 </button>
               </div>
             </Setting>
-            <Setting label="Lifecycle" help="deprecated: still served, closed to new subscriptions. archived: removed from the gateway.">
+            <Setting label={tr('Lifecycle')} help={tr('deprecated: still served, closed to new subscriptions. archived: removed from the gateway.')}>
               <div className="row">
                 <StatusBadge status={api.lifecycle} />
                 {api.lifecycle === 'published' && (
                   <button className="btn sm" onClick={() => lifecycle('deprecated')}>
-                    Deprecate
+                    {tr('Deprecate')}
                   </button>
                 )}
                 {api.lifecycle === 'deprecated' && (
                   <button className="btn sm" onClick={() => lifecycle('published')}>
-                    Republish
+                    {tr('Republish')}
                   </button>
                 )}
                 {['published', 'deprecated'].includes(api.lifecycle) && (
                   <button
                     className="btn sm danger"
-                    onClick={async () => (await confirm({ title: 'Archive this API?', message: 'It is removed from the gateway: its consumers get 404 from now on.', danger: true, confirmLabel: 'Archive' })) && lifecycle('archived')}
+                    onClick={async () => (await confirm({ title: tr('Archive this API?'), message: tr('It is removed from the gateway: its consumers get 404 from now on.'), danger: true, confirmLabel: tr('Archive') })) && lifecycle('archived')}
                   >
-                    Archive
+                    {tr('Archive')}
                   </button>
                 )}
               </div>
@@ -939,39 +934,39 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
       <details className="card">
         <summary className="card-head" style={{ cursor: 'pointer' }}>
           <Icon name="info" />
-          <h3>Technical details</h3>
+          <h3>{tr('Technical details')}</h3>
         </summary>
         <div className="card-body col">
           <Loader state={projection}>
             {(p) => (
               <>
                 <dl className="kv">
-                  <dt>Product id</dt>
+                  <dt>{tr('Product id')}</dt>
                   <dd className="mono">{api.id}</dd>
-                  <dt>Otoroshi entity</dt>
+                  <dt>{tr('Otoroshi entity')}</dt>
                   <dd className="mono">
                     {p.otoroshi.kind} / {p.otoroshi.id}
                   </dd>
-                  <dt>On the gateway</dt>
+                  <dt>{tr('On the gateway')}</dt>
                   <dd>
-                    {p.actual ? <StatusBadge status="deployed" label="present" /> : <StatusBadge status="none" label="absent" />}{' '}
+                    {p.actual ? <StatusBadge status="deployed" label={tr('present')} /> : <StatusBadge status="none" label={tr('absent')} />}{' '}
                     {p.actual && (
                       <a className="link small" href={p.otoroshi.backoffice_url} target="_blank" rel="noreferrer">
-                        open in the Otoroshi backoffice <Icon name="external" size={12} />
+                        {tr('open in the Otoroshi backoffice')} <Icon name="external" size={12} />
                       </a>
                     )}
                   </dd>
-                  <dt>Ownership marker</dt>
+                  <dt>{tr('Ownership marker')}</dt>
                   <dd className="mono small">{p.actual?.metadata?.created_by || '—'}</dd>
-                  <dt>Otoroshi deployments</dt>
-                  <dd>{p.actual?.deployments?.length ?? 0} recorded (Otoroshi keeps the last five)</dd>
+                  <dt>{tr('Otoroshi deployments')}</dt>
+                  <dd><Tr text={'{0} recorded (Otoroshi keeps the last five)'} args={[p.actual?.deployments?.length ?? 0]} /></dd>
                   {p.derived?.length > 0 && (
                     <>
-                      <dt>Derived objects</dt>
+                      <dt>{tr('Derived objects')}</dt>
                       <dd className="col gap-4">
                         {p.derived.map((d) => (
                           <span key={d.id} className="small">
-                            {d.kind} <span className="mono">{d.id}</span> {d.present ? <StatusBadge status="deployed" label="present" /> : <StatusBadge status="missing" />}
+                            {d.kind} <span className="mono">{d.id}</span> {d.present ? <StatusBadge status="deployed" label={tr('present')} /> : <StatusBadge status="missing" />}
                           </span>
                         ))}
                       </dd>
@@ -979,7 +974,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   )}
                   {p.drift && (
                     <>
-                      <dt>Drift</dt>
+                      <dt>{tr('Drift')}</dt>
                       <dd>
                         <StatusBadge status={p.drift.status} />
                       </dd>
@@ -988,9 +983,9 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                 </dl>
                 {p.actual && (
                   <details>
-                    <summary className="link small">Show the projected entity as the gateway holds it</summary>
+                    <summary className="link small">{tr('Show the projected entity as the gateway holds it')}</summary>
                     <div className="mt-8">
-                      <CodeView value={p.actual} maxHeight={480} ariaLabel="entity on the gateway" />
+                      <CodeView value={p.actual} maxHeight={480} ariaLabel={tr('entity on the gateway')} />
                     </div>
                   </details>
                 )}
@@ -1004,15 +999,15 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
         <div className="card" style={{ borderColor: 'color-mix(in srgb, var(--negative) 35%, transparent)' }}>
           <div className="card-head">
             <Icon name="alert" />
-            <h3>Danger zone</h3>
+            <h3>{tr('Danger zone')}</h3>
           </div>
           <div className="card-body">
             <Setting
-              label="Delete this API"
+              label={tr('Delete this API')}
               help={
                 api.deployment.deployed
-                  ? `Removes the Api entity and the keys of its ${api.deployment ? '' : ''}subscriptions from the gateway: every consumer of ${draft.entrypoint.domain} gets 404 from now on.`
-                  : 'Nothing is deployed: deleting it touches nothing on the gateway.'
+                  ? tr('Removes the Api entity and the keys of its {0}subscriptions from the gateway: every consumer of {1} gets 404 from now on.', [api.deployment ? '' : '', draft.entrypoint.domain])
+                  : tr('Nothing is deployed: deleting it touches nothing on the gateway.')
               }
             >
               <button
@@ -1021,23 +1016,23 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                 onClick={async () => {
                   if (
                     !(await confirm({
-                      title: `Delete ${api.name} ${api.version}?`,
-                      message: api.deployment.deployed ? `It runs on the gateway. Deleting it removes its routes and the keys of all its subscriptions: calls to ${api.base_url} will return 404.` : 'Its draft, snapshots and documentation are deleted.',
+                      title: tr('Delete {0} {1}?', [api.name, api.version]),
+                      message: api.deployment.deployed ? tr('It runs on the gateway. Deleting it removes its routes and the keys of all its subscriptions: calls to {0} will return 404.', [api.base_url]) : tr('Its draft, snapshots and documentation are deleted.'),
                       danger: true,
-                      confirmLabel: 'Delete',
+                      confirmLabel: tr('Delete'),
                     }))
                   )
                     return;
                   try {
                     await wapi.del(`/apis/${api.id}`);
-                    toast('API deleted');
+                    toast(tr('API deleted'));
                     navigate(`/ws/${slug}/apis`);
                   } catch (e) {
                     toast(errorMessage(e), 'error');
                   }
                 }}
               >
-                <Icon name="trash" /> Delete API
+                <Icon name="trash" /> {tr('Delete API')}
               </button>
             </Setting>
           </div>

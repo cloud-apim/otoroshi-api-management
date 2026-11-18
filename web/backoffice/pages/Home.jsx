@@ -5,6 +5,7 @@ import { Empty, Icon, Loader, StatusBadge, useLoad } from '../../shared/ui.jsx';
 import { StatTile, TimeSeries } from '../../shared/charts.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 export function Home() {
   const { wapi, slug, ws, session } = useWs();
@@ -12,23 +13,23 @@ export function Home() {
   const traffic = useLoad(() => wapi.get('/analytics'), [slug]);
   return (
     <div className="page">
-      <PageHead title={`Welcome, ${session.user.name}`} sub={`${ws.name} — what needs your attention, and how the catalogue is doing.`} />
+      <PageHead title={tr('Welcome, {0}', [session.user.name])} sub={tr('{0} — what needs your attention, and how the catalogue is doing.', [ws.name])} />
       <Loader state={state}>
         {(h) => (
           <div className="col gap-24">
             <div className="grid-4">
-              <StatTile label="APIs" value={h.counts.apis} hint={`${h.counts.published_apis} published`} />
-              <StatTile label="Active subscriptions" value={h.counts.active_subscriptions} hint={`${h.counts.applications} applications`} />
-              <StatTile label="Waiting for review" value={h.counts.pending_subscriptions} />
-              <StatTile label="Calls, last 24h" value={traffic.data ? fmtNumber(traffic.data.totals.calls) : '…'} hint={traffic.data ? `${fmtNumber(traffic.data.totals.errors)} errors · p95 ${fmtNumber(traffic.data.totals.p95_ms)} ms` : ''} />
+              <StatTile label={tr('APIs')} value={h.counts.apis} hint={tr('{0} published', [h.counts.published_apis])} />
+              <StatTile label={tr('Active subscriptions')} value={h.counts.active_subscriptions} hint={tr('{0} applications', [h.counts.applications])} />
+              <StatTile label={tr('Waiting for review')} value={h.counts.pending_subscriptions} />
+              <StatTile label={tr('Calls, last 24h')} value={traffic.data ? fmtNumber(traffic.data.totals.calls) : '…'} hint={traffic.data ? tr('{0} errors · p95 {1} ms', [fmtNumber(traffic.data.totals.errors), fmtNumber(traffic.data.totals.p95_ms)]) : ''} />
             </div>
             <div className="grid-2">
               <div className="card">
                 <div className="card-head">
                   <Icon name="inbox" />
-                  <h3 className="grow">To review</h3>
+                  <h3 className="grow">{tr('To review')}</h3>
                   <Link className="link small" to={`/ws/${slug}/subscriptions?status=pending`}>
-                    All subscriptions
+                    {tr('All subscriptions')}
                   </Link>
                 </div>
                 {h.pending.length ? (
@@ -44,13 +45,13 @@ export function Home() {
                     </Link>
                   ))
                 ) : (
-                  <Empty title="Nothing to review" icon="check" />
+                  <Empty title={tr('Nothing to review')} icon="check" />
                 )}
               </div>
               <div className="card">
                 <div className="card-head">
                   <Icon name="rocket" />
-                  <h3 className="grow">Out of sync</h3>
+                  <h3 className="grow">{tr('Out of sync')}</h3>
                 </div>
                 {h.out_of_sync.length ? (
                   h.out_of_sync.map((a) => (
@@ -58,16 +59,16 @@ export function Home() {
                       <div className="grow bold">
                         {a.name} <span className="faint">{a.version}</span>
                       </div>
-                      <span className="badge warning">published, not deployed</span>
+                      <span className="badge warning">{tr('published, not deployed')}</span>
                     </Link>
                   ))
                 ) : (
-                  <Empty title="Everything published is deployed" icon="check" />
+                  <Empty title={tr('Everything published is deployed')} icon="check" />
                 )}
                 {h.counts.drifted > 0 && (
                   <Link to="/gateway/drift" className="list-item" style={{ display: 'flex' }}>
                     <Icon name="alert" />
-                    <span className="grow">{h.counts.drifted} projected objects drifted on the gateway</span>
+                    <span className="grow"><Tr text={'{0} projected objects drifted on the gateway'} args={[h.counts.drifted]} /></span>
                     <Icon name="chevronRight" />
                   </Link>
                 )}
@@ -76,9 +77,9 @@ export function Home() {
             <div className="card">
               <div className="card-head">
                 <Icon name="chart" />
-                <h3 className="grow">Traffic, last 24 hours</h3>
+                <h3 className="grow">{tr('Traffic, last 24 hours')}</h3>
                 <Link className="link small" to={`/ws/${slug}/observability`}>
-                  Observability
+                  {tr('Observability')}
                 </Link>
               </div>
               <div className="card-body">
@@ -88,8 +89,8 @@ export function Home() {
                       data={t.series}
                       bucket={t.range.bucket}
                       series={[
-                        { key: 'calls', label: 'Calls' },
-                        { key: 'errors', label: 'Errors' },
+                        { key: 'calls', label: tr('Calls') },
+                        { key: 'errors', label: tr('Errors') },
                       ]}
                     />
                   )}
@@ -99,9 +100,9 @@ export function Home() {
             <div className="card">
               <div className="card-head">
                 <Icon name="audit" />
-                <h3 className="grow">Recent activity</h3>
+                <h3 className="grow">{tr('Recent activity')}</h3>
                 <Link className="link small" to={`/ws/${slug}/audit`}>
-                  Audit
+                  {tr('Audit')}
                 </Link>
               </div>
               {h.recent.map((e) => (

@@ -5,6 +5,7 @@ import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, 
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { PluginModal, PluginRow, moveItem } from './api/tabs.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 // shared policy groups: a named composition of Otoroshi plugins with its own lifecycle
 export function ApisTabs({ current }) {
@@ -12,10 +13,10 @@ export function ApisTabs({ current }) {
   return (
     <div className="tabs mb-16">
       <Link to={`/ws/${slug}/apis`} className={current === 'apis' ? 'on' : ''}>
-        APIs
+        {tr('APIs')}
       </Link>
       <Link to={`/ws/${slug}/policy-groups`} className={current === 'groups' ? 'on' : ''}>
-        Shared policy groups
+        {tr('Shared policy groups')}
       </Link>
     </div>
   );
@@ -30,11 +31,11 @@ export function PolicyGroupsPage() {
   return (
     <div className="page">
       <PageHead
-        title="Shared policy groups"
-        sub="Name a composition of Otoroshi plugins once, govern it, use it on many APIs. An API pins a published version: publishing a group never changes what runs until each API is upgraded."
+        title={tr('Shared policy groups')}
+        sub={tr('Name a composition of Otoroshi plugins once, govern it, use it on many APIs. An API pins a published version: publishing a group never changes what runs until each API is upgraded.')}
         actions={
           <button className="btn primary" onClick={() => setCreating({ name: '', description: '' })}>
-            <Icon name="plus" /> New group
+            <Icon name="plus" /> {tr('New group')}
           </button>
         }
       />
@@ -46,10 +47,10 @@ export function PolicyGroupsPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Group</th>
-                    <th>Version</th>
-                    <th>Used by</th>
-                    <th>Updated</th>
+                    <th>{tr('Group')}</th>
+                    <th>{tr('Version')}</th>
+                    <th>{tr('Used by')}</th>
+                    <th>{tr('Updated')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -59,14 +60,13 @@ export function PolicyGroupsPage() {
                         <div className="bold">{g.name}</div>
                         <div className="faint tiny">{g.description}</div>
                       </td>
-                      <td>{g.last_version ? <Badge kind="accent">v{g.last_version}</Badge> : <StatusBadge status="created" label="draft only" />}</td>
+                      <td>{g.last_version ? <Badge kind="accent"><Tr text={'v{0}'} args={[g.last_version]} /></Badge> : <StatusBadge status="created" label={tr('draft only')} />}</td>
                       <td className="small">
-                        {g.usage.length} API(s)
-                        {g.usage.some((u) => u.behind) && (
+                        <Tr text={'{0} API(s){1}'} args={[g.usage.length, g.usage.some((u) => u.behind) && (
                           <span className="badge warning" style={{ marginLeft: 6 }}>
-                            {g.usage.filter((u) => u.behind).length} behind
+                            <Tr text={'{0} behind'} args={[g.usage.filter((u) => u.behind).length]} />
                           </span>
-                        )}
+                        )]} />
                       </td>
                       <td className="muted small">{fmtRelative(g.updated_at)}</td>
                     </tr>
@@ -76,8 +76,8 @@ export function PolicyGroupsPage() {
             </div>
           ) : (
             <div className="card">
-              <Empty title="No shared policy group" icon="layers">
-                For example: the security headers, the WAF and the CORS policy every public API must carry.
+              <Empty title={tr('No shared policy group')} icon="layers">
+                {tr('For example: the security headers, the WAF and the CORS policy every public API must carry.')}
               </Empty>
             </div>
           )
@@ -85,7 +85,7 @@ export function PolicyGroupsPage() {
       </Loader>
       {creating && (
         <Modal
-          title="New policy group"
+          title={tr('New policy group')}
           onClose={() => setCreating(null)}
           footer={
             <button
@@ -100,14 +100,14 @@ export function PolicyGroupsPage() {
                 }
               }}
             >
-              Create
+              {tr('Create')}
             </button>
           }
         >
-          <Field label="Name">
+          <Field label={tr('Name')}>
             <Input value={creating.name} onChange={(v) => setCreating({ ...creating, name: v })} autoFocus />
           </Field>
-          <Field label="Description">
+          <Field label={tr('Description')}>
             <Input value={creating.description} onChange={(v) => setCreating({ ...creating, description: v })} />
           </Field>
         </Modal>
@@ -135,14 +135,14 @@ export function PolicyGroupPage({ id }) {
           const changed = !last || JSON.stringify(last.plugins) !== JSON.stringify(g.draft.plugins);
           return (
             <>
-              <PageHead crumbs={[{ label: 'Shared policy groups', to: `/ws/${slug}/policy-groups` }, { label: g.name }]} title={g.name} sub={g.description} />
+              <PageHead crumbs={[{ label: tr('Shared policy groups'), to: `/ws/${slug}/policy-groups` }, { label: g.name }]} title={g.name} sub={g.description} />
               <div className="grid-2" style={{ alignItems: 'start' }}>
                 <div className="col gap-16">
                   <div className="card">
                     <div className="card-head">
-                      <h3 className="grow">Draft</h3>
+                      <h3 className="grow">{tr('Draft')}</h3>
                       <button className="btn sm" onClick={() => setEditing({ index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
-                        <Icon name="plus" /> Add plugin
+                        <Icon name="plus" /> {tr('Add plugin')}
                       </button>
                     </div>
                     {plugins.length ? (
@@ -159,7 +159,7 @@ export function PolicyGroupPage({ id }) {
                         />
                       ))
                     ) : (
-                      <div className="card-body muted small">No plugin yet.</div>
+                      <div className="card-body muted small">{tr('No plugin yet.')}</div>
                     )}
                     {draft && (
                       <div className="card-body row" style={{ borderTop: '1px solid var(--border)' }}>
@@ -169,40 +169,40 @@ export function PolicyGroupPage({ id }) {
                             try {
                               await wapi.put(`/policy-groups/${id}`, { plugins: draft });
                               setDraft(null);
-                              toast('Draft saved');
+                              toast(tr('Draft saved'));
                               state.reload();
                             } catch (e) {
                               toast(errorMessage(e), 'error');
                             }
                           }}
                         >
-                          Save draft
+                          {tr('Save draft')}
                         </button>
                         <button className="btn sm" onClick={() => setDraft(null)}>
-                          Discard
+                          {tr('Discard')}
                         </button>
                       </div>
                     )}
                   </div>
                   <div className="card">
                     <div className="card-head">
-                      <h3>Publish a version</h3>
+                      <h3>{tr('Publish a version')}</h3>
                     </div>
                     <div className="card-body col">
                       {!changed ? (
-                        <p className="muted small">The draft is identical to v{last?.number}.</p>
+                        <p className="muted small"><Tr text={'The draft is identical to v{0}.'} args={[last?.number]} /></p>
                       ) : (
                         <>
-                          <Input value={comment} onChange={setComment} placeholder="what changes" />
+                          <Input value={comment} onChange={setComment} placeholder={tr('what changes')} />
                           <button
                             className="btn primary"
                             style={{ alignSelf: 'flex-start' }}
                             disabled={!!draft}
-                            title={draft ? 'save the draft first' : ''}
+                            title={draft ? tr('save the draft first') : ''}
                             onClick={async () => {
                               try {
                                 const v = await wapi.post(`/policy-groups/${id}/publish`, { comment });
-                                toast(`v${v.number} published — the APIs using the group stay on their pinned version`);
+                                toast(tr('v{0} published — the APIs using the group stay on their pinned version', [v.number]));
                                 setComment('');
                                 state.reload();
                               } catch (e) {
@@ -210,7 +210,7 @@ export function PolicyGroupPage({ id }) {
                               }
                             }}
                           >
-                            Publish v{(last?.number || 0) + 1}
+                            <Tr text={'Publish v{0}'} args={[(last?.number || 0) + 1]} />
                           </button>
                         </>
                       )}
@@ -220,7 +220,7 @@ export function PolicyGroupPage({ id }) {
                 <div className="col gap-16">
                   <div className="card">
                     <div className="card-head">
-                      <h3 className="grow">Used by</h3>
+                      <h3 className="grow">{tr('Used by')}</h3>
                     </div>
                     {g.usage.length ? (
                       g.usage.map((u) => (
@@ -228,39 +228,39 @@ export function PolicyGroupPage({ id }) {
                           <span className="grow bold">
                             {u.name} <span className="faint">{u.version}</span>
                           </span>
-                          <span className="small">pins v{u.pinned.join(', v')}</span>
-                          {u.behind ? <span className="badge warning">behind v{u.latest}</span> : <span className="badge positive">latest</span>}
+                          <span className="small"><Tr text={'pins v{0}'} args={[u.pinned.join(', v')]} /></span>
+                          {u.behind ? <span className="badge warning"><Tr text={'behind v{0}'} args={[u.latest]} /></span> : <span className="badge positive">{tr('latest')}</span>}
                         </Link>
                       ))
                     ) : (
-                      <div className="card-body muted small">No API uses this group yet: add it from the policy flows of an API.</div>
+                      <div className="card-body muted small">{tr('No API uses this group yet: add it from the policy flows of an API.')}</div>
                     )}
                     {g.usage.some((u) => u.behind) && (
                       <div className="card-body">
-                        <Callout kind="info">Upgrading is an edit of each API's draft, then a publication: what runs only changes through a snapshot.</Callout>
+                        <Callout kind="info">{tr("Upgrading is an edit of each API's draft, then a publication: what runs only changes through a snapshot.")}</Callout>
                       </div>
                     )}
                   </div>
                   <div className="card">
                     <div className="card-head">
-                      <h3>Versions</h3>
+                      <h3>{tr('Versions')}</h3>
                     </div>
                     {g.versions.map((v) => (
                       <div key={v.id} className="list-item">
-                        <Badge kind="accent">v{v.number}</Badge>
-                        <span className="grow small">{v.comment || <span className="faint">no comment</span>}</span>
+                        <Badge kind="accent"><Tr text={'v{0}'} args={[v.number]} /></Badge>
+                        <span className="grow small">{v.comment || <span className="faint">{tr('no comment')}</span>}</span>
                         <span className="faint small">
                           {fmtDate(v.published_at)} · {v.published_by_email}
                         </span>
                       </div>
                     ))}
-                    {!g.versions.length && <div className="card-body muted small">Never published.</div>}
+                    {!g.versions.length && <div className="card-body muted small">{tr('Never published.')}</div>}
                   </div>
                   <button
                     className="btn danger"
                     style={{ alignSelf: 'flex-start' }}
                     onClick={async () => {
-                      if (!(await confirm({ title: `Delete ${g.name}?`, danger: true, confirmLabel: 'Delete', message: 'Only possible when no API uses it.' }))) return;
+                      if (!(await confirm({ title: tr('Delete {0}?', [g.name]), danger: true, confirmLabel: tr('Delete'), message: tr('Only possible when no API uses it.') }))) return;
                       try {
                         await wapi.del(`/policy-groups/${id}`);
                         navigate(`/ws/${slug}/policy-groups`);
@@ -269,7 +269,7 @@ export function PolicyGroupPage({ id }) {
                       }
                     }}
                   >
-                    <Icon name="trash" /> Delete group
+                    <Icon name="trash" /> {tr('Delete group')}
                   </button>
                 </div>
               </div>

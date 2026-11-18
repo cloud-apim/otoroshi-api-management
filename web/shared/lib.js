@@ -1,4 +1,5 @@
 // Shared front helpers: http client, theme, formatting.
+import { language, tr } from './i18n.jsx';
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -66,19 +67,22 @@ export function initTheme() {
 
 // ---------------------------------------------------------------- formatting
 
+// dates and numbers in the language of the console (the portal sets the same, see i18n.jsx)
+const locale = () => (language() === 'fr' ? 'fr-FR' : undefined);
+
 export function fmtDate(d) {
   if (!d) return '—';
   const date = new Date(d);
-  return date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString(locale(), { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function fmtRelative(d) {
   if (!d) return '—';
   const s = (Date.now() - new Date(d).getTime()) / 1000;
-  if (s < 60) return 'just now';
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)} d ago`;
+  if (s < 60) return tr('just now');
+  if (s < 3600) return tr('{0} min ago', [Math.floor(s / 60)]);
+  if (s < 86400) return tr('{0} h ago', [Math.floor(s / 3600)]);
+  if (s < 86400 * 30) return tr('{0} d ago', [Math.floor(s / 86400)]);
   return fmtDate(d);
 }
 
@@ -87,7 +91,7 @@ export function fmtNumber(n, digits = 0) {
   const v = Number(n);
   if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
   if (Math.abs(v) >= 1e4) return (v / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
-  return v.toLocaleString(undefined, { maximumFractionDigits: digits });
+  return v.toLocaleString(locale(), { maximumFractionDigits: digits });
 }
 
 export function fmtBytes(n) {
@@ -104,10 +108,10 @@ export function fmtBytes(n) {
 
 export function fmtWindow(ms) {
   if (!ms) return '';
-  if (ms % 86400000 === 0) return ms === 86400000 ? 'day' : `${ms / 86400000} days`;
-  if (ms % 3600000 === 0) return ms === 3600000 ? 'hour' : `${ms / 3600000} h`;
-  if (ms % 60000 === 0) return ms === 60000 ? 'minute' : `${ms / 60000} min`;
-  if (ms % 1000 === 0) return ms === 1000 ? 'second' : `${ms / 1000} s`;
+  if (ms % 86400000 === 0) return ms === 86400000 ? tr('day') : tr('{0} days', [ms / 86400000]);
+  if (ms % 3600000 === 0) return ms === 3600000 ? tr('hour') : `${ms / 3600000} h`;
+  if (ms % 60000 === 0) return ms === 60000 ? tr('minute') : `${ms / 60000} min`;
+  if (ms % 1000 === 0) return ms === 1000 ? tr('second') : `${ms / 1000} s`;
   return `${ms} ms`;
 }
 

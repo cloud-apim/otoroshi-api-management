@@ -4,19 +4,20 @@ import { Badge, Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessag
 import { useWs } from '../../context.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
+import { tr, Tr } from '../../../shared/i18n.jsx';
 
 function SnapshotView({ api, number, onClose }) {
   const { wapi } = useWs();
   const state = useLoad(() => wapi.get(`/apis/${api.id}/snapshots/${number}`), [number]);
   return (
-    <Modal title={`Snapshot #${number}`} size="xwide" onClose={onClose}>
+    <Modal title={tr('Snapshot #{0}', [number])} size="xwide" onClose={onClose}>
       <Loader state={state}>
         {(s) => (
           <>
             <p className="muted small">
-              Published {fmtDate(s.published_at)} {s.comment ? `— ${s.comment}` : ''}. Immutable: it can be redeployed, never edited.
+              <Tr text={'Published {0} {1}. Immutable: it can be redeployed, never edited.'} args={[fmtDate(s.published_at), s.comment ? `— ${s.comment}` : '']} />
             </p>
-            <CodeView value={s.content} maxHeight={620} ariaLabel={`snapshot ${number}`} />
+            <CodeView value={s.content} maxHeight={620} ariaLabel={tr('snapshot {0}', [number])} />
           </>
         )}
       </Loader>
@@ -51,7 +52,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
     try {
       await wapi.post('/drift');
       projection.reload();
-      toast('Drift detection done');
+      toast(tr('Drift detection done'));
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -62,44 +63,44 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
         <div className="card">
           <div className="card-head">
             <Icon name="rocket" />
-            <h3 className="grow">Deployed state</h3>
+            <h3 className="grow">{tr('Deployed state')}</h3>
             {!readOnly && current && (
               <button
                 className="btn sm danger"
                 onClick={async () => {
-                  if (!(await confirm({ title: 'Undeploy?', message: `The Api entity is removed from the gateway: calls to ${api.base_url} return 404. Subscriptions stay in the product and are projected again at the next deployment.`, danger: true, confirmLabel: 'Undeploy' }))) return;
+                  if (!(await confirm({ title: tr('Undeploy?'), message: tr('The Api entity is removed from the gateway: calls to {0} return 404. Subscriptions stay in the product and are projected again at the next deployment.', [api.base_url]), danger: true, confirmLabel: tr('Undeploy') }))) return;
                   try {
                     await wapi.post(`/apis/${api.id}/undeploy`);
-                    toast('Undeployed');
+                    toast(tr('Undeployed'));
                     reload();
                   } catch (e) {
                     toast(errorMessage(e), 'error');
                   }
                 }}
               >
-                Undeploy
+                {tr('Undeploy')}
               </button>
             )}
           </div>
           <div className="card-body">
             <dl className="kv">
-              <dt>Running</dt>
-              <dd>{current ? `snapshot #${current.snapshot_number}, since ${fmtRelative(current.at)}` : 'nothing'}</dd>
-              <dt>Latest snapshot</dt>
+              <dt>{tr('Running')}</dt>
+              <dd>{current ? tr('snapshot #{0}, since {1}', [current.snapshot_number, fmtRelative(current.at)]) : tr('nothing')}</dd>
+              <dt>{tr('Latest snapshot')}</dt>
               <dd>{api.deployment.latest_snapshot ? `#${api.deployment.latest_snapshot.number}` : '—'}</dd>
-              <dt>State</dt>
-              <dd>{api.deployment.out_of_sync ? <StatusBadge status="drifted" label="out of sync" /> : <StatusBadge status="in_sync" label="up to date" />}</dd>
-              <dt>Target</dt>
-              <dd>the installation's Otoroshi cluster (one per installation)</dd>
+              <dt>{tr('State')}</dt>
+              <dd>{api.deployment.out_of_sync ? <StatusBadge status="drifted" label={tr('out of sync')} /> : <StatusBadge status="in_sync" label={tr('up to date')} />}</dd>
+              <dt>{tr('Target')}</dt>
+              <dd>{tr("the installation's Otoroshi cluster (one per installation)")}</dd>
             </dl>
           </div>
         </div>
         <div className="card">
           <div className="card-head">
             <Icon name="gateway" />
-            <h3 className="grow">Gateway drift</h3>
+            <h3 className="grow">{tr('Gateway drift')}</h3>
             <button className="btn sm" onClick={recheck}>
-              <Icon name="refresh" /> Check now
+              <Icon name="refresh" /> {tr('Check now')}
             </button>
           </div>
           <div className="card-body col">
@@ -109,23 +110,23 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                   <>
                     <div className="row">
                       <StatusBadge status={p.drift.status} />
-                      <span className="faint small">checked {fmtRelative(p.drift.checked_at)}</span>
+                      <span className="faint small"><Tr text={'checked {0}'} args={[fmtRelative(p.drift.checked_at)]} /></span>
                     </div>
                     {p.drift.status === 'drifted' && (
                       <>
-                        <p className="small muted">Someone changed the projected entity directly on the gateway. Redeploying the running snapshot puts it back; adopting the change means editing the draft.</p>
+                        <p className="small muted">{tr('Someone changed the projected entity directly on the gateway. Redeploying the running snapshot puts it back; adopting the change means editing the draft.')}</p>
                         <DiffView changes={p.drift.diff} />
                         {!readOnly && current && (
                           <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => onDeploy(current.snapshot_id)}>
-                            Re-apply snapshot #{current.snapshot_number}
+                            <Tr text={'Re-apply snapshot #{0}'} args={[current.snapshot_number]} />
                           </button>
                         )}
                       </>
                     )}
-                    {p.drift.status === 'missing' && <Callout kind="negative">The entity is missing on the gateway although it is deployed. Redeploy to restore it.</Callout>}
+                    {p.drift.status === 'missing' && <Callout kind="negative">{tr('The entity is missing on the gateway although it is deployed. Redeploy to restore it.')}</Callout>}
                   </>
                 ) : (
-                  <p className="muted small">{current ? 'Not checked yet.' : 'Nothing deployed.'}</p>
+                  <p className="muted small">{current ? tr('Not checked yet.') : tr('Nothing deployed.')}</p>
                 )
               }
             </Loader>
@@ -135,11 +136,11 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
       <div className="card">
         <div className="card-head">
           <Icon name="layers" />
-          <h3 className="grow">Snapshots</h3>
-          <span className="muted small">immutable, append-only — rollback = redeploy an earlier one</span>
+          <h3 className="grow">{tr('Snapshots')}</h3>
+          <span className="muted small">{tr('immutable, append-only — rollback = redeploy an earlier one')}</span>
         </div>
         <div className="card-body" style={{ paddingBottom: 0 }}>
-          <ListToolbar paging={snapPage} placeholder="search numbers, comments, people" onReload={snaps.reload} loading={snaps.loading} />
+          <ListToolbar paging={snapPage} placeholder={tr('search numbers, comments, people')} onReload={snaps.reload} loading={snaps.loading} />
         </div>
         <Loader state={snaps}>
           {(list) =>
@@ -153,28 +154,28 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                         <td className="bold nowrap">
                           #{s.number}{' '}
                           {s.origin && (
-                            <Badge kind="info" title={`snapshot #${s.origin.number} of ${s.origin.installation}, ${s.origin.digest}`}>
-                              promoted
+                            <Badge kind="info" title={tr('snapshot #{0} of {1}, {2}', [s.origin.number, s.origin.installation, s.origin.digest])}>
+                              {tr('promoted')}
                             </Badge>
                           )}
                         </td>
-                        <td>{s.comment || <span className="faint">no comment</span>}</td>
+                        <td>{s.comment || <span className="faint">{tr('no comment')}</span>}</td>
                         <td className="muted small">
-                          {fmtDate(s.published_at)} · {s.published_by_email || 'system'}
+                          {fmtDate(s.published_at)} · {s.published_by_email || tr('system')}
                         </td>
-                        <td>{current?.snapshot_id === s.id && <StatusBadge status="deployed" label="running" />}</td>
+                        <td>{current?.snapshot_id === s.id && <StatusBadge status="deployed" label={tr('running')} />}</td>
                         <td className="actions">
                           <button className="btn sm ghost" onClick={() => setViewing(s.number)}>
-                            View
+                            {tr('View')}
                           </button>
                           {!readOnly && (
-                            <button className="btn sm ghost" title="the snapshot as a document for the next installation" onClick={() => exportSnapshot(s)}>
-                              Export for promotion
+                            <button className="btn sm ghost" title={tr('the snapshot as a document for the next installation')} onClick={() => exportSnapshot(s)}>
+                              {tr('Export for promotion')}
                             </button>
                           )}
                           {!readOnly && current?.snapshot_id !== s.id && (
                             <button className="btn sm" onClick={() => onDeploy(s.id)}>
-                              {current && s.number < current.snapshot_number ? 'Roll back to it' : 'Deploy'}
+                              {current && s.number < current.snapshot_number ? tr('Roll back to it') : tr('Deploy')}
                             </button>
                           )}
                         </td>
@@ -186,7 +187,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
               <Pager paging={snapPage} total={snapPage.total} />
               </>
             ) : (
-              <div className="card-body muted small">{list.length ? 'No snapshot matches.' : 'No snapshot yet: publish the draft.'}</div>
+              <div className="card-body muted small">{list.length ? tr('No snapshot matches.') : tr('No snapshot yet: publish the draft.')}</div>
             )
           }
         </Loader>
@@ -194,10 +195,10 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
       <div className="card">
         <div className="card-head">
           <Icon name="audit" />
-          <h3 className="grow">Deployment history</h3>
+          <h3 className="grow">{tr('Deployment history')}</h3>
         </div>
         <div className="card-body" style={{ paddingBottom: 0 }}>
-          <ListToolbar paging={depPage} placeholder="search snapshots, statuses, people, errors" onReload={deps.reload} loading={deps.loading} />
+          <ListToolbar paging={depPage} placeholder={tr('search snapshots, statuses, people, errors')} onReload={deps.reload} loading={deps.loading} />
         </div>
         <Loader state={deps}>
           {() => (
@@ -207,12 +208,12 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                 <tbody>
                   {depPage.items.map((x) => (
                     <tr key={x.id}>
-                      <td>{x.action === 'undeploy' ? 'undeploy' : `snapshot #${x.snapshot_number}`}</td>
+                      <td>{x.action === 'undeploy' ? tr('undeploy') : tr('snapshot #{0}', [x.snapshot_number])}</td>
                       <td>
                         <StatusBadge status={x.status} />
                       </td>
                       <td className="muted small">
-                        {fmtDate(x.requested_at)} · {x.requested_by_email || 'system'}
+                        {fmtDate(x.requested_at)} · {x.requested_by_email || tr('system')}
                       </td>
                       <td className="small negative-text">{x.error}</td>
                     </tr>

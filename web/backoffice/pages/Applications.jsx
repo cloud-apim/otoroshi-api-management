@@ -9,6 +9,7 @@ import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { SubscriptionsTable } from './Subscriptions.jsx';
 import { AnalyticsDashboard } from './Observability.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 function CreateAppModal({ onClose, onCreated }) {
   const { wapi, slug } = useWs();
@@ -18,12 +19,12 @@ function CreateAppModal({ onClose, onCreated }) {
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <Modal
-      title="New application"
+      title={tr('New application')}
       onClose={onClose}
       footer={
         <>
           <button className="btn" onClick={onClose}>
-            Cancel
+            {tr('Cancel')}
           </button>
           <button
             className="btn primary"
@@ -36,22 +37,22 @@ function CreateAppModal({ onClose, onCreated }) {
               }
             }}
           >
-            Create
+            {tr('Create')}
           </button>
         </>
       }
     >
-      <p className="muted small">An application groups the subscriptions and the technical identity of a consumer. It groups identity, never counters.</p>
-      <Field label="Name">
+      <p className="muted small">{tr('An application groups the subscriptions and the technical identity of a consumer. It groups identity, never counters.')}</p>
+      <Field label={tr('Name')}>
         <Input value={form.name} onChange={set('name')} autoFocus />
       </Field>
-      <Field label="Description">
+      <Field label={tr('Description')}>
         <Input value={form.description} onChange={set('description')} />
       </Field>
-      <Field label="Owning team">
-        <Select value={form.team_id || teams.data?.[0]?.id || ''} onChange={set('team_id')} options={(teams.data || []).map((t) => ({ value: t.id, label: t.personal ? `${t.name} (personal)` : t.name }))} />
+      <Field label={tr('Owning team')}>
+        <Select value={form.team_id || teams.data?.[0]?.id || ''} onChange={set('team_id')} options={(teams.data || []).map((t) => ({ value: t.id, label: t.personal ? tr('{0} (personal)', [t.name]) : t.name }))} />
       </Field>
-      <Field label="Expected client_id" hint="for oauth2 and mtls plans: how the gateway's consumer is reconciled with this application">
+      <Field label={tr('Expected client_id')} hint={tr("for oauth2 and mtls plans: how the gateway's consumer is reconciled with this application")}>
         <Input value={form.client_id} onChange={set('client_id')} mono />
       </Field>
     </Modal>
@@ -67,15 +68,15 @@ export function ApplicationsPage() {
   return (
     <div className="page">
       <PageHead
-        title="Applications"
-        sub="The consumers of the catalogue. Whoever can see an application can see its credentials."
+        title={tr('Applications')}
+        sub={tr('The consumers of the catalogue. Whoever can see an application can see its credentials.')}
         actions={
           <button className="btn primary" onClick={() => setCreating(true)}>
-            <Icon name="plus" /> New application
+            <Icon name="plus" /> {tr('New application')}
           </button>
         }
       />
-      <ListToolbar paging={page} placeholder="search applications, teams, client ids" onReload={state.reload} loading={state.loading} />
+      <ListToolbar paging={page} placeholder={tr('search applications, teams, client ids')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {() =>
           page.items.length ? (
@@ -84,11 +85,11 @@ export function ApplicationsPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Application</th>
-                    <th>Team</th>
-                    <th>Expected client_id</th>
-                    <th className="right">Subscriptions</th>
-                    <th>Created</th>
+                    <th>{tr('Application')}</th>
+                    <th>{tr('Team')}</th>
+                    <th>{tr('Expected client_id')}</th>
+                    <th className="right">{tr('Subscriptions')}</th>
+                    <th>{tr('Created')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -99,14 +100,14 @@ export function ApplicationsPage() {
                         <div className="faint tiny">{a.description}</div>
                       </td>
                       <td className="small">
-                        {a.team_name} {a.team_personal && <span className="faint">(personal)</span>}
+                        {a.team_name} {a.team_personal && <span className="faint">{tr('(personal)')}</span>}
                       </td>
                       <td className="mono small">{a.client_id || '—'}</td>
                       <td className="right">
                         {a.active_subscriptions}
                         {a.pending_subscriptions > 0 && (
                           <span className="badge warning" style={{ marginLeft: 6 }}>
-                            {a.pending_subscriptions} pending
+                            <Tr text={'{0} pending'} args={[a.pending_subscriptions]} />
                           </span>
                         )}
                       </td>
@@ -120,8 +121,8 @@ export function ApplicationsPage() {
             </div>
           ) : (
             <div className="card">
-              <Empty title={page.q ? 'No application matches' : 'No application'} icon="apps">
-                {page.q ? null : 'Consumers usually create their applications from the developer portal.'}
+              <Empty title={page.q ? tr('No application matches') : tr('No application')} icon="apps">
+                {page.q ? null : tr('Consumers usually create their applications from the developer portal.')}
               </Empty>
             </div>
           )
@@ -149,11 +150,11 @@ export function ApplicationPage({ id }) {
           const set = (k) => (v) => setForm({ ...f, [k]: v });
           return (
             <>
-              <PageHead crumbs={[{ label: 'Applications', to: `/ws/${slug}/applications` }, { label: app.name }]} title={app.name} sub={`team ${app.team_name} · ${app.id}`} />
+              <PageHead crumbs={[{ label: tr('Applications'), to: `/ws/${slug}/applications` }, { label: app.name }]} title={app.name} sub={tr('team {0} · {1}', [app.team_name, app.id])} />
               <div className="tabs mb-16">
                 {['subscriptions', 'identity', 'usage'].map((t) => (
                   <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                    {t[0].toUpperCase() + t.slice(1)}
+                    {tr(t[0].toUpperCase() + t.slice(1))}
                   </button>
                 ))}
               </div>
@@ -163,21 +164,21 @@ export function ApplicationPage({ id }) {
                 <div className="card">
                   {!app.can_see_credentials && (
                     <div className="card-body" style={{ paddingBottom: 0 }}>
-                      <Callout kind="info">Read only: the team of the application and the administrators of the workspace change it.</Callout>
+                      <Callout kind="info">{tr('Read only: the team of the application and the administrators of the workspace change it.')}</Callout>
                     </div>
                   )}
                   <fieldset disabled={!app.can_see_credentials} className="ro-fieldset card-body">
-                    <Setting label="Name">
+                    <Setting label={tr('Name')}>
                       <Input value={f.name} onChange={set('name')} />
                     </Setting>
-                    <Setting label="Description">
+                    <Setting label={tr('Description')}>
                       <TextArea value={f.description} onChange={set('description')} rows={2} />
                     </Setting>
-                    <Setting label="Expected client_id" help="On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application.">
+                    <Setting label={tr('Expected client_id')} help={tr('On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application.')}>
                       <Input value={f.client_id || ''} onChange={set('client_id')} mono />
                     </Setting>
                     {metaFields.length > 0 && (
-                      <Setting label="Metadata" help="typed fields of the workspace's applications; the ones marked for the portal are filled by the consumer">
+                      <Setting label={tr('Metadata')} help={tr("typed fields of the workspace's applications; the ones marked for the portal are filled by the consumer")}>
                         <MetadataForm fields={metaFields} values={f.metadata} onChange={set('metadata')} />
                       </Setting>
                     )}
@@ -186,13 +187,11 @@ export function ApplicationPage({ id }) {
                       onChange={set('certificates')}
                       inspect={(pem) => api.post('/certificates/inspect', { pem })}
                       mode="client"
-                      label="Client certificates"
-                      help={`presented on the mtls plans: derived as certificates of the gateway while the application has an active subscription to an mtls plan, so that the TLS handshake accepts them — ${
-                        app.certificates_on_gateway ? 'they are on the gateway now' : 'not on the gateway now'
-                      }`}
-                      addLabel="Add a certificate"
-                      addTitle="Add a client certificate"
-                      addHelp="The certificate (PEM) the application presents on mtls plans. Only the certificate: never its private key."
+                      label={tr('Client certificates')}
+                      help={tr('presented on the mtls plans: derived as certificates of the gateway while the application has an active subscription to an mtls plan, so that the TLS handshake accepts them — {0}', [app.certificates_on_gateway ? tr('they are on the gateway now') : tr('not on the gateway now')])}
+                      addLabel={tr('Add a certificate')}
+                      addTitle={tr('Add a client certificate')}
+                      addHelp={tr('The certificate (PEM) the application presents on mtls plans. Only the certificate: never its private key.')}
                       clientId={f.client_id}
                       onClientId={set('client_id')}
                       readOnly={!app.can_see_credentials}
@@ -205,20 +204,20 @@ export function ApplicationPage({ id }) {
                           try {
                             await wapi.put(`/applications/${app.id}`, form);
                             setForm(null);
-                            toast('Application saved');
+                            toast(tr('Application saved'));
                             state.reload();
                           } catch (e) {
                             toast(errorMessage(e), 'error');
                           }
                         }}
                       >
-                        Save
+                        {tr('Save')}
                       </button>
                       <span className="spacer" />
                       <button
                         className="btn danger"
                         onClick={async () => {
-                          if (!(await confirm({ title: `Delete ${app.name}?`, danger: true, confirmLabel: 'Delete', message: 'Only possible once its subscriptions are closed.' }))) return;
+                          if (!(await confirm({ title: tr('Delete {0}?', [app.name]), danger: true, confirmLabel: tr('Delete'), message: tr('Only possible once its subscriptions are closed.') }))) return;
                           try {
                             await wapi.del(`/applications/${app.id}`);
                             navigate(`/ws/${slug}/applications`);
@@ -227,7 +226,7 @@ export function ApplicationPage({ id }) {
                           }
                         }}
                       >
-                        Delete application
+                        {tr('Delete application')}
                       </button>
                     </div>
                   </fieldset>

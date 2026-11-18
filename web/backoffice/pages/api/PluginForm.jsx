@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Badge, Field, Icon, Input, NumberInput, Select, Switch, TagsInput } from '../../../shared/ui.jsx';
 import { CodeEditor } from '../../../shared/code-editor.jsx';
+import { tr, Tr } from '../../../shared/i18n.jsx';
 
 const isObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 
@@ -97,14 +98,14 @@ function SchemaField({ name, spec, value, onChange }) {
   }
   if (kind === 'string')
     return (
-      <Field label={label} hint={spec.props?.optionsFrom ? hint || 'an id of an entity of the gateway' : hint}>
+      <Field label={label} hint={spec.props?.optionsFrom ? hint || tr('an id of an entity of the gateway') : hint}>
         <Input value={value ?? ''} onChange={(x) => onChange(x === '' && value == null ? null : x)} placeholder={placeholder} aria-label={label} />
       </Field>
     );
   if (kind === 'strings')
     return (
       <Field label={label} hint={hint}>
-        <TagsInput value={value || []} onChange={onChange} placeholder={placeholder || 'add and press enter'} />
+        <TagsInput value={value || []} onChange={onChange} placeholder={placeholder || tr('add and press enter')} />
       </Field>
     );
   if (kind === 'map') return <MapField label={label} hint={hint} value={value} onChange={onChange} />;
@@ -126,18 +127,18 @@ function MapField({ label, hint, value, onChange }) {
         {rows.map(([k, v], i) => (
           <div key={i} className="row">
             <div className="grow">
-              <Input value={k} onChange={(x) => write(rows.map((r, j) => (j === i ? [x, r[1]] : r)))} placeholder="name" mono aria-label={`${label} name`} />
+              <Input value={k} onChange={(x) => write(rows.map((r, j) => (j === i ? [x, r[1]] : r)))} placeholder={tr('name')} mono aria-label={tr('{0} name', [label])} />
             </div>
             <div className="grow">
-              <Input value={v} onChange={(x) => write(rows.map((r, j) => (j === i ? [r[0], x] : r)))} placeholder="value" mono aria-label={`${label} value`} />
+              <Input value={v} onChange={(x) => write(rows.map((r, j) => (j === i ? [r[0], x] : r)))} placeholder={tr('value')} mono aria-label={tr('{0} value', [label])} />
             </div>
-            <button type="button" className="btn ghost sm icon" onClick={() => write(rows.filter((_, j) => j !== i))} aria-label="remove">
+            <button type="button" className="btn ghost sm icon" onClick={() => write(rows.filter((_, j) => j !== i))} aria-label={tr('remove')}>
               <Icon name="x" />
             </button>
           </div>
         ))}
         <button type="button" className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => setRows([...rows, ['', '']])}>
-          <Icon name="plus" /> entry
+          <Icon name="plus" /> {tr('entry')}
         </button>
       </div>
     </Field>
@@ -154,7 +155,7 @@ function FormGroup({ label, hint, spec, value, onChange }) {
         <span className="bold small grow" style={{ textAlign: 'left' }}>
           {label}
         </span>
-        {!open && count > 0 && <Badge>{count} set</Badge>}
+        {!open && count > 0 && <Badge><Tr text={'{0} set'} args={[count]} /></Badge>}
       </button>
       {hint && <div className="hint">{hint}</div>}
       {open && <PluginForm schema={spec.schema} flow={spec.flow} value={value} onChange={onChange} />}
@@ -171,7 +172,7 @@ function FormList({ label, hint, spec, value, onChange }) {
           <div key={i} className="panel col gap-16">
             <div className="row">
               <span className="bold small grow">#{i + 1}</span>
-              <button type="button" className="btn ghost sm icon" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label="remove">
+              <button type="button" className="btn ghost sm icon" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label={tr('remove')}>
                 <Icon name="trash" />
               </button>
             </div>
@@ -199,7 +200,7 @@ function JsonField({ label, hint, value, onChange }) {
       onChange(t.trim() ? JSON.parse(t) : null);
       setError(null);
     } catch (e) {
-      setError('invalid json — the configuration keeps the last valid value');
+      setError(tr('invalid json — the configuration keeps the last valid value'));
     }
   };
   return (

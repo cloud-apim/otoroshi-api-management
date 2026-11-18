@@ -6,6 +6,7 @@ import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/list
 import { StatTile } from '../../shared/charts.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 // one installation drives one Otoroshi cluster: its health, the projection queue and the
 // drift live here, not in a "clusters" list
@@ -22,25 +23,23 @@ function Status() {
       {(s) => (
         <div className="col gap-16">
           <div className="grid-4">
-            <StatTile label="Gateway" value={s.health.ok ? 'Reachable' : 'Unreachable'} hint={s.health.ok ? `${s.health.url} · ${s.health.latencyMs} ms` : s.health.error} />
-            <StatTile label="Projections waiting" value={(s.queue.pending || 0) + (s.queue.running || 0)} hint={`${s.queue.failed || 0} failed · ${s.queue.done || 0} done`} />
-            <StatTile label="Drift" value={(s.drift?.drifted || 0) + (s.drift?.missing || 0)} hint={s.drift ? `checked ${fmtRelative(s.drift.at)}` : 'not checked yet'} />
-            <StatTile label="Ingested calls" value={fmtNumber(s.ingest?.calls)} hint={s.ingest?.last_at ? `last ${fmtRelative(s.ingest.last_at)}` : 'nothing received yet'} />
+            <StatTile label={tr('Gateway')} value={s.health.ok ? 'Reachable' : 'Unreachable'} hint={s.health.ok ? tr('{0} · {1} ms', [s.health.url, s.health.latencyMs]) : s.health.error} />
+            <StatTile label={tr('Projections waiting')} value={(s.queue.pending || 0) + (s.queue.running || 0)} hint={tr('{0} failed · {1} done', [s.queue.failed || 0, s.queue.done || 0])} />
+            <StatTile label={tr('Drift')} value={(s.drift?.drifted || 0) + (s.drift?.missing || 0)} hint={s.drift ? tr('checked {0}', [fmtRelative(s.drift.at)]) : tr('not checked yet')} />
+            <StatTile label={tr('Ingested calls')} value={fmtNumber(s.ingest?.calls)} hint={s.ingest?.last_at ? tr('last {0}', [fmtRelative(s.ingest.last_at)]) : tr('nothing received yet')} />
           </div>
           <Callout kind="info">
-            The product is never in the request path: if it is down, traffic still flows. Its operations are asynchronous and replayable — a projection that cannot reach the gateway waits in this
-            queue and runs when the gateway is back.
+            {tr('The product is never in the request path: if it is down, traffic still flows. Its operations are asynchronous and replayable — a projection that cannot reach the gateway waits in this queue and runs when the gateway is back.')}
           </Callout>
           {s.queue.failed > 0 && (
-            <Callout kind="negative" title={`${s.queue.failed} projection${s.queue.failed > 1 ? 's' : ''} failed`}>
+            <Callout kind="negative" title={tr('{0} projection{1} failed', [s.queue.failed, s.queue.failed > 1 ? tr('s') : ''])}>
               <div className="col gap-6">
                 <span>
-                  The gateway refused {s.queue.failed > 1 ? 'them' : 'it'}, or {s.queue.failed > 1 ? 'they' : 'it'} failed too many times: a failed projection does not run again by itself. Read its error, fix
-                  the cause — often in the object it projects — and retry it, or dismiss it if it no longer applies.
+                  <Tr text={'The gateway refused {0}, or {1} failed too many times: a failed projection does not run again by itself. Read its error, fix the cause — often in the object it projects — and retry it, or dismiss it if it no longer applies.'} args={[s.queue.failed > 1 ? tr('them') : tr('it'), s.queue.failed > 1 ? tr('they') : tr('it')]} />
                 </span>
                 {status !== 'failed' && (
                   <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setParams({ tasks_status: 'failed', tasks_page: null })}>
-                    Show {s.queue.failed > 1 ? 'them' : 'it'}
+                    <Tr text={'Show {0}'} args={[s.queue.failed > 1 ? tr('them') : tr('it')]} />
                   </button>
                 )}
               </div>
@@ -48,16 +47,16 @@ function Status() {
           )}
           <div className="card">
             <div className="card-head">
-              <h3 className="grow">Projection queue</h3>
+              <h3 className="grow">{tr('Projection queue')}</h3>
             </div>
             <div className="card-body" style={{ paddingBottom: 0 }}>
-              <ListToolbar paging={paging} placeholder="search kinds, payloads, errors" onReload={tasks.reload} loading={tasks.loading}>
+              <ListToolbar paging={paging} placeholder={tr('search kinds, payloads, errors')} onReload={tasks.reload} loading={tasks.loading}>
                 <Select
                   value={status}
                   onChange={(v) => setParams({ tasks_status: v, tasks_page: null })}
-                  options={[{ value: '', label: 'every status' }, 'pending', 'running', 'failed', 'dismissed', 'done']}
+                  options={[{ value: '', label: tr('every status') }, 'pending', 'running', 'failed', 'dismissed', 'done']}
                   style={{ width: 160 }}
-                  aria-label="filter by status"
+                  aria-label={tr('filter by status')}
                 />
               </ListToolbar>
             </div>
@@ -85,11 +84,11 @@ function Status() {
                               <StatusBadge status={t.status} />
                             </td>
                             <td className="muted">
-                              {t.attempts} attempt(s) · {fmtRelative(t.updated_at)}
+                              <Tr text={'{0} attempt(s) · {1}'} args={[t.attempts, fmtRelative(t.updated_at)]} />
                             </td>
                             <td>
                               {t.last_error && <div className="negative-text">{t.last_error}</div>}
-                              {t.payload?.dismissed && <div className="faint tiny">dismissed: {t.payload.dismissed}</div>}
+                              {t.payload?.dismissed && <div className="faint tiny"><Tr text={'dismissed: {0}'} args={[t.payload.dismissed]} /></div>}
                             </td>
                             <td className="actions">
                               {t.status !== 'done' && t.status !== 'running' && user.is_admin && (
@@ -97,22 +96,22 @@ function Status() {
                                   className="btn xs"
                                   onClick={async () => {
                                     await api.post(`/gateway/tasks/${t.id}/retry`);
-                                    toast('Task queued again');
+                                    toast(tr('Task queued again'));
                                     tasks.reload();
                                     st.reload();
                                   }}
                                 >
-                                  Retry
+                                  {tr('Retry')}
                                 </button>
                               )}
                               {t.status === 'failed' && user.is_admin && (
                                 <button
                                   className="btn xs ghost"
-                                  title="it no longer counts as something to do"
+                                  title={tr('it no longer counts as something to do')}
                                   onClick={async () => {
                                     try {
                                       await api.post(`/gateway/tasks/${t.id}/dismiss`, {});
-                                      toast('Task dismissed');
+                                      toast(tr('Task dismissed'));
                                       tasks.reload();
                                       st.reload();
                                     } catch (e) {
@@ -120,7 +119,7 @@ function Status() {
                                     }
                                   }}
                                 >
-                                  Dismiss
+                                  {tr('Dismiss')}
                                 </button>
                               )}
                             </td>
@@ -132,7 +131,7 @@ function Status() {
                   <Pager paging={paging} total={total} />
                   </>
                 ) : (
-                  <Empty title={paging.q || status ? 'No task matches' : 'Nothing queued'} icon="check" />
+                  <Empty title={paging.q || status ? tr('No task matches') : tr('Nothing queued')} icon="check" />
                 )
               }
             </Loader>
@@ -150,7 +149,7 @@ function Drift() {
   return (
     <div className="col gap-16">
       <div className="row">
-        <p className="muted small grow">Both sides are administrable, so drift is certain, not probable. It is detected periodically, object by object, against the snapshot that should run.</p>
+        <p className="muted small grow">{tr('Both sides are administrable, so drift is certain, not probable. It is detected periodically, object by object, against the snapshot that should run.')}</p>
         <button
           className="btn primary"
           disabled={busy}
@@ -158,7 +157,7 @@ function Drift() {
             setBusy(true);
             try {
               const r = await api.post('/gateway/drift');
-              toast(`Checked ${r.apis} apis and ${r.subscriptions} subscriptions in ${r.durationMs} ms`);
+              toast(tr('Checked {0} apis and {1} subscriptions in {2} ms', [r.apis, r.subscriptions, r.durationMs]));
               reports.reload();
             } catch (e) {
               toast(errorMessage(e), 'error');
@@ -167,7 +166,7 @@ function Drift() {
             }
           }}
         >
-          <Icon name="refresh" /> Run detection now
+          <Icon name="refresh" /> {tr('Run detection now')}
         </button>
       </div>
       <Loader state={reports}>{(list) => <DriftList list={list} reports={reports} />}</Loader>
@@ -185,13 +184,13 @@ function DriftList({ list, reports }) {
   );
   return (
     <>
-      <ListToolbar paging={page} placeholder="search apis, subscriptions, ids, changes" onReload={reports.reload} loading={reports.loading}>
+      <ListToolbar paging={page} placeholder={tr('search apis, subscriptions, ids, changes')} onReload={reports.reload} loading={reports.loading}>
         <Select
           value={status}
           onChange={(v) => setParams({ drift_status: v, drift_page: null })}
-          options={[{ value: '', label: 'every status' }, 'drifted', 'missing', 'unmanaged', 'in_sync']}
+          options={[{ value: '', label: tr('every status') }, 'drifted', 'missing', 'unmanaged', 'in_sync']}
           style={{ width: 160 }}
-          aria-label="filter by status"
+          aria-label={tr('filter by status')}
         />
       </ListToolbar>
       {page.items.length ? (
@@ -209,7 +208,7 @@ function DriftList({ list, reports }) {
                         <DiffView changes={r.diff} />
                       </div>
                     )}
-                    {r.status === 'unmanaged' && <div className="muted small">Not managed by the product: it can be adopted from the APIs page.</div>}
+                    {r.status === 'unmanaged' && <div className="muted small">{tr('Not managed by the product: it can be adopted from the APIs page.')}</div>}
                   </div>
                   <span className="faint small nowrap">{fmtRelative(r.checked_at)}</span>
                 </div>
@@ -218,7 +217,7 @@ function DriftList({ list, reports }) {
             </div>
           ) : (
             <div className="card">
-              <Empty title={page.q || status ? 'No report matches' : 'No report yet'} icon="gateway" />
+              <Empty title={page.q || status ? tr('No report matches') : tr('No report yet')} icon="gateway" />
             </div>
           )}
     </>
@@ -230,7 +229,7 @@ function Connection() {
   const st = useLoad(() => api.get('/settings'), []);
   const toast = useToast();
   const [form, setForm] = useState(null);
-  if (!user.is_admin) return <Callout kind="info">Installation administrators only.</Callout>;
+  if (!user.is_admin) return <Callout kind="info">{tr('Installation administrators only.')}</Callout>;
   return (
     <Loader state={st}>
       {(s) => {
@@ -240,26 +239,26 @@ function Connection() {
           <div className="col gap-16">
             <div className="card">
               <div className="card-head">
-                <h3>Otoroshi Admin API</h3>
+                <h3>{tr('Otoroshi Admin API')}</h3>
               </div>
               <div className="card-body">
-                <Setting label="Admin API url" help="how the product reaches the cluster's leader">
+                <Setting label={tr('Admin API url')} help={tr("how the product reaches the cluster's leader")}>
                   <Input value={f.url} onChange={set('url')} mono />
                 </Setting>
-                <Setting label="Admin API host" help="the Host header of the admin api">
+                <Setting label={tr('Admin API host')} help={tr('the Host header of the admin api')}>
                   <Input value={f.host} onChange={set('host')} mono />
                 </Setting>
-                <Setting label="Administration key" help="client id and secret of an Otoroshi admin apikey">
+                <Setting label={tr('Administration key')} help={tr('client id and secret of an Otoroshi admin apikey')}>
                   <Input value={f.clientId} onChange={set('clientId')} mono />
                   <Input value={f.clientSecret} onChange={set('clientSecret')} mono type="password" />
                 </Setting>
-                <Setting label="Public exposure" help="how consumers reach the apis: <scheme>://<api domain>:<port>">
+                <Setting label={tr('Public exposure')} help={tr('how consumers reach the apis: <scheme>://<api domain>:<port>')}>
                   <div className="row">
                     <Input value={f.publicScheme} onChange={set('publicScheme')} mono />
                     <Input value={f.publicPort} onChange={set('publicPort')} mono />
                   </div>
                 </Setting>
-                <Setting label="Otoroshi backoffice url" help="used to link a projected entity — the escape hatch">
+                <Setting label={tr('Otoroshi backoffice url')} help={tr('used to link a projected entity — the escape hatch')}>
                   <Input value={f.backofficeUrl} onChange={set('backofficeUrl')} mono />
                 </Setting>
                 <div className="row mt-16">
@@ -270,14 +269,14 @@ function Connection() {
                       try {
                         await api.put('/settings/gateway', form);
                         setForm(null);
-                        toast('Gateway settings saved');
+                        toast(tr('Gateway settings saved'));
                         st.reload();
                       } catch (e) {
                         toast(errorMessage(e), 'error');
                       }
                     }}
                   >
-                    Save
+                    {tr('Save')}
                   </button>
                 </div>
               </div>
@@ -296,10 +295,10 @@ function Exporter({ ingest }) {
   return (
     <div className="card">
       <div className="card-head">
-        <h3>Events → ingester</h3>
+        <h3>{tr('Events → ingester')}</h3>
       </div>
       <div className="card-body">
-        <Setting label="Data exporter" help="An Otoroshi data exporter sends GatewayEvent, LLMUsageAudit and McpAudit to /ingest. An exporter is gateway infrastructure: this helper creates one, marked as managed, and touches no other.">
+        <Setting label={tr('Data exporter')} help={tr('An Otoroshi data exporter sends GatewayEvent, LLMUsageAudit and McpAudit to /ingest. An exporter is gateway infrastructure: this helper creates one, marked as managed, and touches no other.')}>
           <Input value={url} onChange={setUrl} mono />
           <button
             className="btn"
@@ -307,26 +306,26 @@ function Exporter({ ingest }) {
             onClick={async () => {
               try {
                 const r = await api.post('/gateway/exporter', { url });
-                toast(`Exporter ${r.id} installed`);
+                toast(tr('Exporter {0} installed', [r.id]));
               } catch (e) {
                 toast(errorMessage(e), 'error');
               }
             }}
           >
-            Install / update the exporter
+            {tr('Install / update the exporter')}
           </button>
         </Setting>
-        <Setting label="Raw path" help="computed path: mandatory and exhaustive. Raw path: optional, where lightening and masking of url secrets belong.">
-          <div className="muted small">{ingest.storeRaw ? 'raw events are stored (lightened, url secrets masked)' : 'raw events are not stored'}</div>
+        <Setting label={tr('Raw path')} help={tr('computed path: mandatory and exhaustive. Raw path: optional, where lightening and masking of url secrets belong.')}>
+          <div className="muted small">{ingest.storeRaw ? tr('raw events are stored (lightened, url secrets masked)') : tr('raw events are not stored')}</div>
           <button
             className="btn sm"
             style={{ alignSelf: 'flex-start' }}
             onClick={async () => {
               await api.put('/settings/ingest', { storeRaw: !ingest.storeRaw });
-              toast(`Raw path ${ingest.storeRaw ? 'disabled' : 'enabled'}`);
+              toast(tr('Raw path {0}', [ingest.storeRaw ? tr('disabled') : tr('enabled')]));
             }}
           >
-            {ingest.storeRaw ? 'Disable' : 'Enable'} the raw path
+            <Tr text={'{0} the raw path'} args={[ingest.storeRaw ? tr('Disable') : tr('Enable')]} />
           </button>
         </Setting>
       </div>
@@ -338,12 +337,12 @@ export function GatewayPage({ tab }) {
   const { navigate } = useRouter();
   return (
     <div className="page">
-      <PageHead title="Gateway" sub="The Otoroshi cluster this installation drives. One installation per environment; geography is carried by Otoroshi's own leader/worker cluster." />
+      <PageHead title={tr('Gateway')} sub={tr("The Otoroshi cluster this installation drives. One installation per environment; geography is carried by Otoroshi's own leader/worker cluster.")} />
       <div className="tabs mb-16">
         {[
-          ['status', 'Status & queue'],
-          ['drift', 'Drift'],
-          ['connection', 'Connection & events'],
+          ['status', tr('Status & queue')],
+          ['drift', tr('Drift')],
+          ['connection', tr('Connection & events')],
         ].map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => navigate(`/gateway/${id}`)}>
             {label}

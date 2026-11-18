@@ -1,6 +1,8 @@
 // Portal UI strings (en + fr). The documentation content itself is multilingual in the model;
 // this file only covers the chrome of the portal.
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { setLanguage } from '../shared/i18n.jsx';
+import shared from '../shared/fr.json';
 
 const dict = {
   en: {
@@ -513,7 +515,8 @@ export function I18nProvider({ defaultLanguage = 'en', children }) {
   }, []);
   const t = useCallback((key, vars) => interpolate(dict[lang]?.[key] ?? dict.en[key] ?? key, vars), [lang]);
   const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
-  document.documentElement.lang = lang;
+  // the components shared with the console (lists, dates) read their texts in the same language
+  setLanguage(lang, shared);
   return <I18nCtx.Provider value={value}>{children}</I18nCtx.Provider>;
 }
 

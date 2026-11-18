@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Badge, Callout, Code, Field, Icon, Select } from './ui.jsx';
 import { CodeEditor, CodeView, codeLanguage } from './code-editor.jsx';
+import { tr, Tr } from './i18n.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -27,12 +28,12 @@ function pretty(body, headers) {
 
 export function RequestComposer({ send, credentials = [], paths = [], baseLabel = '', labels = {} }) {
   const L = {
-    send: 'Send',
-    credential: 'Credentials',
-    none: 'No credential',
-    headers: 'Headers',
-    body: 'Body',
-    response: 'Response',
+    send: tr('Send'),
+    credential: tr('Credentials'),
+    none: tr('No credential'),
+    headers: tr('Headers'),
+    body: tr('Body'),
+    response: tr('Response'),
     ...labels,
   };
   const [req, setReq] = useState({ method: 'GET', path: paths[0] || '/', query: '', headers: [{ k: 'accept', v: 'application/json' }], body: '', credential: credentials[0]?.value || '' });
@@ -59,13 +60,13 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
       <form className="card" onSubmit={submit}>
         <div className="card-body col">
           <div className="row">
-            <select className="select" style={{ width: 120 }} value={req.method} onChange={(e) => set({ method: e.target.value })} aria-label="method">
+            <select className="select" style={{ width: 120 }} value={req.method} onChange={(e) => set({ method: e.target.value })} aria-label={tr('method')}>
               {METHODS.map((m) => (
                 <option key={m}>{m}</option>
               ))}
             </select>
             <div className="grow" style={{ position: 'relative' }}>
-              <input className="input mono" list="composer-paths" value={req.path} onChange={(e) => set({ path: e.target.value })} aria-label="path" />
+              <input className="input mono" list="composer-paths" value={req.path} onChange={(e) => set({ path: e.target.value })} aria-label={tr('path')} />
               <datalist id="composer-paths">
                 {paths.map((p) => (
                   <option key={p} value={p} />
@@ -83,26 +84,26 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
               {req.query ? `?${req.query}` : ''}
             </div>
           )}
-          <input className="input mono" placeholder="query string, e.g. page=2&size=10" value={req.query} onChange={(e) => set({ query: e.target.value })} aria-label="query string" />
+          <input className="input mono" placeholder={tr('query string, e.g. page=2&size=10')} value={req.query} onChange={(e) => set({ query: e.target.value })} aria-label={tr('query string')} />
           <Field label={L.credential}>
             <Select value={req.credential} onChange={(v) => set({ credential: v })} options={[{ value: '', label: L.none }, ...credentials]} />
           </Field>
           <div className="label">{L.headers}</div>
           {req.headers.map((h, i) => (
             <div key={i} className="row">
-              <input className="input mono" value={h.k} placeholder="header" onChange={(e) => set({ headers: req.headers.map((x, j) => (j === i ? { ...x, k: e.target.value } : x)) })} aria-label="header name" />
-              <input className="input mono" value={h.v} placeholder="value" onChange={(e) => set({ headers: req.headers.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)) })} aria-label="header value" />
-              <button type="button" className="btn ghost sm icon" onClick={() => set({ headers: req.headers.filter((_, j) => j !== i) })} aria-label="remove header">
+              <input className="input mono" value={h.k} placeholder={tr('header')} onChange={(e) => set({ headers: req.headers.map((x, j) => (j === i ? { ...x, k: e.target.value } : x)) })} aria-label={tr('header name')} />
+              <input className="input mono" value={h.v} placeholder={tr('value')} onChange={(e) => set({ headers: req.headers.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)) })} aria-label={tr('header value')} />
+              <button type="button" className="btn ghost sm icon" onClick={() => set({ headers: req.headers.filter((_, j) => j !== i) })} aria-label={tr('remove header')}>
                 <Icon name="x" />
               </button>
             </div>
           ))}
           <button type="button" className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => set({ headers: [...req.headers, { k: '', v: '' }] })}>
-            <Icon name="plus" /> header
+            <Icon name="plus" /> {tr('header')}
           </button>
           {!['GET', 'HEAD'].includes(req.method) && (
             <Field label={L.body}>
-              <CodeEditor value={req.body} onChange={(v) => set({ body: v })} language={codeLanguage(req.body) === 'json' ? 'json' : 'plaintext'} minHeight={120} maxHeight={320} ariaLabel="request body" />
+              <CodeEditor value={req.body} onChange={(v) => set({ body: v })} language={codeLanguage(req.body) === 'json' ? 'json' : 'plaintext'} minHeight={120} maxHeight={320} ariaLabel={tr('request body')} />
             </Field>
           )}
         </div>
@@ -113,17 +114,17 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
           {res && (
             <>
               <Badge kind={statusKind}>{res.status}</Badge>
-              <span className="faint small">{res.durationMs} ms</span>
+              <span className="faint small"><Tr text={'{0} ms'} args={[res.durationMs]} /></span>
             </>
           )}
         </div>
         <div className="card-body col">
           {error && <Callout kind="negative">{error}</Callout>}
-          {!res && !error && <p className="muted small">Send a request to see the response.</p>}
+          {!res && !error && <p className="muted small">{tr('Send a request to see the response.')}</p>}
           {res && (
             <>
               <details>
-                <summary className="small link">{Object.keys(res.headers || {}).length} response headers</summary>
+                <summary className="small link"><Tr text={'{0} response headers'} args={[Object.keys(res.headers || {}).length]} /></summary>
                 <div className="mt-8">
                   <dl className="kv mono tiny">
                     {Object.entries(res.headers || {}).map(([k, v]) => (
@@ -135,8 +136,8 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
                   </dl>
                 </div>
               </details>
-              {res.body ? <CodeView value={pretty(res.body, res.headers)} language={bodyLanguage(res.headers)} maxHeight={480} ariaLabel="response body" /> : <p className="muted small">(empty body)</p>}
-              {res.truncated && <p className="faint tiny">body truncated to 256 KB</p>}
+              {res.body ? <CodeView value={pretty(res.body, res.headers)} language={bodyLanguage(res.headers)} maxHeight={480} ariaLabel={tr('response body')} /> : <p className="muted small">{tr('(empty body)')}</p>}
+              {res.truncated && <p className="faint tiny">{tr('body truncated to 256 KB')}</p>}
               {res.trace_unavailable && <Callout kind="info">{res.trace_unavailable}</Callout>}
             </>
           )}

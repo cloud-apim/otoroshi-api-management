@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState,
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { copyText } from './lib.js';
+import { tr } from './i18n.jsx';
 
 // ---------------------------------------------------------------- icons (inline svg, stroke style)
 
@@ -140,7 +141,7 @@ export function ErrorBox({ error, onRetry }) {
         <div className="bold">{errorMessage(error)}</div>
         {onRetry && (
           <button className="btn sm mt-8" onClick={onRetry}>
-            Retry
+            {tr('Retry')}
           </button>
         )}
       </div>
@@ -191,7 +192,8 @@ export function Select({ value, onChange, options, ...rest }) {
   return (
     <select className="select" value={value ?? ''} onChange={(e) => onChange?.(e.target.value)} {...rest}>
       {options.map((o) => {
-        const opt = typeof o === 'string' ? { value: o, label: o } : o;
+        // a value offered as such reads in the language of the console: a status, a role
+        const opt = typeof o === 'string' ? { value: o, label: tr(o) } : o;
         return (
           <option key={opt.value} value={opt.value} disabled={opt.disabled}>
             {opt.label}
@@ -240,7 +242,7 @@ export function TagsInput({ value = [], onChange, placeholder = 'add and press e
       {(value || []).map((t) => (
         <span key={t} className="tag" style={{ gap: 4 }}>
           {t}
-          <button type="button" className="btn ghost xs" style={{ height: 16, padding: 0, width: 16 }} onClick={() => onChange(value.filter((x) => x !== t))} aria-label={`remove ${t}`}>
+          <button type="button" className="btn ghost xs" style={{ height: 16, padding: 0, width: 16 }} onClick={() => onChange(value.filter((x) => x !== t))} aria-label={tr('remove {0}', [t])}>
             <Icon name="x" size={12} />
           </button>
         </span>
@@ -287,7 +289,7 @@ export function Modal({ title, onClose, children, footer, size = '' }) {
       <div className={`modal ${size}`} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
         <div className="modal-head">
           <h2 className="grow">{title}</h2>
-          <button className="btn ghost sm icon" onClick={onClose} aria-label="close">
+          <button className="btn ghost sm icon" onClick={onClose} aria-label={tr('close')}>
             <Icon name="x" />
           </button>
         </div>
@@ -313,7 +315,7 @@ export function Drawer({ title, onClose, children, footer, subtitle }) {
             <h2>{title}</h2>
             {subtitle && <div className="muted small">{subtitle}</div>}
           </div>
-          <button className="btn ghost sm icon" onClick={onClose} aria-label="close">
+          <button className="btn ghost sm icon" onClick={onClose} aria-label={tr('close')}>
             <Icon name="x" />
           </button>
         </div>
@@ -344,15 +346,15 @@ export function ConfirmProvider({ children }) {
       {children}
       {state && (
         <Modal
-          title={state.title || 'Are you sure?'}
+          title={state.title || tr('Are you sure?')}
           onClose={() => close(false)}
           footer={
             <>
               <button className="btn" onClick={() => close(false)}>
-                Cancel
+                {tr('Cancel')}
               </button>
               <button className={`btn ${state.danger ? 'danger solid' : 'primary'}`} onClick={() => close(true)}>
-                {state.confirmLabel || 'Confirm'}
+                {state.confirmLabel || tr('Confirm')}
               </button>
             </>
           }
@@ -409,7 +411,7 @@ const STATUS_KIND = {
 export function StatusBadge({ status, label }) {
   return (
     <Badge kind={STATUS_KIND[status] ?? ''} dot>
-      {label || String(status || '—').replace(/_/g, ' ')}
+      {label || tr(String(status || '—').replace(/_/g, ' '))}
     </Badge>
   );
 }
@@ -425,7 +427,7 @@ export function CopyButton({ text, label, className = 'btn sm' }) {
         setDone(true);
         setTimeout(() => setDone(false), 1200);
       }}
-      aria-label="copy"
+      aria-label={tr('copy')}
     >
       <Icon name={done ? 'check' : 'copy'} />
       {label}
@@ -452,7 +454,7 @@ export function Secret({ value, reveal = false }) {
   return (
     <span className="secret">
       <span className="ellipsis">{shown ? value : '•'.repeat(Math.min(24, value.length))}</span>
-      <button className="btn ghost xs icon" onClick={() => setShown(!shown)} aria-label={shown ? 'hide' : 'show'}>
+      <button className="btn ghost xs icon" onClick={() => setShown(!shown)} aria-label={shown ? tr('hide') : tr('show')}>
         <Icon name="eye" size={14} />
       </button>
       <CopyButton text={value} className="btn ghost xs icon" />
@@ -484,7 +486,7 @@ export function Tabs({ tabs, value, onChange }) {
   );
 }
 
-export function DiffView({ changes, empty = 'No change' }) {
+export function DiffView({ changes, empty = tr('No change') }) {
   if (!changes) return null;
   if (!changes.length) return <div className="muted small">{empty}</div>;
   const fmt = (v) => {

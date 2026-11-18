@@ -7,13 +7,14 @@ import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
+import { tr, Tr } from '../../shared/i18n.jsx';
 
 // what a producer may read but not change: disabled, with the reason
 function ReadOnly({ when, children }) {
   if (!when) return children;
   return (
     <>
-      <Callout kind="info">Read only: the administrators of the workspace change these settings.</Callout>
+      <Callout kind="info">{tr('Read only: the administrators of the workspace change these settings.')}</Callout>
       <fieldset disabled className="ro-fieldset">
         {children}
       </fieldset>
@@ -29,13 +30,13 @@ function General() {
     <ReadOnly when={!isAdmin}>
     <div className="card">
       <div className="card-body">
-        <Setting label="Name" help="the workspace is the tenant — the same word on every surface: console, api, cli, crds">
+        <Setting label={tr('Name')} help={tr('the workspace is the tenant — the same word on every surface: console, api, cli, crds')}>
           <Input value={f.name} onChange={(v) => setF({ ...f, name: v })} />
         </Setting>
-        <Setting label="Slug" help="read from the url of its portal, never from a session">
+        <Setting label={tr('Slug')} help={tr('read from the url of its portal, never from a session')}>
           <Input value={ws.slug} disabled mono />
         </Setting>
-        <Setting label="Description">
+        <Setting label={tr('Description')}>
           <TextArea value={f.description} onChange={(v) => setF({ ...f, description: v })} rows={2} />
         </Setting>
         <div className="row mt-16">
@@ -44,14 +45,14 @@ function General() {
             onClick={async () => {
               try {
                 await wapi.put('', f);
-                toast('Workspace saved');
+                toast(tr('Workspace saved'));
                 session.reload();
               } catch (e) {
                 toast(errorMessage(e), 'error');
               }
             }}
           >
-            Save
+            {tr('Save')}
           </button>
         </div>
       </div>
@@ -83,7 +84,7 @@ function Portal() {
       const portal = { ...p, title: asLocalized(p.title, def), tagline: asLocalized(p.tagline, def), homeMarkdown: asLocalized(p.homeMarkdown, def) };
       await wapi.put('', { portal });
       setP(portal);
-      toast('Portal settings saved');
+      toast(tr('Portal settings saved'));
       session.reload();
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -91,17 +92,15 @@ function Portal() {
   };
   return (
     <div className="col gap-16">
-      {ro && <Callout kind="info">Read only: the administrators of the workspace change the portal.</Callout>}
+      {ro && <Callout kind="info">{tr('Read only: the administrators of the workspace change the portal.')}</Callout>}
       <Callout kind="info">
-        One portal per workspace, at{' '}
-        <a className="link mono" href={ws.portal_url} target="_blank" rel="noreferrer">
+        <Tr text={'One portal per workspace, at {0}. Its exposure — by root path, by hostname, or at the root of a single-workspace installation — is an installation setting.'} args={[<a className="link mono" href={ws.portal_url} target="_blank" rel="noreferrer">
           {ws.portal_url}
-        </a>
-        . Its exposure — by root path, by hostname, or at the root of a single-workspace installation — is an installation setting.
+        </a>]} />
       </Callout>
       <div className="card">
         <div className="card-head">
-          <h3 className="grow">Content</h3>
+          <h3 className="grow">{tr('Content')}</h3>
           <Seg
             value={current}
             onChange={setLang}
@@ -110,28 +109,28 @@ function Portal() {
         </div>
         <div className="card-body">
           {current !== def && missing(current).length > 0 && (
-            <Callout kind="info">Not written in {current.toUpperCase()} yet: {missing(current).map((k) => ({ title: 'title', tagline: 'tagline', homeMarkdown: 'home page' })[k]).join(', ')} — the portal shows the {def.toUpperCase()} text meanwhile.</Callout>
+            <Callout kind="info"><Tr text={'Not written in {0} yet: {1} — the portal shows the {2} text meanwhile.'} args={[current.toUpperCase(), missing(current).map((k) => ({ title: tr('title'), tagline: tr('tagline'), homeMarkdown: tr('home page') })[k]).join(', '), def.toUpperCase()]} /></Callout>
           )}
-          <Setting label={`Title (${current})`} help="the name of the portal, in its header and the browser tab">
+          <Setting label={tr('Title ({0})', [current])} help={tr('the name of the portal, in its header and the browser tab')}>
             <Input value={text('title')} onChange={setText('title')} placeholder={current !== def ? asLocalized(p.title, def)[def] : ''} disabled={ro} />
           </Setting>
-          <Setting label={`Tagline (${current})`} help="below the title, on the home page">
+          <Setting label={tr('Tagline ({0})', [current])} help={tr('below the title, on the home page')}>
             <Input value={text('tagline')} onChange={setText('tagline')} placeholder={current !== def ? asLocalized(p.tagline, def)[def] : ''} disabled={ro} />
           </Setting>
-          <Setting label={`Home page (${current})`} help="markdown, below the hero of the portal home">
+          <Setting label={tr('Home page ({0})', [current])} help={tr('markdown, below the hero of the portal home')}>
             <Seg
               value={view}
               onChange={setView}
               options={[
-                { value: 'write', label: 'Write' },
-                { value: 'preview', label: 'Preview' },
+                { value: 'write', label: tr('Write') },
+                { value: 'preview', label: tr('Preview') },
               ]}
             />
             {view === 'write' ? (
-              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} readOnly={ro} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={`home page (${current})`} placeholder="# Markdown" />
+              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} readOnly={ro} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={tr('home page ({0})', [current])} placeholder={tr('# Markdown')} />
             ) : (
               <div className="panel" style={{ background: 'var(--surface)' }}>
-                {text('homeMarkdown') ? <Markdown source={text('homeMarkdown')} /> : <span className="muted small">Nothing written yet.</span>}
+                {text('homeMarkdown') ? <Markdown source={text('homeMarkdown')} /> : <span className="muted small">{tr('Nothing written yet.')}</span>}
               </div>
             )}
           </Setting>
@@ -139,36 +138,36 @@ function Portal() {
       </div>
       <div className="card">
         <div className="card-head">
-          <h3>Settings</h3>
+          <h3>{tr('Settings')}</h3>
         </div>
         <fieldset disabled={ro} className="ro-fieldset card-body">
-          <Setting label="Languages" help="of the portal: its interface (English and French today) and its texts above; the documentation pages declare their own">
+          <Setting label={tr('Languages')} help={tr('of the portal: its interface (English and French today) and its texts above; the documentation pages declare their own')}>
             <TagsInput value={p.languages || []} onChange={set('languages')} />
-            <Select value={def} onChange={set('defaultLanguage')} options={languages.map((l) => ({ value: l, label: `default: ${l}` }))} />
+            <Select value={def} onChange={set('defaultLanguage')} options={languages.map((l) => ({ value: l, label: tr('default: {0}', [l]) }))} />
           </Setting>
-          <Setting label="Accent color">
+          <Setting label={tr('Accent color')}>
             <div className="row">
-              <input type="color" value={p.accentColor || '#0061bd'} onChange={(e) => set('accentColor')(e.target.value)} aria-label="accent color" />
+              <input type="color" value={p.accentColor || '#0061bd'} onChange={(e) => set('accentColor')(e.target.value)} aria-label={tr('accent color')} />
               <Input value={p.accentColor} onChange={set('accentColor')} mono />
             </div>
           </Setting>
-          <Setting label="Logo url">
+          <Setting label={tr('Logo url')}>
             <Input value={p.logoUrl} onChange={set('logoUrl')} />
           </Setting>
-          <Setting label="Self signup" help="anyone can create an account and get a key on public plans">
+          <Setting label={tr('Self signup')} help={tr('anyone can create an account and get a key on public plans')}>
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
           </Setting>
-          <Setting label="Identity provider" help={`One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: ${String(ws.portal_url || '').replace(/\/$/, '')}/front/api/auth/oidc/callback`}>
-            <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label="Sign in with an OpenID Connect provider" />
+          <Setting label={tr('Identity provider')} help={tr('One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: {0}/front/api/auth/oidc/callback', [String(ws.portal_url || '').replace(/\/$/, '')])}>
+            <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label={tr('Sign in with an OpenID Connect provider')} />
             {p.oidc?.enabled && (
               <>
-                <Input value={p.oidc?.label} onChange={(v) => set('oidc')({ ...p.oidc, label: v })} placeholder="button label, e.g. Corporate SSO" />
-                <Input value={p.oidc?.issuer} onChange={(v) => set('oidc')({ ...p.oidc, issuer: v })} mono placeholder="issuer" />
+                <Input value={p.oidc?.label} onChange={(v) => set('oidc')({ ...p.oidc, label: v })} placeholder={tr('button label, e.g. Corporate SSO')} />
+                <Input value={p.oidc?.issuer} onChange={(v) => set('oidc')({ ...p.oidc, issuer: v })} mono placeholder={tr('issuer')} />
                 <div className="row">
-                  <Input value={p.oidc?.clientId} onChange={(v) => set('oidc')({ ...p.oidc, clientId: v })} mono placeholder="client id" />
-                  <Input value={p.oidc?.clientSecret} onChange={(v) => set('oidc')({ ...p.oidc, clientSecret: v })} mono type="password" placeholder="client secret" />
+                  <Input value={p.oidc?.clientId} onChange={(v) => set('oidc')({ ...p.oidc, clientId: v })} mono placeholder={tr('client id')} />
+                  <Input value={p.oidc?.clientSecret} onChange={(v) => set('oidc')({ ...p.oidc, clientSecret: v })} mono type="password" placeholder={tr('client secret')} />
                 </div>
-                <Switch checked={p.localLogin !== false} onChange={set('localLogin')} label="Keep local accounts on this portal" />
+                <Switch checked={p.localLogin !== false} onChange={set('localLogin')} label={tr('Keep local accounts on this portal')} />
               </>
             )}
           </Setting>
@@ -177,7 +176,7 @@ function Portal() {
       {!ro && (
         <div className="row">
           <button className="btn primary" onClick={save}>
-            Save
+            {tr('Save')}
           </button>
         </div>
       )}
@@ -193,11 +192,11 @@ function Members() {
   const [invite, setInvite] = useState({ email: '', role: 'producer' });
   return (
     <div className="col gap-16">
-      {!isAdmin && <Callout kind="info">Read only: the administrators of the workspace choose its members and their roles.</Callout>}
+      {!isAdmin && <Callout kind="info">{tr('Read only: the administrators of the workspace choose its members and their roles.')}</Callout>}
       {isAdmin && (
       <div className="card">
         <div className="card-body row wrap">
-          <Input value={invite.email} onChange={(v) => setInvite({ ...invite, email: v })} placeholder="email" />
+          <Input value={invite.email} onChange={(v) => setInvite({ ...invite, email: v })} placeholder={tr('email')} />
           <Select value={invite.role} onChange={(v) => setInvite({ ...invite, role: v })} options={['admin', 'producer', 'consumer']} style={{ width: 160 }} />
           <button
             className="btn primary"
@@ -212,12 +211,12 @@ function Members() {
               }
             }}
           >
-            Add member
+            {tr('Add member')}
           </button>
         </div>
       </div>
       )}
-      <ListToolbar paging={membersPage} placeholder="search members, emails, roles, tags" onReload={state.reload} loading={state.loading} />
+      <ListToolbar paging={membersPage} placeholder={tr('search members, emails, roles, tags')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {() => (
           <div className="card">
@@ -225,9 +224,9 @@ function Members() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Member</th>
-                  <th>Role</th>
-                  <th>Tags</th>
+                  <th>{tr('Member')}</th>
+                  <th>{tr('Role')}</th>
+                  <th>{tr('Tags')}</th>
                   <th />
                 </tr>
               </thead>
@@ -264,7 +263,7 @@ function Members() {
                       {isAdmin && (
                       <button
                         className="btn ghost sm icon"
-                        aria-label="remove member"
+                        aria-label={tr('remove member')}
                         onClick={async () => {
                           await wapi.del(`/members/${m.id}`);
                           state.reload();
@@ -297,7 +296,7 @@ function Teams() {
     <div className="col gap-16">
       <div className="card">
         <div className="card-body row">
-          <Input value={name} onChange={setName} placeholder="team name" />
+          <Input value={name} onChange={setName} placeholder={tr('team name')} />
           <button
             className="btn primary"
             disabled={!name}
@@ -311,7 +310,7 @@ function Teams() {
               }
             }}
           >
-            Create team
+            {tr('Create team')}
           </button>
         </div>
       </div>
@@ -323,13 +322,13 @@ function Teams() {
                 <Icon name="users" />
                 <div className="grow">
                   <div className="bold">
-                    {t.name} {t.personal && <Badge>personal</Badge>}
+                    {t.name} {t.personal && <Badge>{tr('personal')}</Badge>}
                   </div>
-                  <div className="faint tiny mono">team:{t.id}</div>
+                  <div className="faint tiny mono"><Tr text={'team:{0}'} args={[t.id]} /></div>
                 </div>
-                <span className="muted small">{t.members_count} member(s)</span>
+                <span className="muted small"><Tr text={'{0} member(s)'} args={[t.members_count]} /></span>
                 <button className="btn sm" onClick={() => setOpen(t.id)}>
-                  Members
+                  {tr('Members')}
                 </button>
               </div>
             ))}
@@ -347,16 +346,16 @@ function TeamMembers({ id, onClose }) {
   const state = useLoad(() => wapi.get(`/teams/${id}`), [id]);
   const [email, setEmail] = useState('');
   return (
-    <Modal title="Team members" onClose={onClose}>
+    <Modal title={tr('Team members')} onClose={onClose}>
       <Loader state={state}>
         {(t) => {
           const manages = isAdmin || t.members.some((m) => m.id === session.user.id && m.role === 'owner');
           return (
           <>
-            {!manages && <Callout kind="info">The owners of the team and the administrators of the workspace choose its members.</Callout>}
+            {!manages && <Callout kind="info">{tr('The owners of the team and the administrators of the workspace choose its members.')}</Callout>}
             {manages && (
             <div className="row">
-              <Input value={email} onChange={setEmail} placeholder="email of a workspace member" />
+              <Input value={email} onChange={setEmail} placeholder={tr('email of a workspace member')} />
               <button
                 className="btn"
                 onClick={async () => {
@@ -369,7 +368,7 @@ function TeamMembers({ id, onClose }) {
                   }
                 }}
               >
-                Add
+                {tr('Add')}
               </button>
             </div>
             )}
@@ -382,7 +381,7 @@ function TeamMembers({ id, onClose }) {
                 {manages && (
                 <button
                   className="btn ghost sm icon"
-                  aria-label="remove"
+                  aria-label={tr('remove')}
                   onClick={async () => {
                     await wapi.del(`/teams/${id}/members/${m.id}`);
                     state.reload();
@@ -427,7 +426,7 @@ function MetadataSettings() {
           try {
             await wapi.put('/metadata-fields', { fields: list });
             setFields(null);
-            toast('Metadata fields saved');
+            toast(tr('Metadata fields saved'));
             state.reload();
           } catch (e) {
             toast(errorMessage(e), 'error');
@@ -437,14 +436,13 @@ function MetadataSettings() {
           <ReadOnly when={!isAdmin}>
           <div className="col gap-16">
             <Callout kind="info">
-              Typed key/values attached to an object, wherever the model cannot foresee everything. They serve display, notifications and the review of requests, and are never projected on the gateway.
-              On the subscription scope, the fields marked <b>portal</b> form the request form of every plan.
+              <Tr text={'Typed key/values attached to an object, wherever the model cannot foresee everything. They serve display, notifications and the review of requests, and are never projected on the gateway. On the subscription scope, the fields marked {0} form the request form of every plan.'} args={[<b>{tr('portal')}</b>]} />
             </Callout>
             <div className="card">
               <div className="card-head">
-                <h3 className="grow">Fields</h3>
+                <h3 className="grow">{tr('Fields')}</h3>
                 <button className="btn sm" onClick={() => setEditing({ scope: 'subscription', key: '', label: '', type: 'string', options: [], required: false, portal: false, help: '', _new: true })}>
-                  <Icon name="plus" /> Add field
+                  <Icon name="plus" /> {tr('Add field')}
                 </button>
               </div>
               {list.length ? (
@@ -452,11 +450,11 @@ function MetadataSettings() {
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>Scope</th>
-                        <th>Key</th>
-                        <th>Label</th>
-                        <th>Type</th>
-                        <th>Flags</th>
+                        <th>{tr('Scope')}</th>
+                        <th>{tr('Key')}</th>
+                        <th>{tr('Label')}</th>
+                        <th>{tr('Type')}</th>
+                        <th>{tr('Flags')}</th>
                         <th />
                       </tr>
                     </thead>
@@ -468,15 +466,15 @@ function MetadataSettings() {
                           </td>
                           <td className="mono small">{f.key}</td>
                           <td>{f.label}</td>
-                          <td className="small">{f.type === 'enum' ? `enum (${f.options.join(', ')})` : f.type}</td>
+                          <td className="small">{f.type === 'enum' ? tr('enum ({0})', [f.options.join(', ')]) : f.type}</td>
                           <td className="small">
-                            {f.required && <Badge kind="warning">required</Badge>} {f.portal && <Badge kind="accent">portal</Badge>}
+                            {f.required && <Badge kind="warning">{tr('required')}</Badge>} {f.portal && <Badge kind="accent">{tr('portal')}</Badge>}
                           </td>
                           <td className="actions">
-                            <button className="btn ghost sm icon" onClick={() => setEditing({ ...f, _index: i })} aria-label="edit">
+                            <button className="btn ghost sm icon" onClick={() => setEditing({ ...f, _index: i })} aria-label={tr('edit')}>
                               <Icon name="edit" />
                             </button>
-                            <button className="btn ghost sm icon" onClick={() => setFields(list.filter((_, j) => j !== i))} aria-label="remove">
+                            <button className="btn ghost sm icon" onClick={() => setFields(list.filter((_, j) => j !== i))} aria-label={tr('remove')}>
                               <Icon name="trash" />
                             </button>
                           </td>
@@ -486,15 +484,15 @@ function MetadataSettings() {
                   </table>
                 </div>
               ) : (
-                <div className="card-body muted small">No field declared.</div>
+                <div className="card-body muted small">{tr('No field declared.')}</div>
               )}
               {fields && (
                 <div className="card-body row" style={{ borderTop: '1px solid var(--border)' }}>
                   <button className="btn primary sm" onClick={save}>
-                    Save fields
+                    {tr('Save fields')}
                   </button>
                   <button className="btn sm" onClick={() => setFields(null)}>
-                    Discard
+                    {tr('Discard')}
                   </button>
                 </div>
               )}
@@ -502,7 +500,7 @@ function MetadataSettings() {
             {wsFields.length > 0 && (
               <div className="card">
                 <div className="card-head">
-                  <h3>Values of this workspace</h3>
+                  <h3>{tr('Values of this workspace')}</h3>
                 </div>
                 <div className="card-body col">
                   <MetadataForm fields={wsFields} values={values || ws.metadata} onChange={setValues} />
@@ -514,21 +512,21 @@ function MetadataSettings() {
                       try {
                         await wapi.put('', { metadata: values });
                         setValues(null);
-                        toast('Saved');
+                        toast(tr('Saved'));
                         session.reload();
                       } catch (e) {
                         toast(errorMessage(e), 'error');
                       }
                     }}
                   >
-                    Save
+                    {tr('Save')}
                   </button>
                 </div>
               </div>
             )}
             {editing && (
               <Modal
-                title={editing._new ? 'New field' : `Field ${editing.key}`}
+                title={editing._new ? tr('New field') : tr('Field {0}', [editing.key])}
                 onClose={() => setEditing(null)}
                 footer={
                   <button
@@ -541,38 +539,38 @@ function MetadataSettings() {
                       setEditing(null);
                     }}
                   >
-                    Apply
+                    {tr('Apply')}
                   </button>
                 }
               >
                 <div className="grid-2">
-                  <Field label="Scope">
-                    <Select value={editing.scope} onChange={(v) => setEditing({ ...editing, scope: v })} options={SCOPES.map(([value, label]) => ({ value, label }))} />
+                  <Field label={tr('Scope')}>
+                    <Select value={editing.scope} onChange={(v) => setEditing({ ...editing, scope: v })} options={SCOPES.map(([value, label]) => ({ value, label: tr(label) }))} />
                   </Field>
-                  <Field label="Type">
+                  <Field label={tr('Type')}>
                     <Select value={editing.type} onChange={(v) => setEditing({ ...editing, type: v })} options={TYPES} />
                   </Field>
                 </div>
                 <div className="grid-2">
-                  <Field label="Key" hint="lowercase, stable: it is what the api and the exports carry">
+                  <Field label={tr('Key')} hint={tr('lowercase, stable: it is what the api and the exports carry')}>
                     <Input value={editing.key} onChange={(v) => setEditing({ ...editing, key: v })} mono />
                   </Field>
-                  <Field label="Label">
+                  <Field label={tr('Label')}>
                     <Input value={editing.label} onChange={(v) => setEditing({ ...editing, label: v })} />
                   </Field>
                 </div>
                 {editing.type === 'enum' && (
-                  <Field label="Options">
+                  <Field label={tr('Options')}>
                     <TagsInput value={editing.options} onChange={(v) => setEditing({ ...editing, options: v })} />
                   </Field>
                 )}
-                <Field label="Help">
+                <Field label={tr('Help')}>
                   <Input value={editing.help} onChange={(v) => setEditing({ ...editing, help: v })} />
                 </Field>
                 <div className="row gap-24">
-                  <Switch checked={editing.required} onChange={(v) => setEditing({ ...editing, required: v })} label="Required" />
+                  <Switch checked={editing.required} onChange={(v) => setEditing({ ...editing, required: v })} label={tr('Required')} />
                   {['subscription', 'application'].includes(editing.scope) && (
-                    <Switch checked={editing.portal} onChange={(v) => setEditing({ ...editing, portal: v })} label={editing.scope === 'subscription' ? 'Asked in the request form' : 'Filled by the consumer'} />
+                    <Switch checked={editing.portal} onChange={(v) => setEditing({ ...editing, portal: v })} label={editing.scope === 'subscription' ? tr('Asked in the request form') : tr('Filled by the consumer')} />
                   )}
                 </div>
               </Modal>
@@ -593,7 +591,7 @@ function CatalogModal({ value, onClose, onSaved }) {
   const set = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
   return (
     <Modal
-      title={value.id ? `Catalog ${value.name}` : 'New remote catalog'}
+      title={value.id ? tr('Catalog {0}', [value.name]) : tr('New remote catalog')}
       size="wide"
       onClose={onClose}
       footer={
@@ -609,47 +607,47 @@ function CatalogModal({ value, onClose, onSaved }) {
             }
           }}
         >
-          Save
+          {tr('Save')}
         </button>
       }
     >
       <div className="grid-2">
-        <Field label="Name">
+        <Field label={tr('Name')}>
           <Input value={c.name} onChange={set('name')} />
         </Field>
-        <Field label="Kind">
-          <Select value={c.kind} onChange={set('kind')} options={[{ value: 'http', label: 'HTTP (one url, yaml or json)' }, { value: 'git', label: 'Git repository' }]} />
+        <Field label={tr('Kind')}>
+          <Select value={c.kind} onChange={set('kind')} options={[{ value: 'http', label: tr('HTTP (one url, yaml or json)') }, { value: 'git', label: tr('Git repository') }]} />
         </Field>
       </div>
-      <Field label="Url" hint={c.kind === 'git' ? 'https or file url of the repository' : 'a yaml (multi-document) or json file of api documents'}>
+      <Field label={tr('Url')} hint={c.kind === 'git' ? tr('https or file url of the repository') : tr('a yaml (multi-document) or json file of api documents')}>
         <Input value={c.url} onChange={set('url')} mono />
       </Field>
       {c.kind === 'git' && (
         <div className="grid-2">
-          <Field label="Branch or tag">
-            <Input value={c.ref} onChange={set('ref')} mono placeholder="main" />
+          <Field label={tr('Branch or tag')}>
+            <Input value={c.ref} onChange={set('ref')} mono placeholder={tr('main')} />
           </Field>
-          <Field label="Directory">
-            <Input value={c.path} onChange={set('path')} mono placeholder="apis/" />
+          <Field label={tr('Directory')}>
+            <Input value={c.path} onChange={set('path')} mono placeholder={tr('apis/')} />
           </Field>
         </div>
       )}
-      <Field label="What a sync does" hint="chosen per catalog">
+      <Field label={tr('What a sync does')} hint={tr('chosen per catalog')}>
         <Select
           value={c.mode}
           onChange={set('mode')}
           options={[
-            { value: 'draft', label: 'Write the drafts — publishing stays an explicit act in the console' },
-            { value: 'publish', label: 'Publish snapshots — deploying stays explicit' },
-            { value: 'deploy', label: 'Publish and deploy — the commit is the deployment (GitOps)' },
+            { value: 'draft', label: tr('Write the drafts — publishing stays an explicit act in the console') },
+            { value: 'publish', label: tr('Publish snapshots — deploying stays explicit') },
+            { value: 'deploy', label: tr('Publish and deploy — the commit is the deployment (GitOps)') },
           ]}
         />
       </Field>
       <div className="grid-2">
-        <Field label="Interval (seconds)">
+        <Field label={tr('Interval (seconds)')}>
           <NumberInput value={c.interval_seconds} onChange={set('interval_seconds')} />
         </Field>
-        <Field label="Header (e.g. a token)">
+        <Field label={tr('Header (e.g. a token)')}>
           <Input
             value={Object.entries(c.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
             onChange={(v) => {
@@ -657,13 +655,13 @@ function CatalogModal({ value, onClose, onSaved }) {
               set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
             }}
             mono
-            placeholder="Authorization: Bearer …"
+            placeholder={tr('Authorization: Bearer …')}
           />
         </Field>
       </div>
       <div className="row gap-24">
-        <Switch checked={c.enabled} onChange={set('enabled')} label="Scheduled sync" />
-        <Switch checked={c.prune} onChange={set('prune')} label="Delete the apis that leave the source" />
+        <Switch checked={c.enabled} onChange={set('enabled')} label={tr('Scheduled sync')} />
+        <Switch checked={c.prune} onChange={set('prune')} label={tr('Delete the apis that leave the source')} />
       </div>
     </Modal>
   );
@@ -677,7 +675,7 @@ function PreviewModal({ cat, onClose, onSynced }) {
   const kind = { create: 'positive', update: 'warning', delete: 'negative', conflict: 'negative', orphaned: 'info', unchanged: '' };
   return (
     <Modal
-      title={`Preview — ${cat.name}`}
+      title={tr('Preview — {0}', [cat.name])}
       size="wide"
       onClose={onClose}
       footer={
@@ -688,7 +686,7 @@ function PreviewModal({ cat, onClose, onSynced }) {
             setBusy(true);
             try {
               const r = await wapi.post(`/catalogs/${cat.id}/sync`);
-              toast(r.ok ? 'Catalog synchronised' : `Sync finished with errors`, r.ok ? 'info' : 'error');
+              toast(r.ok ? tr('Catalog synchronised') : tr('Sync finished with errors'), r.ok ? 'info' : 'error');
               onSynced();
             } catch (e) {
               toast(errorMessage(e), 'error');
@@ -697,15 +695,15 @@ function PreviewModal({ cat, onClose, onSynced }) {
             }
           }}
         >
-          Sync now ({cat.mode})
+          <Tr text={'Sync now ({0})'} args={[cat.mode]} />
         </button>
       }
     >
-      <p className="muted small">A dry run: nothing is written. {cat.mode === 'deploy' ? 'This sync deploys: every change below reaches the gateway.' : ''}</p>
+      <p className="muted small"><Tr text={'A dry run: nothing is written. {0}'} args={[cat.mode === 'deploy' ? tr('This sync deploys: every change below reaches the gateway.') : '']} /></p>
       <Loader state={plan}>
         {(p) => (
           <>
-            {p.revision && <div className="small muted">revision <span className="mono">{String(p.revision).slice(0, 12)}</span>{p.ignored ? ` · ${p.ignored} non-api document(s) ignored` : ''}</div>}
+            {p.revision && <div className="small muted"><Tr text={'revision {0}{1}'} args={[<span className="mono">{String(p.revision).slice(0, 12)}</span>, p.ignored ? tr(' · {0} non-api document(s) ignored', [p.ignored]) : '']} /></div>}
             {p.items.map((i) => (
               <div key={`${i.slug}@${i.version}`} className="panel col gap-6">
                 <div className="row">
@@ -713,13 +711,13 @@ function PreviewModal({ cat, onClose, onSynced }) {
                   <span className="bold">
                     {i.slug} <span className="faint">{i.version}</span>
                   </span>
-                  {i.adopt && <span className="badge info">will take over an api edited by hand</span>}
+                  {i.adopt && <span className="badge info">{tr('will take over an api edited by hand')}</span>}
                   {i.reason && <span className="small muted">{i.reason}</span>}
                 </div>
                 {i.changes?.length > 0 && <DiffView changes={i.changes} />}
               </div>
             ))}
-            {!p.items.length && <p className="muted small">The source carries no api document.</p>}
+            {!p.items.length && <p className="muted small">{tr('The source carries no api document.')}</p>}
           </>
         )}
       </Loader>
@@ -738,11 +736,10 @@ function Catalogs() {
     <div className="col gap-16">
       <div className="row">
         <p className="muted small grow">
-          A remote catalog — an http file or a git repository of declarative api documents — becomes the source of truth of the apis it carries. They are marked as managed by it, and the console
-          refuses to edit them. Every sync can be previewed first.
+          {tr('A remote catalog — an http file or a git repository of declarative api documents — becomes the source of truth of the apis it carries. They are marked as managed by it, and the console refuses to edit them. Every sync can be previewed first.')}
         </p>
         <button className="btn primary" onClick={() => setEditing({ name: '', kind: 'git', url: '', ref: 'main', path: '', mode: 'draft', interval_seconds: 300, enabled: true, prune: false, headers: {} })}>
-          <Icon name="plus" /> Add catalog
+          <Icon name="plus" /> {tr('Add catalog')}
         </button>
       </div>
       <Loader state={state}>
@@ -754,7 +751,7 @@ function Catalogs() {
                   <Icon name="git" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="bold">
-                      {c.name} <Badge>{c.kind}</Badge> <Badge kind="accent">{c.mode}</Badge> {!c.enabled && <Badge>manual</Badge>}
+                      {c.name} <Badge>{c.kind}</Badge> <Badge kind="accent">{c.mode}</Badge> {!c.enabled && <Badge>{tr('manual')}</Badge>}
                     </div>
                     <div className="mono tiny faint ellipsis">
                       {c.url}
@@ -775,16 +772,16 @@ function Catalogs() {
                     )}
                   </div>
                   <button className="btn sm" onClick={() => setPreviewing(c)}>
-                    Preview & sync
+                    {tr('Preview & sync')}
                   </button>
-                  <button className="btn ghost sm icon" onClick={() => setEditing(c)} aria-label="edit">
+                  <button className="btn ghost sm icon" onClick={() => setEditing(c)} aria-label={tr('edit')}>
                     <Icon name="edit" />
                   </button>
                   <button
                     className="btn ghost sm icon"
-                    aria-label="delete"
+                    aria-label={tr('delete')}
                     onClick={async () => {
-                      if (!(await confirm({ title: `Delete ${c.name}?`, message: 'Its apis stay, and become editable by hand again.', danger: true, confirmLabel: 'Delete' }))) return;
+                      if (!(await confirm({ title: tr('Delete {0}?', [c.name]), message: tr('Its apis stay, and become editable by hand again.'), danger: true, confirmLabel: tr('Delete') }))) return;
                       await wapi.del(`/catalogs/${c.id}`);
                       state.reload();
                     }}
@@ -796,7 +793,7 @@ function Catalogs() {
             </div>
           ) : (
             <div className="card">
-              <Empty title="No remote catalog" icon="git" />
+              <Empty title={tr('No remote catalog')} icon="git" />
             </div>
           )
         }
@@ -807,7 +804,7 @@ function Catalogs() {
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
-            toast('Catalog saved');
+            toast(tr('Catalog saved'));
             state.reload();
           }}
         />
@@ -836,10 +833,10 @@ function Exchange() {
       <div className="card">
         <div className="card-head">
           <Icon name="download" />
-          <h3>Export</h3>
+          <h3>{tr('Export')}</h3>
         </div>
         <div className="card-body col">
-          <p className="muted small">Every api (one document per api-version, plans inside, documentation and snapshots beside it), application and subscription of the workspace.</p>
+          <p className="muted small">{tr('Every api (one document per api-version, plans inside, documentation and snapshots beside it), application and subscription of the workspace.')}</p>
           <button
             className="btn"
             style={{ alignSelf: 'flex-start' }}
@@ -852,29 +849,29 @@ function Exchange() {
               a.click();
             }}
           >
-            <Icon name="download" /> Download export
+            <Icon name="download" /> {tr('Download export')}
           </button>
         </div>
       </div>
       <div className="card">
         <div className="card-head">
           <Icon name="upload" />
-          <h3>Import</h3>
+          <h3>{tr('Import')}</h3>
         </div>
         <div className="card-body col">
-          <p className="muted small">Idempotent: objects are upserted by id, snapshots are never rewritten, and nothing is deployed. Paste an export document, or load a file and review it.</p>
+          <p className="muted small">{tr('Idempotent: objects are upserted by id, snapshots are never rewritten, and nothing is deployed. Paste an export document, or load a file and review it.')}</p>
           <div className="row">
             <FileButton
               accept=".json,application/json"
               onFile={(content, file) => {
                 setText(content);
-                toast(`${file.name} loaded — review it, then import`);
+                toast(tr('{0} loaded — review it, then import', [file.name]));
               }}
             >
-              Load a file…
+              {tr('Load a file…')}
             </FileButton>
           </div>
-          <CodeEditor value={text} onChange={setText} language="json" minHeight={140} maxHeight={360} ariaLabel="export document" placeholder="paste an export document" />
+          <CodeEditor value={text} onChange={setText} language="json" minHeight={140} maxHeight={360} ariaLabel={tr('export document')} placeholder={tr('paste an export document')} />
           <button
             className="btn primary"
             style={{ alignSelf: 'flex-start' }}
@@ -882,14 +879,14 @@ function Exchange() {
             onClick={async () => {
               try {
                 const res = await wapi.post('/import', JSON.parse(text));
-                toast(`Imported: ${JSON.stringify(res.imported)}`);
+                toast(tr('Imported: {0}', [JSON.stringify(res.imported)]));
                 setText('');
               } catch (e) {
                 toast(errorMessage(e), 'error');
               }
             }}
           >
-            Import
+            {tr('Import')}
           </button>
         </div>
       </div>
@@ -905,11 +902,11 @@ export function WorkspaceSettingsPage({ tab }) {
   const allowed = tabs.includes(tab);
   return (
     <div className="page">
-      <PageHead title="Workspace settings" sub={ws.name} />
+      <PageHead title={tr('Workspace settings')} sub={ws.name} />
       <div className="tabs mb-16">
         {tabs.map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/ws/${slug}/settings/${t}`)}>
-            {t === 'portal' ? 'Developer portal' : t === 'export' ? 'Export / import' : t[0].toUpperCase() + t.slice(1)}
+            {t === 'portal' ? tr('Developer portal') : t === 'export' ? tr('Export / import') : tr(t[0].toUpperCase() + t.slice(1))}
           </button>
         ))}
       </div>
@@ -920,7 +917,7 @@ export function WorkspaceSettingsPage({ tab }) {
       {tab === 'metadata' && <MetadataSettings />}
       {tab === 'catalogs' && allowed && <Catalogs />}
       {tab === 'export' && allowed && <Exchange />}
-      {!allowed && <Callout kind="info">The administrators of the workspace manage its remote catalogs and its export.</Callout>}
+      {!allowed && <Callout kind="info">{tr('The administrators of the workspace manage its remote catalogs and its export.')}</Callout>}
     </div>
   );
 }

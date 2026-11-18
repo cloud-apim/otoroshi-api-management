@@ -3,6 +3,7 @@ import YAML from 'yaml';
 import { Callout, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
+import { tr, Tr } from '../../../shared/i18n.jsx';
 
 // documentation stays in the product, never in the gateway, and is multilingual from the
 // start: the languages belong to the customer
@@ -18,7 +19,7 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
   }, [pages.data]);
   const add = async () => {
     try {
-      const p = await wapi.post(`/apis/${api.id}/pages`, { title: Object.fromEntries(langs.map((l) => [l, 'New page'])), content: {}, slug: `page-${Date.now().toString(36)}` });
+      const p = await wapi.post(`/apis/${api.id}/pages`, { title: Object.fromEntries(langs.map((l) => [l, tr('New page')])), content: {}, slug: `page-${Date.now().toString(36)}` });
       await pages.reload();
       setSelected(p.id);
     } catch (e) {
@@ -29,17 +30,17 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
     <div className="col gap-16">
       <div className="card">
         <div className="card-body row wrap gap-16">
-          <Field label="Languages" hint="any language the customer wants; the first is the default">
+          <Field label={tr('Languages')} hint={tr('any language the customer wants; the first is the default')}>
             <TagsInput
               value={langs}
               onChange={(v) => v.length && setDraft((d) => ({ ...d, documentation: { ...d.documentation, languages: v, defaultLanguage: v.includes(d.documentation.defaultLanguage) ? d.documentation.defaultLanguage : v[0] } }))}
-              placeholder="en, fr, de…"
+              placeholder={tr('en, fr, de…')}
             />
           </Field>
-          <Field label="Default language">
+          <Field label={tr('Default language')}>
             <Select value={draft.documentation.defaultLanguage} onChange={(v) => setDraft((d) => ({ ...d, documentation: { ...d.documentation, defaultLanguage: v } }))} options={langs} />
           </Field>
-          <p className="muted small grow">Pages are saved as you go, in the draft: the portal shows them once a snapshot is published and deployed.</p>
+          <p className="muted small grow">{tr('Pages are saved as you go, in the draft: the portal shows them once a snapshot is published and deployed.')}</p>
         </div>
       </div>
       <Loader state={pages}>
@@ -56,7 +57,7 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
                 ))}
                 {!readOnly && (
                   <button onClick={add}>
-                    <Icon name="plus" /> New page
+                    <Icon name="plus" /> {tr('New page')}
                   </button>
                 )}
               </div>
@@ -74,7 +75,7 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
                     if (!dirty) reload();
                   }}
                   onDelete={async (p) => {
-                    if (!(await confirm({ title: `Delete page ${p.slug}?`, danger: true, confirmLabel: 'Delete' }))) return;
+                    if (!(await confirm({ title: tr('Delete page {0}?', [p.slug]), danger: true, confirmLabel: tr('Delete') }))) return;
                     await wapi.del(`/apis/${api.id}/pages/${p.id}`);
                     setSelected(null);
                     pages.reload();
@@ -82,7 +83,7 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
                 />
               ) : (
                 <div className="card">
-                  <Empty title="No page" icon="doc" action={!readOnly && <button className="btn primary" onClick={add}>Write the first page</button>} />
+                  <Empty title={tr('No page')} icon="doc" action={!readOnly && <button className="btn primary" onClick={add}>{tr('Write the first page')}</button>} />
                 </div>
               )}
             </div>
@@ -113,7 +114,7 @@ function PageEditor({ api, pageId, langs, readOnly, onSaved, onDelete }) {
     try {
       await wapi.put(`/apis/${api.id}/pages/${page.id}`, { slug: page.slug, title: page.title, content: page.content, position: page.position });
       setChanged(false);
-      toast('Page saved in the draft');
+      toast(tr('Page saved in the draft'));
       onSaved();
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -125,15 +126,15 @@ function PageEditor({ api, pageId, langs, readOnly, onSaved, onDelete }) {
       <div className="card-head">
         <Seg value={lang} onChange={setLang} options={langs.map((l) => ({ value: l, label: l.toUpperCase() + (page.content?.[l]?.trim() ? '' : ' ·') }))} />
         <span className="spacer" />
-        <Seg value={mode} onChange={setMode} options={[{ value: 'write', label: 'Write' }, { value: 'preview', label: 'Preview' }]} />
+        <Seg value={mode} onChange={setMode} options={[{ value: 'write', label: tr('Write') }, { value: 'preview', label: tr('Preview') }]} />
       </div>
       <div className="card-body col">
-        {missing.length > 0 && <Callout kind="info">Not translated yet: {missing.join(', ')}. The portal falls back on the default language.</Callout>}
+        {missing.length > 0 && <Callout kind="info"><Tr text={'Not translated yet: {0}. The portal falls back on the default language.'} args={[missing.join(', ')]} /></Callout>}
         <div className="grid-2">
-          <Field label={`Title (${lang})`}>
+          <Field label={tr('Title ({0})', [lang])}>
             <Input value={page.title?.[lang] || ''} onChange={(v) => setLangValue('title', v)} disabled={readOnly} />
           </Field>
-          <Field label="Slug" hint="url of the page on the portal">
+          <Field label={tr('Slug')} hint={tr('url of the page on the portal')}>
             <Input
               value={page.slug}
               onChange={(v) => {
@@ -155,8 +156,8 @@ function PageEditor({ api, pageId, langs, readOnly, onSaved, onDelete }) {
             readOnly={readOnly}
             minHeight={420}
             maxHeight={760}
-            ariaLabel={`page content (${lang})`}
-            placeholder="# Markdown"
+            ariaLabel={tr('page content ({0})', [lang])}
+            placeholder={tr('# Markdown')}
           />
         ) : (
           <div className="panel" style={{ background: 'var(--surface)' }}>
@@ -166,11 +167,11 @@ function PageEditor({ api, pageId, langs, readOnly, onSaved, onDelete }) {
         {!readOnly && (
           <div className="row">
             <button className="btn primary" disabled={!changed} onClick={save}>
-              Save page
+              {tr('Save page')}
             </button>
             <span className="spacer" />
             <button className="btn danger ghost" onClick={() => onDelete(page)}>
-              <Icon name="trash" /> Delete page
+              <Icon name="trash" /> {tr('Delete page')}
             </button>
           </div>
         )}
@@ -188,7 +189,7 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
   if (content.trim()) {
     try {
       parsed = content.trim().startsWith('{') ? JSON.parse(content) : YAML.parse(content);
-      if (!parsed?.openapi && !parsed?.swagger) error = 'not an OpenAPI document: no "openapi" field';
+      if (!parsed?.openapi && !parsed?.swagger) error = tr('not an OpenAPI document: no "openapi" field');
     } catch (e) {
       error = e.message;
     }
@@ -198,11 +199,11 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">
-        The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its test requests go through the portal proxy with the consumer's own credentials.
+        {tr("The specification is rendered on the portal with Scalar, its servers pointing at the gateway, and its test requests go through the portal proxy with the consumer's own credentials.")}
       </p>
       {!readOnly && (
         <div className="row">
-          <input className="input" style={{ maxWidth: 480 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…/openapi.json — import from a url" aria-label="openapi url" />
+          <input className="input" style={{ maxWidth: 480 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder={tr('https://…/openapi.json — import from a url')} aria-label={tr('openapi url')} />
           <button
             className="btn"
             disabled={!url}
@@ -210,30 +211,30 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
               try {
                 const res = await fetch(url);
                 set(await res.text());
-                toast('Specification imported into the draft');
+                toast(tr('Specification imported into the draft'));
               } catch (e) {
-                toast(`cannot fetch ${url}: ${e.message}`, 'error');
+                toast(tr('cannot fetch {0}: {1}', [url, e.message]), 'error');
               }
             }}
           >
-            <Icon name="download" /> Import
+            <Icon name="download" /> {tr('Import')}
           </button>
-          <span className="faint small">or</span>
+          <span className="faint small">{tr('or')}</span>
           <FileButton
             accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
             onFile={(text, file) => {
               set(text);
-              toast(`${file.name} imported into the draft`);
+              toast(tr('{0} imported into the draft', [file.name]));
             }}
           >
-            From a local file…
+            {tr('From a local file…')}
           </FileButton>
         </div>
       )}
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <div className="card">
           <div className="card-head">
-            <h3 className="grow">Specification (YAML or JSON)</h3>
+            <h3 className="grow">{tr('Specification (YAML or JSON)')}</h3>
           </div>
           <div className="card-body">
             <CodeEditor
@@ -244,24 +245,24 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
               minHeight={520}
               maxHeight={760}
               wordWrap="on"
-              ariaLabel="openapi specification"
-              placeholder={'openapi: 3.1.0\ninfo:\n  title: My API\n  version: 1.0.0\npaths: {}'}
+              ariaLabel={tr('openapi specification')}
+              placeholder={tr('openapi: 3.1.0\ninfo:\n  title: My API\n  version: 1.0.0\npaths: {}')}
             />
           </div>
         </div>
         <div className="card">
           <div className="card-head">
-            <h3 className="grow">Outline</h3>
+            <h3 className="grow">{tr('Outline')}</h3>
           </div>
           <div className="card-body col">
-            {!content.trim() && <p className="muted small">No specification yet.</p>}
+            {!content.trim() && <p className="muted small">{tr('No specification yet.')}</p>}
             {error && <Callout kind="negative">{error}</Callout>}
             {parsed && !error && (
               <>
                 <div>
                   <div className="bold">{parsed.info?.title}</div>
                   <div className="muted small">
-                    {parsed.openapi || parsed.swagger} · version {parsed.info?.version} · {paths.length} paths
+                    <Tr text={'{0} · version {1} · {2} paths'} args={[parsed.openapi || parsed.swagger, parsed.info?.version, paths.length]} />
                   </div>
                 </div>
                 {paths.map(([p, ops]) => (
