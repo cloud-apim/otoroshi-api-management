@@ -71,7 +71,13 @@ export function defaultAuthConfig(kind) {
     case 'apikey':
       return { readOnly: false, validityDays: null, rotation: { enabled: false, everyHours: 744, graceHours: 168 } };
     case 'jwt':
-      return { verifier: '', clientIdPath: 'client_id' };
+      // either a reference to an existing Otoroshi verifier, or a description the product derives
+      // the verifier from and keeps reconciled (D-15)
+      return {
+        verifier: '',
+        clientIdPath: 'client_id',
+        derive: { enabled: false, kind: 'jwks', jwksUrl: '', secret: '', size: 256, issuer: '', audience: '', header: 'Authorization', prefix: 'Bearer ' },
+      };
     case 'mtls':
       return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '' };
     case 'oauth2-local':
@@ -243,8 +249,12 @@ export function validateDraft(draft) {
         path: `plans[${i}].unit`,
         message: `plan "${p.name}" meters ${p.unit}: tokens and budget need an LLM backend (D-41), not available in this version`,
       });
-    if (['jwt', 'oauth2-remote'].includes(p.auth.kind) && !p.auth.config.verifier)
-      errors.push({ path: `plans[${i}].auth.config.verifier`, message: `plan "${p.name}" needs a verifier reference` });
+    const derive = p.auth.kind === 'jwt' && p.auth.config.derive?.enabled ? p.auth.config.derive : null;
+    if (derive) {
+      if (derive.kind === 'jwks' && !derive.jwksUrl) errors.push({ path: `plans[${i}].auth.config.derive.jwksUrl`, message: `plan "${p.name}" derives its verifier from a JWKS: give its url` });
+      if (derive.kind === 'hmac' && !derive.secret) errors.push({ path: `plans[${i}].auth.config.derive.secret`, message: `plan "${p.name}" derives an HMAC verifier: give its secret (or a vault reference)` });
+    } else if (['jwt', 'oauth2-remote'].includes(p.auth.kind) && !p.auth.config.verifier)
+      errors.push({ path: `plans[${i}].auth.config.verifier`, message: `plan "${p.name}" needs a verifier: reference one, or describe how its tokens are validated` });
     if (p.flowRef && !d.flows.find((f) => f.id === p.flowRef))
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)

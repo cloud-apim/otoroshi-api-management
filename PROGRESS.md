@@ -16,7 +16,7 @@ Dernière mise à jour : 18/11/2026.
 ## Suite, dans l'ordre proposé
 
 1. Relecture et commit de la documentation ; captures d'écran.
-2. **D-15** : objets dérivés de la description d'une API (JWT verifiers, certificats) — aujourd'hui seulement référencés.
+2. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
 3. **D-30** : règles de consentement du transfert (accord du consommateur quand les conditions se dégradent).
 4. Console en français (le portail l'est déjà).
 5. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
@@ -53,8 +53,8 @@ Dernière mise à jour : 18/11/2026.
 | D-10 WAF dans l'extension | 🟡 | posable comme plugin dans un flow ou un groupe ; pas d'écran dédié |
 | D-11 i18n | 🟡 | doc multilingue ✅, portail en/fr ✅, console en anglais seulement, libellés de métadonnées non traduits |
 | D-12 clair / sombre / système | ✅ | console et portail |
-| D-14 plus besoin d'ouvrir Otoroshi | 🟡 | APIM complet ; reste D-15 |
-| D-15 objets dérivés (certificats, modules d'auth, JWT verifiers) | ⬜ | référencés seulement |
+| D-14 plus besoin d'ouvrir Otoroshi | 🟡 | APIM complet ; reste D-15 pour les certificats et modules d'auth |
+| D-15 objets dérivés (certificats, modules d'auth, JWT verifiers) | 🟡 | JWT verifiers ✅ dérivés de la description du plan (JWKS ou HMAC, iss, aud), marqués, inclus dans le diff de déploiement et le drift, supprimés avec l'API — test L0 ; certificats et modules d'auth ⬜ |
 | D-16 compositions nommées | 🟡 | groupes de policies ✅ (versions figées, montée de version) ; resources et dictionnaires ⬜ |
 | D-17 try-it | 🟡 | portail (Scalar + proxy) ✅ ; console ✅ sans la trace des policies (G-12) |
 | D-18 métadonnées typées, une seule mécanique | ✅ | 5 portées, formulaire de demande, blocage de publication |
@@ -103,7 +103,7 @@ Dernière mise à jour : 18/11/2026.
 
 ## Critère de sortie de L0
 
-✅ `test/reference-catalogue.test.js` : catalogue Atlas (6 plans, 5 mécanismes d'auth, 4 modes d'approbation, une API, un seul jeu de routes) projeté sur Otoroshi 18.0.1, réconcilié, drift détecté puis réparé. 13 tests, stables.
+✅ `test/reference-catalogue.test.js` : catalogue Atlas (6 plans, 5 mécanismes d'auth, 4 modes d'approbation, une API, un seul jeu de routes) projeté sur Otoroshi 18.0.1, réconcilié, drift détecté puis réparé — y compris le JWT verifier dérivé du plan Partner. 14 tests, stables.
 
 ## Manques côté Otoroshi
 

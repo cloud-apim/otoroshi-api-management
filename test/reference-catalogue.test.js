@@ -22,7 +22,6 @@ const RUN = Date.now().toString(36);
 const WS = `ref-atlas-${RUN}`;
 const DOMAIN = `atlas-${RUN}.oto.tools`;
 const JWT_SECRET = 'atlas-partner-secret';
-const VERIFIER_ID = `l0_eu_login_${RUN}`;
 const BASE = `http://localhost:${process.env.APIM_PORT}/api`;
 const GATEWAY = 'http://localhost:8080';
 
@@ -69,27 +68,16 @@ const state = {};
 
 beforeAll(async () => {
   server = await start();
-  // infrastructure the plans reference but do not own (D-15): the Atlas ID provider JWT verifier
-  await otoroshi('POST', '/api/verifiers', {
-    _loc: { tenant: 'default', teams: ['default'] },
-    type: 'global',
-    id: VERIFIER_ID,
-    name: 'Atlas ID (reference test)',
-    desc: 'HS256 stand-in for the Atlas ID provider',
-    strict: true,
-    source: { type: 'InHeader', name: 'Authorization', remove: 'Bearer ' },
-    algoSettings: { type: 'HSAlgoSettings', size: 256, secret: JWT_SECRET, base64: false },
-    strategy: { type: 'PassThrough', verificationSettings: { fields: {}, arrayFields: {} } },
-    metadata: {},
-    tags: [],
-  });
 });
 
 afterAll(async () => {
   try {
     if (state.apiId) await call('DELETE', ws(`/apis/${state.apiId}`));
-  } catch (e) {}
-  await otoroshi('DELETE', `/api/verifiers/${VERIFIER_ID}`).catch(() => null);
+    // deleting the api removed its derived verifier from the gateway
+    if (state.verifierId) expect(await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).toBeNull();
+  } catch (e) {
+    console.error('cleanup', e.message);
+  }
   server?.stop(true);
 });
 
@@ -127,7 +115,9 @@ function catalogPlans() {
       id: 'plan_partner',
       name: 'Partner',
       status: 'published',
-      auth: { kind: 'jwt', config: { verifier: VERIFIER_ID, clientIdPath: 'client_id' } },
+      // the plan describes how its tokens are validated; the product derives the Otoroshi JWT
+      // verifier from it and keeps it reconciled (D-15) — an HS256 stand-in for the Atlas ID provider
+      auth: { kind: 'jwt', config: { clientIdPath: 'client_id', derive: { enabled: true, kind: 'hmac', secret: JWT_SECRET, size: 256, issuer: 'https://id.atlas.example' } } },
       rateLimit: perMinute(10000),
       validation: 'auto', // approval mode 3: a form (usage statement + terms)
       usageStatement: { enabled: true, required: true, prompt: 'Which organisation, for what use?' },
@@ -209,6 +199,13 @@ describe('reference catalogue', () => {
     expect(starter.rate_limiting.strategy.windowDurationMs).toBe(60000);
     // otoroshi records the catalog write in its own deployment history (D-38)
     expect(entity.deployments.length).toBeGreaterThanOrEqual(1);
+    // the verifier of the Partner plan is derived, marked as the product's (D-15, D-24)
+    const verifierId = entity.plans.find((p) => p.id === 'plan_partner').access_mode_configuration.verifier;
+    const verifier = await otoroshi('GET', `/api/verifiers/${verifierId}`);
+    expect(verifier.metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
+    expect(verifier.metadata.apim_api_id).toBe(state.apiId);
+    expect(verifier.strategy.verificationSettings.fields.iss).toBe('https://id.atlas.example');
+    state.verifierId = verifierId;
     // selective synchronisation (D-2): neither documentation nor portal options reach the gateway
     expect(entity.documentation).toBeNull();
     expect(JSON.stringify(entity)).not.toContain('Which institution');
@@ -267,7 +264,7 @@ describe('reference catalogue', () => {
     expect(sub.status).toBe('active');
     expect(sub.request.usage).toBe('reference data for our public dashboards');
     // the jwt consumer calls with its own token, identified by the client_id of the application
-    const res = await gatewayCall('/documents/2026-0042', { headers: { Authorization: `Bearer ${jwt({ client_id: 'agency-north' })}` }, expect: (r) => r.status === 200 });
+    const res = await gatewayCall('/documents/2026-0042', { headers: { Authorization: `Bearer ${jwt({ client_id: 'agency-north', iss: 'https://id.atlas.example' })}` }, expect: (r) => r.status === 200 });
     expect(res.status).toBe(200);
   });
 
@@ -354,6 +351,17 @@ describe('reference catalogue', () => {
     await call('POST', ws(`/subscriptions/${state.starterSub}/close`));
     expect(await oto.getApikey(state.cred.client_id)).toBeNull();
     expect(await oto.getSubscription(state.starterSub)).toBeNull();
+  });
+
+  test('a derived object drifts like the api, and leaves with it', async () => {
+    const v = await otoroshi('GET', `/api/verifiers/${state.verifierId}`);
+    await otoroshi('PUT', `/api/verifiers/${state.verifierId}`, { ...v, strategy: { ...v.strategy, verificationSettings: { fields: {}, arrayFields: {} } } });
+    await call('POST', ws('/drift'));
+    const report = (await call('GET', ws(`/apis/${state.apiId}/projection`))).drift;
+    expect(report.status).toBe('drifted');
+    expect(report.diff.map((d) => d.path).join(' ')).toContain('derived[JwtVerifier');
+    await call('POST', ws(`/apis/${state.apiId}/deploy`), {});
+    expect((await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).strategy.verificationSettings.fields.iss).toBe('https://id.atlas.example');
   });
 
   test('every action is audited', async () => {

@@ -788,6 +788,18 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   <dd className="mono small">{p.actual?.metadata?.created_by || '—'}</dd>
                   <dt>Otoroshi deployments</dt>
                   <dd>{p.actual?.deployments?.length ?? 0} recorded (Otoroshi keeps the last five)</dd>
+                  {p.derived?.length > 0 && (
+                    <>
+                      <dt>Derived objects</dt>
+                      <dd className="col gap-4">
+                        {p.derived.map((d) => (
+                          <span key={d.id} className="small">
+                            {d.kind} <span className="mono">{d.id}</span> {d.present ? <StatusBadge status="deployed" label="present" /> : <StatusBadge status="missing" />}
+                          </span>
+                        ))}
+                      </dd>
+                    </>
+                  )}
                   {p.drift && (
                     <>
                       <dt>Drift</dt>

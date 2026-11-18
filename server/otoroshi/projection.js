@@ -164,7 +164,7 @@ function accessModeConfiguration(plan, draft) {
         metadata: {},
       };
     case 'jwt':
-      return { verifier: c.verifier || null, client_id_path: c.clientIdPath || 'client_id', create_if_missing: true };
+      return { verifier: c.derive?.enabled ? derivedVerifierId(draft.__apiId, plan.id) : c.verifier || null, client_id_path: c.clientIdPath || 'client_id', create_if_missing: true };
     case 'mtls':
       return {
         regex_subject_dns: c.regexSubjectDNs || [],
@@ -214,10 +214,60 @@ export function planJson(plan, draft) {
   };
 }
 
+// ---------------------------------------------------------------- derived objects (D-15)
+// Objects that follow from the description of an api are derived by the product, marked as its
+// own, reconciled with the api and removed with it. Today: the JWT verifiers of jwt plans that
+// describe how their tokens are validated instead of referencing an existing verifier.
+
+export function derivedVerifierId(apiId, planId) {
+  return `apim_jwt_${apiId}_${planId}`;
+}
+
+export function derivedEntities(snapshot) {
+  const api = snapshot.api;
+  const draft = normalizeDraft(snapshot.draft);
+  const out = [];
+  for (const p of draft.plans) {
+    const d = p.auth.kind === 'jwt' ? p.auth.config.derive : null;
+    if (!d?.enabled) continue;
+    const fields = {};
+    if (d.issuer) fields.iss = d.issuer;
+    if (d.audience) fields.aud = d.audience;
+    out.push({
+      kind: 'JwtVerifier',
+      path: '/api/verifiers',
+      id: derivedVerifierId(api.id, p.id),
+      entity: {
+        _loc: { tenant: 'default', teams: ['default'] },
+        type: 'global',
+        id: derivedVerifierId(api.id, p.id),
+        name: `${api.name} ${api.version} — ${p.name}`,
+        desc: `derived by otoroshi-api-management from plan ${p.name} of ${api.name} ${api.version}`,
+        strict: true,
+        source: { type: 'InHeader', name: d.header || 'Authorization', remove: d.prefix ?? 'Bearer ' },
+        algoSettings:
+          d.kind === 'hmac'
+            ? { type: 'HSAlgoSettings', size: parseInt(d.size || 256, 10), secret: d.secret, base64: false }
+            : { type: 'JWKSAlgoSettings', url: d.jwksUrl, headers: {}, timeout: 2000, ttl: 3600000, kty: 'RSA' },
+        strategy: { type: 'PassThrough', verificationSettings: { fields, arrayFields: {} } },
+        metadata: { [META.createdBy]: OWNER_MARKER, [META.api]: api.id, apim_plan_id: p.id, apim_derived: 'true' },
+        tags: [],
+      },
+    });
+  }
+  return out;
+}
+
+export function comparableDerived(e) {
+  if (!e) return null;
+  return { source: e.source, algoSettings: e.algoSettings, verification: e.strategy?.verificationSettings || null, owner: e.metadata?.[META.createdBy] };
+}
+
 // snapshot = { api: {...}, draft: {...}, docs: {...} } — see apis.publish()
 export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecycle } = {}) {
   const api = snapshot.api;
   const draft = normalizeDraft(snapshot.draft);
+  draft.__apiId = api.id;
   return {
     _loc: { tenant: 'default', teams: ['default'] }, // D-24: never an otoroshi tenant
     kind: 'Api',

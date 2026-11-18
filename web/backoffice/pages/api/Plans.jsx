@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
-import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, Tabs, useLoad } from '../../../shared/ui.jsx';
+import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, Tabs, useLoad } from '../../../shared/ui.jsx';
 import { api as rootApi, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 
@@ -223,7 +223,34 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               </Setting>
             </>
           )}
-          {(p.auth.kind === 'jwt' || p.auth.kind === 'oauth2-remote') && (
+          {p.auth.kind === 'jwt' && (
+            <Setting label="Token validation" help="describe how the tokens are validated and the product derives the Otoroshi JWT verifier, keeps it reconciled and removes it with the api (D-15) — or reference an existing one">
+              <Seg
+                value={p.auth.config.derive?.enabled ? 'derive' : 'reference'}
+                onChange={(v) => setAuthConfig({ derive: { kind: 'jwks', header: 'Authorization', prefix: 'Bearer ', size: 256, ...(p.auth.config.derive || {}), enabled: v === 'derive' } })}
+                options={[{ value: 'derive', label: 'Describe it' }, { value: 'reference', label: 'Reference a verifier' }]}
+              />
+              {p.auth.config.derive?.enabled && (
+                <>
+                  <Select
+                    value={p.auth.config.derive.kind}
+                    onChange={(v) => setAuthConfig({ derive: { ...p.auth.config.derive, kind: v } })}
+                    options={[{ value: 'jwks', label: 'Signed by the IdP — keys from a JWKS url' }, { value: 'hmac', label: 'HMAC shared secret' }]}
+                  />
+                  {p.auth.config.derive.kind === 'jwks' ? (
+                    <Input value={p.auth.config.derive.jwksUrl} onChange={(v) => setAuthConfig({ derive: { ...p.auth.config.derive, jwksUrl: v } })} mono placeholder="https://idp/.well-known/jwks.json" />
+                  ) : (
+                    <Input value={p.auth.config.derive.secret} onChange={(v) => setAuthConfig({ derive: { ...p.auth.config.derive, secret: v } })} mono type="password" placeholder="secret, or a vault reference ${vault://…}" />
+                  )}
+                  <div className="row">
+                    <Input value={p.auth.config.derive.issuer} onChange={(v) => setAuthConfig({ derive: { ...p.auth.config.derive, issuer: v } })} mono placeholder="expected issuer (iss)" />
+                    <Input value={p.auth.config.derive.audience} onChange={(v) => setAuthConfig({ derive: { ...p.auth.config.derive, audience: v } })} mono placeholder="expected audience (aud)" />
+                  </div>
+                </>
+              )}
+            </Setting>
+          )}
+          {(p.auth.kind === 'oauth2-remote' || (p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled)) && (
             <>
               <Setting label={p.auth.kind === 'jwt' ? 'JWT verifier' : 'Auth module'} help="infrastructure of the gateway the plan references (D-15)">
                 <Select

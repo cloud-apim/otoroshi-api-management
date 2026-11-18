@@ -10,7 +10,18 @@ import { getSnapshot, lastSnapshot } from './apis.js';
 import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
 import { validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
-import { buildOtoroshiApi, comparableApi } from '../otoroshi/projection.js';
+import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
+import { META } from '../otoroshi/client.js';
+
+// derived objects first (the Api references them), then the stale ones of this api are removed
+async function syncDerived(apiId, snapshotContent) {
+  const wanted = snapshotContent ? derivedEntities(snapshotContent) : [];
+  for (const d of wanted) await oto.upsertEntity(d.path, d.entity);
+  const all = (await oto.listJwtVerifiers()) || [];
+  const stale = all.filter((v) => v.metadata?.[META.api] === apiId && v.metadata?.apim_derived === 'true' && !wanted.some((w) => w.id === v.id));
+  for (const v of stale) await oto.deleteEntity('/api/verifiers', v.id).catch(() => null);
+  return { derived: wanted.map((w) => w.id), removed: stale.map((v) => v.id) };
+}
 
 export async function currentDeployment(apiId) {
   const rows = await db`select d.*, s.number as snapshot_number from api_deployments d left join api_snapshots s on s.id = d.snapshot_id
@@ -54,11 +65,21 @@ export async function planDeployment(api, snapshotRef) {
     gatewayError = e.message;
   }
   const validation = validateDraft(snapshot.content.draft);
+  const gatewayChanges = diff(comparableApi(gateway), comparableApi(entity));
+  const derived = derivedEntities(snapshot.content);
+  if (!gatewayError) {
+    for (const d of derived) {
+      const got = await oto.getEntity(d.path, d.id).catch(() => null);
+      if (!got) gatewayChanges.push({ op: 'add', path: `derived[${d.kind} ${d.entity.name}]`, after: d.id });
+      else diff(comparableDerived(got), comparableDerived(d.entity), `derived[${d.kind} ${d.entity.name}]`, gatewayChanges);
+    }
+  }
   return {
     snapshot: { id: snapshot.id, number: snapshot.number, published_at: snapshot.published_at, comment: snapshot.comment },
     running: running ? { id: running.id, number: running.number } : null,
     changes: running ? diff(running.content, snapshot.content) : null,
-    gatewayChanges: diff(comparableApi(gateway), comparableApi(entity)),
+    gatewayChanges,
+    derived: derived.map((d) => ({ kind: d.kind, id: d.id, name: d.entity.name })),
     gatewayExists: !!gateway,
     gatewayError,
     warnings: validation.warnings,
@@ -106,8 +127,10 @@ registerTaskHandler('deploy_api', async ({ deployment_id }) => {
   if (!api || !snap) throw new PermanentError('api or snapshot not found');
   const entity = buildOtoroshiApi(snap.content, { snapshotId: snap.id, snapshotNumber: snap.number, lifecycle: api.lifecycle });
   try {
+    const derived = await syncDerived(api.id, snap.content);
     const written = await oto.upsertApi(entity);
     const result = {
+      derived,
       otoroshi_api_id: written?.id,
       otoroshi_state: written?.state,
       otoroshi_deployments: (written?.deployments || []).length,
@@ -132,6 +155,7 @@ registerTaskHandler('undeploy_api', async ({ deployment_id, api_id }) => {
   const dep = (await db`select * from api_deployments where id = ${deployment_id}`)[0];
   try {
     await oto.deleteApi(api_id);
+    await syncDerived(api_id, null);
   } catch (e) {
     if (dep) await db`update api_deployments set error = ${e.message} where id = ${dep.id}`;
     throw e;
@@ -148,6 +172,7 @@ registerTaskHandler('purge_api', async ({ api_id, subscriptions = [] }) => {
     await oto.deleteSubscription(s.id).catch(() => null);
   }
   await oto.deleteApi(api_id);
+  await syncDerived(api_id, null);
   return { purged: api_id };
 });
 

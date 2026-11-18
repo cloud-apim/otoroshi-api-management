@@ -7,7 +7,7 @@ import { db, newId } from '../db/index.js';
 import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
-import { buildOtoroshiApi, comparableApi } from './projection.js';
+import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
   await db`insert into drift_reports (id, workspace_id, entity_kind, entity_id, otoroshi_kind, otoroshi_id, status, diff, checked_at)
@@ -27,6 +27,12 @@ export async function checkApi(api) {
   const expected = buildOtoroshiApi(dep.content, { snapshotId: dep.snapshot_id, snapshotNumber: dep.number, lifecycle: api.lifecycle });
   const actual = await oto.getApi(api.id);
   const changes = actual ? diff(comparableApi(expected), comparableApi(actual)) : [];
+  // the derived objects (D-15) drift too: they are the product's, even though they live apart
+  for (const d of derivedEntities(dep.content)) {
+    const got = await oto.getEntity(d.path, d.id);
+    if (!got) changes.push({ op: 'remove', path: `derived[${d.kind} ${d.id}]`, before: 'present' });
+    else diff(comparableDerived(d.entity), comparableDerived(got), `derived[${d.kind} ${d.entity.name}]`, changes);
+  }
   const report = {
     workspace_id: api.workspace_id,
     entity_kind: 'api',

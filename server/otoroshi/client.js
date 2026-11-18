@@ -109,6 +109,14 @@ export const oto = {
   deleteApikey: (clientId) => otoroshi('DELETE', `/api/apikeys/${clientId}`),
   apikeyQuotas: (clientId) => otoroshi('GET', `/api/apikeys/${clientId}/quotas`),
   listJwtVerifiers: () => otoroshi('GET', '/api/verifiers'),
+  // a derived object is written like the Api: GET, then PUT or POST (G-10)
+  upsertEntity: async (path, entity) => {
+    const existing = await otoroshi('GET', `${path}/${entity.id}`);
+    if (existing) return otoroshi('PUT', `${path}/${entity.id}`, entity);
+    return otoroshi('POST', path, entity);
+  },
+  getEntity: (path, id) => otoroshi('GET', `${path}/${id}`),
+  deleteEntity: (path, id) => otoroshi('DELETE', `${path}/${id}`),
   listAuthModules: () => otoroshi('GET', '/api/auths'),
   listCertificates: () => otoroshi('GET', '/api/certificates'),
   listDataExporters: () => otoroshi('GET', '/api/data-exporter-configs'),

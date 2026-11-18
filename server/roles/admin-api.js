@@ -16,7 +16,7 @@ import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../d
 import { listTasks, queueStats, enqueue } from '../domain/tasks.js';
 import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
-import { buildOtoroshiApi } from '../otoroshi/projection.js';
+import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
@@ -509,7 +509,14 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   }
   const gw = await gatewaySettings();
   const report = (await db`select * from drift_reports where entity_kind = 'api' and entity_id = ${api.id}`)[0] || null;
+  // objects derived from the description of the api (D-15), and whether the gateway holds them
+  const derived = [];
+  for (const d of snap ? derivedEntities(snap.content) : []) {
+    const got = await oto.getEntity(d.path, d.id).catch(() => null);
+    derived.push({ kind: d.kind, id: d.id, name: d.entity.name, present: !!got });
+  }
   return {
+    derived,
     otoroshi: { kind: 'apis.otoroshi.io/Api', id: api.id, backoffice_url: `${gw.backofficeUrl}/bo/dashboard/apis/${api.id}` },
     expected,
     actual,
