@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtRelative } from '../../shared/lib.js';
-import { Badge, Callout, Code, Field, Icon, Input, Loader, Switch, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, Code, Field, Icon, Input, Loader, Select, Setting, Switch, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 
@@ -190,10 +190,116 @@ function Tokens() {
   );
 }
 
+// D-25: one IdP for the console. local and oidc run in parallel; the otoroshi mode is exclusive.
+function Authentication() {
+  const st = useLoad(() => api.get('/settings'), []);
+  const toast = useToast();
+  const [form, setForm] = useState(null);
+  return (
+    <Loader state={st}>
+      {(s) => {
+        const f = form || s.auth;
+        const setO = (patch) => setForm({ ...f, oidc: { ...f.oidc, ...patch } });
+        const setX = (patch) => setForm({ ...f, otoroshi: { ...f.otoroshi, ...patch } });
+        return (
+          <div className="col gap-16">
+            <div className="card">
+              <div className="card-body">
+                <Setting label="Mode" help="local accounts and an OIDC provider compose; the Otoroshi mode reads the identity in a header set by the gateway and is exclusive.">
+                  <Select
+                    value={f.mode}
+                    onChange={(v) => setForm({ ...f, mode: v })}
+                    options={[
+                      { value: 'local', label: 'Local accounts + optional OIDC provider' },
+                      { value: 'otoroshi', label: 'Via Otoroshi (exclusive)' },
+                    ]}
+                  />
+                  {f.mode === 'otoroshi' && (
+                    <Callout kind="warning" title="No fallback entry">
+                      The identity comes from the gateway: a gateway outage locks the console — the very tool you need to diagnose it. A defensible trade-off when the gateway is already the single entry point of the organisation.
+                    </Callout>
+                  )}
+                </Setting>
+              </div>
+            </div>
+            {f.mode === 'local' ? (
+              <div className="card">
+                <div className="card-head">
+                  <h3>OpenID Connect provider</h3>
+                </div>
+                <div className="card-body">
+                  <Setting label="Enabled">
+                    <Switch checked={f.oidc.enabled} onChange={(v) => setO({ enabled: v })} />
+                  </Setting>
+                  <Setting label="Button label">
+                    <Input value={f.oidc.label} onChange={(v) => setO({ label: v })} />
+                  </Setting>
+                  <Setting label="Issuer" help="discovery at <issuer>/.well-known/openid-configuration">
+                    <Input value={f.oidc.issuer} onChange={(v) => setO({ issuer: v })} mono />
+                  </Setting>
+                  <Setting label="Client" help={`register this redirect uri at the provider: ${s.auth.callback}`}>
+                    <Input value={f.oidc.clientId} onChange={(v) => setO({ clientId: v })} mono placeholder="client id" />
+                    <Input value={f.oidc.clientSecret} onChange={(v) => setO({ clientSecret: v })} mono type="password" placeholder="client secret" />
+                  </Setting>
+                  <Setting label="Scopes and claims">
+                    <Input value={f.oidc.scopes} onChange={(v) => setO({ scopes: v })} mono />
+                    <div className="row">
+                      <Input value={f.oidc.emailClaim} onChange={(v) => setO({ emailClaim: v })} mono placeholder="email claim" />
+                      <Input value={f.oidc.nameClaim} onChange={(v) => setO({ nameClaim: v })} mono placeholder="name claim" />
+                    </div>
+                  </Setting>
+                  <Setting label="Local accounts" help="when off, only the bootstrap administrators keep the local form">
+                    <Switch checked={f.oidc.localLogin} onChange={(v) => setO({ localLogin: v })} label="Keep the local sign-in form" />
+                  </Setting>
+                </div>
+              </div>
+            ) : (
+              <div className="card">
+                <div className="card-head">
+                  <h3>Otoroshi info token</h3>
+                </div>
+                <div className="card-body">
+                  <Setting label="Header" help="set by the Otoroshi info. token plugin (legacy version) on the route exposing the console, behind an auth module">
+                    <Input value={f.otoroshi.header} onChange={(v) => setX({ header: v })} mono />
+                  </Setting>
+                  <Setting label="Secret" help="the HMAC secret of the token, shared with the route">
+                    <Input value={f.otoroshi.secret} onChange={(v) => setX({ secret: v })} mono type="password" />
+                  </Setting>
+                  <Setting label="Issuer" help="optional check of the iss claim">
+                    <Input value={f.otoroshi.issuer} onChange={(v) => setX({ issuer: v })} mono />
+                  </Setting>
+                </div>
+              </div>
+            )}
+            <div className="row">
+              <button
+                className="btn primary"
+                disabled={!form}
+                onClick={async () => {
+                  try {
+                    await api.put('/settings/auth', { mode: form.mode, oidc: form.oidc, otoroshi: form.otoroshi });
+                    setForm(null);
+                    toast('Authentication settings saved');
+                    st.reload();
+                  } catch (e) {
+                    toast(errorMessage(e), 'error');
+                  }
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        );
+      }}
+    </Loader>
+  );
+}
+
 export function GlobalSettingsPage({ tab }) {
   const { navigate } = useRouter();
   const { user } = useSession();
-  const tabs = user.is_admin ? ['workspaces', 'users', 'tokens'] : ['tokens'];
+  const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'tokens'] : ['tokens'];
   return (
     <div className="page">
       <PageHead title="Global settings" sub="Installation-level: workspaces, users, access tokens." />
@@ -206,6 +312,7 @@ export function GlobalSettingsPage({ tab }) {
       </div>
       {tab === 'workspaces' && user.is_admin && <Workspaces />}
       {tab === 'users' && user.is_admin && <Users />}
+      {tab === 'authentication' && user.is_admin && <Authentication />}
       {tab === 'tokens' && <Tokens />}
     </div>
   );

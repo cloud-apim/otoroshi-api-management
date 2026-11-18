@@ -109,9 +109,14 @@ async function myApplicationIds(ctx) {
 
 // ---------------------------------------------------------------- portal & auth
 
+function publicPortal(portal = {}) {
+  const { oidc, ...rest } = portal;
+  return { ...rest, sso: oidc?.enabled ? { label: oidc.label || 'single sign-on' } : null };
+}
+
 r.get('/portal', async ({ ctx }) => ({
   workspace: { slug: ctx.workspace.slug, name: ctx.workspace.name, description: ctx.workspace.description },
-  portal: ctx.workspace.portal,
+  portal: publicPortal(ctx.workspace.portal),
   user: ctx.user ? { ...identity.publicUser(ctx.user), role: ctx.role } : null,
 }));
 

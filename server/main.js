@@ -14,6 +14,9 @@ import { portalRouter, tryItProxy } from './roles/portal-api.js';
 import { ingest, parseEvents } from './domain/ingest.js';
 import { workOnce } from './domain/tasks.js';
 import { runDriftDetection } from './otoroshi/drift.js';
+import { consoleAuth, portalAuth, publicAuthConfig } from './auth/settings.js';
+import { authorizeUrl, completeLogin } from './auth/oidc.js';
+import { verifyOtoroshiClaim } from './auth/otoroshi.js';
 
 const DIST = join(import.meta.dir, '..', 'dist');
 const BO_COOKIE = 'apim_bo';
@@ -24,6 +27,18 @@ function cookie(name, value, { path = '/', maxAge } = {}) {
   if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
   if (config.cookieSecure) parts.push('Secure');
   return parts.join('; ');
+}
+
+// the origin the browser used: oidc redirect uris are built from it
+function origin(req) {
+  const url = new URL(req.url);
+  const proto = req.headers.get('x-forwarded-proto') || url.protocol.replace(':', '');
+  const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || url.host;
+  return `${proto}://${host}`;
+}
+
+function redirect(location, headers = {}) {
+  return new Response(null, { status: 302, headers: { location, ...headers } });
 }
 
 function clientIp(req, server) {
@@ -90,10 +105,46 @@ async function handleAdminApi(req, path, server) {
 
 async function handleBackofficeApi(req, path, server) {
   const cookies = parseCookies(req);
+  const auth = await consoleAuth();
+  if (path === '/auth/config') return json(publicAuthConfig(auth));
+  // via Otoroshi (D-25): exclusive, the identity comes from the gateway on every request
+  if (auth.mode === 'otoroshi') {
+    if (path.startsWith('/auth/')) return json({ error: 'authentication is delegated to Otoroshi on this installation' }, 400);
+    let user = null;
+    try {
+      const id = verifyOtoroshiClaim(req.headers.get(auth.otoroshi.header), auth.otoroshi);
+      user = await identity.externalUser(id, 'otoroshi');
+    } catch (e) {
+      return json({ error: `unauthorized: ${e.message}` }, 401);
+    }
+    checkCsrf(req);
+    return dispatch(adminRouter, req, path, { user, via: 'backoffice', ip: clientIp(req, server) });
+  }
+  if (path === '/auth/oidc/login' && auth.oidc.enabled) {
+    try {
+      return redirect(await authorizeUrl(auth.oidc, { redirectUri: `${origin(req)}/backoffice/api/auth/oidc/callback`, context: { face: 'backoffice' } }));
+    } catch (e) {
+      return redirect(`/backoffice/?error=${encodeURIComponent(`identity provider unreachable: ${e.message}`)}`);
+    }
+  }
+  if (path === '/auth/oidc/callback' && auth.oidc.enabled) {
+    const url = new URL(req.url);
+    try {
+      if (url.searchParams.get('error')) throw new Error(url.searchParams.get('error_description') || url.searchParams.get('error'));
+      const id = await completeLogin(auth.oidc, { code: url.searchParams.get('code'), state: url.searchParams.get('state') });
+      const user = await identity.externalUser(id, 'oidc');
+      const s = await identity.createSession(user.id, 'backoffice');
+      return redirect('/backoffice/', { 'set-cookie': cookie(BO_COOKIE, s.id, { path: '/backoffice', maxAge: config.sessionTtlMs / 1000 }) });
+    } catch (e) {
+      return redirect(`/backoffice/?error=${encodeURIComponent(e.message)}`);
+    }
+  }
   if (path === '/auth/login' && req.method === 'POST') {
     const body = await readJson(req);
     const user = await identity.checkPassword(body.email, body.password);
     if (!user) return json({ error: 'invalid credentials' }, 401);
+    // with the IdP as the norm, the local form stays open to bootstrap administrators only
+    if (!publicAuthConfig(auth).local && !config.bootstrap.admins.map((x) => x.toLowerCase()).includes(user.email)) return json({ error: 'sign in with the identity provider' }, 403);
     const s = await identity.createSession(user.id, 'backoffice');
     return json({ user: identity.publicUser(user) }, 200, { 'set-cookie': cookie(BO_COOKIE, s.id, { path: '/backoffice', maxAge: config.sessionTtlMs / 1000 }) });
   }
@@ -143,7 +194,35 @@ async function handlePortal(req, url, server) {
     if (path === '/tryit' || path.startsWith('/tryit?')) {
       return tryItProxy(req, ctx);
     }
+    const pauth = portalAuth(ws);
+    if (path === '/auth/config') return json({ local: pauth.localLogin, selfSignup: !!ws.portal?.selfSignup && pauth.localLogin, oidc: pauth.oidc.enabled ? { label: pauth.oidc.label } : null });
+    if (path.startsWith('/auth/oidc/login') && pauth.oidc.enabled) {
+      const next = new URL(req.url).searchParams.get('next') || '/';
+      try {
+        return redirect(await authorizeUrl(pauth.oidc, { redirectUri: `${origin(req)}${base}/front/api/auth/oidc/callback`, context: { face: 'portal', workspace: ws.id, next } }));
+      } catch (e) {
+        return redirect(`${base}/signin?error=${encodeURIComponent(`identity provider unreachable: ${e.message}`)}`);
+      }
+    }
+    if (path.startsWith('/auth/oidc/callback') && pauth.oidc.enabled) {
+      const url = new URL(req.url);
+      try {
+        if (url.searchParams.get('error')) throw new Error(url.searchParams.get('error_description') || url.searchParams.get('error'));
+        const id = await completeLogin(pauth.oidc, { code: url.searchParams.get('code'), state: url.searchParams.get('state') });
+        if (id.context?.workspace !== ws.id) throw new Error('this login was started on another portal');
+        const u = await identity.externalUser(id, `oidc:${ws.slug}`);
+        // the workspace's own IdP vouches for its members: they join the portal as consumers
+        if (!u.is_admin && !(await identity.membership(ws.id, u.id))) await identity.addMember(ws.id, u.id, 'consumer');
+        await identity.personalTeam({ user: u, via: 'portal' }, ws.id, u);
+        const s = await identity.createSession(u.id, 'portal');
+        const next = String(id.context?.next || '/').startsWith('/') ? id.context.next : '/';
+        return redirect(`${base}${next}`, { 'set-cookie': cookie(PORTAL_COOKIE, s.id, { path: '/', maxAge: config.sessionTtlMs / 1000 }) });
+      } catch (e) {
+        return redirect(`${base}/signin?error=${encodeURIComponent(e.message)}`);
+      }
+    }
     if (path === '/auth/login' && req.method === 'POST') {
+      if (!pauth.localLogin) return json({ error: 'sign in with the identity provider of this portal' }, 403);
       const body = await readJson(req);
       const u = await identity.checkPassword(body.email, body.password);
       if (!u) return json({ error: 'invalid credentials' }, 401);
@@ -155,7 +234,7 @@ async function handlePortal(req, url, server) {
       return json({ user: identity.publicUser(u) }, 200, { 'set-cookie': cookie(PORTAL_COOKIE, s.id, { path: '/', maxAge: config.sessionTtlMs / 1000 }) });
     }
     if (path === '/auth/signup' && req.method === 'POST') {
-      if (!ws.portal?.selfSignup) return json({ error: 'self signup is disabled on this portal' }, 403);
+      if (!ws.portal?.selfSignup || !pauth.localLogin) return json({ error: 'self signup is disabled on this portal' }, 403);
       const body = await readJson(req);
       if (!body.password || body.password.length < 8) return json({ error: 'the password must have at least 8 characters' }, 400);
       const u = await identity.createUser({ email: body.email, name: body.name, password: body.password });

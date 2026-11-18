@@ -19,6 +19,7 @@ import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } fro
 import { buildOtoroshiApi } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
+import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 
 const r = new Router();
 
@@ -43,7 +44,7 @@ function mask(secret) {
 
 r.get('/me', async ({ ctx }) => {
   identity.requireUser(ctx);
-  const workspaces = await identity.listWorkspacesFor(ctx.user);
+  const workspaces = (await identity.listWorkspacesFor(ctx.user)).map(identity.maskWorkspace);
   return { user: identity.publicUser(ctx.user), workspaces };
 });
 
@@ -76,17 +77,32 @@ r.get('/settings', async ({ ctx }) => {
     portal: { exposure: config.portal.exposure, domain: config.portal.domain, ...(rows.find((x) => x.key === 'portal')?.value || {}) },
     ingest: { storeRaw: config.ingest.storeRaw, url: config.ingest.url || `${config.publicUrl}/ingest`, ...(rows.find((x) => x.key === 'ingest')?.value || {}) },
     drift: rows.find((x) => x.key === 'drift.last_run')?.value || null,
+    auth: await consoleAuth().then((a) => ({
+      ...a,
+      oidc: { ...a.oidc, clientSecret: mask(a.oidc.clientSecret) },
+      otoroshi: { ...a.otoroshi, secret: mask(a.otoroshi.secret) },
+      callback: `${config.publicUrl}/backoffice/api/auth/oidc/callback`,
+    })),
   };
 });
 
 r.put('/settings/:key', async ({ ctx, params, body }) => {
   identity.requireAdmin(ctx);
-  if (!['gateway', 'portal', 'ingest'].includes(params.key)) throw badRequest('unknown settings key');
+  if (!['gateway', 'portal', 'ingest', 'auth'].includes(params.key)) throw badRequest('unknown settings key');
   const current = (await db`select value from settings where key = ${params.key}`)[0]?.value || {};
   const value = { ...current, ...body };
+  if (params.key === 'auth') {
+    const effective = await consoleAuth();
+    const keep = (v, old) => (!v || String(v).includes('••') ? old : v);
+    if (body.oidc) value.oidc = { ...current.oidc, ...body.oidc, clientSecret: keep(body.oidc.clientSecret, effective.oidc.clientSecret) };
+    if (body.otoroshi) value.otoroshi = { ...current.otoroshi, ...body.otoroshi, secret: keep(body.otoroshi.secret, effective.otoroshi.secret) };
+    if (value.mode === 'otoroshi' && !value.otoroshi?.secret && !effective.otoroshi.secret)
+      throw badRequest('the otoroshi mode needs the secret shared with the route that exposes the console');
+  }
   if (params.key === 'gateway' && (!body.clientSecret || body.clientSecret.includes('••'))) value.clientSecret = current.clientSecret || config.otoroshi.clientSecret;
   await db`insert into settings (key, value) values (${params.key}, ${value}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   invalidateGatewaySettings();
+  invalidateAuthSettings();
   await audit(ctx, { action: `settings.${params.key}.update`, entityKind: 'settings', entityId: params.key, summary: `${params.key} settings updated` });
   return { updated: params.key };
 });
@@ -216,7 +232,7 @@ r.put('/users/:id', async ({ ctx, params, body }) => {
 
 r.get('/workspaces', async ({ ctx }) => {
   identity.requireUser(ctx);
-  return identity.listWorkspacesFor(ctx.user);
+  return (await identity.listWorkspacesFor(ctx.user)).map(identity.maskWorkspace);
 });
 
 r.post('/workspaces', async ({ ctx, body }) => {
@@ -226,12 +242,12 @@ r.post('/workspaces', async ({ ctx, body }) => {
 
 r.get('/workspaces/:ws', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin', 'producer']);
-  return { ...c.workspace, role: c.role };
+  return { ...identity.maskWorkspace(c.workspace), role: c.role };
 });
 
 r.put('/workspaces/:ws', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
-  return identity.updateWorkspace(c, c.workspace, body);
+  return identity.maskWorkspace(await identity.updateWorkspace(c, c.workspace, body));
 });
 
 r.delete('/workspaces/:ws', async ({ ctx, params }) => {

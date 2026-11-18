@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { Callout, Field, Input, errorMessage } from '../../shared/ui.jsx';
-import { api, usePortal } from '../context.jsx';
+import { api, runtime, usePortal } from '../context.jsx';
 import { useT } from '../i18n.jsx';
 
 function safeNext(next) {
@@ -32,6 +32,7 @@ export function SignIn() {
   const { navigate } = useRouter();
   const [params] = useQuery();
   const next = params.get('next');
+  const ssoError = params.get('error');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -55,7 +56,7 @@ export function SignIn() {
       title={t('auth.signin.title')}
       subtitle={t('auth.signin.subtitle', { portal: portal?.title })}
       footer={
-        portal?.selfSignup && (
+        portal?.selfSignup && portal?.localLogin !== false && (
           <>
             {t('auth.noaccount')}{' '}
             <Link to={`/signup${next ? `?next=${encodeURIComponent(next)}` : ''}`} className="link">
@@ -66,6 +67,17 @@ export function SignIn() {
       }
     >
       {next && <Callout kind="info">{t('auth.required')}</Callout>}
+      {ssoError && <Callout kind="negative">{ssoError}</Callout>}
+      {/* the workspace's own identity provider (D-25: one IdP per portal) */}
+      {portal?.sso && (
+        <>
+          <a className="btn primary" href={`${runtime.base}/front/api/auth/oidc/login?next=${encodeURIComponent(safeNext(next))}`}>
+            {t('auth.sso', { label: portal.sso.label })}
+          </a>
+          {portal?.localLogin !== false && <div className="center faint small">{t('auth.or')}</div>}
+        </>
+      )}
+      {portal?.localLogin !== false && (
       <form className="col gap-16" onSubmit={submit}>
         <Field label={t('auth.email')}>
           <Input type="email" value={email} onChange={setEmail} autoComplete="email" required autoFocus aria-label={t('auth.email')} />
@@ -74,10 +86,11 @@ export function SignIn() {
           <Input type="password" value={password} onChange={setPassword} autoComplete="current-password" required aria-label={t('auth.password')} />
         </Field>
         {error && <Callout kind="negative">{errorMessage(error)}</Callout>}
-        <button className="btn primary" type="submit" disabled={busy}>
+        <button className={`btn ${portal?.sso ? '' : 'primary'}`} type="submit" disabled={busy}>
           {busy ? <span className="spinner" /> : t('auth.submit.signin')}
         </button>
       </form>
+      )}
     </AuthCard>
   );
 }

@@ -260,6 +260,17 @@ create table drift_reports (
 );
 `,
   },
+  {
+    version: '0002_auth_states',
+    sql: `
+-- logins in flight (OIDC state, PKCE verifier, nonce): single use, short-lived (D-25)
+create table auth_states (
+  id text primary key,
+  data jsonb not null,
+  expires_at timestamptz not null
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

@@ -39,6 +39,16 @@ export async function checkPassword(email, password) {
   return ok ? user : null;
 }
 
+// an identity asserted by an IdP or by the gateway: the user is global, found or created by email
+export async function externalUser({ email, name }, via) {
+  let user = await findUserByEmail(email);
+  if (!user) {
+    user = await createUser({ email, name, isAdmin: config.bootstrap.admins.map((x) => x.toLowerCase()).includes(email.toLowerCase()) });
+    await audit({ user, via }, { action: 'user.provision', entityKind: 'user', entityId: user.id, summary: `${email} provisioned from ${via}` });
+  }
+  return user;
+}
+
 // ---------------------------------------------------------------- sessions & tokens
 
 export async function createSession(userId, kind) {
@@ -94,6 +104,17 @@ export async function tokenUser(token) {
 
 // ---------------------------------------------------------------- workspaces
 
+export function maskSecret(secret) {
+  if (!secret) return secret;
+  return secret.slice(0, 3) + '••••••••';
+}
+
+// never hand an idp secret back to a client
+export function maskWorkspace(ws) {
+  if (!ws?.portal?.oidc) return ws;
+  return { ...ws, portal: { ...ws.portal, oidc: { ...ws.portal.oidc, clientSecret: maskSecret(ws.portal.oidc.clientSecret) } } };
+}
+
 export async function listWorkspacesFor(user) {
   if (user.is_admin) return db`select * from workspaces order by name`;
   return db`select w.*, m.role from workspaces w join workspace_members m on m.workspace_id = w.id
@@ -134,6 +155,9 @@ export async function updateWorkspace(ctx, ws, patch) {
   const name = patch.name ?? ws.name;
   const description = patch.description ?? ws.description;
   const portal = patch.portal ? { ...ws.portal, ...patch.portal } : ws.portal;
+  // a masked secret sent back by the console keeps the stored one
+  if (patch.portal?.oidc && (!patch.portal.oidc.clientSecret || String(patch.portal.oidc.clientSecret).includes('••')))
+    portal.oidc = { ...portal.oidc, clientSecret: ws.portal?.oidc?.clientSecret || '' };
   const metadata = patch.metadata ?? ws.metadata;
   const rows = await db`update workspaces set name = ${name}, description = ${description}, portal = ${portal},
     metadata = ${metadata}, updated_at = now() where id = ${ws.id} returning *`;

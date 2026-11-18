@@ -25,8 +25,12 @@ const LAST_WS = 'apim.workspace';
 function Login({ onLogged }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(() => new URLSearchParams(window.location.search).get('error'));
   const [busy, setBusy] = useState(false);
+  const [auth, setAuth] = useState({ local: true, oidc: null, mode: 'local' });
+  useEffect(() => {
+    api.get('/auth/config').then(setAuth).catch(() => {});
+  }, []);
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true);
@@ -52,17 +56,30 @@ function Login({ onLogged }) {
             </div>
           </div>
           <h1>Sign in to the console</h1>
+          {auth.mode === 'otoroshi' && (
+            <div className="callout warning">Authentication is delegated to Otoroshi: open the console through the gateway route that protects it.</div>
+          )}
+          {auth.oidc && (
+            <a className="btn primary" href="/backoffice/api/auth/oidc/login">
+              Continue with {auth.oidc.label}
+            </a>
+          )}
+          {auth.oidc && auth.local && <div className="center faint small">or with a local account</div>}
+          {auth.local && (
+          <>
           <Field label="Email">
             <Input type="email" autoComplete="username" value={email} onChange={setEmail} autoFocus required />
           </Field>
           <Field label="Password">
             <Input type="password" autoComplete="current-password" value={password} onChange={setPassword} required />
           </Field>
-          {error && <div className="callout negative">{error}</div>}
-          <button className="btn primary" disabled={busy} type="submit">
+          <button className={`btn ${auth.oidc ? '' : 'primary'}`} disabled={busy} type="submit">
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
-          <p className="faint small">Bootstrap administrators are declared by environment variable (APIM_BOOTSTRAP_ADMINS).</p>
+          </>
+          )}
+          {error && <div className="callout negative">{error}</div>}
+          <p className="faint small">Bootstrap administrators are declared by environment variable (APIM_BOOTSTRAP_ADMINS) and keep a local entry that depends on nothing.</p>
         </div>
       </form>
     </div>

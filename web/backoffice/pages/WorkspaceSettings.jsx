@@ -75,6 +75,20 @@ function Portal() {
           <Setting label="Self signup" help="anyone can create an account and get a key on public plans">
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
           </Setting>
+          <Setting label="Identity provider" help={`One IdP per portal (D-25): the people of this workspace sign in with it and join as consumers. Redirect uri: ${window.location.origin}/${ws.slug}/front/api/auth/oidc/callback`}>
+            <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label="Sign in with an OpenID Connect provider" />
+            {p.oidc?.enabled && (
+              <>
+                <Input value={p.oidc?.label} onChange={(v) => set('oidc')({ ...p.oidc, label: v })} placeholder="button label, e.g. Corporate SSO" />
+                <Input value={p.oidc?.issuer} onChange={(v) => set('oidc')({ ...p.oidc, issuer: v })} mono placeholder="issuer" />
+                <div className="row">
+                  <Input value={p.oidc?.clientId} onChange={(v) => set('oidc')({ ...p.oidc, clientId: v })} mono placeholder="client id" />
+                  <Input value={p.oidc?.clientSecret} onChange={(v) => set('oidc')({ ...p.oidc, clientSecret: v })} mono type="password" placeholder="client secret" />
+                </div>
+                <Switch checked={p.localLogin !== false} onChange={set('localLogin')} label="Keep local accounts on this portal" />
+              </>
+            )}
+          </Setting>
           <Setting label="Home page content" help="markdown, below the hero of the portal home">
             <TextArea value={p.homeMarkdown} onChange={set('homeMarkdown')} mono rows={6} />
             {p.homeMarkdown && (
