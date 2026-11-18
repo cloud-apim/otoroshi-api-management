@@ -133,7 +133,7 @@
   },
   {
     "file": "console-snapshot.png",
-    "title": "An immutable snapshot"
+    "title": "An immutable snapshot, read-only"
   },
   {
     "file": "console-deploy-dry-run.png",
@@ -148,8 +148,8 @@
     "title": "Publish — changes since the last snapshot, validation"
   },
   {
-    "file": "console-api-tryit.png",
-    "title": "Try it — replay a request through the gateway"
+    "file": "console-api-test.png",
+    "title": "Test — replay a request through the gateway, with the credentials of a subscription"
   },
   {
     "file": "console-api-analytics.png",
@@ -197,7 +197,7 @@
   },
   {
     "file": "console-audit-event.png",
-    "title": "An audit event"
+    "title": "An audit event, read-only"
   },
   {
     "file": "console-ws-general.png",
@@ -297,7 +297,7 @@
   },
   {
     "file": "portal-reference.png",
-    "title": "Portal — API reference and try-it (Scalar)"
+    "title": "Portal — API reference, and testing from it (Scalar)"
   },
   {
     "file": "portal-plans.png",

@@ -239,7 +239,8 @@ async function consoleTour(page) {
   await go(page, `${A}/deployment`);
   await shot(page, 'console-api-deployment', 'API — deployed state, gateway drift, snapshots (rollback), history');
   await click(page, 'View');
-  await shot(page, 'console-snapshot', 'An immutable snapshot', { full: false });
+  await editors(page);
+  await shot(page, 'console-snapshot', 'An immutable snapshot, read-only', { full: false });
   await go(page, A);
   await click(page, 'Deploy');
   await shot(page, 'console-deploy-dry-run', 'Deploy — the diff is always shown first', { full: false });
@@ -253,10 +254,11 @@ async function consoleTour(page) {
   await shot(page, 'console-publish', 'Publish — changes since the last snapshot, validation', { full: false });
   await api(page, `/backoffice/api/workspaces/${WS}/apis/${books.id}`, 'PUT', { description: original });
 
-  await go(page, `${A}/tryit`);
+  await go(page, `${A}/test`);
   await click(page, 'Send');
   await sleep(800);
-  await shot(page, 'console-api-tryit', 'Try it — replay a request through the gateway');
+  await editors(page);
+  await shot(page, 'console-api-test', 'Test — replay a request through the gateway, with the credentials of a subscription');
   await go(page, `${A}/analytics?range=24h`);
   await shot(page, 'console-api-analytics', 'API — analytics, in the catalogue vocabulary');
   await go(page, `${A}/settings`);
@@ -291,7 +293,8 @@ async function consoleTour(page) {
   await go(page, `${W}/audit`);
   await shot(page, 'console-audit', 'Audit — writes, and reads of credentials and request logs', { full: false });
   await click(page, '', { selector: 'tr.clickable' });
-  await shot(page, 'console-audit-event', 'An audit event', { full: false });
+  await editors(page);
+  await shot(page, 'console-audit-event', 'An audit event, read-only', { full: false });
 
   for (const [tab, name, title] of [
     ['general', 'console-ws-general', 'Workspace settings — general'],
@@ -362,7 +365,7 @@ async function portalTour(page) {
   await shot(page, 'portal-docs', 'Portal — documentation, in the languages of the api');
   await go(page, `${P}/apis/books/reference`);
   await sleep(1500);
-  await shot(page, 'portal-reference', 'Portal — API reference and try-it (Scalar)');
+  await shot(page, 'portal-reference', 'Portal — API reference, and testing from it (Scalar)');
   await go(page, `${P}/apis/books/plans`);
   await shot(page, 'portal-plans', 'Portal — plans: what really applies, per credential');
   await go(page, `${P}/signin`);
