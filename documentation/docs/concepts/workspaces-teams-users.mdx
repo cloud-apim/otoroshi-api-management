@@ -1,0 +1,61 @@
+---
+sidebar_position: 1
+title: Workspaces, teams and users
+description: The tenant is a workspace, teams own APIs and applications, users are global.
+---
+
+# Workspaces, teams and users
+
+## Workspaces
+
+The tenant is called a **workspace**, with the same word on every surface: console, admin API,
+CLI and declarative documents (D-19). Each workspace has its own APIs, applications, teams and its
+own [developer portal](../developer-portal.mdx).
+
+A workspace is never an Otoroshi tenant: everything the product projects lands in the default
+location of the gateway (D-24). Tenancy lives in the product.
+
+- In the **console**, the workspace is a selector at the top of the sidebar: a session state,
+  bounded by your rights (D-20).
+- On the **portal**, it is read from the URL — never from a session, because an anonymous visitor
+  has none and an API URL must mean the same thing to everyone.
+
+## Users
+
+Users are **global**: one record per person, with memberships in several workspaces. A membership
+carries a role:
+
+| Role | Can |
+|---|---|
+| `admin` | everything in the workspace: settings, members, portal, catalogs, metadata fields |
+| `producer` | create APIs, and manage the APIs of the teams they belong to (or with no team) |
+| `consumer` | use the developer portal; no access to the console |
+
+**Installation administrators** (`APIM_BOOTSTRAP_ADMINS`, or created with *admin* in Global
+settings) can do everything everywhere. An administrator only sees the users who are members of
+its own workspaces: a shared installation does not reveal that an email exists elsewhere.
+
+Users signing in with an identity provider are created on their first login, with no workspace —
+an administrator adds them, or the portal of a workspace makes them consumers (see
+[Authentication](../authentication.mdx)).
+
+## Teams
+
+A team belongs to a workspace and groups people. It owns **APIs** (its producers can edit them) and
+**applications** (its members can see them and their credentials).
+
+An individual developer never has to create a team to get a key: the portal gives each user an
+implicit **personal team** in the workspace, invisible until it matters.
+
+## ACL tags
+
+Restricted visibility — of an API or of a plan — is expressed as tags:
+
+```
+user:jane@corp.eu     a person
+team:team_01a1…       the members of a team
+role:producer         the members with a role in the workspace
+```
+
+A user carries `user:<email>`, `role:<role>` for its membership and `team:<id>` for each of its
+teams; installation administrators also carry `role:admin`.

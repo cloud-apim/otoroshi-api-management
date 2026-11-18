@@ -1,0 +1,58 @@
+/**
+ * Global styles. Infima variables are overridden here.
+ * The palette follows the product's own console: the Otoroshi blue as the primary.
+ */
+
+:root {
+  --ifm-color-primary: #0061bd;
+  --ifm-color-primary-dark: #0057aa;
+  --ifm-color-primary-darker: #0052a1;
+  --ifm-color-primary-darkest: #004484;
+  --ifm-color-primary-light: #006bd0;
+  --ifm-color-primary-lighter: #0070d9;
+  --ifm-color-primary-lightest: #0b80f0;
+  --ifm-code-font-size: 92%;
+  --ifm-font-family-monospace: 'IBM Plex Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+
+  --apim-accent: #6250d6;
+  --apim-surface: #ffffff;
+  --apim-surface-alt: #f2f4f7;
+  --apim-border: #dde2ea;
+  --apim-muted: #5b6474;
+  --apim-hero-bg: linear-gradient(150deg, #0b1220 0%, #11203a 55%, #0061bd 100%);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #7db8ff;
+  --ifm-color-primary-dark: #5ea7ff;
+  --ifm-color-primary-darker: #4f9fff;
+  --ifm-color-primary-darkest: #2286ff;
+  --ifm-color-primary-light: #9cc9ff;
+  --ifm-color-primary-lighter: #abd1ff;
+  --ifm-color-primary-lightest: #d9eaff;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  --apim-accent: #9085e9;
+  --apim-surface: #14171d;
+  --apim-surface-alt: #1a1e25;
+  --apim-border: #2a303a;
+  --apim-muted: #a3acb9;
+  --apim-hero-bg: linear-gradient(150deg, #07090d 0%, #0d1626 55%, #123a6e 100%);
+}
+
+/* tables in the reference pages carry a lot of short values — keep them tight and scrollable */
+.markdown table {
+  display: table;
+  width: 100%;
+}
+.markdown table td:first-child {
+  white-space: nowrap;
+}
+.markdown table code {
+  white-space: nowrap;
+}
+
+.theme-admonition {
+  margin-bottom: 1.4rem;
+}

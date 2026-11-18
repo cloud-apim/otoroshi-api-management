@@ -11,11 +11,11 @@ Dernière mise à jour : 18/11/2026.
 
 ## En cours
 
-- Site de documentation Docusaurus (`documentation/`, comme les autres extensions) : en rédaction.
+- Rien : prochaine entrée de la liste ci-dessous.
 
 ## Suite, dans l'ordre proposé
 
-1. Relecture et commit de la documentation ; captures d'écran.
+1. Captures d'écran dans la documentation.
 2. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
 3. Console en français (le portail l'est déjà).
 4. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
@@ -49,7 +49,7 @@ Dernière mise à jour : 18/11/2026.
 | D-9 n°4 réversibilité | 🟡 | export / import ✅ ; « désinstaller laisse une conf qui tourne » non testé |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
 | D-10 WAF dans l'extension | 🟡 | posable comme plugin dans un flow ou un groupe ; pas d'écran dédié |
-| D-11 i18n | 🟡 | doc multilingue ✅, portail en/fr ✅, console en anglais seulement, libellés de métadonnées non traduits |
+| D-11 i18n | 🟡 | doc multilingue ✅, portail en/fr ✅, console en anglais seulement, libellés des champs de métadonnées dans une seule langue |
 | D-12 clair / sombre / système | ✅ | console et portail |
 | D-14 plus besoin d'ouvrir Otoroshi | 🟡 | APIM complet ; reste D-15 pour les certificats et modules d'auth |
 | D-15 objets dérivés (certificats, modules d'auth, JWT verifiers) | 🟡 | JWT verifiers ✅ dérivés de la description du plan (JWKS ou HMAC, iss, aud), marqués, inclus dans le diff de déploiement et le drift, supprimés avec l'API — test L0 ; certificats et modules d'auth ⬜ |
@@ -103,6 +103,10 @@ Dernière mise à jour : 18/11/2026.
 
 ✅ `test/reference-catalogue.test.js` : catalogue Atlas (6 plans, 5 mécanismes d'auth, 4 modes d'approbation, une API, un seul jeu de routes) projeté sur Otoroshi 18.0.1, réconcilié, drift détecté puis réparé — y compris le JWT verifier dérivé du plan Partner. 14 tests, stables.
 
+## Documentation
+
+✅ Site Docusaurus dans `documentation/` (même socle que les autres extensions : recherche locale, thème sombre par défaut), 19 pages, construit sans lien cassé ; `doc.sh` le publie dans `./docs` pour GitHub Pages.
+
 ## Manques côté Otoroshi
 
-Consignés au fil de l'eau dans [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 à G-12), pour correction dans le plan de données.
+Consignés au fil de l'eau dans [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 à G-14), pour correction dans le plan de données.

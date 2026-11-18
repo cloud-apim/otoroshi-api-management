@@ -22,6 +22,8 @@ the product has to compensate, **low** = friction.
 | G-10 | A `PUT` on an entity that does not exist is refused (`resource does not exists`) | low | `GET` then `POST` or `PUT` |
 | G-11 | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | The try-it with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | the console replays requests through the gateway without the trace |
+| G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | validation warning on the plan |
+| G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
 
 ---
 
@@ -177,3 +179,30 @@ policy trace needs this upstream change.
 **Upstream fix.** Expose the try-it on the Admin API (e.g. `POST /api/routes/_tryit`, and a
 variant taking an `Api` id + route id), returning the response and the execution report — or let
 an admin apikey enable a report id for the next request.
+
+## G-13 — a deprecated plan loses its extractor — high
+
+**Observed.** `applyPlansPolicies` builds the extractors and the enforcer from the **published**
+plans only (`next/models/Api.scala:1949`). A plan moved to `deprecated` — meant as "still served,
+closed to new subscriptions" — gets no extractor any more: the consumers of a deprecated jwt, mtls,
+oauth2-remote or keyless plan are no longer identified, and those of a deprecated apikey plan only
+keep working while another published apikey or oauth2-local plan still installs `ApikeyCalls`.
+Found by reading the source while documenting; not reproduced on the gateway yet.
+
+**Product meanwhile.** A validation warning on every deprecated plan whose extractor no published
+plan installs (`deprecated_without_extractor`).
+
+**Upstream fix.** Install the extractors of `published` **and** `deprecated` plans (deprecation
+closes subscriptions, not access); keep `closed` and `staging` out.
+
+## G-14 — no key validity relative to the subscription — low
+
+**Observed.** The key template of a plan (`ApikeyAccessModeConfiguration.validUntil`,
+`next/models/Api.scala:529`) is an absolute date, applied as is to every key the plan mints.
+"Keys of this plan are valid 90 days from the subscription" cannot be expressed; a `validUntil`
+written on a key afterwards is overwritten by the next plan update (`updateApikeyFromPlan`).
+
+**Product meanwhile.** Not offered: the unused `validityDays` field was removed from the model.
+
+**Upstream fix.** A relative validity (`validity: 90d`) in the plan's key template, turned into
+`validUntil` when the key is minted.

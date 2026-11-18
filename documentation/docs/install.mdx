@@ -1,0 +1,155 @@
+---
+sidebar_position: 3
+title: Install
+description: Deployment roles, configuration, databases, the container image, the data exporter and the portal exposure.
+---
+
+# Install
+
+## One binary, four roles
+
+The product is a single Bun program, started with a comma-separated list of roles in `APIM_ROLES`
+(default: all of them). A deployment can carry every role, or split them according to load and
+exposure — the public portal and the ingester do not have the same profile as the console.
+
+| Role | Serves |
+|---|---|
+| `api` | `/api` — the admin API, bearer tokens |
+| `backoffice` | `/backoffice` (the console) and `/backoffice/api` (the same admin API, with a session) |
+| `portal` | `/<workspace>/` and `/<workspace>/front/api` — or `<workspace>.<domain>/` in hostname mode |
+| `ingester` | `/ingest` |
+
+`/health` answers `{"status":"ok","roles":[…]}` on every instance.
+
+The background workers — the projection queue, the periodic drift detection, the remote catalog
+scheduler — run on instances carrying `api` or `backoffice`, unless `APIM_WORKERS_ENABLED=false`.
+
+## The container image
+
+```bash
+docker build -t otoroshi-api-management .
+docker run -p 9000:9000 \
+  -e APIM_DATABASE_URL=postgres://… -e APIM_ANALYTICS_DATABASE_URL=postgres://… \
+  -e OTOROSHI_URL=http://otoroshi:8080 -e OTOROSHI_CLIENT_ID=… -e OTOROSHI_CLIENT_SECRET=… \
+  otoroshi-api-management
+```
+
+The image builds both UIs in a first stage and carries `git`, used by the git
+[remote catalogs](./gitops/remote-catalogs.mdx).
+
+## Databases
+
+Two PostgreSQL databases (D-8): the **application data** (workspaces, APIs, drafts, snapshots,
+subscriptions, audit…) and the **events and analytics**. They do not have the same write profile,
+retention or criticality, so they are two connection URLs — they may live on the same server.
+Migrations run at startup.
+
+## Configuration
+
+Installation-level settings come from the environment. Everything per workspace lives in the
+database. The gateway connection and the console authentication can also be edited later from the
+console (*Gateway* and *Global settings*); stored values take precedence.
+
+### Server
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_PORT` (or `PORT`) | `9000` | listening port |
+| `APIM_ROLES` | `ingester,api,backoffice,portal` | roles of this instance |
+| `APIM_PUBLIC_URL` | `http://localhost:<port>` | public base url of the product |
+| `APIM_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim` | application database |
+| `APIM_ANALYTICS_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim_analytics` | events and analytics database |
+| `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |
+| `APIM_PROJECTION_INTERVAL_MS` | `2000` | how often the projection queue is polled |
+| `APIM_DRIFT_INTERVAL_MS` | `60000` | how often drift is detected |
+| `APIM_COOKIE_SECURE` | `false` | mark session cookies `Secure` |
+
+### Bootstrap
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_BOOTSTRAP_ADMINS` | `admin@otoroshi.io` | comma-separated emails of the installation administrators |
+| `APIM_BOOTSTRAP_PASSWORD` | `password` | their local password, set when they are created |
+| `APIM_BOOTSTRAP_WORKSPACE` | `default` | slug of the workspace created on first start, and the target of `/` |
+| `APIM_ADMIN_TOKEN` | `apim-admin-token` | a static admin API token acting as the first bootstrap administrator |
+
+:::warning
+Change `APIM_BOOTSTRAP_PASSWORD`, `APIM_ADMIN_TOKEN` and `APIM_INGEST_TOKEN` on anything that is not
+your laptop.
+:::
+
+### The Otoroshi cluster
+
+One installation drives one Otoroshi cluster (D-37), with an administration key (D-24).
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `OTOROSHI_URL` | `http://localhost:8080` | where the product reaches the Otoroshi admin API |
+| `OTOROSHI_HOST` | `otoroshi-api.oto.tools` | the `Host` of the admin API |
+| `OTOROSHI_CLIENT_ID` / `OTOROSHI_CLIENT_SECRET` | `apim-admin-client` / `apim-admin-secret` | an Otoroshi admin apikey |
+| `OTOROSHI_PUBLIC_SCHEME` / `OTOROSHI_PUBLIC_PORT` | `http` / `8080` | how consumers reach the APIs: `<scheme>://<api domain>:<port>` |
+| `OTOROSHI_BACKOFFICE_URL` | `http://otoroshi.oto.tools:8080` | used to link a projected entity in the Otoroshi backoffice |
+
+### Ingestion
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_INGEST_TOKEN` | `ingest-secret` | the token the data exporter presents to `/ingest` |
+| `APIM_INGEST_URL` | — | `/ingest` as the gateway reaches it, used by the exporter helper |
+| `APIM_INGEST_STORE_RAW` | `true` | keep the raw path (see [analytics](./gateway/analytics-and-ingester.mdx)) |
+
+### Developer portal
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_PORTAL_EXPOSURE` | `path` | `path`: `<domain>/<workspace>/` · `hostname`: `<workspace>.<domain>/` |
+| `APIM_PORTAL_DOMAIN` | `portal.oto.tools` | the domain of the hostname mode |
+
+### Console authentication
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_CONSOLE_AUTH` | `local` | `local` (accounts + optional OIDC) or `otoroshi` (exclusive) |
+| `APIM_OIDC_ISSUER` | — | enables OIDC for the console when set |
+| `APIM_OIDC_CLIENT_ID` / `APIM_OIDC_CLIENT_SECRET` | — | the client at the provider |
+| `APIM_OIDC_SCOPES` | `openid email profile` | requested scopes |
+| `APIM_OIDC_LABEL` | `single sign-on` | the label of the sign-in button |
+| `APIM_OTOROSHI_CLAIM_HEADER` | `Otoroshi-Claim` | header of the Otoroshi info token (otoroshi mode) |
+| `APIM_OTOROSHI_CLAIM_SECRET` | — | its HMAC secret |
+
+See [Authentication](./authentication.mdx).
+
+### Command line
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_URL` | `http://localhost:9000` | the product the CLI talks to |
+| `APIM_TOKEN` | — | an admin API token |
+
+## The data exporter
+
+Analytics need Otoroshi to send its events to the ingester. From the console, **Gateway →
+Connection & events → Install / update the exporter**, or:
+
+```bash
+curl -X POST http://localhost:9000/api/gateway/exporter \
+  -H 'Authorization: Bearer apim-admin-token' -H 'Content-Type: application/json' \
+  -d '{"url": "http://apim:9000/ingest"}'
+```
+
+It creates (or updates) an Otoroshi `webhook` data exporter with the id `apim_ingester_exporter`,
+filtered on `GatewayEvent`, `LLMUsageAudit` and `McpAudit`, sending batches to `/ingest` with
+`Authorization: Bearer <APIM_INGEST_TOKEN>`. An exporter is gateway infrastructure (D-15): this
+helper only creates the one it marks as its own and never touches the others.
+
+## Portal exposure
+
+There is one portal per workspace and **no global portal** (D-20). The workspace is always read from
+the URL, never from a session, so an API URL means the same thing to everyone:
+
+- **path** (default): `https://apis.example.com/<workspace>/` — no wildcard DNS or certificate per
+  workspace. `/` redirects to the portal of `APIM_BOOTSTRAP_WORKSPACE`.
+- **hostname**: `https://<workspace>.<APIM_PORTAL_DOMAIN>/`.
+
+The pattern holds for the whole installation and changes the form of every public URL, so choose it
+at installation time. The portal assets are always served under `/_portal/`.

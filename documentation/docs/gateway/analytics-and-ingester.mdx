@@ -1,0 +1,73 @@
+---
+sidebar_position: 3
+title: Analytics and the ingester
+description: The two storage paths of the ingester, attribution to the catalogue, masking, and the dashboards.
+---
+
+# Analytics and the ingester
+
+The ingester receives the events Otoroshi exports — `GatewayEvent`, `LLMUsageAudit` and
+`McpAudit` (D-32) — and stores them twice, for two purposes (D-33). Install the exporter as described
+in [Install](../install.mdx#the-data-exporter).
+
+## `/ingest`
+
+```http
+POST /ingest
+Authorization: Bearer <APIM_INGEST_TOKEN>
+
+[ { "@type": "GatewayEvent", … }, … ]
+```
+
+The token is also accepted as an `X-Apim-Ingest-Token` header or a `token` query parameter. The body
+is a JSON array, a single event, `{ "events": [ … ] }`, or newline-delimited JSON.
+
+## The computed path — mandatory, exhaustive
+
+Every `GatewayEvent` becomes one row, **attributed to the catalogue at ingestion**: workspace, API,
+plan, subscription, application, client id, method, path, status, duration, gateway overhead,
+backend duration, bytes in and out, error flag, caller IP and user agent.
+
+A `GatewayEvent` carries the route and the identity, not the key's `apiRef`
+([G-9](../otoroshi-gaps.mdx)), so the ingester attributes each call from:
+
+1. the client id, matched against the credentials the product minted;
+2. the key metadata the product projects (`apim_subscription_id`, `id_ref`);
+3. for consumers the gateway mints on `jwt`, `mtls`, `oauth2` and `keyless` plans, their
+   `<kind>_<planId>_<clientId>` name, matched against the applications' declared `client_id`.
+
+A quota consumed, an attribution, a token count are **counted, never sampled**. `LLMUsageAudit` and
+`McpAudit` go to an AI usage table (provider, model, tool, tokens, cost): collected from day one,
+even though AI and MCP products are not in this version — a feature can come later, uncollected data
+is lost.
+
+## The raw path — optional
+
+When enabled (`APIM_INGEST_STORE_RAW`, or **Gateway → Connection & events**), events are also kept
+as they came, for diagnosis and export — lightened and masked:
+
+- the heavy embedded configurations are dropped (route, descriptor, JWT verifier): only the route's
+  id, name and metadata remain;
+- **secrets in the URL are masked**. Otoroshi already masks credential headers and secret fields of
+  configurations; nothing masks a secret passed in a query parameter, so the ingester does it:
+
+```
+http://books.oto.tools:8080/v1/books?page=1&api_key=leaked-secret
+http://books.oto.tools:8080/v1/books?page=1&api_key=********
+```
+
+Parameters whose names look like a secret (`*token*`, `*secret*`, `*password*`, `api_key`, `key`,
+`sig`, `signature`, `code`, `auth*`…) are masked.
+
+## Dashboards
+
+They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's
+(PX-08).
+
+- **Console → Observability**, and the *Analytics* tab of each API and application: calls and errors
+  over time, latency (average, p95, gateway overhead), data, status classes, calls by API, plan and
+  application, top endpoints, recent calls. Filters live in the URL, so a filtered view is a bookmark.
+  Reading the request log is recorded in the audit trail: it is personal data.
+- **Portal → Usage**: the same, restricted to the consumer's own applications.
+- **Portal → My apps**: the live quotas of each key, as the gateway counts them (read-only, never on
+  the request path).

@@ -1,0 +1,73 @@
+---
+sidebar_position: 4
+title: Remote catalogs
+description: An HTTP file or a git repository becomes the source of truth of a set of APIs, reconciled on a schedule.
+---
+
+# Remote catalogs
+
+A **remote catalog** makes an external source the source of truth of the APIs it carries (D-28),
+in the manner of Otoroshi's remote catalogs. Configure them in **Workspace settings → Catalogs**
+(workspace administrators).
+
+## Sources
+
+| Kind | Reads |
+|---|---|
+| `http` | one URL serving [declarative documents](./declarative-documents.mdx): a multi-document YAML file, or JSON (a document, a list, or `{"items": […]}`) |
+| `git` | every `.yaml`, `.yml` and `.json` file of a repository directory, on a branch or tag; the commit is the revision |
+
+An HTTP catalog can send a header (a token, for instance). Documents of another kind than `Api`
+are ignored and counted.
+
+## What a sync does
+
+The mode is explicit, per catalog — the question the specification leaves open under D-36:
+
+| Mode | A sync… |
+|---|---|
+| `draft` | writes the drafts; publishing and deploying stay explicit acts in the console |
+| `publish` | also freezes a snapshot for every API that changed |
+| `deploy` | also deploys it — the commit is the deployment |
+
+Catalogs are synchronised on their own interval (300 seconds by default, checked every 30 seconds),
+or on demand.
+
+## Preview first
+
+**Preview & sync** runs a dry run — nothing is written — and lists, per API:
+
+| Action | |
+|---|---|
+| `create` | the API does not exist yet |
+| `update` | with the diff of what changes |
+| `unchanged` | |
+| `conflict` | the API is managed by another source |
+| `orphaned` | managed by this catalog, gone from the source — kept |
+| `delete` | gone from the source, and the catalog prunes |
+
+Over the admin API: `POST /api/workspaces/<ws>/catalogs/<id>/preview`, then `…/sync`.
+
+## Ownership
+
+Every API a catalog writes is marked `managed_by: catalog:<id>`. The console then shows it read-only
+— *"Managed by a remote catalog: change it at its source"* — and the admin API refuses hand edits
+with `409` (unless the write passes `"force": true`, as the catalog itself does). Publishing, deploying and reviewing subscriptions stay operable. An API edited by hand
+that a catalog takes over is flagged in the preview.
+
+APIs that leave the source are reported as orphaned; they are deleted — undeployed first — only if
+the catalog **prunes**. Deleting a catalog releases its APIs: they become editable by hand again.
+
+## Trying it locally
+
+The development stack serves `examples/` as a catalog source:
+
+```bash
+H='Authorization: Bearer apim-admin-token'; J='Content-Type: application/json'
+curl -s -H "$H" -H "$J" -X POST http://localhost:9000/api/workspaces \
+  -d '{"name": "GitOps", "slug": "gitops"}'
+curl -s -H "$H" -H "$J" -X POST http://localhost:9000/api/workspaces/gitops/catalogs \
+  -d '{"name": "platform", "kind": "http", "url": "http://catalog.oto.tools/catalog/apis.yaml", "mode": "deploy"}'
+```
+
+Edit `examples/catalog/apis.yaml`, and the next sync publishes and deploys the change.

@@ -1,0 +1,83 @@
+---
+sidebar_position: 3
+title: Declarative documents
+description: The Api document — one API-version with its plans and its documentation — that the CLI, the export and remote catalogs share.
+---
+
+# Declarative documents
+
+The declarative unit is the **API-version** (Q-11): since a version is an API (D-29), one document
+carries an API and its plans, with its documentation pages beside them. `apis get` produces it,
+`apply` consumes it, and [remote catalogs](./remote-catalogs.mdx) reconcile it.
+
+```yaml
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: petstore          # the slug: the document is upserted by (workspace, name, version)
+  version: 1.0.0
+spec:
+  name: Petstore
+  description: Pets, as a product.
+  team: Platform team     # a team name or id of the workspace
+  tags: [demo]
+  visibility: public      # public | authenticated | restricted
+  acl: []                 # tags, for restricted visibility
+  draft:
+    entrypoint: { domain: petstore.oto.tools, contextPath: /v1 }
+    backends:
+      - id: backend_echo
+        name: echo
+        targets: [{ hostname: echo, port: 8080, tls: false, weight: 1 }]
+    flows:
+      - id: default_flow
+        name: Default flow
+        plugins: [{ plugin: cp:otoroshi.next.plugins.OverrideHost }]
+    resources:
+      - { id: res_pets, name: Pets, path: /pets, methods: [GET, POST], backendId: backend_echo, flowId: default_flow }
+    plans:
+      - id: plan_petstore_discovery
+        name: Discovery
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 5, windowMs: 1000 }
+        quota: { daily: 1000 }
+        resourceFilter: { mode: only, resources: [res_pets] }
+        validation: auto
+    openapi:
+      format: yaml
+      content: |
+        openapi: 3.0.3
+        …
+    documentation: { languages: [en, fr], defaultLanguage: en }
+  pages:
+    - slug: getting-started
+      title: { en: Getting started, fr: Démarrage }
+      content: { en: "# Petstore …", fr: "# Petstore …" }
+```
+
+The complete file is [`examples/petstore.yaml`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/examples/petstore.yaml);
+[`examples/catalog/apis.yaml`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/examples/catalog/apis.yaml)
+holds several documents in one multi-document YAML file.
+
+Every attribute of a plan described in [Plans](../concepts/plans.mdx) can be set; what is left out
+takes its default. Ids are yours to choose: they are stable, so a plan keeps its subscriptions from
+one apply to the next.
+
+## Applying
+
+```bash
+bun cli/apim.js apply default -f petstore.yaml                      # writes the draft
+bun cli/apim.js apply default -f petstore.yaml --publish            # + freezes a snapshot if anything changed
+bun cli/apim.js apply default -f petstore.yaml --publish --deploy   # + projects it
+```
+
+`apply` upserts by `(workspace, metadata.name, metadata.version)` and writes the **draft**: publishing
+and deploying stay explicit acts unless asked for. A document applied twice changes nothing
+(`snapshot unchanged`). Pages are upserted by slug.
+
+`--managed-by <source>` marks the API as owned by that source: the console then refuses to edit it
+by hand (D-28).
+
+Over HTTP: `POST /api/workspaces/<ws>/apply?publish=true&deploy=true` with one document, a list, or
+`{"items": […]}`.

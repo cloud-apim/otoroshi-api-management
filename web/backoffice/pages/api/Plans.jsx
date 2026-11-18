@@ -7,7 +7,7 @@ import { MetadataForm } from '../../../shared/metadata.jsx';
 const rid = () => `plan_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 
 const AUTH_DEFAULTS = {
-  apikey: { readOnly: false, validityDays: null, rotation: { enabled: false, everyHours: 744, graceHours: 168 } },
+  apikey: { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } },
   jwt: { verifier: '', clientIdPath: 'client_id' },
   mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '' },
   'oauth2-local': { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 },
@@ -185,7 +185,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           <Setting label="Description" help="shown to consumers on the portal">
             <TextArea value={p.description} onChange={(v) => set({ description: v })} rows={3} />
           </Setting>
-          <Setting label="Status" help="staging: not enforced, not subscribable · published · deprecated: enforced, closed to new subscriptions · closed: Otoroshi deletes the keys of its subscriptions">
+          <Setting label="Status" help="staging: not enforced, not subscribable · published · deprecated: closed to new subscriptions — on Otoroshi 18 its consumers also lose access (G-13) · closed: Otoroshi deletes the keys of its subscriptions">
             <Select value={p.status} onChange={(v) => set({ status: v })} options={['staging', 'published', 'deprecated', 'closed']} />
           </Setting>
           <Setting label="Plan plugins" help="a flow of this api added on top of the route's flow for the consumers of this plan (ApiPlanPlugins.flow_ref)">

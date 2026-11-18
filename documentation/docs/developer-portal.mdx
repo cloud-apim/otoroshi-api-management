@@ -1,0 +1,77 @@
+---
+sidebar_position: 6
+title: Developer portal
+description: The public face — catalogue, documentation, reference and try-it, subscriptions, credentials and usage.
+---
+
+# Developer portal
+
+Each workspace has **its own portal** (D-20), carrying its identity, its catalogue and its identity
+provider. It is served at `/<workspace>/` (or `<workspace>.<domain>/`, see
+[portal exposure](./install.mdx#portal-exposure)) and talks to `/<workspace>/front/api`.
+
+## Identity
+
+**Workspace settings → Developer portal**: title, tagline, accent colour, logo, the interface
+languages (English and French ship today) and default language, self signup, the Markdown shown on
+the home page, and the workspace's [identity provider](./authentication.mdx#portal). The portal
+follows the visitor's light / dark / system preference.
+
+## Catalogue
+
+The catalogue shows the APIs whose snapshot **runs on the gateway** — never a draft — in the
+`published` or `deprecated` lifecycle, filtered by their visibility: public APIs to anyone,
+`authenticated` ones to signed-in members, `restricted` ones by ACL tags. Because it is served from
+the product's own snapshots, it stays readable during a gateway incident (D-4).
+
+Search covers names, descriptions and tags.
+
+## An API page
+
+- **Overview**: the description, the base URL on the gateway, and how to call it — `curl`,
+  JavaScript and Python snippets, filled with the visitor's own credentials when signed in — and the
+  resources.
+- **Documentation**: the pages of the snapshot, with a language switcher over the languages the
+  producer wrote them in (D-11).
+- **Reference**: when the API has an OpenAPI specification, rendered with
+  [Scalar](https://github.com/scalar/scalar), bundled in the portal (D-42). Its servers point at the
+  gateway.
+- **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled
+  (D-31) — the resources a plan gives access to, terms, approval mode and price.
+- A version switcher when several versions of the API are in the catalogue.
+
+### Try it
+
+Scalar sends its requests through the portal's proxy, `/<workspace>/front/api/tryit?scalar_url=…`.
+The proxy only talks to the hosts of the workspace's deployed APIs, never forwards the portal's
+cookies, and reaches the gateway at its own address with the API's `Host` header — so the browser
+needs no CORS on the API. The consumer tries the API with its own credentials (D-17).
+
+## Subscribing
+
+**Subscribe** on a plan opens a dialog: pick an application or create one (it goes to the visitor's
+personal team), declare the expected `client_id` when the plan is `jwt`, `mtls` or `oauth2-remote`,
+answer the usage statement and the request form, accept the terms. The result depends on the plan:
+
+- **automatic**: the credentials are shown at once;
+- **manual**: waiting for a producer's review;
+- **paid**: waiting for the payment — the prototype offers a clearly labelled *test payment* button.
+
+Plans that are not open to self-service are shown, marked as such, and cannot be requested from the
+portal.
+
+## My apps
+
+The consumer's applications: their subscriptions with their status, the credentials (reveal, copy,
+**rotate**), the live quotas of each key as the gateway counts them, the expected `client_id`, and
+**close** a subscription. Whoever can see an application can see its credentials (D-26).
+
+## Usage
+
+Calls, errors and latency over 24 hours, 7 or 30 days, by API, plan and application — restricted to
+the visitor's own applications.
+
+## Teams
+
+A consumer can create teams and invite workspace members by email to share applications. An
+invitation never reveals whether an email exists outside the workspace.

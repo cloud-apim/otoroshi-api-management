@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#0061bd"/>
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g)"/>
+  <!-- a catalogue of three products over one gateway line -->
+  <rect x="15" y="15" width="12" height="12" rx="3" fill="#ffffff"/>
+  <rect x="31" y="15" width="18" height="5" rx="2.5" fill="#ffffff" opacity="0.85"/>
+  <rect x="31" y="22" width="12" height="5" rx="2.5" fill="#ffffff" opacity="0.6"/>
+  <rect x="15" y="31" width="12" height="12" rx="3" fill="#ffffff" opacity="0.85"/>
+  <rect x="31" y="31" width="18" height="5" rx="2.5" fill="#ffffff" opacity="0.6"/>
+  <path d="M14 50h36" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="21" cy="50" r="3" fill="#ffffff"/>
+  <circle cx="43" cy="50" r="3" fill="#ffffff"/>
+  <defs>
+    <linearGradient id="g" x1="4" y1="4" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0061bd" stop-opacity="0"/>
+      <stop offset="1" stop-color="#6250d6"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -1,0 +1,66 @@
+---
+sidebar_position: 2
+title: Command line
+description: apim, the command line of the product, in the manner of otoroshictl and kubectl.
+---
+
+# Command line
+
+`cli/apim.js` only talks to the [admin API](./admin-api.mdx) — so everything the console does can be
+scripted and run from a CI.
+
+```bash
+export APIM_URL=http://localhost:9000
+export APIM_TOKEN=<a token from the console>
+bun cli/apim.js help
+```
+
+| Flag | Environment | Default |
+|---|---|---|
+| `--url` | `APIM_URL` | `http://localhost:9000` |
+| `--token` | `APIM_TOKEN` | — |
+| `-o`, `--output` | — | `table` (or `json`, `yaml`) |
+
+## Commands
+
+| Command | |
+|---|---|
+| `whoami` | the user behind the token |
+| `gateway status` | gateway health, projection queue, last drift run, ingestion |
+| `workspaces list` | |
+| `apis list <ws>` | name, version, lifecycle, gateway state, snapshot, plans, subscriptions |
+| `apis get <ws> <api>` | the [declarative document](./declarative-documents.mdx) of an API-version |
+| `apis changes <ws> <api>` | what the draft changes since the last snapshot |
+| `apis publish <ws> <api> [--comment c] [--deploy]` | freeze a snapshot, optionally deploy it |
+| `apis deploy <ws> <api> [--snapshot n] [--dry-run]` | deploy the latest (or a given) snapshot; `--dry-run` prints the catalogue and gateway diffs |
+| `apis undeploy <ws> <api>` | remove the API from the gateway |
+| `apis snapshots <ws> <api>` | the snapshot history |
+| `apply <ws> -f <file> [--publish] [--deploy] [--managed-by <source>] [--comment c]` | upsert declarative documents |
+| `subscriptions list <ws> [--status s] [--api id]` | |
+| `subscriptions accept\|reject\|suspend\|resume\|close <ws> <id> [--message m]` | |
+| `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan |
+| `applications list <ws>` | |
+| `drift <ws>` | run drift detection and print the reports |
+| `audit <ws> [--limit n]` | the audit trail |
+| `export <ws>` | the full export, re-importable |
+| `import <ws> -f <file>` | |
+
+## Round trip
+
+```bash
+bun cli/apim.js apis get default petstore -o yaml > petstore.yaml
+# edit the plans, the resources, the documentation…
+bun cli/apim.js apply default -f petstore.yaml
+bun cli/apim.js apis changes default petstore
+bun cli/apim.js apis deploy default petstore --dry-run
+bun cli/apim.js apis publish default petstore --comment "from git" --deploy
+```
+
+```shell-session
+$ bun cli/apim.js apis deploy default petstore --dry-run
+dry run: snapshot #3 replaces #2
+catalogue changes:
+  change draft.plans[Discovery].rateLimit.calls
+gateway changes:
+  change plans[Discovery].rate_limiting.window
+```

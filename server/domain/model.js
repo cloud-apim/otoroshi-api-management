@@ -69,7 +69,7 @@ export function defaultResource(backendId, flowId, overrides = {}) {
 export function defaultAuthConfig(kind) {
   switch (kind) {
     case 'apikey':
-      return { readOnly: false, validityDays: null, rotation: { enabled: false, everyHours: 744, graceHours: 168 } };
+      return { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } };
     case 'jwt':
       // either a reference to an existing Otoroshi verifier, or a description the product derives
       // the verifier from and keeps reconciled (D-15)
@@ -242,6 +242,17 @@ export function validateDraft(draft) {
         'no published plan: Otoroshi 18 serves the routes of an api without published plan to anyone (open routes). Publish at least one plan, or a keyless plan if the api is meant to be open.',
     });
   }
+  // Otoroshi 18 only installs the extractors of published plans (G-13)
+  const apikeyExtractor = active.some((p) => ['apikey', 'oauth2-local'].includes(p.auth.kind));
+  d.plans
+    .filter((p) => p.status === 'deprecated' && !(['apikey', 'oauth2-local'].includes(p.auth.kind) && apikeyExtractor))
+    .forEach((p) =>
+      warnings.push({
+        path: `plans[${p.name}]`,
+        code: 'deprecated_without_extractor',
+        message: `plan "${p.name}" is deprecated: Otoroshi 18 no longer installs its extractor, so its consumers are no longer identified (upstream gap G-13).`,
+      })
+    );
   d.plans.forEach((p, i) => {
     if (!AUTH_KINDS.includes(p.auth.kind)) errors.push({ path: `plans[${i}].auth.kind`, message: 'unknown auth kind' });
     if (p.unit !== 'calls')

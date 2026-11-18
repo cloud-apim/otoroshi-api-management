@@ -1,0 +1,80 @@
+---
+sidebar_position: 7
+title: Authentication
+description: Local accounts, OpenID Connect for the console and per portal, and the exclusive "via Otoroshi" mode.
+---
+
+# Authentication
+
+One identity provider for the console, and one **per portal**, so one per workspace (D-25): the
+console serves a customer's staff, the portal serves its consumers — two populations that have
+nothing in common.
+
+| Mode | What | Composable |
+|---|---|---|
+| local | bootstrap administrators and accounts stored by the product | yes |
+| OpenID Connect | delegated to the customer's identity provider | yes, with local |
+| via Otoroshi | the identity is read in a header the gateway sets | **no: exclusive** |
+
+Users are global (D-19): an identity asserted by a provider is matched by email, and created on its
+first login.
+
+## Local accounts
+
+The emails of `APIM_BOOTSTRAP_ADMINS` are installation administrators, created at startup with
+`APIM_BOOTSTRAP_PASSWORD`. They depend on nothing, and keep their entry even when the provider is
+down. Other accounts are created in **Global settings → Users**, or by self signup on a portal.
+
+## Console: OpenID Connect
+
+**Global settings → Authentication** (or the `APIM_OIDC_*` variables): issuer, client id and secret,
+scopes, the email and name claims, the button label. Register this redirect URI at the provider:
+
+```
+<public url>/backoffice/api/auth/oidc/callback
+```
+
+The product runs the authorization code flow with PKCE, verifies the `id_token` against the
+provider's JWKS (RS, PS and ES algorithms), and checks issuer, audience, nonce and expiry. A new user
+has no workspace until an administrator adds them.
+
+The local sign-in form can be closed once the provider is the norm: the bootstrap administrators
+keep it.
+
+## Portal
+
+**Workspace settings → Developer portal → Identity provider**: issuer, client id and secret, the
+button label, and whether local accounts stay open on that portal. Redirect URI:
+
+```
+<public url>/<workspace>/front/api/auth/oidc/callback
+```
+
+People signing in with the workspace's own provider join its portal as **consumers**, with their
+implicit personal team, and come back to the page that asked them to sign in. The provider's secret
+is never returned by any API, and never in the public portal settings.
+
+## Via Otoroshi
+
+`APIM_CONSOLE_AUTH=otoroshi` (or **Global settings → Authentication → Mode**): the console is exposed
+behind an Otoroshi route that authenticates users with an auth module and adds the *Otoroshi info.
+token* plugin (legacy version). The product reads the token from the `Otoroshi-Claim` header,
+verifies its HMAC signature with the secret shared with the route, and takes the user's email.
+
+:::warning No fallback entry
+In this mode the identity comes from the gateway: there is no login form and no other way in. A
+gateway outage locks the console — the very tool you need to diagnose it. It is a defensible
+trade-off when the gateway is already the single entry point of the organisation; choose it knowing
+that.
+:::
+
+## The admin API
+
+The admin API (`/api`) takes bearer tokens: personal tokens created in the console (**user menu →
+API tokens**) or the static `APIM_ADMIN_TOKEN`. See [Admin API](./gitops/admin-api.mdx).
+
+## Development provider
+
+The development stack includes a mock OpenID Connect provider at
+`http://oidc.oto.tools:8090/<issuer id>`, reachable with the same URL from the browser and the
+containers; it lets you sign in as anyone.

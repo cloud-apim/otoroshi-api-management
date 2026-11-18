@@ -1,0 +1,47 @@
+---
+sidebar_position: 9
+title: Known limitations of the data plane
+description: The Otoroshi gaps met while building the product, what the product does meanwhile, and the upstream fixes they call for.
+---
+
+# Known limitations of the data plane
+
+A gap in the data plane is fixed in the data plane — in Otoroshi or one of its extensions — never
+worked around in the product: a workaround there would freeze the product's model for nothing.
+Meanwhile, the product says what really applies rather than promising what the gateway cannot hold
+(D-9).
+
+The full list, with the source references and the proposed upstream fixes, is kept in
+[`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
+Reference: Otoroshi 18.0.1.
+
+| # | Gap | Severity | What the product does meanwhile |
+|---|---|---|---|
+| G-1 | A `pending` ApiSubscription gets an **enabled** apikey | high | never projects a pending subscription |
+| G-2 | Deleting an ApiSubscription **revokes nothing** | high | deletes the keys first, then the subscription |
+| G-3 | An `Api` without a published plan has **open routes** | high | warns, and asks for an explicit acknowledgement before deploying |
+| G-4 | On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, **any valid token passes**, subscribed or not | high | flags it on the plan |
+| G-5 | Resource filtering only exists on **apikey** plans | medium | flags the filter as not enforced on the other kinds |
+| G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | stores them, projects them as plan metadata, flags them as not enforced |
+| G-7 | An `ApiDeployment` cannot carry the **external snapshot id**, and only the last five are kept | medium | writes the snapshot id in the `Api` metadata and keeps the full history itself |
+| G-8 | The catalog-deploy path is borrowed through a **naming convention** | medium | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
+| G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | attributes calls from the key metadata and a client id cache at ingestion |
+| G-10 | A `PUT` on an entity that does not exist is refused | low | reads first, then creates or updates |
+| G-11 | Nothing says when a new route or key becomes routable | low | the console says *deployed* once the gateway accepted the write |
+| G-12 | The try-it with the policy execution trace is only reachable from the Otoroshi backoffice | medium | the console replays requests through the gateway without the trace |
+| G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | warns on the plan |
+| G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
+
+## The ones to keep in mind
+
+**G-1 and G-2 — subscriptions.** The product's workflow carries the fix: a subscription reaches the
+gateway only once accepted, and closing it deletes its keys explicitly. Writing ApiSubscriptions by
+hand in Otoroshi does not get those guarantees.
+
+**G-3 — an API without a published plan is open.** Deprecating or closing the last plan opens the
+API to anyone. The console warns at validation and at deployment.
+
+**G-4 — token-based plans.** Declaring the expected `client_id` on the application reconciles what
+the gateway sees with the catalogue, but does not stop an unsubscribed caller holding a valid token.
+Until a "subscription required" mode exists upstream, treat these plans as open to anyone your
+identity provider issues tokens to.

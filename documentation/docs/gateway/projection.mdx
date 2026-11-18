@@ -1,0 +1,113 @@
+---
+sidebar_position: 1
+title: Projection
+description: What the product writes to Otoroshi, how, and what never leaves the product.
+---
+
+# Projection
+
+The product never enforces anything itself: it **projects** what a published snapshot describes
+onto the Otoroshi cluster of the installation, through the Otoroshi Admin API (D-1). Only what the
+gateway needs to *enforce* is pushed (D-2).
+
+## The `Api` entity
+
+Deploying a snapshot writes one Otoroshi `Api` entity, whose id is the product's API id:
+
+```json
+{
+  "_loc": { "tenant": "default", "teams": ["default"] },
+  "kind": "Api",
+  "id": "api_01a1eb8054c5…",
+  "name": "Books 1.0.0",
+  "domain": "books.oto.tools",
+  "contextPath": "/v1",
+  "state": "published",
+  "metadata": {
+    "created_by": "remote_catalog=otoroshi-apim-deployment",
+    "apim_api_id": "api_01a1eb8054c5…",
+    "apim_workspace": "ws_01a1eb8016…",
+    "apim_snapshot_id": "snap_01a1eb806b…",
+    "apim_snapshot_number": "2"
+  },
+  "routes": [ … ],      // one per resource
+  "backends": [ … ],    // with their client settings
+  "flows": [ … ],       // shared policy groups expanded in place
+  "plans": [ … ],       // auth kind, rate limiting, restrictions, plan plugins
+  "documentation": null
+}
+```
+
+- **The catalog marker** (D-38). Otoroshi treats any `Api` write whose `created_by` starts with
+  `remote_catalog=` as the deployment of a catalog: the API may be created already published,
+  `production_readonly` is lifted, state transitions are still checked, and the write is recorded in
+  Otoroshi's own deployment history (`deployments`, the last five). The product uses the id
+  `otoroshi-apim-deployment` — no real remote catalog may use it.
+- **Ownership** (D-24). The marker and `apim_api_id` are how the product recognises its own
+  entities on a gateway that also serves other things — for drift detection, adopt mode and cleanup.
+- **No tenancy** (D-24). Everything lands in the default location: a workspace is never an
+  Otoroshi tenant.
+
+## Derived objects
+
+Otoroshi objects that follow from the description of an API are **derived** by the product (D-15):
+today, the JWT verifiers of `jwt` plans that describe how their tokens are validated. They are
+written before the `Api` that references them, with the id `apim_jwt_<api>_<plan>`, marked with the
+same `created_by` marker plus `apim_api_id` and `apim_derived`, compared by drift detection, and
+removed when no plan derives them any more. What does not follow from an API — the cluster, global
+plugins, data exporters, listeners — is infrastructure the product references and never owns.
+
+## Subscriptions and keys
+
+An active subscription is written as an Otoroshi `ApiSubscription` (D-6), with the same id as the
+product's subscription:
+
+```json
+{
+  "id": "sub_01a1eb808c84…",
+  "status": "enabled",
+  "plan_ref": "plan_…",
+  "api_ref": "api_…",
+  "owner_ref": "app_…",
+  "subscription_kind": "apikey",
+  "metadata": { "id_ref": "app_…", "apim_subscription_id": "sub_…", "apim_workspace": "ws_…" }
+}
+```
+
+On `apikey` and `oauth2-local` plans Otoroshi mints the key from the plan's template. The key carries
+`apiRef = { api, plan, sub }`, the plan's throttling strategy and restrictions, and the
+subscription's metadata — among which **`id_ref`, the application** (D-26). That is what answers
+"which APIs does this application consume" and "which keys to revoke if it is compromised".
+
+A suspended subscription is projected `disabled`; a pending or rejected one is not projected at all;
+closing deletes the keys first, then the subscription.
+
+## Asynchronous and replayable
+
+Every projection goes through a task queue (D-4). A task is idempotent — it computes the wanted
+state and makes the gateway match — and retried with a backoff (2, 4, 8… seconds, at most 5 minutes)
+while the gateway is unreachable. A refusal of the gateway (`4xx`) fails it at once; so do 25
+attempts. A subscription accepted while the API is not deployed waits, and is projected at the
+deployment.
+
+The **Gateway** page of the console shows the queue and lets you retry a task.
+
+## Never projected
+
+| Stays in the product | Even though Otoroshi has the notion |
+|---|---|
+| drafts and the snapshot history | Otoroshi `Draft`s and API deployments |
+| documentation pages | `ApiDocumentation` |
+| catalogue visibility, subscribability, approval workflow | plan visibility and validation labels |
+| terms of use, usage statements, request forms | — |
+| pricing, payment state | plan pricing |
+| [metadata](../concepts/metadata.mdx) | entity metadata |
+| workspaces and teams | tenants and teams |
+
+## The escape hatch
+
+*No longer need to* is not *no longer able to* (D-14). In **API → Settings → Technical details**
+the console shows the Otoroshi entity behind the API, the marker, the gateway's own deployment count,
+a link to open it in the Otoroshi backoffice, and the entity exactly as the gateway holds it. The
+admin API serves the same at `GET /api/workspaces/<ws>/apis/<api>/projection`: the expected entity,
+the actual one and the last drift report.

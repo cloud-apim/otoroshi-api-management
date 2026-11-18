@@ -1,0 +1,49 @@
+---
+sidebar_position: 6
+title: Shared policy groups
+description: A named composition of Otoroshi plugins with its own lifecycle, pinned by version in the APIs that use it.
+---
+
+# Shared policy groups
+
+Otoroshi gets its power from composition — plugins chained in flows. The flip side is that a
+composition exists nowhere as an object: it is rebuilt by hand on thirty APIs, and nobody can point
+at "our company policy". A **shared policy group** names it and makes it governable (D-16).
+
+It creates no new gateway capability: a group is a chain of ordinary Otoroshi plugins, projected
+inline in the flows of the APIs that use it.
+
+## Lifecycle
+
+Like an API, a group has a **draft** and **published versions**, immutable and numbered:
+
+1. **APIs → Shared policy groups → New group**, add Otoroshi plugins with their native configuration.
+2. **Publish v1**.
+3. In an API, **Policies & flows → Add policy group**: the flow pins the latest published version.
+
+## Pinned, never floating
+
+An API references a group **at a version**. Its snapshot freezes the plugins of that version, and
+the projection expands them in place. Publishing v2 of the group changes nothing in production:
+snapshots are immutable (D-35).
+
+The group page lists the APIs that use it and which ones are behind; the flow of each API shows
+*"v2 available · Upgrade"*. Upgrading is an edit of the API's draft, then a publication — what runs
+only ever changes through a snapshot.
+
+A flow referencing a group without a version is a draft error, and a group cannot be deleted while
+an API uses it.
+
+## Through the admin API
+
+```bash
+H='Authorization: Bearer apim-admin-token'
+curl -X POST http://localhost:9000/api/workspaces/default/policy-groups -H "$H" -H 'Content-Type: application/json' \
+  -d '{"name": "Company security headers", "plugins": [
+        {"plugin": "cp:otoroshi.next.plugins.AdditionalHeadersOut",
+         "config": {"headers": {"X-Company-Policy": "v1"}}}]}'
+curl -X POST http://localhost:9000/api/workspaces/default/policy-groups/<id>/publish -H "$H" \
+  -H 'Content-Type: application/json' -d '{"comment": "v1"}'
+```
+
+In a draft, a flow references a group with `{ "group": "<id>", "version": 1 }` among its plugins.

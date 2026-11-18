@@ -1,0 +1,146 @@
+---
+sidebar_position: 3
+title: Plans
+description: Where the policy lives — auth mechanism, limits, resource filtering, catalogue attributes, approval and pricing.
+---
+
+# Plans
+
+The policy lives in the plan; the route is a projection detail (D-5). One API carries one set of
+resources and as many plans as it needs, each with its own auth mechanism — adding a tier never
+touches the infrastructure.
+
+## Status
+
+| Status | On the gateway | On the portal |
+|---|---|---|
+| `staging` | projected; its extractor is not installed | hidden |
+| `published` | projected and enforced | shown, subscribable |
+| `deprecated` | projected as deprecated; Otoroshi 18 only installs the extractors of published plans | shown, closed to new subscriptions |
+| `closed` | Otoroshi deletes the keys of its subscriptions | hidden |
+
+## Auth mechanism
+
+| Kind | The consumer calls with | Configuration |
+|---|---|---|
+| `apikey` | a client id / secret minted by the subscription | read only, automatic secret rotation (every N hours, with a grace period) |
+| `oauth2-local` | a token obtained from the gateway with the subscription's client id / secret | signing key pair, token lifetime |
+| `jwt` | its own JWT | a reference to an Otoroshi JWT verifier, **or** a description the product derives the verifier from (see below); client id claim (`client_id`) |
+| `mtls` | a client certificate | subject and issuer DN regexes, client id field |
+| `oauth2-remote` | a token of a remote IdP, validated by an Otoroshi auth module | auth module, client id claim |
+| `keyless` | nothing | the expression the caller identity is derived from (`${req.ip}`) — an ephemeral identity, so quotas still apply per caller |
+
+### Derived JWT verifiers
+
+Instead of referencing a verifier that already exists on the gateway, a `jwt` plan can describe how
+its tokens are validated — keys from a JWKS url, or an HMAC secret (a vault reference works), the
+expected issuer and audience, the header and its prefix. The product then **derives** the Otoroshi
+JWT verifier from the plan (D-15): written before the `Api` that references it, marked as the
+product's own, part of the deployment diff and of drift detection, and removed when the plan stops
+deriving it, on undeploy, or when the API is deleted.
+
+```yaml
+auth:
+  kind: jwt
+  config:
+    clientIdPath: client_id
+    derive: { enabled: true, kind: jwks, jwksUrl: https://idp.example.com/.well-known/jwks.json, issuer: https://idp.example.com }
+```
+
+On `jwt`, `mtls` and `oauth2-remote` plans the application must declare its expected `client_id`:
+it is how the consumer seen by the gateway is reconciled with the catalogue (D-26).
+
+:::warning Any valid token passes
+On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, Otoroshi 18 mints the consumer itself on
+the first call, so any valid token or certificate is served, subscribed or not. The console flags
+it on the plan. See [G-4](../otoroshi-gaps.mdx).
+:::
+
+## Resolution order
+
+When several plans are published, the gateway tries them in the order of its extractors — it is
+not freely chosen, so the console shows it rather than hiding it (ADR-10):
+
+| Kind | Extractor index |
+|---|---|
+| `apikey`, `oauth2-local` | 2.00 |
+| `jwt` | 2.01 |
+| `mtls` | 2.02 |
+| `oauth2-remote` | 2.03 |
+| `keyless` | 900 — always last |
+
+"If you present a valid key you are on your tier, otherwise you fall back on the open access."
+Two `apikey` plans are told apart by the key itself. Two `jwt`, `mtls`, `oauth2-remote` or `keyless`
+plans that can both match need a **selection rule** on all but one of them, or the draft does not
+publish.
+
+## Limits
+
+- **Rate limit**: N calls per second, minute, hour or day.
+- **Quotas**: daily and monthly, empty meaning unlimited.
+- **Unit of measure** (D-41): calls. Tokens and AI budgets are in the model, and refused at
+  validation until LLM backends are supported.
+
+Limits are **per credential**: nothing is pooled between the subscriptions of an application or
+between plans (D-31). On an Otoroshi leader/worker cluster the quota is global, within a few seconds
+of synchronisation.
+
+They are projected as the throttling strategy of the keys:
+
+```json
+{ "strategy": { "id": "FixedWindowStrategyConfig", "windowDurationMs": 60000,
+                "quota": { "window": 500, "daily": 10000000, "monthly": 10000000 } } }
+```
+
+(`10000000` is Otoroshi's "unlimited").
+
+## Resource filtering
+
+A plan can give access to **all resources** or **only some**. On `apikey` plans it is projected as
+key restrictions — the allowed resources first, everything else forbidden:
+
+```json
+{ "enabled": true, "allowLast": false,
+  "allowed": [{ "method": "GET", "path": "/v1/pets*" }],
+  "forbidden": [{ "method": "*", "path": "*" }] }
+```
+
+A call outside the plan's resources gets `403`. Other plan kinds cannot carry restrictions on
+Otoroshi 18 ([G-5](../otoroshi-gaps.mdx)): the console says the filter is not enforced there.
+
+## Recorded, not yet enforced
+
+The **selection rule**, the **counter failure strategy** (let the call pass or refuse it when the
+distributed counter is unreachable) and the **circuit breaker granularity** (per API or per
+subscription) are attributes of the plan, projected as plan metadata (`apim_selection_rule`,
+`apim_counter_failure`, `apim_circuit_breaker`) and flagged as not enforced until Otoroshi reads
+them ([G-6](../otoroshi-gaps.mdx)).
+
+## Plan plugins
+
+A plan can add one of the API's policy flows on top of the flow of the route, for its consumers
+only — projected as the plan's `flow_ref`. That is how a protection is put plan by plan.
+
+## Catalogue and approval — never projected
+
+These belong to the portal (D-2):
+
+| Attribute | |
+|---|---|
+| visibility | `public`, `authenticated` or `restricted` (ACL tags) |
+| subscribable | off = out of self-service: only a producer can put a consumer on it (a contract) |
+| approval | `auto` (the key is issued at once) or `manual` (a producer reviews) |
+| terms of use | a URL the requester must accept |
+| usage statement | a question to the requester, optional or required |
+| request form | the subscription [metadata](./metadata.mdx) fields marked for the portal |
+
+## Pricing
+
+A plan is free or paid (D-36): amount, currency, interval, the provider's price reference and a
+grace period. The product decides access, a payment provider decides the money. A paid subscription
+waits in `pending_payment`, and its key is only projected once the payment is confirmed.
+
+:::note
+This prototype ships a **test payment connector** only: the portal and the console confirm a
+payment by hand. No provider is wired yet.
+:::

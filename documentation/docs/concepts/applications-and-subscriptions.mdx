@@ -1,0 +1,104 @@
+---
+sidebar_position: 4
+title: Applications and subscriptions
+description: Applications group a consumer's identity; subscriptions bind an application to a plan; credentials are minted on the gateway.
+---
+
+# Applications and subscriptions
+
+## Applications
+
+An application groups the subscriptions and the technical identity of a consumer (D-26): name,
+owning team, the **expected `client_id`** for `jwt`, `mtls` and `oauth2` plans, client certificates
+and [metadata](./metadata.mdx).
+
+It groups **identity, never counters** (D-31): each credential keeps its own quotas.
+
+**Whoever can see an application can see its credentials** — the members of its team, and the
+workspace administrators. Reading credentials is recorded in the audit trail.
+
+## Subscriptions
+
+A subscription binds an application to a plan. Its states:
+
+```
+                 ┌── auto ──────────────────────────────▶ active ◀──▶ suspended
+request ─────────┤                                          │             │
+                 ├── manual ─▶ pending ─▶ accepted ─────────┘             │
+                 │                     └▶ rejected                        │
+                 └── paid ───▶ pending_payment ─▶ payment confirmed ──▶ active
+                                                    any open state ──▶ closed
+```
+
+The approval workflow belongs to the product (D-1): Otoroshi carries the plan's validation as a
+label only. At request time the product checks that the plan is published and subscribable, visible
+to the requester, that the usage statement and the terms are given when asked, that a `client_id`
+is declared for token-based plans, and that the application has no open subscription to that plan.
+
+## Credentials
+
+A subscription becomes an Otoroshi apikey (D-6) — **only once it is active**. Otoroshi 18 would
+enable the key of a pending subscription, so pending subscriptions are never projected
+([G-1](../otoroshi-gaps.mdx)).
+
+- On `apikey` and `oauth2-local` plans the gateway mints a client id and secret; the product reads
+  them back and shows them in the portal and in the console.
+- On the other kinds the consumer calls with its own token or certificate; nothing is minted.
+- **Rotate secret** replaces the secret on the gateway at once.
+- **Suspend** disables the key; **resume** enables it again.
+- **Close** deletes the key from the gateway, then the subscription — deleting a subscription in
+  Otoroshi 18 revokes nothing on its own ([G-2](../otoroshi-gaps.mdx)).
+
+Every operation is projected asynchronously and replayed if the gateway is unreachable: the
+console shows the projection state (`synced`, `waiting`, `error`) and offers to replay it.
+
+## Transfer
+
+A subscription can be **transferred to an equivalent plan** (D-30) — same auth mechanism — on the
+same API or on another version of it. The key does not change, the subscription keeps its identity
+and its history, and Otoroshi applies the target plan's limits to the existing key.
+
+That single operation covers a tier upgrade, the replacement of a badly designed plan, a
+renegotiated contract, demoting an abusive consumer instead of cutting it off, and moving to a new
+version. Transferring between different mechanisms (apikey → jwt) is refused: the credential would
+change, so it is a new subscription.
+
+### Consent
+
+A transfer that degrades the conditions is a change of contract, so it needs the consumer's
+agreement (D-30). The product compares the two plans and treats as a degradation: a lower rate
+limit, a lower daily or monthly quota, a higher price, different terms of use, or access limited
+to fewer resources.
+
+| Who starts it | Nothing degrades | Something degrades |
+|---|---|---|
+| a producer (console, CLI) | applied at once | waits for the consumer's consent, with the reasons |
+| a consumer (portal, *Change plan*) | the producer applies or declines it | the request itself carries the consent |
+
+The consent — who, when, for which reasons — is kept in the transfer history of the subscription.
+Both sides are notified in-app (the bells of the console and of the portal).
+
+```bash
+bun cli/apim.js subscriptions transfer default sub_01a1… --plan plan_partner
+```
+
+The command answers with the subscription: when `pending_transfer.status` is `awaiting_consent`,
+the move waits for the consumer.
+
+## Notifications
+
+Consumers are notified of what happens to their subscriptions — accepted, rejected, suspended,
+resumed, closed, moved, a move to agree to — and producers of what they have to decide — a
+request waiting for review, a move asked by a consumer. Notifications are addressed to teams:
+every member sees them.
+
+## Reviewing
+
+The console lists subscriptions per API, per application and across the workspace, with the
+request (usage statement, terms acceptance, request form answers). A reviewer accepts or rejects
+with a message; the decision is recorded on the subscription and in the audit trail.
+
+```bash
+bun cli/apim.js subscriptions list default --status pending
+bun cli/apim.js subscriptions accept default sub_01a1… --message "welcome"
+```

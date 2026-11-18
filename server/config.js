@@ -75,7 +75,6 @@ export const config = {
 
   sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
   cookieSecure: bool(env.APIM_COOKIE_SECURE, false),
-  dev: bool(env.APIM_DEV, env.NODE_ENV !== 'production'),
 };
 
 export function hasRole(role) {

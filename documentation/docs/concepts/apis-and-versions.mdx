@@ -1,0 +1,76 @@
+---
+sidebar_position: 2
+title: APIs, snapshots and versions
+description: The draft you edit, the immutable snapshots you publish, the deployment that references one of them, and versions as new APIs.
+---
+
+# APIs, snapshots and versions
+
+## An API
+
+An API is the published, documented, subscribable unit. It carries:
+
+- an **entrypoint**: a domain and a context path (`books.oto.tools` + `/v1`);
+- **backends**: targets (host, port, TLS, weight), root path, load balancing, timeouts, retries;
+- **resources**: an endpoint or a group of endpoints (path, methods, exact or prefix match, strip
+  path), each pointing at a backend and a policy flow — projected as the routes of the Otoroshi `Api`;
+- **policy flows**: named chains of Otoroshi plugins, possibly including
+  [shared policy groups](./shared-policy-groups.mdx);
+- **[plans](./plans.mdx)**, where the policy lives;
+- **documentation pages** in as many languages as you want, and an **OpenAPI** specification;
+- catalogue attributes: tags (classification, never a governance axis — D-19), visibility, owning team,
+  [metadata](./metadata.mdx).
+
+## Draft, snapshot, deployment
+
+Three objects with three lifetimes (D-35):
+
+| Object | Mutable | Reaches the gateway |
+|---|---|---|
+| the **draft** — the API, its draft document and its documentation pages | yes, it is the only thing you edit | never |
+| the **snapshots** — append-only, numbered, dated, attributed | no | yes, one of them |
+| the **deployment** — which snapshot runs on the gateway | — | it *is* the gateway state |
+
+**Publishing** validates the draft and freezes a complete copy — resources, plans, documentation,
+the pinned versions of the shared policy groups. Errors block it; warnings are shown, never
+silent. The console always shows the gap between what is described and what runs: *"snapshot #3
+runs on the gateway · latest snapshot #4 is not deployed · the draft has 2 unpublished changes"*.
+
+**Deploying** shows its diff first (D-22): the catalogue changes between the snapshot that runs and
+the one about to be pushed, and the gateway changes against what Otoroshi actually holds. Then it
+writes the `Api` entity (see [projection](../gateway/projection.mdx)).
+
+**Rolling back** is deploying an earlier snapshot — not an inverse operation to compute.
+
+```bash
+bun cli/apim.js apis changes default books          # what the draft changes since the last snapshot
+bun cli/apim.js apis publish default books --comment "new plan" --deploy
+bun cli/apim.js apis deploy default books --snapshot 2 --dry-run
+```
+
+## Lifecycle
+
+| State | Meaning |
+|---|---|
+| `created` | never published |
+| `published` | in the catalogue |
+| `deprecated` | still served, closed to new subscriptions; projected as a deprecated `Api` |
+| `archived` | removed from the gateway |
+
+## Versions are new APIs
+
+A version is a **new API**, pre-filled from the previous one (D-29): its own routes, plans,
+documentation and lifecycle. No plan is shared between versions — the new version gets fresh plan
+ids, in `staging`. Subscriptions do not follow; they are [transferred](./applications-and-subscriptions.mdx#transfer)
+to an equivalent plan of the new version, keeping their key.
+
+```bash
+curl -X POST http://localhost:9000/api/workspaces/default/apis/books/versions \
+  -H 'Authorization: Bearer apim-admin-token' -H 'Content-Type: application/json' \
+  -d '{"version": "2.0.0"}'
+```
+
+## Deleting
+
+Deleting a deployed API removes its `Api` entity and the keys of all its subscriptions from the
+gateway — the console says so before you confirm: its consumers get `404` from then on.

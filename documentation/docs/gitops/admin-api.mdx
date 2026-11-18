@@ -1,0 +1,99 @@
+---
+sidebar_position: 1
+title: Admin API
+description: The only way to do anything in the product — the console and the CLI are its clients.
+---
+
+# Admin API
+
+Everything the console does goes through the admin API, without exception (D-9, PX-02): the very
+same router is served on two mounts.
+
+| Mount | Authentication | Used by |
+|---|---|---|
+| `/api` | `Authorization: Bearer <token>` | the CLI, CI, scripts |
+| `/backoffice/api` | the console's session cookie (mutations must be JSON) | the console |
+
+So a feature cannot exist only on screen: *every action of the console replays from the CLI* (D-28).
+
+## Tokens
+
+- **Personal tokens**: in the console, **user menu → API tokens**, or `POST /api/me/tokens`
+  (`{"name": "ci"}`). The token is shown once; it acts as its owner, with its rights.
+- **The bootstrap token**: `APIM_ADMIN_TOKEN` acts as the first bootstrap administrator.
+
+```bash
+curl -H 'Authorization: Bearer apim-admin-token' http://localhost:9000/api/me
+```
+
+Errors are JSON: `{"error": "…", "details": …}` with a meaningful status (`400`, `401`, `403`,
+`404`, `409`). A draft that cannot be published answers `400` with the validation errors in
+`details.errors`.
+
+## Resources
+
+Workspace-scoped resources live under `/api/workspaces/<workspace>` (slug or id); an API is
+addressed by id or slug.
+
+| Area | Endpoints |
+|---|---|
+| you | `GET /me`, `GET POST DELETE /me/tokens` |
+| installation | `GET /settings`, `PUT /settings/{gateway,portal,ingest,auth}`, `GET POST PUT /users`, `GET /audit`, `GET POST PUT DELETE /audit/exporters`, `POST /audit/exporters/<id>/test` |
+| gateway | `GET /gateway/status`, `GET /gateway/tasks`, `POST /gateway/tasks/<id>/retry`, `GET /gateway/references`, `GET /gateway/plugins`, `POST /gateway/exporter`, `POST /gateway/drift`, `GET /gateway/unmanaged-apis` |
+| workspaces | `GET POST /workspaces`, `GET PUT DELETE /workspaces/<ws>`, `…/members`, `…/teams`, `…/teams/<team>/members` |
+| APIs | `GET POST …/apis`, `GET PUT DELETE …/apis/<api>`, `PUT …/draft`, `POST …/validate`, `POST …/lifecycle`, `POST …/versions`, `GET …/plans`, `GET …/document` |
+| documentation | `GET POST …/apis/<api>/pages`, `GET PUT DELETE …/pages/<page>` |
+| publication | `GET …/changes`, `POST …/publish`, `GET …/snapshots`, `GET …/snapshots/<n>` |
+| deployment | `GET …/deployments`, `POST …/deploy` (`{"snapshot": …, "dry_run": true}`), `POST …/undeploy`, `GET …/projection`, `POST …/tryit` |
+| applications | `GET POST …/applications`, `GET PUT DELETE …/applications/<app>` |
+| subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync,payment}`, `PUT …/metadata`, `POST …/credentials/<cred>/rotate` |
+| composition | `GET POST …/policy-groups`, `GET PUT DELETE …/policy-groups/<pg>`, `POST …/publish` |
+| metadata | `GET PUT …/metadata-fields` |
+| GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
+| observability | `GET …/analytics`, `GET …/analytics/calls`, `GET …/audit`, `GET POST …/drift`, `GET …/search`, `GET …/home` |
+
+## A complete flow
+
+```bash
+H='Authorization: Bearer apim-admin-token'; J='Content-Type: application/json'
+B=http://localhost:9000/api/workspaces/default
+
+curl -s -H "$H" -H "$J" -X POST $B/apis \
+  -d '{"name": "Books", "version": "1.0.0", "domain": "books.oto.tools", "contextPath": "/v1"}'
+curl -s -H "$H" -H "$J" -X POST $B/apis/books/publish -d '{"comment": "first", "deploy": true}'
+curl -s -H "$H" -H "$J" -X POST $B/applications -d '{"name": "My app", "team_id": "<team id>"}'
+curl -s -H "$H" -H "$J" -X POST $B/subscriptions \
+  -d '{"api_id": "<api id>", "plan_id": "<plan id>", "application_id": "<app id>"}'
+curl -s -H "$H" $B/subscriptions/<sub id>          # the credentials
+```
+
+## Audit trail
+
+The admin API writes the audit trail itself: every write, plus the reads that touch secrets or
+personal data — credentials, request logs. **Console → Audit**, `GET …/audit?action=api.`, or
+`bun cli/apim.js audit default`.
+
+### Audit exporters
+
+**Global settings → Audit export**, or the admin API. The trail leaves the product in batches, to a SIEM or a log pipeline, like Otoroshi's data
+exporters do for its events. An exporter (installation administrators) posts JSON arrays of
+`ApimAuditEvent` to a URL, optionally restricted to a workspace and to action prefixes
+(`subscription.`, `credential.read`…), with custom headers. Each exporter keeps a cursor: delivery is
+at least once, in order, and nothing is lost while the target is down — the batch is sent again at
+the next tick. A new exporter starts from now on, unless created with `"from_beginning": true`.
+
+```bash
+curl -X POST http://localhost:9000/api/audit/exporters \
+  -H 'Authorization: Bearer apim-admin-token' -H 'Content-Type: application/json' \
+  -d '{"name": "siem", "url": "https://siem.example.com/ingest", "actions": ["subscription.", "credential."]}'
+```
+
+`GET /audit/exporters` lists them with their lag; `POST /audit/exporters/<id>/test` sends a test
+event.
+
+## Export and import
+
+`GET …/export` returns the whole workspace — teams, every API (one document per API-version, with
+its documentation pages and snapshot history), applications and subscriptions — and `POST …/import`
+re-imports it elsewhere (PX-07). Import is idempotent: objects are upserted by id, snapshots are
+never rewritten, and nothing is deployed.

@@ -1,0 +1,70 @@
+---
+sidebar_position: 2
+title: Drift and adopt
+description: Detecting changes made by hand on the gateway, repairing them, and taking over existing Otoroshi APIs.
+---
+
+# Drift and adopt
+
+Both sides are administrable, so drift is certain, not probable. The product detects it,
+shows it readably, and lets you repair it — or take over what already runs.
+
+## Drift detection
+
+Every `APIM_DRIFT_INTERVAL_MS` (one minute by default), and on demand, the product compares what
+should run with what the gateway holds:
+
+- **APIs**: the `Api` entity computed from the deployed snapshot against the actual one — name,
+  domain, context path, state, the ownership marker, the snapshot id, and every route (path,
+  methods, matching, backend, flow), backend (targets, root), flow (plugins and their configuration)
+  and plan (status, kind, rate limits, restrictions).
+- **Subscriptions**: the `ApiSubscription` (status, plan, API) and each active key (present,
+  enabled, `apiRef.plan`, secret).
+
+Each object gets a report:
+
+| Status | Meaning |
+|---|---|
+| `in_sync` | the gateway holds exactly what was deployed |
+| `drifted` | something changed on the gateway; the report lists the changes |
+| `missing` | the entity is deployed but absent from the gateway |
+| `unmanaged` | an Otoroshi `Api` without the product's marker — a candidate for adopt mode |
+
+Reports show in **Gateway → Drift**, on the deployment tab of each API, in the subscription review
+and from the CLI:
+
+```bash
+bun cli/apim.js drift default
+```
+
+```
+STATUS   KIND             OBJECT          CHANGES
+drifted  Api              Atlas 1.0.0   plans[Starter].rate_limiting.window, routes[Search].methods
+in_sync  ApiSubscription  sub_01a1…
+```
+
+## Repairing
+
+- An API: **re-apply the running snapshot** (a deployment of the same snapshot). The dry run shows
+  the gateway changes it will revert. Accepting the change instead means editing the draft and
+  publishing.
+- A subscription: **replay the projection**.
+
+## Adopt mode
+
+A product that can only manage what it created is unusable for anyone already in production.
+**APIs → Adopt from gateway** lists the Otoroshi APIs the product does not manage and turns one into
+a **draft** — routes, backends, flows and plans converted, with their ids kept — **without writing
+anything to the gateway**. The first deployment then updates the entity in place, marking it as
+managed.
+
+```bash
+curl -X POST http://localhost:9000/api/workspaces/default/adopt \
+  -H 'Authorization: Bearer apim-admin-token' -H 'Content-Type: application/json' \
+  -d '{"otoroshi_api_id": "api_4b28c494-…"}'
+```
+
+:::note
+Adopt mode takes over the API description only. The subscriptions and apikeys that already exist on
+the adopted API are not imported in this version.
+:::
