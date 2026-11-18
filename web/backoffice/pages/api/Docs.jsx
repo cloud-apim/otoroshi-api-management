@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import YAML from 'yaml';
-import { Callout, Empty, Field, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Callout, Empty, Field, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
 
@@ -146,7 +146,18 @@ function PageEditor({ api, pageId, langs, readOnly, onSaved, onDelete }) {
           </Field>
         </div>
         {mode === 'write' ? (
-          <TextArea value={page.content?.[lang] || ''} onChange={(v) => setLangValue('content', v)} mono rows={22} disabled={readOnly} placeholder="# Markdown" />
+          <CodeEditor
+            key={lang}
+            value={page.content?.[lang] || ''}
+            onChange={(v) => setLangValue('content', v)}
+            language="markdown"
+            wordWrap="on"
+            readOnly={readOnly}
+            minHeight={420}
+            maxHeight={760}
+            ariaLabel={`page content (${lang})`}
+            placeholder="# Markdown"
+          />
         ) : (
           <div className="panel" style={{ background: 'var(--surface)' }}>
             <Markdown source={page.content?.[lang] || ''} />

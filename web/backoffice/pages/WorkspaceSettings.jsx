@@ -93,7 +93,7 @@ function Portal() {
             )}
           </Setting>
           <Setting label="Home page content" help="markdown, below the hero of the portal home">
-            <TextArea value={p.homeMarkdown} onChange={set('homeMarkdown')} mono rows={6} />
+            <CodeEditor value={p.homeMarkdown || ''} onChange={set('homeMarkdown')} language="markdown" wordWrap="on" minHeight={140} maxHeight={420} ariaLabel="home page content" placeholder="# Markdown" />
             {p.homeMarkdown && (
               <div className="panel">
                 <Markdown source={p.homeMarkdown} />

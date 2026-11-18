@@ -57,11 +57,19 @@
   },
   {
     "file": "console-api-plugin-edit.png",
-    "title": "Editing a plugin of a flow — its native configuration, where it applies"
+    "title": "Editing a plugin of a flow — a form generated from the description the gateway gives of the plugin"
+  },
+  {
+    "file": "console-api-plugin-json.png",
+    "title": "Editing a plugin — the same configuration as JSON, in a code editor"
   },
   {
     "file": "console-api-plugin-add.png",
-    "title": "Adding a plugin — the gateway's catalog, and the default configuration of the plugin chosen"
+    "title": "Adding a plugin — the gateway's catalog, and the plugin chosen with its default configuration"
+  },
+  {
+    "file": "console-api-plugin-form.png",
+    "title": "A generated form — nested groups, switches, lists, as the gateway describes the plugin"
   },
   {
     "file": "console-plan-flow.png",
@@ -93,7 +101,7 @@
   },
   {
     "file": "console-api-docs.png",
-    "title": "API — multilingual documentation pages"
+    "title": "API — multilingual documentation pages, in Markdown in a code editor"
   },
   {
     "file": "console-api-openapi.png",

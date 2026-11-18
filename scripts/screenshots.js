@@ -165,14 +165,21 @@ async function consoleTour(page) {
   await shot(page, 'console-api-flows', 'API — policy flows: Otoroshi plugins in order, a shared policy group pinned to a version, a flow for one plan');
   await page.setViewport({ width: 1440, height: 1080 });
   await clickNth(page, '[aria-label=edit]', 1);
+  await shot(page, 'console-api-plugin-edit', 'Editing a plugin of a flow — a form generated from the description the gateway gives of the plugin', { full: false });
+  await clickNth(page, '.seg button', 0, 'JSON');
   await editors(page);
-  await shot(page, 'console-api-plugin-edit', 'Editing a plugin of a flow — its native configuration, where it applies', { full: false });
+  await shot(page, 'console-api-plugin-json', 'Editing a plugin — the same configuration as JSON, in a code editor', { full: false });
   await click(page, 'Cancel');
   await click(page, 'Add plugin');
   await page.type('[aria-label="search plugins"]', 'compression');
   await click(page, 'Brotli compression', { selector: '.palette-item' });
-  await editors(page);
-  await shot(page, 'console-api-plugin-add', "Adding a plugin — the gateway's catalog, and the default configuration of the plugin chosen", { full: false });
+  await shot(page, 'console-api-plugin-add', "Adding a plugin — the gateway's catalog, and the plugin chosen with its default configuration", { full: false });
+  await click(page, 'Cancel');
+  await click(page, 'Add plugin');
+  await page.type('[aria-label="search plugins"]', 'apikeys');
+  await click(page, 'Apikeys', { selector: '.palette-item' });
+  await click(page, 'Extractors', { selector: 'button' });
+  await shot(page, 'console-api-plugin-form', 'A generated form — nested groups, switches, lists, as the gateway describes the plugin', { full: false });
   await click(page, 'Cancel');
   await page.setViewport({ width: 1440, height: 900 });
   await go(page, `${W}/apis/petstore/plans`);
@@ -195,7 +202,8 @@ async function consoleTour(page) {
   }
 
   await go(page, `${A}/documentation`);
-  await shot(page, 'console-api-docs', 'API — multilingual documentation pages');
+  await editors(page);
+  await shot(page, 'console-api-docs', 'API — multilingual documentation pages, in Markdown in a code editor');
   await go(page, `${A}/openapi`);
   await editors(page);
   await shot(page, 'console-api-openapi', 'API — OpenAPI specification, in a code editor', { full: false });
@@ -271,7 +279,7 @@ async function consoleTour(page) {
     ['export', 'console-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);
-    if (tab === 'export') await editors(page);
+    if (tab === 'export' || tab === 'portal') await editors(page);
     await shot(page, name, title);
   }
   await go(page, '/backoffice/ws/gitops/settings/catalogs');
@@ -306,6 +314,7 @@ async function consoleTour(page) {
   await go(page, `${W}/apis/petstore/flows`);
   await page.setViewport({ width: 1440, height: 1080 });
   await clickNth(page, '[aria-label=edit]', 1);
+  await clickNth(page, '.seg button', 0, 'JSON');
   await editors(page);
   await shot(page, 'console-dark-plugin-edit', 'Dark theme — the plugin editor, its code editor following the theme', { full: false });
   await page.setViewport({ width: 1440, height: 900 });
