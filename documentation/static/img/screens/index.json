@@ -257,7 +257,11 @@
   },
   {
     "file": "console-gateway-connection.png",
-    "title": "Gateway — connection, data exporter, raw path"
+    "title": "Gateway — connection and data exporter"
+  },
+  {
+    "file": "console-gateway-ingestion.png",
+    "title": "Gateway — ingestion: the sampling of the raw path, the pseudonymisation of personal data, the retention of each path"
   },
   {
     "file": "console-global-workspaces.png",
