@@ -60,7 +60,9 @@ ingester when the product runs inside the compose stack (`http://apim:9000/inges
   analytics, exchange (export/import, declarative documents), audit, diff
 - `server/otoroshi/` — admin api client, projection (snapshot → entities, comparable form for
   drift), drift detection and adopt
-- `web/shared/` — theme tokens, router (filters in the url), components, svg charts
+- `web/shared/` — theme tokens, router (filters in the url), components, svg charts; the code editor
+  (Monaco, bundled and loaded on first use — `monaco-setup.js` is generated from monaco's
+  `editor.main`, regenerate it when upgrading `monaco-editor`)
 - `web/backoffice/`, `web/portal/` — the two apps (portal UI strings in en/fr via `i18n.jsx`)
 
 ## Conventions

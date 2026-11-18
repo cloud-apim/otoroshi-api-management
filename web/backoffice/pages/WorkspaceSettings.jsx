@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, DiffView, Empty, Field, Icon, Input, Loader, Markdown, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { CodeEditor } from '../../shared/code-editor.jsx';
 import { fmtRelative } from '../../shared/lib.js';
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
@@ -775,7 +776,7 @@ function Exchange() {
         </div>
         <div className="card-body col">
           <p className="muted small">Idempotent: objects are upserted by id, snapshots are never rewritten, and nothing is deployed.</p>
-          <TextArea value={text} onChange={setText} mono rows={6} placeholder="paste an export document" />
+          <CodeEditor value={text} onChange={setText} language="json" minHeight={140} maxHeight={360} ariaLabel="export document" placeholder="paste an export document" />
           <button
             className="btn"
             style={{ alignSelf: 'flex-start' }}

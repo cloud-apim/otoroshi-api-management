@@ -4,7 +4,7 @@ import { fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
-import { PluginModal } from './api/tabs.jsx';
+import { PluginModal, PluginRow, moveItem } from './api/tabs.jsx';
 
 // shared policy groups: a named composition of Otoroshi plugins with its own lifecycle
 export function ApisTabs({ current }) {
@@ -147,19 +147,16 @@ export function PolicyGroupPage({ id }) {
                     </div>
                     {plugins.length ? (
                       plugins.map((p, i) => (
-                        <div key={i} className="list-item">
-                          <span className="faint tiny">{i + 1}</span>
-                          <div className="grow" style={{ minWidth: 0 }}>
-                            <div className="mono small ellipsis">{p.plugin}</div>
-                            <div className="faint tiny">{Object.keys(p.config || {}).length} config keys</div>
-                          </div>
-                          <button className="btn ghost sm icon" onClick={() => setEditing({ index: i, value: p })} aria-label="edit">
-                            <Icon name="edit" />
-                          </button>
-                          <button className="btn ghost sm icon" onClick={() => setDraft(plugins.filter((_, j) => j !== i))} aria-label="remove">
-                            <Icon name="trash" />
-                          </button>
-                        </div>
+                        <PluginRow
+                          key={i}
+                          index={i}
+                          count={plugins.length}
+                          plugin={p}
+                          catalog={catalog.data}
+                          onMove={(delta) => setDraft(moveItem(plugins, i, delta))}
+                          onEdit={() => setEditing({ index: i, value: p })}
+                          onRemove={() => setDraft(plugins.filter((_, j) => j !== i))}
+                        />
                       ))
                     ) : (
                       <div className="card-body muted small">No plugin yet.</div>

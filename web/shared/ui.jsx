@@ -51,6 +51,8 @@ const paths = {
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   swap: 'M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4',
+  up: 'M12 19V5M5 12l7-7 7 7',
+  down: 'M12 5v14M19 12l-7 7-7-7',
 };
 
 export function Icon({ name, size = 16, className = '', strokeWidth = 1.8 }) {

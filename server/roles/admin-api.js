@@ -157,7 +157,15 @@ r.get('/gateway/plugins', async ({ ctx }) => {
   const list = Array.isArray(all) ? all : all.plugins || [];
   return list
     .filter((p) => (p.plugin_type || p.pluginType) === 'ng' || String(p.id || '').startsWith('cp:otoroshi.next'))
-    .map((p) => ({ id: p.id, name: p.name, description: p.description, steps: p.plugin_steps || p.steps || [], categories: p.plugin_categories || [] }));
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      steps: p.plugin_steps || p.steps || [],
+      categories: p.plugin_categories || [],
+      defaultConfig: p.default_config ?? null,
+    }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
 });
 
 // installs the data exporter that feeds the ingester. An exporter is infrastructure: this is a

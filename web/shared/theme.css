@@ -181,6 +181,9 @@ hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
   transition: border-color .12s, box-shadow .12s;
 }
 .input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.code-editor { width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.code-editor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.code-editor.loading { background: var(--surface-2); }
 .input.mono, .textarea.mono { font-family: var(--mono); font-size: 12.5px; }
 .textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
 .select { appearance: none; padding-right: 30px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import YAML from 'yaml';
 import { Callout, Empty, Field, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
+import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
 
 // documentation stays in the product, never in the gateway, and is multilingual from the
 // start: the languages belong to the customer
@@ -214,7 +215,17 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
             <h3 className="grow">Specification (YAML or JSON)</h3>
           </div>
           <div className="card-body">
-            <TextArea value={content} onChange={set} mono rows={28} disabled={readOnly} placeholder={'openapi: 3.1.0\ninfo:\n  title: My API\n  version: 1.0.0\npaths: {}'} />
+            <CodeEditor
+              value={content}
+              onChange={set}
+              language={codeLanguage(content)}
+              readOnly={readOnly}
+              minHeight={520}
+              maxHeight={760}
+              wordWrap="on"
+              ariaLabel="openapi specification"
+              placeholder={'openapi: 3.1.0\ninfo:\n  title: My API\n  version: 1.0.0\npaths: {}'}
+            />
           </div>
         </div>
         <div className="card">

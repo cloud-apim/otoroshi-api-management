@@ -1,7 +1,8 @@
 // The request composer: one component, two execution contexts — the console replays a
 // request through its own api, the portal tries an api with the consumer's credentials.
 import React, { useState } from 'react';
-import { Badge, Callout, Code, Field, Icon, Select, TextArea } from './ui.jsx';
+import { Badge, Callout, Code, Field, Icon, Select } from './ui.jsx';
+import { CodeEditor, codeLanguage } from './code-editor.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -92,7 +93,7 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
           </button>
           {!['GET', 'HEAD'].includes(req.method) && (
             <Field label={L.body}>
-              <TextArea value={req.body} onChange={(v) => set({ body: v })} mono rows={6} />
+              <CodeEditor value={req.body} onChange={(v) => set({ body: v })} language={codeLanguage(req.body) === 'json' ? 'json' : 'plaintext'} minHeight={120} maxHeight={320} ariaLabel="request body" />
             </Field>
           )}
         </div>

@@ -7,6 +7,7 @@ import {
 } from '../../../shared/ui.jsx';
 import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
+import { CodeEditor } from '../../../shared/code-editor.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const rid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
@@ -413,15 +414,134 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
 
 // ---------------------------------------------------------------- flows: named compositions of otoroshi plugins
 
+// The plugins are the gateway's own: they are named, described and configured from its catalog
+// (GET /gateway/plugins), and the configuration stays the plugin's native one.
+
+export const pluginOf = (catalog, id) => (catalog || []).find((c) => c.id === id);
+const shortPluginId = (id) => String(id || '').replace(/^cp:otoroshi\.next\.plugins\./, '');
+const isEmptyValue = (v) => v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v).length);
+
+function configSummary(config) {
+  const parts = Object.entries(config || {})
+    .filter(([, v]) => !isEmptyValue(v))
+    .map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`);
+  const s = parts.join(' · ');
+  return s.length > 120 ? `${s.slice(0, 117)}…` : s;
+}
+
+export function moveItem(list, i, delta) {
+  const j = i + delta;
+  if (j < 0 || j >= list.length) return list;
+  const next = [...list];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+function MoveButtons({ index, count, onMove }) {
+  return (
+    <>
+      <button className="btn ghost sm icon" disabled={index === 0} onClick={() => onMove(-1)} aria-label="move up" title="run earlier">
+        <Icon name="up" />
+      </button>
+      <button className="btn ghost sm icon" disabled={index === count - 1} onClick={() => onMove(1)} aria-label="move down" title="run later">
+        <Icon name="down" />
+      </button>
+    </>
+  );
+}
+
+// one plugin of a flow or of a policy group: its name from the gateway catalog, where it applies,
+// what is configured
+export function PluginRow({ index, count, plugin: p, catalog, readOnly, onEdit, onRemove, onMove }) {
+  const meta = pluginOf(catalog, p.plugin);
+  const summary = configSummary(p.config);
+  const where = p.include?.length ? `only ${p.include.join(', ')}` : 'all paths';
+  return (
+    <div className="list-item">
+      <span className="faint tiny">{index + 1}</span>
+      <div className="grow" style={{ minWidth: 0 }}>
+        <div className="row gap-6" style={{ minWidth: 0 }}>
+          <span className="bold small nowrap">{meta?.name || shortPluginId(p.plugin)}</span>
+          <span className="mono faint tiny ellipsis">{p.plugin}</span>
+        </div>
+        <div className="faint tiny ellipsis">
+          {where}
+          {p.exclude?.length ? ` · except ${p.exclude.join(', ')}` : ''} · {summary || 'default configuration'}
+        </div>
+      </div>
+      {!p.enabled && <Badge>disabled</Badge>}
+      {!readOnly && (
+        <>
+          <MoveButtons index={index} count={count} onMove={onMove} />
+          <button className="btn ghost sm icon" onClick={onEdit} aria-label="edit">
+            <Icon name="edit" />
+          </button>
+          <button className="btn ghost sm icon" onClick={onRemove} aria-label="remove">
+            <Icon name="trash" />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PluginCard({ meta, id }) {
+  if (!meta)
+    return id ? (
+      <Callout kind="warning" title="Not in the gateway's catalog">
+        <span className="mono small">{id}</span> — a custom plugin, or a gateway that does not run it. It is projected as is.
+      </Callout>
+    ) : null;
+  return (
+    <div className="panel col gap-6">
+      <div className="row gap-6 wrap">
+        <span className="bold">{meta.name}</span>
+        {(meta.categories || []).map((c) => (
+          <Badge key={c} kind="accent">
+            {c}
+          </Badge>
+        ))}
+        {(meta.steps || []).map((s) => (
+          <Badge key={s}>{s}</Badge>
+        ))}
+      </div>
+      {meta.description && <div className="small muted">{meta.description}</div>}
+      <div className="mono faint tiny">{meta.id}</div>
+    </div>
+  );
+}
+
 export function PluginModal({ value, catalog, onSave, onClose }) {
+  const isNew = !value.plugin;
   const [p, setP] = useState(value);
   const [config, setConfig] = useState(JSON.stringify(value.config || {}, null, 2));
-  const [error, setError] = useState(null);
+  const [picking, setPicking] = useState(isNew);
   const [q, setQ] = useState('');
-  const matches = (catalog || []).filter((c) => !q || `${c.name} ${c.id}`.toLowerCase().includes(q.toLowerCase())).slice(0, 60);
+  const [category, setCategory] = useState('');
+  const meta = pluginOf(catalog, p.plugin);
+  let parsed = null;
+  let jsonError = null;
+  try {
+    parsed = JSON.parse(config || '{}');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) jsonError = 'the configuration is a json object';
+  } catch (e) {
+    jsonError = `invalid json — ${e.message}`;
+  }
+  const categories = [...new Set((catalog || []).flatMap((c) => c.categories || []))].sort();
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (catalog || []).filter(
+    (c) => (!category || (c.categories || []).includes(category)) && words.every((w) => `${c.name} ${c.id} ${c.description || ''}`.toLowerCase().includes(w)),
+  );
+  // choosing a plugin brings its default configuration, unless the current one was edited
+  const pick = (c) => {
+    const previous = JSON.stringify(pluginOf(catalog, p.plugin)?.defaultConfig || {});
+    const untouched = !jsonError && (!Object.keys(parsed).length || JSON.stringify(parsed) === previous);
+    setP({ ...p, plugin: c.id });
+    if (untouched) setConfig(JSON.stringify(c.defaultConfig || {}, null, 2));
+  };
   return (
     <Modal
-      title="Plugin"
+      title={isNew ? 'Add a plugin' : `Edit plugin — ${meta?.name || shortPluginId(p.plugin)}`}
       size="wide"
       onClose={onClose}
       footer={
@@ -429,48 +549,65 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
           <button className="btn" onClick={onClose}>
             Cancel
           </button>
-          <button
-            className="btn primary"
-            disabled={!p.plugin}
-            onClick={() => {
-              try {
-                onSave({ ...p, config: JSON.parse(config || '{}') });
-              } catch (e) {
-                setError('invalid json configuration');
-              }
-            }}
-          >
-            Apply
+          <button className="btn primary" disabled={!p.plugin || !!jsonError} onClick={() => onSave({ ...p, config: parsed })}>
+            {isNew ? 'Add to the flow' : 'Apply'}
           </button>
         </>
       }
     >
-      <p className="muted small">The plugins are Otoroshi's own — no product-specific plugin. The configuration is the plugin's native one.</p>
-      <Field label="Plugin">
-        <Input value={p.plugin} onChange={(v) => setP({ ...p, plugin: v })} mono placeholder="cp:otoroshi.next.plugins.…" />
-      </Field>
-      {catalog?.length > 0 && (
+      <p className="muted small">The plugins are Otoroshi's own — no product-specific plugin. The configuration is the plugin's native one, and it reaches the gateway as is.</p>
+      {catalog?.length > 0 && picking && (
         <div className="panel col gap-6">
-          <Input value={q} onChange={setQ} placeholder="search the gateway's plugin catalog" />
-          <div style={{ maxHeight: 180, overflow: 'auto' }}>
-            {matches.map((c) => (
-              <div key={c.id} className={`palette-item ${p.plugin === c.id ? 'on' : ''}`} onClick={() => setP({ ...p, plugin: c.id })}>
-                <span className="bold small">{c.name}</span>
+          <div className="row">
+            <div className="grow">
+              <Input value={q} onChange={setQ} placeholder={`search the gateway's ${catalog.length} plugins`} aria-label="search plugins" autoFocus />
+            </div>
+            <div style={{ width: 220 }}>
+              <Select value={category} onChange={setCategory} options={[{ value: '', label: 'all categories' }, ...categories]} aria-label="category" />
+            </div>
+          </div>
+          <div style={{ maxHeight: 220, overflow: 'auto' }}>
+            {matches.slice(0, 80).map((c) => (
+              <div key={c.id} className={`palette-item ${p.plugin === c.id ? 'on' : ''}`} onClick={() => pick(c)}>
+                <span className="bold small nowrap">{c.name}</span>
                 <span className="faint tiny ellipsis grow">{c.description}</span>
+                <span className="faint tiny nowrap">{(c.categories || [])[0]}</span>
               </div>
             ))}
+            {!matches.length && <div className="muted small" style={{ padding: 12 }}>No plugin matches.</div>}
           </div>
         </div>
       )}
-      <Field label="Configuration (json)" error={error}>
-        <TextArea value={config} onChange={setConfig} mono rows={8} />
+      <PluginCard meta={meta} id={p.plugin} />
+      <div className="row" style={{ alignItems: 'flex-end' }}>
+        <div className="grow">
+          <Field label="Plugin id">
+            <Input value={p.plugin} onChange={(v) => setP({ ...p, plugin: v })} mono placeholder="cp:otoroshi.next.plugins.…" />
+          </Field>
+        </div>
+        {catalog?.length > 0 && !picking && (
+          <button className="btn" onClick={() => setPicking(true)}>
+            <Icon name="search" /> Change plugin
+          </button>
+        )}
+      </div>
+      <div className="row">
+        <label className="bold small grow">Configuration (json)</label>
+        {meta && (
+          <button className="btn ghost xs" onClick={() => setConfig(JSON.stringify(meta.defaultConfig || {}, null, 2))} disabled={!jsonError && JSON.stringify(parsed) === JSON.stringify(meta.defaultConfig || {})}>
+            Reset to the default configuration
+          </button>
+        )}
+      </div>
+      <Field error={jsonError} hint={meta && !meta.defaultConfig ? 'this plugin takes no configuration' : "the plugin's native configuration"}>
+        <CodeEditor value={config} onChange={setConfig} language="json" minHeight={160} maxHeight={380} ariaLabel="plugin configuration" />
       </Field>
       <div className="grid-2">
-        <Field label="Only on paths" hint="include patterns, empty = everywhere">
-          <TagsInput value={p.include} onChange={(v) => setP({ ...p, include: v })} placeholder="/admin/*" />
+        <Field label="Only on paths" hint="Java regular expressions on the full request path; empty = everywhere">
+          <TagsInput value={p.include} onChange={(v) => setP({ ...p, include: v })} placeholder="/v1/admin/.*" />
         </Field>
-        <Field label="Except paths">
-          <TagsInput value={p.exclude} onChange={(v) => setP({ ...p, exclude: v })} placeholder="/health" />
+        <Field label="Except paths" hint="evaluated after the include list">
+          <TagsInput value={p.exclude} onChange={(v) => setP({ ...p, exclude: v })} placeholder="/v1/health" />
         </Field>
       </div>
       <Switch checked={p.enabled} onChange={(v) => setP({ ...p, enabled: v })} label="Enabled" />
@@ -524,19 +661,24 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">
-        A flow is a named chain of Otoroshi plugins. A resource runs one flow; a plan can add its own flow (merged with the flow of the current route) to put a policy plan by plan.
+        A flow is a named chain of Otoroshi plugins, run in this order within each step of the request. A resource runs one flow; a plan can add its own flow (merged with the flow of
+        the current route) to put a policy plan by plan. Shared policy groups are expanded in place.
       </p>
       {draft.flows.map((f) => {
-        const usedBy = draft.resources.filter((r) => r.flowId === f.id).length;
-        const usedByPlans = draft.plans.filter((p) => p.flowRef === f.id).length;
+        const resources = draft.resources.filter((r) => r.flowId === f.id);
+        const plans = draft.plans.filter((p) => p.flowRef === f.id);
+        const usedBy = resources.length;
+        const usedByPlans = plans.length;
+        const usage = [
+          resources.length ? `${resources.length > 1 ? 'resources' : 'resource'} ${resources.map((r) => r.name).join(', ')}` : '',
+          plans.length ? `${plans.length > 1 ? 'plans' : 'plan'} ${plans.map((p) => p.name).join(', ')}` : '',
+        ].filter(Boolean);
         return (
           <div key={f.id} className="card">
             <div className="card-head">
               <Icon name="layers" />
               <input className="input" style={{ maxWidth: 280, fontWeight: 600 }} value={f.name} disabled={readOnly} onChange={(e) => updateFlow(f.id, { name: e.target.value })} aria-label="flow name" />
-              <span className="faint small grow">
-                {usedBy} resource(s) · {usedByPlans} plan(s)
-              </span>
+              <span className="faint small grow ellipsis">{usage.length ? `runs for ${usage.join(' · ')}` : 'not used yet'}</span>
               {!readOnly && (
                 <>
                   <button className="btn sm" onClick={() => setEditing({ flowId: f.id, index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
@@ -552,8 +694,10 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
               )}
             </div>
             {f.plugins.length ? (
-              f.plugins.map((p, i) =>
-                p.group ? (
+              f.plugins.map((p, i) => {
+                const move = (delta) => updateFlow(f.id, { plugins: moveItem(f.plugins, i, delta) });
+                const remove = () => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) });
+                return p.group ? (
                   <div key={i} className="list-item">
                     <span className="faint tiny">{i + 1}</span>
                     <Icon name="layers" />
@@ -574,35 +718,28 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
                       </>
                     )}
                     {!readOnly && (
-                      <button className="btn ghost sm icon" onClick={() => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) })} aria-label="remove">
-                        <Icon name="trash" />
-                      </button>
+                      <>
+                        <MoveButtons index={i} count={f.plugins.length} onMove={move} />
+                        <button className="btn ghost sm icon" onClick={remove} aria-label="remove">
+                          <Icon name="trash" />
+                        </button>
+                      </>
                     )}
                   </div>
                 ) : (
-                <div key={i} className="list-item">
-                  <span className="faint tiny">{i + 1}</span>
-                  <div className="grow" style={{ minWidth: 0 }}>
-                    <div className="mono small ellipsis">{p.plugin}</div>
-                    <div className="faint tiny">
-                      {p.include?.length ? `only ${p.include.join(', ')}` : 'all paths'}
-                      {p.exclude?.length ? ` · except ${p.exclude.join(', ')}` : ''} · {Object.keys(p.config || {}).length} config keys
-                    </div>
-                  </div>
-                  {!p.enabled && <Badge>disabled</Badge>}
-                  {!readOnly && (
-                    <>
-                      <button className="btn ghost sm icon" onClick={() => setEditing({ flowId: f.id, index: i, value: p })} aria-label="edit">
-                        <Icon name="edit" />
-                      </button>
-                      <button className="btn ghost sm icon" onClick={() => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) })} aria-label="remove">
-                        <Icon name="trash" />
-                      </button>
-                    </>
-                  )}
-                </div>
-                )
-              )
+                  <PluginRow
+                    key={i}
+                    index={i}
+                    count={f.plugins.length}
+                    plugin={p}
+                    catalog={catalog.data}
+                    readOnly={readOnly}
+                    onMove={move}
+                    onRemove={remove}
+                    onEdit={() => setEditing({ flowId: f.id, index: i, value: p })}
+                  />
+                );
+              })
             ) : (
               <div className="card-body muted small">No plugin.</div>
             )}
