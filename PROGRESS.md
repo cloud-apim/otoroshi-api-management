@@ -247,4 +247,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane — each with its upstream issue, the size of the fix and the item it unblocks.

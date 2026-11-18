@@ -8,29 +8,35 @@ Reference: Otoroshi `18.0.1` (the docker stack runs `otoroshi.jar` 18.0.1; sourc
 `18.1.0-dev` checkout in `../otoroshi`). Severity: **high** = security or contract, **medium** =
 the product has to compensate, **low** = friction.
 
-| # | Gap | Severity | Product meanwhile |
-|---|---|---|---|
-| G-1 | A `pending` ApiSubscription gets an **enabled** apikey | high | never projects a pending subscription |
-| G-2 | Deleting an ApiSubscription **revokes nothing** | high | deletes the keys first, then the subscription |
-| G-3 | An `Api` without a published plan has **open routes** | high | warns and asks for an explicit acknowledgement before deploying |
-| G-4 | On jwt / mtls / oauth2-remote / keyless plans, **any valid token passes**, subscribed or not | high | flags it on the plan (warning `any_token_passes`) |
-| G-5 | Resource filtering (restrictions) only exists on **apikey** plans | medium | flags it as not enforced on other kinds |
-| G-6 | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | stored, projected as plan metadata, flagged as not enforced |
-| G-7 | `ApiDeployment` cannot carry the **external snapshot id**, and keeps only 5 entries | medium | snapshot id written in `Api.metadata` |
-| G-8 | The catalog-deploy path is borrowed by a control plane via a **naming convention** | medium | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
-| G-9 | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | attribution via the key's metadata + a client id cache at ingestion |
-| G-10 | A `PUT` on an entity that does not exist is refused (`resource does not exists`) | low | `GET` then `POST` or `PUT` |
-| G-11 | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | tests poll; the console says "deployed" once the write is accepted |
-| G-12 | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | the console replays requests through the gateway without the trace |
-| G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | validation warning on the plan |
-| G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
-| G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
-| G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
-| G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
-| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
-| G-19 | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
-| G-20 | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
-| G-21 | The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | medium | the product's key keeps every right; with a narrowed key the vault references and the TLS checks would fail |
+Size of the fix in Otoroshi, tests included — an estimate from the work each issue describes: **S**
+≈ half a day to a day, **M** ≈ two to three days, **L** ≈ a week. **Unblocks**: the item of
+[PROGRESS.md](./PROGRESS.md) waiting for it.
+
+| # | Issue | Gap | Severity | Size | Unblocks | Product meanwhile |
+|---|---|---|---|---|---|---|
+| G-1 | [#2940](https://github.com/MAIF/otoroshi/issues/2940) | A `pending` ApiSubscription gets an **enabled** apikey | high | S | — | never projects a pending subscription |
+| G-2 | [#2941](https://github.com/MAIF/otoroshi/issues/2941) | Deleting an ApiSubscription **revokes nothing** | high | S | — | deletes the keys first, then the subscription |
+| G-3 | [#2942](https://github.com/MAIF/otoroshi/issues/2942) | An `Api` without a published plan has **open routes** | high | M | — | warns and asks for an explicit acknowledgement before deploying |
+| G-4 | [#2943](https://github.com/MAIF/otoroshi/issues/2943) | On jwt / mtls / oauth2-remote / keyless plans, **any valid token passes**, subscribed or not | high | M, after G-17 | R-15 | flags it on the plan (warning `any_token_passes`) |
+| G-5 | [#2944](https://github.com/MAIF/otoroshi/issues/2944) | Resource filtering (restrictions) only exists on **apikey** plans | medium | M | — | flags it as not enforced on other kinds |
+| G-6 | [#2945](https://github.com/MAIF/otoroshi/issues/2945) | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | L | R-14 | stored, projected as plan metadata, flagged as not enforced |
+| G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` cannot carry the **external snapshot id**, and keeps only 5 entries | medium | S | R-33 | snapshot id written in `Api.metadata` |
+| G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path is borrowed by a control plane via a **naming convention** | medium | S | — | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
+| G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | S | — | attribution via the key's metadata + a client id cache at ingestion |
+| G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused (`resource does not exists`) | low | S | — | `GET` then `POST` or `PUT` |
+| G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | L | — | tests poll; the console says "deployed" once the write is accepted |
+| G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | M | R-24 | the console replays requests through the gateway without the trace |
+| G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | S | R-16 | validation warning on the plan |
+| G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | S | — | not offered (the field was removed from the model) |
+| G-15 | [#2954](https://github.com/MAIF/otoroshi/issues/2954) | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | S | — | warns on the plan (`token_claims_not_checked`) |
+| G-16 | [#2955](https://github.com/MAIF/otoroshi/issues/2955) | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | M | — | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
+| G-17 | [#2937](https://github.com/MAIF/otoroshi/issues/2937) | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | M | — | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
+| G-18 | [#2938](https://github.com/MAIF/otoroshi/issues/2938) | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | M (key migration) | — | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
+| G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | L | — | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
+| G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | M | — | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
+| G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | medium | M | — | the product's key keeps every right; with a narrowed key the vault references and the TLS checks would fail |
+
+Total: 9 S + 9 M + 3 L. Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
 
 ---
 
