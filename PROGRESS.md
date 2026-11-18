@@ -16,16 +16,15 @@ Dernière mise à jour : 18/11/2026.
 ## Suite, dans l'ordre proposé
 
 1. Relecture et commit de la documentation ; captures d'écran.
-2. Fichiers `LICENSE` (Apache 2.0) et `NOTICE` — le README annonce la licence, le fichier manque.
-3. **D-15** : objets dérivés de la description d'une API (JWT verifiers, certificats) — aujourd'hui seulement référencés.
-4. **D-30** : règles de consentement du transfert (accord du consommateur quand les conditions se dégradent).
-5. Console en français (le portail l'est déjà).
-6. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
-7. Notifications (souscription acceptée / refusée…) — pas tranché dans le spec, à proposer.
-8. **D-28** : CRDs Kubernetes et chart Helm.
-9. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
-10. **Q-8** : rétention et échantillonnage du chemin brut.
-11. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
+2. **D-15** : objets dérivés de la description d'une API (JWT verifiers, certificats) — aujourd'hui seulement référencés.
+3. **D-30** : règles de consentement du transfert (accord du consommateur quand les conditions se dégradent).
+4. Console en français (le portail l'est déjà).
+5. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
+6. Notifications (souscription acceptée / refusée…) — pas tranché dans le spec, à proposer.
+7. **D-28** : CRDs Kubernetes et chart Helm.
+8. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
+9. **Q-8** : rétention et échantillonnage du chemin brut.
+10. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
 
 ## Points connus
 
@@ -50,7 +49,7 @@ Dernière mise à jour : 18/11/2026.
 | D-9 n°2 échappatoire vers l'entité projetée | ✅ | « Technical details », lien vers le backoffice Otoroshi |
 | D-9 n°3 rien d'essentiel masqué | ✅ | avertissements : routes ouvertes, tout jeton passe, attributs non appliqués, ordre de résolution |
 | D-9 n°4 réversibilité | 🟡 | export / import ✅ ; « désinstaller laisse une conf qui tourne » non testé |
-| D-9 n°5 Apache 2.0 | 🟡 | fichier `LICENSE` manquant |
+| D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
 | D-10 WAF dans l'extension | 🟡 | posable comme plugin dans un flow ou un groupe ; pas d'écran dédié |
 | D-11 i18n | 🟡 | doc multilingue ✅, portail en/fr ✅, console en anglais seulement, libellés de métadonnées non traduits |
 | D-12 clair / sombre / système | ✅ | console et portail |
