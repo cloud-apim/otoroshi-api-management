@@ -121,3 +121,27 @@ describe('oauth2-remote plans', () => {
     expect(diff(comparableDerived(mod.entity), comparableDerived({ ...mod.entity, jwtVerifier: { type: 'JWKSAlgoSettings', url: 'https://other/jwks' } })).length).toBe(1);
   });
 });
+
+describe('client certificates of applications', () => {
+  test('only readable certificates, never a private key, each once', async () => {
+    const { normalizeCertificates } = await import('../server/domain/applications.js');
+    expect(normalizeCertificates([CA, ` ${CA} `, ''])).toEqual([CA.trim()]);
+    expect(() => normalizeCertificates(['-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----'])).toThrow(/private key/);
+    expect(() => normalizeCertificates(['not a certificate'])).toThrow(/PEM/);
+  });
+
+  test('derived as certificates of the gateway, marked with their application', async () => {
+    const { applicationCertificates, derivedApplicationCertId } = await import('../server/otoroshi/projection.js');
+    const [cert] = applicationCertificates({ id: 'app_1', name: 'Partner app', workspace_id: 'ws_1', certificates: [CA] });
+    expect(cert.id).toBe(derivedApplicationCertId('app_1', CA));
+    expect(cert.entity.privateKey).toBe('');
+    expect(cert.entity.selfSigned).toBe(true);
+    expect(cert.entity.metadata).toMatchObject({ apim_application_id: 'app_1', apim_derived: 'true' });
+  });
+
+  test('an mtls plan reads the CN by default, and says when it reads nothing', () => {
+    expect(mtlsPlan({}).auth.config.clientIdField).toBe('CN');
+    const codes = validateDraft(snapshot([mtlsPlan({ clientIdField: '' })]).draft).warnings.map((w) => w.code);
+    expect(codes).toContain('no_client_id_field');
+  });
+});

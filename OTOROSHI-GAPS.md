@@ -26,6 +26,7 @@ the product has to compensate, **low** = friction.
 | G-14 | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | not offered (the field was removed from the model) |
 | G-15 | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | warns on the plan (`token_claims_not_checked`) |
 | G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
+| G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
 
 ---
 
@@ -240,4 +241,26 @@ patterns and no issuer pattern gets a validation warning (`subject_without_issue
 
 **Upstream fix.** Combine the two lists with AND when both are given (or a `match: all | any`
 switch), and an optional per-plan list of trusted CA certificate ids checked on the chain.
+
+## G-17 — token and certificate subscriptions carry no consumer identity — high
+
+**Observed.** On `jwt`, `mtls` and `oauth2-remote` plans, an `ApiSubscription` creates nothing
+(`next/models/Api.scala:1203`: only `apikey` and `oauth2-local` subscriptions mint a key) and
+carries no identity of its consumer — `owner_ref` is the application, not a client id or a
+certificate. The extractor builds the consumer at call time as `<kind>_<planId>_<clientId>`
+(`next/plugins/apimgmt.scala`), unrelated to any subscription. So suspending or closing such a
+subscription changes nothing at the gateway, and a call cannot be tied to the subscription it was
+made under — even once G-4 refuses unsubscribed callers, there is nothing to resolve them against.
+
+**Product meanwhile.** The application declares its expected client id and its client
+certificates. The ingester attributes `<kind>_<planId>_<clientId>` consumers to the subscription of
+the application that declared that client id. The certificates of an application are derived as
+certificates of the gateway only while it has an active subscription to an mtls plan: suspending
+or closing removes the trust in a self-signed certificate (one signed by a CA the gateway trusts is
+not affected).
+
+**Upstream fix.** An identity on the `ApiSubscription` of these kinds (the client id, or the
+certificate subject), from which Otoroshi provisions the consumer `<kind>_<planId>_<clientId>`
+with the plan's settings, enabled or not with the subscription — and which G-4's "subscription
+required" resolves against.
 

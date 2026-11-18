@@ -10,7 +10,7 @@ const rid = () => `plan_${Math.random().toString(36).slice(2, 10)}${Date.now().t
 const AUTH_DEFAULTS = {
   apikey: { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } },
   jwt: { verifier: '', clientIdPath: 'client_id' },
-  mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '', trustedCAs: [] },
+  mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: 'CN', trustedCAs: [] },
   'oauth2-local': { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 },
   'oauth2-remote': {
     verifier: '',

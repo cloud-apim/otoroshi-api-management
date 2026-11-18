@@ -349,6 +349,9 @@ async function removeFromGateway(sub, existing) {
 registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
   const sub = (await db`select * from subscriptions where id = ${subscription_id}`)[0];
   if (!sub) return { skipped: 'deleted' };
+  // the client certificates of its application follow the subscriptions to mtls plans
+  if (sub.auth_kind === 'mtls')
+    await enqueue('sync_application_certificates', { application_id: sub.application_id, workspace_id: sub.workspace_id }, { dedupeKey: `appcerts:${sub.application_id}` });
   const app = (await db`select * from applications where id = ${sub.application_id}`)[0];
   const wanted = ['active', 'suspended'].includes(sub.status);
   const setProjection = (p) => db`update subscriptions set projection = ${p}, updated_at = now() where id = ${sub.id}`;

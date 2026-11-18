@@ -32,6 +32,7 @@ Reference: Otoroshi 18.0.1.
 | G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
 | G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | warns on the plan |
 | G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
+| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity: suspending or closing it changes nothing at the gateway | high | calls attributed at ingestion; application certificates trusted only while an mtls subscription is active |
 
 ## The ones to keep in mind
 

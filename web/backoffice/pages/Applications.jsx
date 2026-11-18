@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { fmtRelative } from '../../shared/lib.js';
-import { Empty, Field, Icon, Input, Loader, Modal, Select, Setting, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
-import { useWs, useMetadataFields } from '../context.jsx';
+import { Callout, Empty, Field, Icon, Input, Loader, Modal, Select, Setting, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { api, useWs, useMetadataFields } from '../context.jsx';
+import { CertificateList } from '../../shared/certificates.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
@@ -160,7 +161,12 @@ export function ApplicationPage({ id }) {
               {tab === 'usage' && <AnalyticsDashboard fixed={{ application: app.id }} />}
               {tab === 'identity' && (
                 <div className="card">
-                  <div className="card-body">
+                  {!app.can_see_credentials && (
+                    <div className="card-body" style={{ paddingBottom: 0 }}>
+                      <Callout kind="info">Read only: the team of the application and the administrators of the workspace change it.</Callout>
+                    </div>
+                  )}
+                  <fieldset disabled={!app.can_see_credentials} className="ro-fieldset card-body">
                     <Setting label="Name">
                       <Input value={f.name} onChange={set('name')} />
                     </Setting>
@@ -175,9 +181,22 @@ export function ApplicationPage({ id }) {
                         <MetadataForm fields={metaFields} values={f.metadata} onChange={set('metadata')} />
                       </Setting>
                     )}
-                    <Setting label="Client certificates" help="PEM, one per entry, for mtls plans">
-                      <TextArea value={(f.certificates || []).join('\n-----\n')} onChange={(v) => set('certificates')(v ? v.split('\n-----\n') : [])} mono rows={4} />
-                    </Setting>
+                    <CertificateList
+                      value={f.certificates || []}
+                      onChange={set('certificates')}
+                      inspect={(pem) => api.post('/certificates/inspect', { pem })}
+                      mode="client"
+                      label="Client certificates"
+                      help={`presented on the mtls plans: derived as certificates of the gateway while the application has an active subscription to an mtls plan, so that the TLS handshake accepts them — ${
+                        app.certificates_on_gateway ? 'they are on the gateway now' : 'not on the gateway now'
+                      }`}
+                      addLabel="Add a certificate"
+                      addTitle="Add a client certificate"
+                      addHelp="The certificate (PEM) the application presents on mtls plans. Only the certificate: never its private key."
+                      clientId={f.client_id}
+                      onClientId={set('client_id')}
+                      readOnly={!app.can_see_credentials}
+                    />
                     <div className="row mt-16">
                       <button
                         className="btn primary"
@@ -211,7 +230,7 @@ export function ApplicationPage({ id }) {
                         Delete application
                       </button>
                     </div>
-                  </div>
+                  </fieldset>
                 </div>
               )}
             </>

@@ -62,6 +62,12 @@ and nothing else. A subject Otoroshi's form cannot be predicted for (an e-mail a
 character) gets a warning instead. Otoroshi accepts a certificate when its subject **or** its issuer
 matches (upstream gap G-16): a subject pattern alone is flagged.
 
+Without trusted CAs nor issuer patterns, the plan accepts any certificate the gateway trusts —
+among them the [client certificates of the applications](./applications-and-subscriptions.mdx#client-certificates)
+that have an active subscription to an mtls plan, derived for that time. The plan reads the `CN` of
+the certificate as the client id by default; without a client id field, the gateway names a
+consumer after its whole certificate and no application can be reconciled with it.
+
 Two gateway settings decide whether the plan can work at all, and the deployment dry run says so:
 the gateway must **ask callers for a client certificate** (TLS client auth `Want` or `Need`), and if
 it trusts a fixed list of CAs (`trustedCAsServer`), the derived ones must be on it. Both belong to

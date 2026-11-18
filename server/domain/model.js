@@ -82,7 +82,7 @@ export function defaultAuthConfig(kind) {
     case 'mtls':
       // trustedCAs: the CA certificates the plan trusts, derived as certificates of the gateway;
       // without issuer patterns, the plan accepts what they signed and nothing else
-      return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: '', trustedCAs: [] };
+      return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: 'CN', trustedCAs: [] };
     case 'oauth2-local':
       return { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 };
     case 'oauth2-remote':
@@ -298,6 +298,12 @@ export function validateDraft(draft) {
           path: `plans[${i}].auth.config.regexIssuerDNs`,
           code: 'issuer_not_derived',
           message: `plan "${p.name}": the subject of a trusted CA cannot be predicted in Otoroshi's form — give the issuer patterns, or any certificate the gateway trusts passes`,
+        });
+      if (!p.auth.config.clientIdField && p.status === 'published')
+        warnings.push({
+          path: `plans[${i}].auth.config.clientIdField`,
+          code: 'no_client_id_field',
+          message: `plan "${p.name}": without a client id field (CN, typically), the gateway names a consumer after its whole certificate — the expected client_id of an application can never match it`,
         });
       if ((p.auth.config.regexSubjectDNs || []).length && !issuers.length && !cas.length && p.status === 'published')
         warnings.push({

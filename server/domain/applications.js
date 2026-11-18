@@ -7,6 +7,10 @@ import { badRequest, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { findTeam, isTeamMember } from './identity.js';
 import { checkValues } from './metadata.js';
+import { readCertificate } from './pki.js';
+import { enqueue, registerTaskHandler } from './tasks.js';
+import { oto } from '../otoroshi/client.js';
+import { applicationCertificates } from '../otoroshi/projection.js';
 
 export async function listApplications(workspaceId, { userId = null, teamId = null } = {}) {
   return db`select a.*, t.name as team_name, t.personal as team_personal,
@@ -36,6 +40,40 @@ export async function requireSeeApplication(ctx, app) {
   if (!(await canSeeApplication(ctx, app))) throw forbidden('you cannot see this application');
 }
 
+// the client certificates of an application: readable PEM certificates, never a private key
+export function normalizeCertificates(list) {
+  const out = [];
+  for (const raw of list || []) {
+    const pem = String(raw || '').trim();
+    if (!pem) continue;
+    if (/PRIVATE KEY/.test(pem)) throw badRequest('a client certificate is given without its private key: paste the certificate only');
+    try {
+      readCertificate(pem);
+    } catch (e) {
+      throw badRequest(`not a readable PEM certificate: ${e.message}`);
+    }
+    if (!out.includes(pem)) out.push(pem);
+  }
+  return out;
+}
+
+const syncCertificates = (app) =>
+  enqueue('sync_application_certificates', { application_id: app.id, workspace_id: app.workspace_id }, { dedupeKey: `appcerts:${app.id}` });
+
+// the certificates of an application reach the gateway while it has an active subscription to an
+// mtls plan, and leave it otherwise: suspending or closing removes the trust in a self-signed one
+registerTaskHandler('sync_application_certificates', async ({ application_id }) => {
+  const app = (await db`select * from applications where id = ${application_id}`)[0];
+  const subscribed = app ? (await db`select 1 from subscriptions where application_id = ${app.id} and auth_kind = 'mtls' and status = 'active' limit 1`).length > 0 : false;
+  const wanted = app && subscribed ? applicationCertificates(app) : [];
+  for (const d of wanted) await oto.upsertEntity(d.path, d.entity);
+  const stale = ((await oto.listCertificates()) || []).filter(
+    (c) => c.metadata?.apim_application_id === application_id && c.metadata?.apim_derived === 'true' && !wanted.some((w) => w.id === c.id),
+  );
+  for (const c of stale) await oto.deleteEntity('/api/certificates', c.id).catch(() => null);
+  return { projected: wanted.map((w) => w.id), removed: stale.map((c) => c.id) };
+});
+
 export async function createApplication(ctx, workspaceId, input) {
   if (!input.name) throw badRequest('name is required');
   if (!input.team_id) throw badRequest('team_id is required');
@@ -48,7 +86,7 @@ export async function createApplication(ctx, workspaceId, input) {
   const id = newId('app');
   const rows = await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by)
     values (${id}, ${workspaceId}, ${team.id}, ${input.name}, ${input.description || ''}, ${input.client_id || null},
-      ${input.certificates || []}, ${metadata}, ${ctx.user?.id || null}) returning *`;
+      ${normalizeCertificates(input.certificates)}, ${metadata}, ${ctx.user?.id || null}) returning *`;
   await audit(ctx, { action: 'application.create', workspaceId, entityKind: 'application', entityId: id, summary: `application ${input.name} created` });
   return rows[0];
 }
@@ -58,9 +96,10 @@ export async function updateApplication(ctx, app, patch) {
     patch = { ...patch, metadata: await checkValues(app.workspace_id, 'application', { ...app.metadata, ...patch.metadata }, { only: ctx.via === 'portal' ? (f) => f.portal : null }) };
   const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
       client_id = ${patch.client_id !== undefined ? patch.client_id || null : app.client_id},
-      certificates = ${patch.certificates ?? app.certificates}, metadata = ${patch.metadata ?? app.metadata}, updated_at = now()
+      certificates = ${patch.certificates !== undefined ? normalizeCertificates(patch.certificates) : app.certificates}, metadata = ${patch.metadata ?? app.metadata}, updated_at = now()
     where id = ${app.id} returning *`;
   await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated` });
+  if (patch.certificates !== undefined || patch.name !== undefined) await syncCertificates(rows[0]);
   return rows[0];
 }
 
@@ -68,5 +107,6 @@ export async function deleteApplication(ctx, app) {
   const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'pending', 'pending_payment')`;
   if (active[0].c > 0) throw badRequest('close the subscriptions of this application first');
   await db`delete from applications where id = ${app.id}`;
+  await syncCertificates(app);
   await audit(ctx, { action: 'application.delete', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${app.name} deleted` });
 }

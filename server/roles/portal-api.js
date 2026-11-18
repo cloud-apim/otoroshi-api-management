@@ -2,6 +2,7 @@
 // from the URL by the server, never from a session. The catalogue is served from the snapshots that
 // run on the gateway, so it stays readable during a gateway incident.
 
+import { readCertificate } from '../domain/pki.js';
 import { Router, badRequest, forbidden, notFound, unauthorized } from '../http/router.js';
 import { db } from '../db/index.js';
 import * as identity from '../domain/identity.js';
@@ -225,6 +226,16 @@ r.get('/applications/:app', async ({ ctx, params }) => {
   const withCreds = await Promise.all(subs.map(async (s) => ({ ...s, credentials: await subscriptions.credentialsOf(s.id) })));
   await audit(ctx, { action: 'credential.read', entityKind: 'application', entityId: app.id, summary: `credentials of ${app.name} read from the portal`, via: 'portal' });
   return { ...app, subscriptions: withCreds };
+});
+
+// reads a client certificate a consumer pastes for its application
+r.post('/certificates/inspect', async ({ ctx, body }) => {
+  requireUser(ctx);
+  try {
+    return readCertificate(body.pem);
+  } catch (e) {
+    throw badRequest(`not a readable PEM certificate: ${e.message}`);
+  }
 });
 
 r.put('/applications/:app', async ({ ctx, params, body }) => {

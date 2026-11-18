@@ -369,6 +369,47 @@ export function derivedEntities(snapshot) {
   return out;
 }
 
+// the client certificates of an application, derived as certificates of the gateway so that the
+// TLS handshake of an mtls plan accepts them (a self-signed one in particular)
+export function derivedApplicationCertId(appId, pem) {
+  return `apim_appcert_${appId}_${certificateKey(pem)}`;
+}
+
+export function applicationCertificates(app) {
+  return (app.certificates || []).map((pem) => {
+    const c = readCertificate(pem);
+    const cn = /CN=([^,]+)/.exec(c.subject)?.[1] || c.subject;
+    const id = derivedApplicationCertId(app.id, pem);
+    return {
+      kind: 'Certificate',
+      path: '/api/certificates',
+      id,
+      entity: {
+        _loc: { tenant: 'default', teams: ['default'] },
+        id,
+        domain: cn,
+        name: `${app.name} — ${cn}`,
+        description: `client certificate of the application ${app.name}, derived by otoroshi-api-management while it subscribes to an mtls plan`,
+        chain: String(pem).trim(),
+        privateKey: '',
+        caRef: null,
+        selfSigned: c.subject === c.issuer,
+        ca: c.ca,
+        client: false,
+        keypair: false,
+        valid: true,
+        exposed: false,
+        revoked: false,
+        autoRenew: false,
+        letsEncrypt: false,
+        sans: [],
+        metadata: { [META.createdBy]: OWNER_MARKER, apim_application_id: app.id, [META.workspace]: app.workspace_id, apim_derived: 'true' },
+        tags: [],
+      },
+    };
+  });
+}
+
 // what of a derived object the product owns, by kind (the gateway adds its own fields: the
 // subject and dates of a certificate, the secret of a module it may not give back)
 export function comparableDerived(e) {

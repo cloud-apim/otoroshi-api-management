@@ -5,6 +5,7 @@ import { fmtDate, fmtNumber } from '../../shared/lib.js';
 import { api } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { PageHeader, RequireUser, SubStatus, authLabel, snippets } from '../common.jsx';
+import { CertificateList } from '../../shared/certificates.jsx';
 
 const TOKEN_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
 const MAX = 10000000;
@@ -168,7 +169,7 @@ function AppDetailView({ id }) {
   const state = useLoad(() => api.get(`/applications/${id}`), [id]);
   const [form, setForm] = useState(null);
   useEffect(() => {
-    if (state.data) setForm({ name: state.data.name, description: state.data.description, client_id: state.data.client_id || '' });
+    if (state.data) setForm({ name: state.data.name, description: state.data.description, client_id: state.data.client_id || '', certificates: state.data.certificates || [] });
   }, [state.data]);
   const save = async () => {
     try {
@@ -237,6 +238,21 @@ function AppDetailView({ id }) {
                       <Field label={t('apps.clientId')} hint={t('apps.clientId.help')}>
                         <Input value={form.client_id} onChange={(v) => setForm({ ...form, client_id: v })} mono aria-label={t('apps.clientId')} />
                       </Field>
+                      <CertificateList
+                        layout="field"
+                        mode="client"
+                        value={form.certificates}
+                        onChange={(v) => setForm({ ...form, certificates: v })}
+                        inspect={(pem) => api.post('/certificates/inspect', { pem })}
+                        label={t('apps.certs')}
+                        help={t('apps.certs.help')}
+                        addLabel={t('apps.certs.add')}
+                        addTitle={t('apps.certs.addTitle')}
+                        addHelp={t('apps.certs.addHelp')}
+                        labels={Object.fromEntries(['selfSigned', 'validUntil', 'identifiedAs', 'useAsClientId', 'issuedBy', 'remove', 'cancel', 'add', 'incomplete'].map((k) => [k, t(`certs.${k}`)]))}
+                        clientId={form.client_id}
+                        onClientId={(v) => setForm({ ...form, client_id: v })}
+                      />
                       <div className="faint tiny">
                         {t('apps.team')}: {app.team_name}
                       </div>

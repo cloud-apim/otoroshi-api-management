@@ -165,6 +165,28 @@ describe('derived objects', () => {
     expect((await otoroshi('GET', `/api/auths/${mod.id}`)).jwtVerifier.url).toBe(`${IDP}/jwks`);
   });
 
+  test('the certificate of an application is on the gateway while its mtls subscription is active', async () => {
+    const team = await call('POST', ws('/teams'), { name: 'Partners' });
+    const app = await call('POST', ws('/applications'), { name: 'Certified partner', team_id: team.id, client_id: 'Atlas Partner CA', certificates: [CA] });
+    state.appId = app.id;
+    const onGateway = async () => ((await otoroshi('GET', '/api/certificates')) || []).filter((c) => c.metadata?.apim_application_id === app.id);
+    expect(await onGateway()).toEqual([]);
+    const sub = await call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_certified', application_id: app.id });
+    expect(sub.status).toBe('active');
+    const [cert] = await onGateway();
+    expect(cert.chain.replace(/\s+/g, '')).toBe(CA.replace(/\s+/g, ''));
+    expect(cert.metadata.apim_derived).toBe('true');
+    // suspended: the gateway no longer trusts it; resumed: back
+    await call('POST', ws(`/subscriptions/${sub.id}/suspend`), {});
+    expect(await onGateway()).toEqual([]);
+    await call('POST', ws(`/subscriptions/${sub.id}/resume`), {});
+    expect((await onGateway()).length).toBe(1);
+    await call('POST', ws(`/subscriptions/${sub.id}/close`), {});
+    expect(await onGateway()).toEqual([]);
+    const detail = await call('GET', ws(`/applications/${app.id}`));
+    expect(detail.certificates_on_gateway).toBe(false);
+  });
+
   test('the derived objects follow the description: a CA removed is a certificate removed', async () => {
     const api = await call('GET', ws(`/apis/${state.apiId}`));
     const draft = api.draft;

@@ -710,7 +710,9 @@ r.get('/workspaces/:ws/applications/:app', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
   const app = await applications.getApplication(c.workspace.id, params.app);
   const subs = await subscriptions.listSubscriptions(c.workspace.id, { applicationId: app.id });
-  return { ...app, subscriptions: subs, can_see_credentials: await applications.canSeeApplication(c, app) };
+  // its certificates are on the gateway while it has an active subscription to an mtls plan
+  const certificatesOnGateway = (app.certificates || []).length > 0 && subs.some((s) => s.status === 'active' && s.auth_kind === 'mtls');
+  return { ...app, subscriptions: subs, can_see_credentials: await applications.canSeeApplication(c, app), certificates_on_gateway: certificatesOnGateway };
 });
 r.put('/workspaces/:ws/applications/:app', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);

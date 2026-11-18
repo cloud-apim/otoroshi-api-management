@@ -44,6 +44,8 @@ async function refreshCache() {
   cache.byClientId = new Map(creds.map((c) => [c.client_id, c]));
   cache.apis = new Map(apis.map((a) => [a.id, a]));
   cache.subsByApp = subsByApp;
+  // <planId>_<clientId> → the subscription: a plan id can itself hold underscores
+  cache.byPlanClient = new Map(subsByApp.filter((s) => s.client_id).map((s) => [`${s.plan_id}_${s.client_id}`, s]));
   cache.at = Date.now();
 }
 
@@ -61,11 +63,13 @@ function attribute(clientId, otoroshiApiId) {
   if (!clientId) return out;
   const c = cache.byClientId.get(clientId);
   if (c) return { ...out, ...c };
-  const m = /^(jwt|mtls|oauth2|keyless)_(plan_[a-z0-9]+)_(.*)$/.exec(clientId);
+  const m = /^(jwt|mtls|oauth2|keyless)_(.+)$/.exec(clientId);
   if (m) {
-    out.plan_id = m[2];
-    const sub = (cache.subsByApp || []).find((s) => s.plan_id === m[2] && s.client_id && s.client_id === m[3]);
+    const sub = cache.byPlanClient?.get(m[2]);
     if (sub) return { ...out, ...sub };
+    // not a subscribed consumer: at least the plan, when the api is known
+    const plan = (cache.subsByApp || []).find((s) => m[2].startsWith(`${s.plan_id}_`));
+    if (plan) out.plan_id = plan.plan_id;
   }
   return out;
 }

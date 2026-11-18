@@ -1,96 +1,30 @@
 // The gateway objects a plan's auth mechanism needs, described in the plan and derived by the
 // product: the trusted CAs of an mtls plan, the authorization server of an oauth2-remote plan.
 import React, { useState } from 'react';
-import { fmtDate } from '../../../shared/lib.js';
-import { Badge, Callout, Field, Icon, Input, Modal, Seg, Select, Setting, Switch, errorMessage, useLoad } from '../../../shared/ui.jsx';
-import { CodeEditor } from '../../../shared/code-editor.jsx';
+import { Callout, Field, Icon, Input, Seg, Select, Setting, Switch, errorMessage } from '../../../shared/ui.jsx';
+import { CertificateList } from '../../../shared/certificates.jsx';
 import { api as rootApi } from '../../context.jsx';
 
 const inspect = (pem) => rootApi.post('/certificates/inspect', { pem });
 
-function CertificateFacts({ info }) {
-  if (!info) return null;
-  if (info.error) return <Callout kind="negative">{info.error}</Callout>;
-  return (
-    <div className="col gap-4">
-      <div className="row gap-6 wrap">
-        <span className="bold small">{info.subject}</span>
-        {info.ca ? <Badge kind="positive">CA</Badge> : <Badge kind="warning">not a CA</Badge>}
-        {info.subject === info.issuer && <Badge>self-signed</Badge>}
-      </div>
-      <div className="faint tiny">
-        valid until {fmtDate(info.validTo)} · sha-256 {info.fingerprint.slice(0, 23)}…
-      </div>
-      <div className="faint tiny">{info.dn ? <>Otoroshi sees the issuer of what it signs as <span className="mono">{info.dn}</span></> : 'its subject cannot be predicted in Otoroshi’s form: give the issuer patterns'}</div>
-    </div>
-  );
-}
-
-function AddCertificate({ onAdd, onClose }) {
-  const [pem, setPem] = useState('');
-  const complete = /-----END CERTIFICATE-----\s*$/.test(pem);
-  const info = useLoad(() => (complete ? inspect(pem).catch((e) => ({ error: errorMessage(e) })) : Promise.resolve(null)), [pem]);
-  return (
-    <Modal
-      title="Trust a certificate authority"
-      size="wide"
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary" disabled={!info.data || !!info.data.error} onClick={() => onAdd(pem.trim())}>
-            Trust it
-          </button>
-        </>
-      }
-    >
-      <p className="muted small">
-        The CA certificate (PEM) that signs the client certificates of this plan&apos;s consumers. The product derives it as a certificate of the gateway, marked as its own, and removes it with
-        the api. No private key: only the certificate.
-      </p>
-      <CodeEditor value={pem} onChange={setPem} language="plaintext" minHeight={200} maxHeight={360} ariaLabel="ca certificate" placeholder="-----BEGIN CERTIFICATE-----" />
-      <CertificateFacts info={info.data} />
-    </Modal>
-  );
-}
-
 export function TrustedCAs({ value = [], onChange, hasIssuerPatterns }) {
-  const [adding, setAdding] = useState(false);
-  const infos = useLoad(() => Promise.all(value.map((pem) => inspect(pem).catch((e) => ({ error: errorMessage(e) })))), [value.join('|')]);
   return (
-    <Setting
+    <CertificateList
+      value={value}
+      onChange={onChange}
+      inspect={inspect}
+      mode="ca"
       label="Trusted CAs"
       help={
         hasIssuerPatterns
           ? 'derived as certificates of the gateway; the issuer patterns below decide which certificates the plan accepts'
           : 'derived as certificates of the gateway; with no issuer pattern, the plan accepts the certificates they signed and nothing else'
       }
-    >
-      {value.map((pem, i) => (
-        <div key={i} className="panel row" style={{ alignItems: 'flex-start' }}>
-          <div className="grow" style={{ minWidth: 0 }}>
-            <CertificateFacts info={infos.data?.[i]} />
-          </div>
-          <button className="btn ghost sm icon" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="remove">
-            <Icon name="trash" />
-          </button>
-        </div>
-      ))}
-      <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setAdding(true)}>
-        <Icon name="plus" /> Trust a CA
-      </button>
-      {adding && (
-        <AddCertificate
-          onClose={() => setAdding(false)}
-          onAdd={(pem) => {
-            if (!value.includes(pem)) onChange([...value, pem]);
-            setAdding(false);
-          }}
-        />
-      )}
-    </Setting>
+      addLabel="Trust a CA"
+      addTitle="Trust a certificate authority"
+      addHelp="The CA certificate (PEM) that signs the client certificates of this plan's consumers. The product derives it as a certificate of the gateway, marked as its own, and removes it with the api. No private key: only the certificate."
+      labels={{ add: 'Trust it' }}
+    />
   );
 }
 
