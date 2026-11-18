@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Switch as Routes, useRouter } from '../shared/router.jsx';
 import { Icon, Loading, ErrorBox, Dropdown, MenuItem } from '../shared/ui.jsx';
 import { getThemePref, setThemePref } from '../shared/lib.js';
-import { usePortal } from './context.jsx';
+import { api, usePortal } from './context.jsx';
 import { I18nProvider, useI18n, UI_LANGUAGES } from './i18n.jsx';
 import { Home } from './pages/Home.jsx';
 import { Catalogue } from './pages/Catalogue.jsx';
@@ -74,6 +74,57 @@ function LangMenu() {
         ))}
       </select>
     </label>
+  );
+}
+
+// what happened to my subscriptions (D-30: systematic notification)
+function NotificationsMenu() {
+  const { t } = useI18n();
+  const { navigate } = useRouter();
+  const [data, setData] = useState({ unread: 0, items: [] });
+  const load = () => api.get('/notifications').then(setData).catch(() => {});
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <Dropdown
+      align="right"
+      trigger={({ toggle }) => (
+        <button
+          className="btn ghost sm icon"
+          style={{ position: 'relative' }}
+          aria-label={`${t('notif.title')}${data.unread ? ` (${data.unread})` : ''}`}
+          onClick={() => {
+            toggle();
+            if (data.unread) api.post('/notifications/read').then(load);
+          }}
+        >
+          <Icon name="inbox" />
+          {data.unread > 0 && (
+            <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: 'var(--negative)' }} aria-hidden="true" />
+          )}
+        </button>
+      )}
+    >
+      <div style={{ width: 320, maxHeight: 360, overflow: 'auto' }}>
+        {data.items.length ? (
+          data.items.slice(0, 15).map((n) => (
+            <button key={n.id} className="btn ghost sm" style={{ width: '100%', height: 'auto', padding: '8px 10px', justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => n.link && navigate(n.link)}>
+              <span className="col gap-4" style={{ alignItems: 'flex-start' }}>
+                <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
+                {n.body && <span className="faint tiny">{n.body}</span>}
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="muted small" style={{ padding: 10 }}>
+            {t('notif.empty')}
+          </div>
+        )}
+      </div>
+    </Dropdown>
   );
 }
 
@@ -171,6 +222,7 @@ function Shell() {
           </nav>
           <div className="spacer" />
           <div className="row gap-6">
+            {user && <NotificationsMenu />}
             <LangMenu />
             <ThemeMenu />
             <UserMenu />

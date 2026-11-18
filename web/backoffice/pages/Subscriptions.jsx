@@ -276,6 +276,22 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               )}
             </div>
 
+            {s.pending_transfer && (
+              <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={`Move to ${s.pending_transfer.to.plan_name} — ${s.pending_transfer.status === 'requested' ? 'asked by the consumer' : "waiting for the consumer's consent"}`}>
+                {s.pending_transfer.reasons?.length > 0 && <div>The target plan brings {s.pending_transfer.reasons.join(', ')} (D-30: a change of contract needs the consumer's agreement).</div>}
+                {s.pending_transfer.status === 'requested' && (
+                  <div className="row mt-8">
+                    <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, 'Subscription transferred — the key does not change')}>
+                      Apply the move
+                    </button>
+                    <button className="btn sm" disabled={busy} onClick={() => act('transfer/decision', { accept: false }, 'Request declined')}>
+                      Decline
+                    </button>
+                  </div>
+                )}
+              </Callout>
+            )}
+
             {s.history?.length > 0 && (
               <div className="col gap-6">
                 <div className="label">Transfers</div>
@@ -367,7 +383,10 @@ function TransferPanel({ sub, onDone, onCancel }) {
     <div className="card flat">
       <div className="card-body col">
         <h3>Transfer</h3>
-        <p className="muted small">The key does not change; the subscription keeps its identity and history. Only plans with the same auth mechanism ({AUTH_LABELS[sub.auth_kind]}) are eligible.</p>
+        <p className="muted small">
+          The key does not change; the subscription keeps its identity and history. Only plans with the same auth mechanism ({AUTH_LABELS[sub.auth_kind]}) are eligible. A move that degrades the
+          conditions — lower limits, a higher price, other terms, fewer resources — waits for the consumer's consent (D-30).
+        </p>
         <Loader state={state}>
           {(options) => {
             const eligible = options.filter((o) => o.plan.auth.kind === sub.auth_kind && o.plan.status === 'published' && !(o.api.id === sub.api_id && o.plan.id === sub.plan_id));
@@ -385,8 +404,8 @@ function TransferPanel({ sub, onDone, onCancel }) {
                     onClick={async () => {
                       const [api_id, plan_id] = target.split('|');
                       try {
-                        await wapi.post(`/subscriptions/${sub.id}/transfer`, { api_id, plan_id });
-                        toast('Subscription transferred');
+                        const r = await wapi.post(`/subscriptions/${sub.id}/transfer`, { api_id, plan_id });
+                        toast(r.pending_transfer ? `Proposed: it degrades the conditions (${r.pending_transfer.reasons.join(', ')}), so it waits for the consumer's consent` : 'Subscription transferred — the key does not change');
                         onDone();
                       } catch (e) {
                         toast(errorMessage(e), 'error');

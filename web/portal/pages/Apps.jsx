@@ -333,6 +333,82 @@ function ExampleCall({ sub, cred }) {
   return <Code>{snippets({ kind: sub.auth_kind, url, clientId: cred.client_id, clientSecret: cred.client_secret }).curl}</Code>;
 }
 
+// D-30 from the consumer's side: ask to move to an equivalent plan
+function ChangePlanModal({ sub, onClose, onDone }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const [target, setTarget] = useState('');
+  const options = useLoad(async () => {
+    const view = await api.get(`/apis/${sub.api_id}`);
+    const out = [];
+    for (const v of view.versions || [{ id: view.id, version: view.version }]) {
+      const av = v.id === view.id ? view : await api.get(`/apis/${v.id}`);
+      for (const p of av.plans || []) {
+        if (p.auth_kind === sub.auth_kind && p.status === 'published' && p.subscribable && !(av.id === sub.api_id && p.id === sub.plan_id))
+          out.push({ value: `${av.id}|${p.id}`, label: `${av.name} ${av.version} — ${p.name}` });
+      }
+    }
+    return out;
+  }, [sub.id]);
+  return (
+    <Modal
+      title={t('transfer.title')}
+      onClose={onClose}
+      footer={
+        <button
+          className="btn primary"
+          disabled={!target}
+          onClick={async () => {
+            const [api_id, plan_id] = target.split('|');
+            try {
+              await api.post(`/subscriptions/${sub.id}/transfer`, { api_id, plan_id });
+              toast(t('transfer.asked'));
+              onDone();
+            } catch (e) {
+              toast(errorMessage(e), 'error');
+            }
+          }}
+        >
+          {t('transfer.ask')}
+        </button>
+      }
+    >
+      <p className="muted small">{t('transfer.help')}</p>
+      <Loader state={options}>{(opts) => (opts.length ? <Select value={target} onChange={setTarget} options={[{ value: '', label: '—' }, ...opts]} /> : <Callout kind="info">{t('transfer.none')}</Callout>)}</Loader>
+    </Modal>
+  );
+}
+
+function PendingTransfer({ sub, onChange }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const pt = sub.pending_transfer;
+  if (!pt) return null;
+  if (pt.status === 'requested') return <Callout kind="info">{t('transfer.requested', { plan: pt.to.plan_name })}</Callout>;
+  const answer = async (accept) => {
+    try {
+      await api.post(`/subscriptions/${sub.id}/transfer/consent`, { accept });
+      toast(t('transfer.done'));
+      onChange();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
+  return (
+    <Callout kind="warning" title={t('transfer.consent.title', { plan: pt.to.plan_name })}>
+      <div>{t('transfer.consent.body', { reasons: (pt.reason_codes ? pt.reason_codes.map((c) => t(`reason.${c}`)) : pt.reasons || []).join(', ') })}</div>
+      <div className="row mt-8">
+        <button className="btn primary sm" onClick={() => answer(true)}>
+          {t('transfer.consent.accept')}
+        </button>
+        <button className="btn sm" onClick={() => answer(false)}>
+          {t('transfer.consent.decline')}
+        </button>
+      </div>
+    </Callout>
+  );
+}
+
 function SubscriptionCard({ sub, app, onChange }) {
   const { t } = useI18n();
   const toast = useToast();
@@ -340,6 +416,7 @@ function SubscriptionCard({ sub, app, onChange }) {
   const creds = (sub.credentials || []).filter((c) => c.status === 'active');
   const closable = ['active', 'pending', 'pending_payment', 'suspended'].includes(sub.status);
   const [pay, setPay] = useState(false);
+  const [changing, setChanging] = useState(false);
   const rotate = async (c) => {
     if (!(await confirm({ title: t('subs.rotate'), message: t('subs.rotate.confirm', { id: c.client_id }), confirmLabel: t('subs.rotate') }))) return;
     try {
@@ -438,13 +515,29 @@ function SubscriptionCard({ sub, app, onChange }) {
           </div>
         ))}
         {sub.status === 'active' && creds.length > 0 && <Quotas sub={sub} />}
+        <PendingTransfer sub={sub} onChange={onChange} />
         {closable && (
           <div className="row">
+            {['active', 'suspended'].includes(sub.status) && !sub.pending_transfer && (
+              <button className="btn sm" onClick={() => setChanging(true)}>
+                <Icon name="swap" /> {t('transfer.change')}
+              </button>
+            )}
             <span className="spacer" />
             <button className="btn ghost danger sm" onClick={close}>
               {t('subs.close')}
             </button>
           </div>
+        )}
+        {changing && (
+          <ChangePlanModal
+            sub={sub}
+            onClose={() => setChanging(false)}
+            onDone={() => {
+              setChanging(false);
+              onChange();
+            }}
+          />
         )}
       </div>
     </div>

@@ -15,6 +15,7 @@ import { aclAllows, isTeamMember, userAclTags } from './identity.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiSubscription } from '../otoroshi/projection.js';
 import { checkValues } from './metadata.js';
+import { notify } from './notifications.js';
 
 export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
 
@@ -116,7 +117,9 @@ export async function requestSubscription(ctx, workspaceId, input) {
     summary: `${app.name} requested ${api.name} ${api.version} / ${plan.name} (${status})`,
   });
   if (status === 'active') await enqueue('sync_subscription', { subscription_id: id }, { dedupeKey: `sub:${id}` });
-  return (await db`select * from subscriptions where id = ${id}`)[0];
+  const created = (await db`select * from subscriptions where id = ${id}`)[0];
+  if (status === 'pending') await notifyProducers(created, { kind: 'subscription.request', title: `${app.name} asks for ${plan.name}`, body: input.usage || '' });
+  return created;
 }
 
 async function setStatus(ctx, sub, status, { review, datesPatch = {}, action, summary, payment } = {}) {
@@ -126,7 +129,22 @@ async function setStatus(ctx, sub, status, { review, datesPatch = {}, action, su
     where id = ${sub.id} returning *`;
   await audit(ctx, { action, workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary });
   await enqueue('sync_subscription', { subscription_id: sub.id }, { dedupeKey: `sub:${sub.id}` });
+  await notifyConsumer(sub, { kind: action, title: `${sub.request?.plan_name || 'Subscription'}: ${status.replace('_', ' ')}`, body: review?.message || '' });
   return (await db`select * from subscriptions where id = ${sub.id}`)[0] || rows[0];
+}
+
+// the team owning the application sees what happens to its subscriptions (D-30: systematic)
+async function notifyConsumer(sub, { kind, title, body = '', data = {} }) {
+  const app = (await db`select team_id, name from applications where id = ${sub.application_id}`)[0];
+  if (!app) return;
+  await notify({ workspaceId: sub.workspace_id, teamId: app.team_id, face: 'portal', kind, title: `${app.name} — ${title}`, body, link: `/apps/${sub.application_id}`, data: { subscription_id: sub.id, ...data } });
+}
+
+// the producers of the api see what they have to decide
+async function notifyProducers(sub, { kind, title, body = '', data = {} }) {
+  const api = (await db`select team_id, name, version from apis where id = ${sub.api_id}`)[0];
+  if (!api?.team_id) return;
+  await notify({ workspaceId: sub.workspace_id, teamId: api.team_id, face: 'console', kind, title: `${api.name} ${api.version} — ${title}`, body, link: `/subscriptions?open=${sub.id}`, data: { subscription_id: sub.id, ...data } });
 }
 
 export async function acceptSubscription(ctx, sub, { message = '' } = {}) {
@@ -185,7 +203,40 @@ export async function confirmPayment(ctx, sub, { providerRef } = {}) {
 
 // D-30: transfer to an equivalent plan (same auth mechanism). The key does not change, the
 // subscription keeps its identity and its history. Works across versions (D-29).
-export async function transferSubscription(ctx, sub, { plan_id, api_id }) {
+// D-30: how the target plan compares to the current one. A transfer that degrades the conditions —
+// lower limits, a higher price, other terms, fewer resources — is a change of contract.
+export const DEGRADATION_LABELS = {
+  rate: 'a lower rate limit',
+  daily_quota: 'a lower daily quota',
+  monthly_quota: 'a lower monthly quota',
+  price: 'a higher price',
+  terms: 'different terms of use',
+  resources_limited: 'access limited to some resources',
+  fewer_resources: 'fewer resources',
+};
+
+export function degradationCodes(from, to) {
+  const out = [];
+  const rate = (p) => (p.rateLimit?.enabled ? (p.rateLimit.calls || 0) / ((p.rateLimit.windowMs || 1000) / 1000) : Infinity);
+  if (rate(to) < rate(from)) out.push('rate');
+  const q = (v) => v || Infinity;
+  if (q(to.quota?.daily) < q(from.quota?.daily)) out.push('daily_quota');
+  if (q(to.quota?.monthly) < q(from.quota?.monthly)) out.push('monthly_quota');
+  const price = (p) => (p.pricing?.kind === 'paid' ? Number(p.pricing.amount) || 0 : 0);
+  if (price(to) > price(from)) out.push('price');
+  const terms = (p) => (p.terms?.enabled ? p.terms.url || p.terms.pageSlug || 'terms' : '');
+  if (terms(to) && terms(to) !== terms(from)) out.push('terms');
+  const all = (p) => p.resourceFilter?.mode !== 'only';
+  if (all(from) && !all(to)) out.push('resources_limited');
+  else if (!all(from) && !all(to) && to.resourceFilter.resources.length < from.resourceFilter.resources.length) out.push('fewer_resources');
+  return out;
+}
+
+export function degradations(from, to) {
+  return degradationCodes(from, to).map((c) => DEGRADATION_LABELS[c]);
+}
+
+async function resolveTransfer(sub, { plan_id, api_id }) {
   if (!['active', 'suspended'].includes(sub.status)) throw badRequest(`a ${sub.status} subscription cannot be transferred`);
   const fromApi = (await db`select * from apis where id = ${sub.api_id}`)[0];
   const toApi = (await db`select * from apis where id = ${api_id || sub.api_id} and workspace_id = ${sub.workspace_id}`)[0];
@@ -197,12 +248,17 @@ export async function transferSubscription(ctx, sub, { plan_id, api_id }) {
   if (!plansAreEquivalent(fromPlan, toPlan))
     throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer (D-30)`);
   if (toPlan.status !== 'published') throw badRequest(`target plan is ${toPlan.status}`);
+  return { fromApi, toApi, fromPlan, toPlan, reasons: degradations(fromPlan, toPlan), reason_codes: degradationCodes(fromPlan, toPlan) };
+}
+
+async function applyTransfer(ctx, sub, t) {
+  const { fromApi, toApi, fromPlan, toPlan } = t;
   const history = [
     ...(sub.history || []),
-    { at: now(), by: ctx.user?.email, from: { api_id: sub.api_id, plan_id: sub.plan_id, plan_name: fromPlan.name }, to: { api_id: toApi.id, plan_id: toPlan.id, plan_name: toPlan.name } },
+    { at: now(), by: ctx.user?.email, from: { api_id: sub.api_id, plan_id: sub.plan_id, plan_name: fromPlan.name }, to: { api_id: toApi.id, plan_id: toPlan.id, plan_name: toPlan.name }, consent: sub.pending_transfer?.consent || null },
   ];
-  await db`update subscriptions set api_id = ${toApi.id}, plan_id = ${toPlan.id}, history = ${history},
-      projection = ${{ ...sub.projection, status: 'pending' }}, updated_at = now() where id = ${sub.id}`;
+  await db`update subscriptions set api_id = ${toApi.id}, plan_id = ${toPlan.id}, history = ${history}, pending_transfer = null,
+      request = ${{ ...sub.request, plan_name: toPlan.name }}, projection = ${{ ...sub.projection, status: 'pending' }}, updated_at = now() where id = ${sub.id}`;
   await audit(ctx, {
     action: 'subscription.transfer',
     workspaceId: sub.workspace_id,
@@ -211,7 +267,60 @@ export async function transferSubscription(ctx, sub, { plan_id, api_id }) {
     summary: `subscription ${sub.id} transferred from ${fromApi.name} ${fromApi.version}/${fromPlan.name} to ${toApi.name} ${toApi.version}/${toPlan.name}`,
   });
   await enqueue('sync_subscription', { subscription_id: sub.id }, { dedupeKey: `sub:${sub.id}` });
+  await notifyConsumer(sub, { kind: 'subscription.transfer', title: `moved to ${toPlan.name}`, body: `Your key does not change. ${t.reasons.length ? `Accepted changes: ${t.reasons.join(', ')}.` : ''}` });
   return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+}
+
+function pending(ctx, t, status, extra = {}) {
+  return {
+    status, // awaiting_consent | requested
+    to: { api_id: t.toApi.id, plan_id: t.toPlan.id, plan_name: t.toPlan.name, api_name: `${t.toApi.name} ${t.toApi.version}` },
+    from: { plan_name: t.fromPlan.name },
+    reasons: t.reasons,
+    reason_codes: t.reason_codes,
+    by: ctx.user?.email,
+    at: now(),
+    ...extra,
+  };
+}
+
+// D-30. A producer transfers: applied at once when nothing degrades, otherwise it waits for the
+// consumer's consent. A consumer asks: the producer decides, the request carries the consent.
+export async function transferSubscription(ctx, sub, { plan_id, api_id }, { initiator = 'producer' } = {}) {
+  const t = await resolveTransfer(sub, { plan_id, api_id });
+  if (initiator === 'consumer') {
+    const pt = pending(ctx, t, 'requested', { consent: { by: ctx.user?.email, at: now() } });
+    await db`update subscriptions set pending_transfer = ${pt}, updated_at = now() where id = ${sub.id}`;
+    await audit(ctx, { action: 'subscription.transfer.request', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `move to ${t.toPlan.name} requested by the consumer` });
+    await notifyProducers(sub, { kind: 'subscription.transfer.request', title: `asks to move from ${t.fromPlan.name} to ${t.toPlan.name}` });
+    return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+  }
+  if (t.reasons.length) {
+    const pt = pending(ctx, t, 'awaiting_consent');
+    await db`update subscriptions set pending_transfer = ${pt}, updated_at = now() where id = ${sub.id}`;
+    await audit(ctx, { action: 'subscription.transfer.propose', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `move to ${t.toPlan.name} proposed, waiting for the consumer's consent (${t.reasons.join(', ')})` });
+    await notifyConsumer(sub, { kind: 'subscription.transfer.consent', title: `move to ${t.toPlan.name} needs your agreement`, body: `The new plan brings ${t.reasons.join(', ')}.`, data: { reasons: t.reasons } });
+    return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+  }
+  return applyTransfer(ctx, sub, t);
+}
+
+// the consumer answers a proposal, or the producer answers a request
+export async function answerTransfer(ctx, sub, { accept }, { side }) {
+  const pt = sub.pending_transfer;
+  if (!pt) throw badRequest('no transfer is waiting');
+  if (side === 'consumer' && pt.status !== 'awaiting_consent') throw badRequest('this transfer waits for the producer, not for you');
+  if (side === 'producer' && pt.status !== 'requested') throw badRequest('this transfer waits for the consumer');
+  if (!accept) {
+    await db`update subscriptions set pending_transfer = null, updated_at = now() where id = ${sub.id}`;
+    await audit(ctx, { action: 'subscription.transfer.decline', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `move to ${pt.to.plan_name} declined by the ${side}` });
+    if (side === 'consumer') await notifyProducers(sub, { kind: 'subscription.transfer.decline', title: `move to ${pt.to.plan_name} declined by the consumer` });
+    else await notifyConsumer(sub, { kind: 'subscription.transfer.decline', title: `move to ${pt.to.plan_name} declined` });
+    return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+  }
+  const t = await resolveTransfer(sub, { plan_id: pt.to.plan_id, api_id: pt.to.api_id });
+  const consent = side === 'consumer' ? { by: ctx.user?.email, at: now(), reasons: t.reasons } : pt.consent;
+  return applyTransfer(ctx, { ...sub, pending_transfer: { ...pt, consent } }, t);
 }
 
 export async function rotateCredential(ctx, sub, credentialId) {

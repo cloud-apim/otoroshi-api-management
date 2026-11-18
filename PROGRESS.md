@@ -17,14 +17,13 @@ Dernière mise à jour : 18/11/2026.
 
 1. Relecture et commit de la documentation ; captures d'écran.
 2. **D-15**, suite : certificats (autorités de confiance des plans mTLS) et modules d'auth (plans oauth2-remote) dérivés, comme les JWT verifiers.
-3. **D-30** : règles de consentement du transfert (accord du consommateur quand les conditions se dégradent).
-4. Console en français (le portail l'est déjà).
-5. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
-6. Notifications (souscription acceptée / refusée…) — pas tranché dans le spec, à proposer.
-7. **D-28** : CRDs Kubernetes et chart Helm.
-8. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
-9. **Q-8** : rétention et échantillonnage du chemin brut.
-10. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
+3. Console en français (le portail l'est déjà).
+4. **D-20** : tester l'exposition par nom d'hôte ; redirections quand le patron change ; mono-tenant sans préfixe.
+5. Notifications hors application (e-mail, webhook) — les notifications in-app existent ; le canal n'est pas tranché dans le spec.
+6. **D-28** : CRDs Kubernetes et chart Helm.
+7. **D-36 / Q-12** : connecteur Stripe Checkout + webhooks (le connecteur de test existe).
+8. **Q-8** : rétention et échantillonnage du chemin brut.
+9. Mode adopt : reprendre aussi les souscriptions et apikeys existantes.
 
 ## Points connus
 
@@ -66,7 +65,7 @@ Dernière mise à jour : 18/11/2026.
 | D-27 navigation de la console | ✅ | état de la gateway en bas de la sidebar (emplacement que D-37 laissait ouvert : proposition) |
 | D-28 administrable par programme | 🟡 | API ✅, CLI ✅, catalogues distants http/git ✅, CRDs ⬜ |
 | D-29 une version est une nouvelle API | ✅ | |
-| D-30 transfert vers un plan équivalent | 🟡 | ✅ même clé, même historique ; règles de consentement ⬜ |
+| D-30 transfert vers un plan équivalent | ✅ | même clé, même historique ; un transfert qui dégrade (débit, quotas, prix, CGU, ressources) attend l'accord du consommateur ; le consommateur demande, le producteur applique ; notifications in-app des deux côtés |
 | D-31 pas de quota agrégé | ✅ | |
 | D-32 périmètre MVP, événements captés | 🟡 | GatewayEvent vérifié en réel ; LLMUsageAudit et McpAudit codés, non testés avec de vrais événements |
 | D-33 deux chemins de stockage | 🟡 | calculé + brut avec masquage ✅ ; rétention / échantillonnage ⬜ (Q-8) |

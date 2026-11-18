@@ -97,6 +97,59 @@ function SearchPalette({ onClose }) {
   );
 }
 
+// in-app notifications of the producers (requests to review, transfers to decide)
+function NotificationsBell() {
+  const { workspace } = useSession();
+  const { navigate } = useRouter();
+  const [data, setData] = useState({ unread: 0, items: [] });
+  const ws = workspace?.slug;
+  const load = () => ws && wsApi(ws).get('/notifications').then(setData).catch(() => {});
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [ws]);
+  if (!ws) return null;
+  return (
+    <Dropdown
+      trigger={({ toggle }) => (
+        <button
+          className="gw-pill"
+          style={{ border: 0, background: 'none', font: 'inherit', cursor: 'pointer', width: '100%' }}
+          onClick={() => {
+            toggle();
+            if (data.unread) wsApi(ws).post('/notifications/read').then(load);
+          }}
+          aria-label="notifications"
+        >
+          <Icon name="inbox" />
+          <span className="grow" style={{ textAlign: 'left' }}>
+            Notifications
+          </span>
+          {data.unread > 0 && <span className="badge warning">{data.unread}</span>}
+        </button>
+      )}
+    >
+      <div style={{ maxHeight: 360, overflow: 'auto', width: 320 }}>
+        {data.items.length ? (
+          data.items.slice(0, 15).map((n) => (
+            <button key={n.id} className="btn ghost sm" style={{ width: '100%', height: 'auto', padding: '8px 10px', justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => n.link && navigate(`/ws/${ws}${n.link}`)}>
+              <span className="col gap-4" style={{ alignItems: 'flex-start' }}>
+                <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
+                {n.body && <span className="faint tiny">{n.body}</span>}
+              </span>
+            </button>
+          ))
+        ) : (
+          <div className="muted small" style={{ padding: 10 }}>
+            Nothing new.
+          </div>
+        )}
+      </div>
+    </Dropdown>
+  );
+}
+
 function GatewayPill() {
   const [st, setSt] = useState(null);
   useEffect(() => {
@@ -228,6 +281,7 @@ export function Layout({ children }) {
           </>
         )}
         <div className="sidebar-bottom">
+          <NotificationsBell />
           <GatewayPill />
           {user.is_admin && (
             <NavLink to="/settings" icon="settings">

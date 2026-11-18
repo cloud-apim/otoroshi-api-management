@@ -13,6 +13,7 @@ import { normalizeDraft } from '../domain/model.js';
 import { gatewaySettings, oto } from '../otoroshi/client.js';
 import YAML from 'yaml';
 import { listFields } from '../domain/metadata.js';
+import * as notifications from '../domain/notifications.js';
 
 const r = new Router();
 
@@ -258,6 +259,26 @@ const mySub = async (ctx, id) => {
 };
 
 r.post('/subscriptions/:sub/close', async ({ ctx, params }) => subscriptions.closeSubscription(ctx, await mySub(ctx, params.sub)));
+
+// D-30 from the consumer's side: ask to move to an equivalent plan, or answer a proposal
+r.post('/subscriptions/:sub/transfer', async ({ ctx, params, body }) => {
+  const sub = await mySub(ctx, params.sub);
+  const entry = await findEntry(ctx, body.api_id || sub.api_id);
+  return subscriptions.transferSubscription(ctx, sub, { plan_id: body.plan_id, api_id: entry.row.id }, { initiator: 'consumer' });
+});
+r.post('/subscriptions/:sub/transfer/consent', async ({ ctx, params, body }) =>
+  subscriptions.answerTransfer(ctx, await mySub(ctx, params.sub), { accept: !!body.accept }, { side: 'consumer' })
+);
+
+r.get('/notifications', async ({ ctx }) => {
+  requireUser(ctx);
+  return { unread: await notifications.unreadCount(ctx.user, ctx.workspace.id, 'portal'), items: await notifications.listFor(ctx.user, ctx.workspace.id, 'portal') };
+});
+r.post('/notifications/read', async ({ ctx }) => {
+  requireUser(ctx);
+  await notifications.markRead(ctx.user, ctx.workspace.id, 'portal');
+  return { ok: true };
+});
 
 // test payment connector: stands for the provider's hosted checkout + webhook (D-36)
 r.post('/subscriptions/:sub/pay', async ({ ctx, params }) => subscriptions.confirmPayment(ctx, await mySub(ctx, params.sub), {}));

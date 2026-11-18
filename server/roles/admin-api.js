@@ -24,6 +24,7 @@ import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
 import * as catalogs from '../domain/catalogs.js';
 import * as auditExport from '../domain/auditExport.js';
+import * as notifications from '../domain/notifications.js';
 
 const r = new Router();
 
@@ -681,7 +682,8 @@ r.post('/workspaces/:ws/subscriptions/:sub/reject', subAction((c, s, b) => subsc
 r.post('/workspaces/:ws/subscriptions/:sub/suspend', subAction((c, s, b) => subscriptions.suspendSubscription(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/resume', subAction((c, s) => subscriptions.resumeSubscription(c, s)));
 r.post('/workspaces/:ws/subscriptions/:sub/close', subAction((c, s) => subscriptions.closeSubscription(c, s)));
-r.post('/workspaces/:ws/subscriptions/:sub/transfer', subAction((c, s, b) => subscriptions.transferSubscription(c, s, b)));
+r.post('/workspaces/:ws/subscriptions/:sub/transfer', subAction((c, s, b) => subscriptions.transferSubscription(c, s, b, { initiator: 'producer' })));
+r.post('/workspaces/:ws/subscriptions/:sub/transfer/decision', subAction((c, s, b) => subscriptions.answerTransfer(c, s, b, { side: 'producer' })));
 r.post('/workspaces/:ws/subscriptions/:sub/resync', subAction((c, s) => subscriptions.resync(c, s)));
 r.post('/workspaces/:ws/subscriptions/:sub/payment', subAction((c, s, b) => subscriptions.confirmPayment(c, s, b)));
 r.put('/workspaces/:ws/subscriptions/:sub/metadata', subAction((c, s, b) => subscriptions.setSubscriptionMetadata(c, s, b)));
@@ -756,6 +758,16 @@ r.delete('/audit/exporters/:id', async ({ ctx, params }) => {
 r.post('/audit/exporters/:id/test', async ({ ctx, params }) => {
   identity.requireAdmin(ctx);
   return auditExport.testExporter(await auditExport.getExporter(params.id));
+});
+
+r.get('/workspaces/:ws/notifications', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  return { unread: await notifications.unreadCount(ctx.user, c.workspace.id, 'console'), items: await notifications.listFor(ctx.user, c.workspace.id, 'console') };
+});
+r.post('/workspaces/:ws/notifications/read', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  await notifications.markRead(ctx.user, c.workspace.id, 'console');
+  return { ok: true };
 });
 
 r.get('/workspaces/:ws/drift', async ({ ctx, params }) => {

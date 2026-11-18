@@ -367,6 +367,30 @@ create table audit_exporters (
 );
 `,
   },
+  {
+    version: '0007_notifications_transfers',
+    sql: `
+-- in-app notifications, addressed to a team (every member sees them) or to a user
+create table notifications (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  team_id text references teams(id) on delete cascade,
+  user_id text references users(id) on delete cascade,
+  face text not null default 'portal', -- portal | console
+  kind text not null,
+  title text not null,
+  body text not null default '',
+  link text,
+  data jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index notifications_team on notifications(team_id, created_at desc);
+
+-- a transfer waiting for someone (D-30): the consumer's consent, or the producer's decision
+alter table subscriptions add column pending_transfer jsonb;
+`,
+  },
 ];
 
 export const analyticsMigrations = [
