@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
-import { Callout, DiffView, Empty, Icon, Input, Loader, NumberInput, Seg, Select, Setting, StatusBadge, Switch, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Empty, Icon, Input, Loader, NumberInput, Seg, Select, Setting, StatusBadge, Switch, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { StatTile } from '../../shared/charts.jsx';
 import { api, useSession } from '../context.jsx';
@@ -494,6 +494,189 @@ function Ingestion() {
   );
 }
 
+// what the product needs on the gateway, created or repaired: the same run as otoroshi-apim setup
+const SETUP_PARTS = {
+  key: () => tr('the admin key the product calls the gateway with, its own'),
+  exporter: () => tr('the data exporter that feeds the ingester'),
+  console: () => tr('the route that exposes the console, behind an auth module if asked'),
+  portals: () => tr('the route that exposes the developer portals'),
+  tls: () => tr('the gateway asks callers for a client certificate, for the mtls plans'),
+};
+const OP_MARK = { create: '+', update: '~', unchanged: '=', remove: '-' };
+const LEVEL_KIND = { ok: 'positive', warning: 'warning', error: 'negative' };
+const PART_KIND = { ok: 'positive', changed: 'positive', would_change: 'warning', skipped: '', error: 'negative' };
+
+function SetupReport({ report }) {
+  return (
+    <div className="col gap-16">
+      <div className="card">
+        <div className="card-head">
+          <h3 className="grow">{report.dryRun ? tr('Dry run — nothing changed') : tr('Run')}</h3>
+          <span className="muted small">
+            <Tr text={'{0} by {1}'} args={[fmtRelative(report.at), report.by || '—']} />
+          </span>
+        </div>
+        <div className="card-body col gap-12">
+          {report.parts.map((p) => (
+            <div key={p.part} className="col gap-4">
+              <div className="row gap-6">
+                <span className="bold mono">{p.part}</span>
+                <Badge kind={PART_KIND[p.status]}>{tr(p.status.replace('_', ' '))}</Badge>
+              </div>
+              {p.actions.map((a) => (
+                <div key={`${a.kind}-${a.id}`} className="col" style={{ paddingLeft: 16 }}>
+                  <span className="mono small">
+                    {OP_MARK[a.op] || a.op} {a.kind} {a.id} <span className="muted">{a.name}</span>
+                  </span>
+                  {(a.changes || []).map((c, i) => (
+                    <span key={i} className="mono tiny muted" style={{ paddingLeft: 16 }}>
+                      {c.path}: {JSON.stringify(c.before)} → {JSON.stringify(c.after)}
+                    </span>
+                  ))}
+                </div>
+              ))}
+              {p.notes.map((n, i) => (
+                <span key={i} className={p.status === 'error' ? 'negative-text small' : 'muted small'} style={{ paddingLeft: 16 }}>
+                  {n}
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-head">
+          <h3>{tr('Checks')}</h3>
+        </div>
+        <div className="card-body col gap-6">
+          {report.checks.map((c) => (
+            <div key={c.code + c.message} className="row gap-6">
+              <Badge kind={LEVEL_KIND[c.level]} dot>
+                {tr(c.level)}
+              </Badge>
+              <span className="small">{c.message}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Setup() {
+  const toast = useToast();
+  const state = useLoad(() => api.get('/gateway/setup'), []);
+  const refs = useLoad(() => api.get('/gateway/references').catch(() => ({ authModules: [] })), []);
+  const [form, setForm] = useState(null);
+  const [admin, setAdmin] = useState({ clientId: '', clientSecret: '' });
+  const [parts, setParts] = useState(Object.keys(SETUP_PARTS));
+  const [report, setReport] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const options = form || state.data?.options;
+  const set = (k) => (v) => setForm({ ...options, [k]: v });
+  const run = async (dryRun) => {
+    setBusy(true);
+    try {
+      const r = await api.post('/gateway/setup', {
+        dryRun,
+        only: parts.length === Object.keys(SETUP_PARTS).length ? null : parts,
+        // the options changed here only: the others keep following the installation
+        options: Object.fromEntries(Object.entries(form || {}).filter(([k, v]) => v !== state.data.options[k])),
+        otoroshi: admin.clientId && admin.clientSecret ? admin : null,
+      });
+      setReport(r);
+      if (!dryRun) {
+        setForm(null);
+        state.reload();
+        toast(r.parts.some((p) => p.status === 'error') ? tr('The setup ran, with errors') : tr('The gateway is set up'), r.parts.some((p) => p.status === 'error') ? 'error' : 'success');
+      }
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Loader state={state}>
+      {(s) => (
+        <div className="col gap-16">
+          <Callout kind="info">
+            {tr('What the product needs on the gateway, created or repaired: every entity it makes is marked, and nothing it did not make is touched. Re-run it at will, all of it or some parts; a dry run shows what it would change. The same run as otoroshi-apim setup.')}
+          </Callout>
+          <div className="card">
+            <div className="card-head">
+              <h3>{tr('Parts')}</h3>
+            </div>
+            <div className="card-body">
+              {Object.entries(SETUP_PARTS).map(([p, help]) => (
+                <Setting key={p} label={<span className="mono">{p}</span>} help={help()}>
+                  <Switch checked={parts.includes(p)} onChange={(on) => setParts(on ? [...parts, p] : parts.filter((x) => x !== p))} label={parts.includes(p) ? tr('in this run') : tr('left out')} />
+                </Setting>
+              ))}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <h3>{tr('Options of the setup')}</h3>
+              <span className="muted small grow" style={{ textAlign: 'right' }}>
+                {tr('remembered from one run to the next')}
+              </span>
+            </div>
+            <div className="card-body">
+              <Setting label={tr('Product url')} help={tr('the product as the gateway reaches it: the backend of the routes')}>
+                <Input value={options.productUrl || ''} onChange={set('productUrl')} mono />
+              </Setting>
+              <Setting label={tr('Ingester url')} help={tr('where the data exporter sends the events')}>
+                <Input value={options.exporterUrl || ''} onChange={set('exporterUrl')} mono />
+              </Setting>
+              <Setting label={tr('Console host')} help={tr('the host the gateway serves the console on, at /backoffice')}>
+                <Input value={options.consoleHost || ''} onChange={set('consoleHost')} placeholder="apim.example.com" mono />
+              </Setting>
+              <Setting label={tr('Auth module of the console')} help={tr('an auth module of the gateway in front of the console, with the info token of the "via Otoroshi" login')}>
+                <Select
+                  style={{ maxWidth: 360 }}
+                  value={options.consoleAuthModule || ''}
+                  onChange={set('consoleAuthModule')}
+                  options={[{ value: '', label: tr('none') }, ...((refs.data?.authModules || []).map((m) => ({ value: m.id, label: `${m.name} (${m.type})` })))]}
+                />
+              </Setting>
+              <Setting label={tr('Portals host')} help={tr('the host the gateway serves the developer portals on; *.domain in the hostname form')}>
+                <Input value={options.portalHost || ''} onChange={set('portalHost')} placeholder="developers.example.com" mono />
+              </Setting>
+              <Setting label={tr('TLS client authentication')} help={tr('by default Want, once an mtls plan is deployed; never lowered')}>
+                <Select style={{ maxWidth: 360 }} value={options.clientAuth || ''} onChange={set('clientAuth')} options={[{ value: '', label: tr('as the mtls plans need') }, 'Want', 'Need']} />
+              </Setting>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <Icon name="key" />
+              <h3>{tr('Otoroshi admin key')}</h3>
+            </div>
+            <div className="card-body">
+              <Setting label={tr('For this run only')} help={tr('needed to make the key of the product; otherwise the parts run with the key of the product. Never stored, never in the audit trail.')}>
+                <div className="row gap-6 wrap">
+                  <Input value={admin.clientId} onChange={(v) => setAdmin({ ...admin, clientId: v })} placeholder={tr('client id')} mono />
+                  <Input type="password" value={admin.clientSecret} onChange={(v) => setAdmin({ ...admin, clientSecret: v })} placeholder={tr('client secret')} mono autoComplete="off" />
+                </div>
+              </Setting>
+            </div>
+          </div>
+          <div className="row gap-6" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn" disabled={busy || !parts.length} onClick={() => run(true)}>
+              {tr('Dry run')}
+            </button>
+            <button className="btn primary" disabled={busy || !parts.length} onClick={() => run(false)}>
+              <Icon name="play" /> {tr('Run the setup')}
+            </button>
+          </div>
+          {(report || s.lastRun) && <SetupReport report={report || s.lastRun} />}
+        </div>
+      )}
+    </Loader>
+  );
+}
+
 export function GatewayPage({ tab }) {
   const { navigate } = useRouter();
   return (
@@ -505,6 +688,7 @@ export function GatewayPage({ tab }) {
           ['drift', tr('Drift')],
           ['connection', tr('Connection & events')],
           ['ingestion', tr('Ingestion')],
+          ['setup', tr('Setup')],
         ].map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => navigate(`/gateway/${id}`)}>
             {label}
@@ -515,6 +699,7 @@ export function GatewayPage({ tab }) {
       {tab === 'drift' && <Drift />}
       {tab === 'connection' && <Connection />}
       {tab === 'ingestion' && <Ingestion />}
+      {tab === 'setup' && <Setup />}
     </div>
   );
 }

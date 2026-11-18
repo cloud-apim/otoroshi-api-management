@@ -12,6 +12,7 @@ import * as applications from '../domain/applications.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import * as analytics from '../domain/analytics.js';
 import { invalidatePolicy as invalidateIngestPolicy, normalize as normalizeIngest, policy as ingestPolicy, publicPolicy } from '../domain/ingest-policy.js';
+import { EXPORTER_ID, runSetup, setupState } from '../domain/setup.js';
 import { runRetention } from '../domain/retention.js';
 import { listAudit, searchAudit, audit } from '../domain/audit.js';
 import { pageParams } from '../http/paging.js';
@@ -272,35 +273,37 @@ r.post('/oidc/discovery', async ({ ctx, body }) => {
   };
 });
 
-// installs the data exporter that feeds the ingester. An exporter is infrastructure: this is a
-// helper, the product marks what it created and never touches other exporters.
+// installs the data exporter that feeds the ingester: the exporter part of the setup
 r.post('/gateway/exporter', async ({ ctx, body }) => {
   identity.requireAdmin(ctx);
-  const url = body.url || config.ingest.url || `${config.publicUrl.replace('localhost', 'host.docker.internal')}/ingest`;
-  const entity = {
-    _loc: { tenant: 'default', teams: ['default'] },
-    type: 'webhook',
-    enabled: true,
-    id: 'apim_ingester_exporter',
-    name: 'otoroshi-api-management ingester',
-    desc: 'Exports GatewayEvent, LLMUsageAudit and McpAudit to the otoroshi-api-management ingester',
-    metadata: { [META.managedBy]: 'otoroshi-api-management' },
-    tags: [],
-    bufferSize: 5000,
-    jsonWorkers: 1,
-    sendWorkers: 5,
-    groupSize: 50,
-    groupDuration: 2000,
-    projection: {},
-    filtering: { include: [{ '@type': { $in: ['GatewayEvent', 'LLMUsageAudit', 'McpAudit'] } }], exclude: [] },
-    customFilter: null,
-    customTransform: null,
-    config: { type: 'webhook', url, headers: { Authorization: `Bearer ${config.ingest.token}` }, mtlsConfig: { mtls: false } },
-  };
-  const existing = ((await oto.listDataExporters()) || []).find((e) => e.id === entity.id);
-  const res = existing ? await oto.updateDataExporter(entity) : await oto.createDataExporter(entity);
-  await audit(ctx, { action: 'gateway.exporter.install', entityKind: 'gateway', entityId: entity.id, summary: `data exporter installed towards ${url}` });
-  return { installed: true, id: res?.id || entity.id, url };
+  const report = await runSetup({ only: ['exporter'], options: body.url ? { exporterUrl: body.url } : {}, actor: ctx.user?.email });
+  const part = report.parts[0];
+  if (part.status === 'error') throw badRequest(part.notes.join('; '));
+  await audit(ctx, { action: 'gateway.exporter.install', entityKind: 'gateway', entityId: EXPORTER_ID, summary: `data exporter ${part.actions[0]?.op}`, data: { url: report.options.exporterUrl } });
+  return { id: EXPORTER_ID, url: report.options.exporterUrl, op: part.actions[0]?.op };
+});
+
+// the setup of the gateway: what the product needs there, its parts, what the last run did
+r.get('/gateway/setup', async ({ ctx }) => {
+  identity.requireAdmin(ctx);
+  return setupState();
+});
+
+// a run, all of it or some parts, a dry run first if asked. `otoroshi` is an Otoroshi admin key
+// for this run only: never stored, never audited
+r.post('/gateway/setup', async ({ ctx, body }) => {
+  identity.requireAdmin(ctx);
+  const only = Array.isArray(body.only) ? body.only : body.only ? String(body.only).split(',').map((x) => x.trim()).filter(Boolean) : null;
+  const report = await runSetup({ only, dryRun: !!body.dryRun, creds: body.otoroshi || null, options: body.options || {}, actor: ctx.user?.email || 'api' });
+  if (!body.dryRun)
+    await audit(ctx, {
+      action: 'gateway.setup',
+      entityKind: 'gateway',
+      entityId: 'setup',
+      summary: `gateway setup: ${report.parts.map((p) => `${p.part} ${p.status}`).join(', ')}`,
+      data: { only, withAdminKey: !!body.otoroshi?.clientId, options: report.options, parts: report.parts.map((p) => ({ part: p.part, status: p.status, actions: p.actions.map((a) => ({ op: a.op, kind: a.kind, id: a.id })) })) },
+    });
+  return report;
 });
 
 r.post('/gateway/drift', async ({ ctx }) => {

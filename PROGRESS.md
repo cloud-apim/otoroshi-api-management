@@ -17,8 +17,7 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
-2. **R-50** — the container image built from the compiled executable.
+1. **R-50** — the container image built from the compiled executable.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -77,7 +76,6 @@ waits for the data plane rather than working around it.
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
 | R-30 | §3 | Run the roles **split across instances** (ingester alone, portal alone…) and with several instances of a role — the task queue claims atomically, never tested | S | |
-| R-41 | D-14, D-15 | A **setup mode** of the binary (`apim setup`, given an Otoroshi admin api key): creates or repairs everything the product needs on the gateway, idempotently, all of it or a part (`--only exporter,routes,…`), re-runnable at will and with `--dry-run` showing the diff first. Parts: the product's own admin api key on Otoroshi (narrowed rights), the data exporter to the ingester, the routes that expose the console and each portal (hostnames of R-3, TLS, the info-token auth module and its route for the "via Otoroshi" console login), the shared certificates the product relies on (key pair for `oauth2-local`), a health check of what it found (version, cluster, listener asking for client certificates for mtls plans). Marked like every product entity, reported in the gateway status | M | |
 
 ### Analytics and audit
 
@@ -135,7 +133,7 @@ waits for the data plane rather than working around it.
 | D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
 | D-11 i18n | 🟡 | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages in English: R-45; metadata labels: R-22; more portal pages: R-42 |
 | D-12 light / dark / system | ✅ | console and portal |
-| D-14 no need to open Otoroshi | 🟡 | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the gateway's own settings (TLS client auth, exposure routes): R-41 |
+| D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, G-21 |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
 | D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
@@ -204,4 +202,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-19), to be fixed in the data plane.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane.

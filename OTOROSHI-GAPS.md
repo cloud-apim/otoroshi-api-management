@@ -29,6 +29,8 @@ the product has to compensate, **low** = friction.
 | G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
 | G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
 | G-19 | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
+| G-20 | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
+| G-21 | The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | medium | the product's key keeps every right; with a narrowed key the vault references and the TLS checks would fail |
 
 ---
 
@@ -347,4 +349,44 @@ clear on the exporter's connection; the other exporters of the gateway are not c
 so that two exporters can share pseudonyms or not. And a `sampling` block: a rate decided by
 `reqId`, so that the events of one request stay together, with `keepErrors`. The same options
 belong to the analytics module of the 18, which stores the same events.
+
+## G-20 — a narrowed admin key reads the secrets of the other admin keys — high
+
+**Observed.** An admin key (authorized on the admin api group) can be narrowed by its metadata
+`otoroshi-access-rights`: tenants, teams, kinds of entities (`app/actions/api.scala:136`). Its calls
+then run as a back office user with those rights. Reading an apikey checks only that the caller can
+read it (`canUserRead`, `app/utils/controllers.scala:1026`) and writes it whole
+(`ApiKeysController.writeEntity`, `app/controllers/adminapi/ApiKeysController.scala:716`, the
+`clientSecret` at `app/models/apikey.scala:527`). Writing an admin key is guarded
+(`canUserGrantApikeyRights`, `app/actions/api.scala:30`), reading it is not: a key narrowed to the
+apikeys of the default team reads the secret of the super admin key of that team, and calls with
+it. Seen on the development stack: a key limited to eight kinds read `apim-admin-client`'s secret.
+Only personal admin keys are spared (`PersonalAdminApikey.canRead`).
+
+**Product meanwhile.** The setup makes the product an admin key of its own, `apim_product_admin`,
+with every right: distinct from the operator's, rotated without it (`--rotate-key`), named in the
+audit of the gateway. It does not narrow it — the narrowing would protect nothing, and G-21 would
+break the product.
+
+**Upstream fix.** The secret of an apikey authorized on the admin api (the back office group or
+descriptor) is never written to a caller who could not grant that key (`canUserGrantApikeyRights`
+false): masked in the reads, the lists and the exports, like the personal admin keys. Then the
+product's key can be narrowed to the tenant, the teams and the kinds it uses — apis and
+apisubscriptions, apikeys, certificates, auth modules, jwt verifiers, data exporters, routes — and
+read the global configuration (G-21).
+
+## G-21 — the global configuration is readable by super admins only — medium
+
+**Observed.** `GET /api/globalconfig` checks `RightsChecker.SuperAdminOnly`
+(`app/controllers/adminapi/GlobalConfigController.scala:27`): a right on
+`config.otoroshi.io/global-configs` does not open it. A narrowed key therefore cannot read the TLS
+settings (`tlsSettings.clientAuth`, `trustedCAsServer`) nor the `env` the local vault resolves
+`${vault://local/…}` against.
+
+**Product meanwhile.** Its key keeps every right (G-20). With a narrowed key, the warnings about the
+TLS client authentication of mtls plans and the vault references of the promotion would fail.
+
+**Upstream fix.** Read access to the global configuration for a right on
+`config.otoroshi.io/global-configs` (its secrets masked, as in the exports), and the `fields`
+parameter it already takes for narrower reads.
 

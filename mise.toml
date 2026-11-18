@@ -158,7 +158,7 @@ run = "bun test test/model.test.js test/derived.test.js test/auth.test.js test/c
 
 [tasks."test:e2e"]
 description = "Run the reference catalogue test against the real gateway (needs the stack)"
-run = "bun test test/reference-catalogue.test.js test/derived-objects.test.js test/permissions.test.js test/product-down.test.js test/shared-plan-ids.test.js test/portal-forms.test.js test/promotion.test.js test/queue-and-notifications.test.js test/payments.test.js test/ingestion.test.js"
+run = "bun test test/reference-catalogue.test.js test/derived-objects.test.js test/permissions.test.js test/product-down.test.js test/shared-plan-ids.test.js test/portal-forms.test.js test/promotion.test.js test/queue-and-notifications.test.js test/payments.test.js test/ingestion.test.js test/setup.test.js"
 
 [tasks."test:binary"]
 description = "Start the compiled executable away from the repository: its faces, its health, its command line (needs the stack)"
@@ -201,6 +201,11 @@ description = "Capture every screen of the console and the portal and regenerate
 run = "bun run screenshots"
 
 # ─── Tools ───────────────────────────────────────────────────────────
+
+[tasks.setup]
+description = "The setup of the gateway against the stack, with its admin key: the console at apim.oto.tools:8080/backoffice/, the portals at portal.oto.tools:8080 (e.g. mise run setup -- --dry-run)"
+run = "bun server/bin.js setup --admin-client-id apim-admin-client --admin-client-secret apim-admin-secret --product-url http://apim:9000 --console-host apim.oto.tools --portal-host portal.oto.tools"
+raw = true
 
 [tasks.cli]
 description = "Run the apim cli against the local product (e.g. mise run cli apis list default)"

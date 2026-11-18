@@ -14,6 +14,7 @@ export const META = {
   subscription: 'apim_subscription_id',
   application: 'id_ref', // the application is projected as an id_ref metadata on the apikey
   managedBy: 'apim_managed_by',
+  setupPart: 'apim_setup_part', // the part of the setup that made an entity of the gateway
   clientId: 'apim_client_id', // the client id an application declares, on the subscriptions that have no key
 };
 
@@ -40,8 +41,9 @@ export class OtoroshiError extends Error {
   }
 }
 
-export async function otoroshi(method, path, body, { timeoutMs = 10000 } = {}) {
-  const s = await gatewaySettings();
+// `creds` calls with another key than the product's own — the admin key given to the setup
+export async function otoroshi(method, path, body, { timeoutMs = 10000, creds = null } = {}) {
+  const s = { ...(await gatewaySettings()), ...(creds || {}) };
   const headers = {
     Host: s.host,
     Authorization: 'Basic ' + Buffer.from(`${s.clientId}:${s.clientSecret}`).toString('base64'),

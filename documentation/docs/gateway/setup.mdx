@@ -1,0 +1,70 @@
+---
+sidebar_position: 0
+title: Setting the gateway up
+description: What the product needs on Otoroshi, created or repaired by its setup — its own key, the data exporter, the routes of the console and of the portals, the TLS client authentication — re-runnable at will, part by part, with a dry run.
+---
+
+# Setting the gateway up
+
+The product needs a few things on Otoroshi that no API describes: a key to call its admin API with,
+the data exporter that feeds the ingester, the routes that expose the console and the developer
+portals. **The setup makes them, or repairs them**, given an Otoroshi admin key. It is idempotent:
+re-run it at will, all of it or some parts, and a **dry run** says first what it would change.
+
+```bash
+otoroshi-apim setup --admin-client-id <id> --admin-client-secret <secret> \
+  --product-url http://apim.internal:9000 \
+  --console-host apim.example.com --portal-host developers.example.com --dry-run
+```
+
+The same run is in the console — **Gateway › Setup** — and in the command line through the admin
+API — `apim gateway setup`, with the same flags. The binary runs it in process: it needs the
+databases of the product and the gateway, not a running product.
+
+## The parts
+
+| Part | What it makes | Without the admin key |
+|---|---|---|
+| `key` | **the product's own admin key** (`apim_product_admin`), on the admin API as the key given; the product switches to it once the gateway accepts it. `--rotate-key` gives it a new secret | checks it |
+| `exporter` | the **data exporter** to the ingester (`--exporter-url`, by default `<product url>/ingest`) | runs |
+| `console` | the **route of the console**: `<console host>/backoffice`, and `/payments` when payments are on (Stripe calls the product back). With `--console-auth-module`, an auth module of the gateway in front of it and the info token the [*via Otoroshi* login](../authentication.mdx#via-otoroshi) reads, signed with a secret it shares with the console | runs |
+| `portals` | the **route of the portals**, in the form of the installation: `<host>/<workspace>/`, `*.domain` in the hostname form, `<host>/` with a single workspace. The console, the admin API and the ingester answer 404 there, whatever the roles of the instance behind | runs |
+| `tls` | the gateway **asks callers for a client certificate** (`Want`), once an mtls plan is deployed, or as `--client-auth Want\|Need` says; it never lowers it | runs |
+
+Each entity it makes is **marked** (`created_by: otoroshi-apim-setup`, the part); an entity of the
+same id that it did not make is left alone, and the part fails saying so. The routes take the
+product as their backend (`--product-url`, the product as the gateway reaches it) and keep the host
+they were called on: the product resolves a portal by it.
+
+The options are **remembered** from one run to the next; an option not given follows the
+configuration of the installation — the hosts of `APIM_PUBLIC_URL` and of the portals,
+`APIM_INGEST_URL`.
+
+The **admin key** given to the setup is used for that run only: never stored, never in the audit
+trail. Without it, the parts run with the product's own key — the `key` part then only checks it.
+
+## The checks
+
+Each run reads, and reports: the version of Otoroshi (18 at least) and its cluster; the key the
+product calls the gateway with — its own, or one it did not make; the key pairs the oauth2-local
+plans sign their tokens with (Otoroshi makes `otoroshi-jwt-signing` again at start and every day);
+a certificate for each host served over https; the events reaching the ingester in the last
+fifteen minutes.
+
+## The key of the product
+
+The product's key is an admin key with every right. Otoroshi can narrow an admin key —
+`otoroshi-access-rights`, by tenant, team and kind of entity — but, today, a narrowed key reads the
+secrets of the other admin keys of its teams ([G-20](../otoroshi-gaps.mdx)), and cannot read the
+global configuration, where the TLS settings and the values of the local vault are
+([G-21](../otoroshi-gaps.mdx)). Narrowing it would protect nothing and break the vault references:
+the setup makes a key of its own, that the operator rotates without touching theirs.
+
+## In the development
+
+```bash
+mise run setup -- --dry-run
+```
+
+runs it against the stack, with its admin key: the console at `apim.oto.tools:8080/backoffice/`,
+the portals at `portal.oto.tools:8080/<workspace>/`.

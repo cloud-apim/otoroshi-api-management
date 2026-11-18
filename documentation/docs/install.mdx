@@ -40,9 +40,14 @@ mise run build:binaries        # dist/bin/otoroshi-apim-{linux,darwin}-{x64,arm6
 
 ```bash
 otoroshi-apim                  # the server, with the roles of APIM_ROLES — or: otoroshi-apim serve
+otoroshi-apim setup …          # what the product needs on the gateway, given an Otoroshi admin key
 otoroshi-apim version
 otoroshi-apim apis list default        # the command line: the same commands as bun cli/apim.js
 ```
+
+Once the databases are reachable, `otoroshi-apim setup` with an Otoroshi admin key makes the
+product's own key, the data exporter and the routes of the console and of the portals — see
+[Setting the gateway up](./gateway/setup.mdx).
 
 Cross-compiling makes bun download the runtime of each target. `mise run test:binary` starts the
 executable away from the repository and checks its faces, its health and its command line.

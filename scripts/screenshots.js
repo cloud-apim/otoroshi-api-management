@@ -348,6 +348,11 @@ async function consoleTour(page) {
     await go(page, path);
     await shot(page, name, title, { full: path !== '/backoffice/gateway/status' });
   }
+  // the setup of the gateway, and what a dry run of it says
+  await go(page, '/backoffice/gateway/setup');
+  await click(page, 'Dry run');
+  await sleep(1500);
+  await shot(page, 'console-gateway-setup', 'Gateway — setup: what the product needs on the gateway, a dry run first');
 
   await theme(page, 'dark');
   await go(page, W);

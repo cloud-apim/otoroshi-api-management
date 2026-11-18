@@ -8,12 +8,14 @@
 
 import YAML from 'yaml';
 import { readFileSync } from 'node:fs';
+import { SETUP_HELP, failed, formatSetup, setupRequest } from './setup.js';
 
 const HELP = `apim — otoroshi-api-management command line
 
 Usage: apim <command> [args] [--flags]
        otoroshi-apim <command> [args] [--flags]   the compiled binary: the same commands, and
        otoroshi-apim [serve]                      the server, with the roles of APIM_ROLES
+       otoroshi-apim setup [flags]                the setup of the gateway, in process (no server needed)
 
 Global flags / env:
   --url <url>        APIM_URL      (default http://localhost:9000)
@@ -23,6 +25,8 @@ Global flags / env:
 Commands:
   whoami
   gateway status
+  gateway setup                        what the product needs on the gateway, created or repaired:
+${SETUP_HELP}
   workspaces list
   apis list <ws>
   apis get <ws> <api>                  the declarative document of an api-version (-o yaml)
@@ -151,8 +155,14 @@ async function main() {
   switch (cmd) {
     case 'whoami':
       return print((await call('GET', '/me')).user);
-    case 'gateway':
-      return print(await call('GET', '/gateway/status'));
+    case 'gateway': {
+      if (sub !== 'setup') return print(await call('GET', '/gateway/status'));
+      const report = await call('POST', '/gateway/setup', setupRequest(flags));
+      if (OUTPUT === 'json' || OUTPUT === 'yaml') return print(report);
+      console.log(formatSetup(report));
+      if (failed(report)) process.exit(1);
+      return;
+    }
     case 'workspaces':
       return print(await call('GET', '/workspaces'), [['slug', 'slug'], ['name', 'name'], ['id', 'id']]);
     case 'apis': {

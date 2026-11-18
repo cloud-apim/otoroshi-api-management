@@ -60,6 +60,8 @@ is never returned by any API, and never in the public portal settings.
 behind an Otoroshi route that authenticates users with an auth module and adds the *Otoroshi info.
 token* plugin (legacy version). The product reads the token from the `Otoroshi-Claim` header,
 verifies its HMAC signature with the secret shared with the route, and takes the user's email.
+The [setup](./gateway/setup.mdx) makes that route — `--console-auth-module <id>` — and the shared
+secret; switching the mode stays a decision of an administrator.
 
 :::warning No fallback entry
 In this mode the identity comes from the gateway: there is no login form and no other way in. A

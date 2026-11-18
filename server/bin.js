@@ -3,6 +3,7 @@
 //   otoroshi-apim                  the server, with the roles of APIM_ROLES
 //   otoroshi-apim serve            the same
 //   otoroshi-apim version          its version
+//   otoroshi-apim setup …          what the product needs on the gateway (server/setup-command.js)
 //   otoroshi-apim <command> …      the command line (otoroshi-apim help)
 
 import pkg from '../package.json';
@@ -18,6 +19,9 @@ if (!cmd || cmd === 'serve') {
     console.error('[apim] failed to start', e);
     process.exit(1);
   }
+} else if (cmd === 'setup') {
+  const { setupCommand } = await import('./setup-command.js');
+  process.exit(await setupCommand(process.argv.slice(3)));
 } else if (cmd === 'version' || cmd === '--version' || cmd === '-v') {
   console.log(`otoroshi-apim ${pkg.version}`);
 } else {
