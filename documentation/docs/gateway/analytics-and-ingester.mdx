@@ -68,12 +68,15 @@ An event names people: the address of the caller, the user signed in on the gate
 sometimes a path (`/users/jane@example.com/orders/42`). **Gateway → Ingestion › Personal data** says
 what becomes of them, **before anything is stored, in both paths**:
 
-| | kept | otherwise |
+| | by default | otherwise |
 |---|---|---|
-| **Address of the caller** — `from`, and the headers that carry it (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`…) | as is | truncated to its network (`/24`, `/48`), replaced by a pseudonym, or left out |
-| **Signed-in user** — its email and name (a private app) | as is | replaced by a pseudonym, or left out |
-| **User agent** | as is | left out |
-| **Paths** | as is | templated: `/users/{email}/orders/{n}`, the values of the query left out |
+| **Address of the caller** — `from`, and the headers that carry it (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`…) | truncated to its network (`/24`, `/48`) | kept, replaced by a pseudonym, or left out |
+| **Signed-in user** — its email and name (a private app) | replaced by a pseudonym | kept, or left out |
+| **User agent** | kept | left out |
+| **Paths** | kept | templated: `/users/{email}/orders/{n}`, the values of the query left out |
+
+By default the product keeps the least that still serves: a network is enough to see where the
+traffic comes from, a pseudonym enough to count the calls of a user.
 
 A **pseudonym** is a keyed hash (HMAC-SHA-256): one caller, one token — calls can still be counted
 by caller — never the address back without the key. The product makes the key, keeps it, and never
@@ -81,8 +84,8 @@ shows nor exports it; **rotating** it breaks the link between the pseudonyms bef
 client id of an application is not personal data: it stays, it is what attributes a call. The
 geolocation and the parsed user agent go with the address and the agent.
 
-A change applies to what is received from then on: what was stored before goes with its retention.
-Every change of the policy is in the audit trail, with its values before and after.
+A change applies to what is received from then on. Every change of the policy is in the audit
+trail, with its values before and after.
 
 Otoroshi itself does not pseudonymise what it exports ([G-19](../otoroshi-gaps.mdx)): what reaches
 the ingester has the personal data in clear, over the exporter's connection.

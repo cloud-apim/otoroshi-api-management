@@ -57,7 +57,6 @@ if (!sync.ok) console.log(`gitops    catalog sync: ${sync.error || 'see items'}`
 sync.items.forEach((i) => console.log(`gitops    api ${i.slug} ${i.version}: ${i.action}${i.snapshot ? `, snapshot ${i.snapshot}` : ''}${i.deployment ? `, ${i.deployment}` : ''}${i.error ? ` (${i.error})` : ''}`));
 
 // the default portal speaks the two languages of the portal; a text already written is kept
-const OLD_TAGLINE = 'Discover, subscribe to and try our APIs.';
 const texts = {
   title: { en: 'Default developer portal', fr: 'Portail développeur Default' },
   tagline: { en: 'Discover, subscribe to and test our APIs.', fr: 'Découvrez nos API, abonnez-vous et testez-les.' },
@@ -67,7 +66,7 @@ const texts = {
   },
 };
 const portal = (await call('GET', '/workspaces/default')).portal || {};
-const localized = (v) => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : v ? { en: v } : {}).filter(([, t]) => t && t !== OLD_TAGLINE));
+const localized = (v) => Object.fromEntries(Object.entries(v && typeof v === 'object' ? v : {}).filter(([, t]) => t));
 const merged = Object.fromEntries(Object.entries(texts).map(([k, v]) => [k, { ...v, ...localized(portal[k]) }]));
 if (JSON.stringify(merged) !== JSON.stringify(Object.fromEntries(Object.keys(texts).map((k) => [k, portal[k]])))) {
   await call('PUT', '/workspaces/default', { portal: { ...portal, ...merged } });

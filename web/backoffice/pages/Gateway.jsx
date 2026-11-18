@@ -374,7 +374,7 @@ function Ingestion() {
       {() => (
         <div className="col gap-16">
           <Callout kind="info">
-            {tr('The computed path counts every call — the dashboards, the consumption of a subscription, the attribution to a plan — and is never sampled. The raw path keeps the events themselves, for diagnosis: optional, sampled, lightened. Both are pseudonymised before anything is stored. A change applies to what is received from now on; what was stored before goes with its retention.')}
+            {tr('The computed path counts every call — the dashboards, the consumption of a subscription, the attribution to a plan — and is never sampled. The raw path keeps the events themselves, for diagnosis: optional, sampled, lightened. Both are pseudonymised before anything is stored. A change applies to what is received from now on.')}
           </Callout>
           {status.data?.ingest && (
             <div className="grid-4">

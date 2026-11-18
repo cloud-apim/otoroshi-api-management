@@ -20,7 +20,8 @@ export const PATH_MODES = ['keep', 'template'];
 export const DEFAULTS = {
   storeRaw: true,
   raw: { sampleRate: 1, keepErrors: true, headers: 'keep' },
-  privacy: { ip: 'keep', user: 'keep', userAgent: 'keep', paths: 'keep' },
+  // by default, the least that still serves: an address cut to its network, a user as a pseudonym
+  privacy: { ip: 'truncate', user: 'hash', userAgent: 'keep', paths: 'keep' },
   retention: { callsDays: 30, rollupsDays: 400, aiDays: 90, rawDays: 7 },
 };
 

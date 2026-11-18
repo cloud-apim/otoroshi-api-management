@@ -10,7 +10,8 @@ describe('the settings', () => {
   test('completed with the defaults, checked, the key made once and never shown', () => {
     const p = normalize({});
     expect(p.raw).toEqual({ sampleRate: 1, keepErrors: true, headers: 'keep' });
-    expect(p.privacy).toEqual({ ip: 'keep', user: 'keep', userAgent: 'keep', paths: 'keep' });
+    // privacy by default: the address cut to its network, the signed-in user a pseudonym
+    expect(p.privacy).toEqual({ ip: 'truncate', user: 'hash', userAgent: 'keep', paths: 'keep' });
     expect(p.retention).toEqual({ callsDays: 30, rollupsDays: 400, aiDays: 90, rawDays: 7 });
     expect(p.key).toMatch(/^[0-9a-f]{64}$/);
     expect(normalize({ raw: { sampleRate: 0.1 } }, p).key).toBe(p.key);
