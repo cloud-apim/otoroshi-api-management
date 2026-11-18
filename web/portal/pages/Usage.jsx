@@ -7,7 +7,7 @@ import { api } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { PageHeader, RequireUser } from '../common.jsx';
 
-const RANGES = { '24h': 24 * 3600e3, '7d': 7 * 24 * 3600e3, '30d': 30 * 24 * 3600e3 };
+const RANGES = { '24h': 24 * 3600e3, '7d': 7 * 24 * 3600e3, '30d': 30 * 24 * 3600e3, '90d': 90 * 24 * 3600e3 };
 
 export function Usage() {
   return (

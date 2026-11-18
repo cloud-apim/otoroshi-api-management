@@ -1,7 +1,7 @@
 ---
 sidebar_position: 3
 title: Analytics and the ingester
-description: The two storage paths of the ingester, attribution to the catalogue, masking, and the dashboards.
+description: The two storage paths of the ingester, attribution to the catalogue, pseudonymisation, sampling, rollups and retention, and the dashboards.
 ---
 
 # Analytics and the ingester
@@ -41,13 +41,16 @@ A quota consumed, an attribution, a token count are **counted, never sampled**. 
 even though AI and MCP products are not in this version — a feature can come later, uncollected data
 is lost.
 
-## The raw path — optional
+## The raw path — optional, sampled
 
-When enabled (`APIM_INGEST_STORE_RAW`, or **Gateway → Connection & events**), events are also kept
-as they came, for diagnosis and export — lightened and masked:
+When enabled (`APIM_INGEST_STORE_RAW`, or **Gateway → Ingestion**), events are also kept as they
+came, for diagnosis and export — sampled, lightened and masked:
 
+- **a share of the requests** (100 % by default), decided by request, so that the events of one
+  request are kept together; **every error** (status ≥ 400) is kept whatever the share, unless told
+  otherwise. Only the raw path is sampled: the computed one counts everything;
 - the heavy embedded configurations are dropped (route, descriptor, JWT verifier): only the route's
-  id, name and metadata remain;
+  id, name and metadata remain; the headers can be left out too;
 - **secrets in the URL are masked**. Otoroshi already masks credential headers and secret fields of
   configurations; nothing masks a secret passed in a query parameter, so the ingester does it:
 
@@ -59,13 +62,56 @@ http://books.oto.tools:8080/v1/books?page=1&api_key=********
 Parameters whose names look like a secret (`*token*`, `*secret*`, `*password*`, `api_key`, `key`,
 `sig`, `signature`, `code`, `auth*`…) are masked.
 
+## Personal data — pseudonymised before they are stored
+
+An event names people: the address of the caller, the user signed in on the gateway, its browser,
+sometimes a path (`/users/jane@example.com/orders/42`). **Gateway → Ingestion › Personal data** says
+what becomes of them, **before anything is stored, in both paths**:
+
+| | kept | otherwise |
+|---|---|---|
+| **Address of the caller** — `from`, and the headers that carry it (`X-Forwarded-For`, `X-Real-IP`, `Forwarded`…) | as is | truncated to its network (`/24`, `/48`), replaced by a pseudonym, or left out |
+| **Signed-in user** — its email and name (a private app) | as is | replaced by a pseudonym, or left out |
+| **User agent** | as is | left out |
+| **Paths** | as is | templated: `/users/{email}/orders/{n}`, the values of the query left out |
+
+A **pseudonym** is a keyed hash (HMAC-SHA-256): one caller, one token — calls can still be counted
+by caller — never the address back without the key. The product makes the key, keeps it, and never
+shows nor exports it; **rotating** it breaks the link between the pseudonyms before and after. The
+client id of an application is not personal data: it stays, it is what attributes a call. The
+geolocation and the parsed user agent go with the address and the agent.
+
+A change applies to what is received from then on: what was stored before goes with its retention.
+Every change of the policy is in the audit trail, with its values before and after.
+
+Otoroshi itself does not pseudonymise what it exports ([G-19](../otoroshi-gaps.mdx)): what reaches
+the ingester has the personal data in clear, over the exporter's connection.
+
+## Rollups and retention
+
+The calls are kept **30 days**. Before they go, they are **rolled up by the hour**: one row per hour,
+workspace, API, plan, subscription, application, method, templated path and status class — calls,
+errors, durations (their sum and a histogram), gateway overhead, bytes. The rollups are kept
+**400 days**; the AI usage 90 days, its tokens rolled up by the hour too; the raw path **7 days**.
+Every duration is set in **Gateway → Ingestion › Retention**.
+
+The rollups are made by the ingester every five minutes (`APIM_INGEST_RETENTION_MS`), one ingester
+at a time, **by id, not by hour**: a late event is counted in its hour, and nothing is counted twice.
+A call is deleted only once rolled up. **Roll up and purge now** runs it at once.
+
+A dashboard whose range starts after the last purge reads the calls themselves, exactly. Before,
+it reads the rollups plus the calls not rolled up yet: its **counts are exact**, its buckets an hour
+at least, its percentiles read from the histograms (an approximation, marked `≈`), its paths
+templated. The request log is the calls: it goes back as far as they are kept.
+
 ## Dashboards
 
 They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's.
 
 - **Console → Observability**, and the *Analytics* tab of each API and application: calls and errors
   over time, latency (average, p95, gateway overhead), data, status classes, calls by API, plan and
-  application, top endpoints, recent calls. Filters live in the URL, so a filtered view is a bookmark.
+  application, top endpoints (by templated path), recent calls, from the last hour to the last year.
+  Filters live in the URL, so a filtered view is a bookmark.
   Reading the request log is recorded in the audit trail: it is personal data.
 - **Portal → Usage**: the same, restricted to the consumer's own applications.
 - **Portal → My apps**: the live quotas of each key, as the gateway counts them (read-only, never on

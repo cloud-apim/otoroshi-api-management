@@ -530,4 +530,60 @@ create table raw_events (
 create index raw_events_at on raw_events(at);
 `,
   },
+  {
+    version: '0002_rollups_and_retention',
+    sql: `
+-- the computed path, kept longer than its calls: hourly rollups, one row per hour and grain. The
+-- dimensions are never null ('' for none), so that a grain is a key; the durations are a histogram
+-- (bucket of DURATION_BOUNDS -> calls), the percentiles are read from it
+alter table calls add column path_template text;
+alter table calls add column received_at timestamptz not null default now();
+create index calls_at on calls(at);
+alter table ai_usage add column received_at timestamptz not null default now();
+
+create table call_rollups (
+  hour timestamptz not null,
+  workspace_id text not null default '',
+  api_id text not null default '',
+  plan_id text not null default '',
+  subscription_id text not null default '',
+  application_id text not null default '',
+  method text not null default '',
+  path text not null default '',
+  status_class int not null default 0,
+  calls bigint not null,
+  errors bigint not null,
+  duration_sum bigint not null,
+  overhead_sum bigint not null,
+  bytes_in bigint not null,
+  bytes_out bigint not null,
+  durations jsonb not null default '{}',
+  primary key (hour, workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class)
+);
+create index call_rollups_ws_hour on call_rollups(workspace_id, hour);
+
+create table ai_rollups (
+  hour timestamptz not null,
+  workspace_id text not null default '',
+  api_id text not null default '',
+  subscription_id text not null default '',
+  type text not null default '',
+  provider text not null default '',
+  model text not null default '',
+  tool text not null default '',
+  events bigint not null,
+  input_tokens bigint not null,
+  output_tokens bigint not null,
+  cost_micro_usd bigint not null,
+  primary key (hour, workspace_id, api_id, subscription_id, type, provider, model, tool)
+);
+
+-- how far the rollups went: the last id rolled up, per table
+create table rollup_state (
+  name text primary key,
+  last_id bigint not null default 0,
+  updated_at timestamptz not null default now()
+);
+`,
+  },
 ];

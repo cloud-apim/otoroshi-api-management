@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Loader, Modal, Seg, Select, StatusBadge, useLoad } from '../../shared/ui.jsx';
+import { Callout, Loader, Modal, Seg, Select, StatusBadge, useLoad } from '../../shared/ui.jsx';
 import { CodeView } from '../../shared/code-editor.jsx';
 import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
 import { BarList, StatTile, TimeSeries } from '../../shared/charts.jsx';
@@ -14,6 +14,8 @@ const RANGES = [
   { value: '24h', label: tr('24h'), ms: 86400e3 },
   { value: '7d', label: tr('7 days'), ms: 7 * 86400e3 },
   { value: '30d', label: tr('30 days'), ms: 30 * 86400e3 },
+  { value: '90d', label: tr('90 days'), ms: 90 * 86400e3 },
+  { value: '1y', label: tr('1 year'), ms: 365 * 86400e3 },
 ];
 
 // dashboards speak the catalogue's vocabulary: apis, plans, applications — not routes.
@@ -75,9 +77,18 @@ export function AnalyticsDashboard({ fixed = {} }) {
             <div className="grid-4">
               <StatTile label={tr('Calls')} value={fmtNumber(d.totals.calls)} hint={tr('{0} consuming applications', [d.totals.applications])} />
               <StatTile label={tr('Errors')} value={fmtNumber(d.totals.errors)} hint={d.totals.calls ? tr('{0} % of calls', [((100 * d.totals.errors) / d.totals.calls).toFixed(1)]) : ''} />
-              <StatTile label={tr('Latency')} value={`${fmtNumber(d.totals.avg_ms)} ms`} hint={tr('p95 {0} ms · gateway overhead {1} ms', [fmtNumber(d.totals.p95_ms), fmtNumber(d.totals.avg_overhead_ms)])} />
+              <StatTile
+                label={tr('Latency')}
+                value={`${fmtNumber(d.totals.avg_ms)} ms`}
+                hint={(d.source === 'rollups' ? (x) => tr('p95 ≈ {0} ms · gateway overhead {1} ms', x) : (x) => tr('p95 {0} ms · gateway overhead {1} ms', x))([fmtNumber(d.totals.p95_ms), fmtNumber(d.totals.avg_overhead_ms)])}
+              />
               <StatTile label={tr('Data')} value={fmtBytes(d.totals.bytes_out)} hint={tr('out · {0} in', [fmtBytes(d.totals.bytes_in)])} />
             </div>
+            {d.source === 'rollups' && (
+              <Callout kind="info">
+                <Tr text={'Each call is kept {0} days: before {1}, this range is read from the hourly rollups — its counts are exact, its percentiles approximate, its paths templated.'} args={[d.retention.callsDays, fmtDate(d.retention.from)]} />
+              </Callout>
+            )}
             <div className="card">
               <div className="card-head">
                 <h3 className="grow">{tr('Traffic')}</h3>
@@ -138,7 +149,10 @@ export function AnalyticsDashboard({ fixed = {} }) {
       <div className="card">
         <div className="card-head">
           <h3 className="grow">{tr('Recent calls')}</h3>
-          <span className="faint small">{tr('reading request logs is traced in the audit trail')}</span>
+          <span className="faint small">
+            {calls.data?.retention && new Date(calls.data.retention.from).getTime() > Date.now() - ms ? tr('each call is kept {0} days · ', [calls.data.retention.callsDays]) : ''}
+            {tr('reading request logs is traced in the audit trail')}
+          </span>
         </div>
         <div className="card-body" style={{ paddingBottom: 0 }}>
           <ListToolbar paging={paging} placeholder={tr('search path, method, status, client id, address')} onReload={calls.reload} loading={calls.loading} />

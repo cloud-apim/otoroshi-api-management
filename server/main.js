@@ -337,6 +337,13 @@ async function start() {
     setInterval(() => deliverAll().catch((e) => console.error('[apim] audit export failed', e.message)), 5000);
     setTimeout(() => runDriftDetection().catch(() => null), 5000);
   }
+  // the ingester rolls its calls up and applies the retention of each path
+  if (config.workers.enabled && hasRole('ingester')) {
+    const { runRetention } = await import('./domain/retention.js');
+    const run = () => runRetention().catch((e) => console.error('[apim] ingestion retention failed', e.message));
+    setInterval(run, config.ingest.retentionMs);
+    setTimeout(run, 10000);
+  }
   return server;
 }
 

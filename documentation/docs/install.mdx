@@ -132,7 +132,8 @@ One installation drives one Otoroshi cluster, with an administration key.
 |---|---|---|
 | `APIM_INGEST_TOKEN` | `ingest-secret` | the token the data exporter presents to `/ingest` |
 | `APIM_INGEST_URL` | — | `/ingest` as the gateway reaches it, used by the exporter helper |
-| `APIM_INGEST_STORE_RAW` | `true` | keep the raw path (see [analytics](./gateway/analytics-and-ingester.mdx)) |
+| `APIM_INGEST_STORE_RAW` | `true` | keep the raw path (see [analytics](./gateway/analytics-and-ingester.mdx)); its sampling, the pseudonymisation and the retention are set in the console |
+| `APIM_INGEST_RETENTION_MS` | `300000` | how often the ingester rolls the calls up and applies the retention |
 
 ### Developer portal
 

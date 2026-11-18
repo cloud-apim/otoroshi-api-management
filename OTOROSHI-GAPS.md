@@ -28,6 +28,7 @@ the product has to compensate, **low** = friction.
 | G-16 | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
 | G-17 | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
 | G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
+| G-19 | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
 
 ---
 
@@ -319,3 +320,31 @@ computed by one function shared with the subscription keys of G-17; `resolveOrCr
 an existing key whose `apiRef` names another api or plan; a one-shot migration moves the keys
 already minted to the new ids, keeping their secret and their enabled flag; deleting an Api
 deletes the keys minted for it, its ApiSubscriptions and their keys.
+
+## G-19 — data exporters send personal data and url secrets in clear, unsampled — medium
+
+**Observed.** Since the 18, `GatewayEvent.writes` masks the credential headers and, by name, the
+secret fields of the configurations it embeds (`app/events/analytics.scala:478`, unless
+`OTOROSHI_EVENTS_MASK_SECRETS` is off). The rest goes out as it is: `url` with its query
+(`analytics.scala:493`) — an `api_key` or a `token` passed as a parameter included —, `from`
+(`:495`), the `X-Forwarded-For` / `X-Real-IP` / `Forwarded` headers, the identity of a user signed in
+on a private app (its email), the user agent and the geolocation derived from the address. A data
+exporter can filter events (`acceptEvent`, `app/events/OtoroshiEventsActor.scala:225`) and project
+fields (`project`, `:382`), but has no notion of pseudonymisation nor of sampling: only a custom
+transform, a wasm plugin or a workflow (`customTransformAsync`, `:489`), can do it, written by each
+operator. So every exporter of the gateway — Kafka, Elastic, a webhook, a file — receives the same
+personal data in clear, and keeps everything.
+
+**Product meanwhile.** The ingester masks the url secrets, pseudonymises (truncation of the
+address, keyed hash of the address or of the user, path templates) and samples its raw path before
+anything is stored, as its policy says (**Gateway → Ingestion**). What reaches it has transited in
+clear on the exporter's connection; the other exporters of the gateway are not covered.
+
+**Upstream fix.** A `privacy` block on the data exporter, applied before its projection:
+`maskQuerySecrets` (parameter names matching a list, as the secret headers), `ip`
+(`keep | truncate | hash | drop`, applied to `from` and to the forwarding headers), `user`
+(`keep | hash | drop`), `userAgent` (`keep | drop`), and a keyed hash whose key is a vault reference,
+so that two exporters can share pseudonyms or not. And a `sampling` block: a rate decided by
+`reqId`, so that the events of one request stay together, with `keepErrors`. The same options
+belong to the analytics module of the 18, which stores the same events.
+

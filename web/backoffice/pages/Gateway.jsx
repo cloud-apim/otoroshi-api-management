@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
-import { Callout, DiffView, Empty, Icon, Input, Loader, Select, Setting, StatusBadge, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
+import { Callout, DiffView, Empty, Icon, Input, Loader, NumberInput, Seg, Select, Setting, StatusBadge, Switch, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { StatTile } from '../../shared/charts.jsx';
 import { api, useSession } from '../context.jsx';
@@ -315,21 +315,182 @@ function Exporter({ ingest }) {
             {tr('Install / update the exporter')}
           </button>
         </Setting>
-        <Setting label={tr('Raw path')} help={tr('computed path: mandatory and exhaustive. Raw path: optional, where lightening and masking of url secrets belong.')}>
-          <div className="muted small">{ingest.storeRaw ? tr('raw events are stored (lightened, url secrets masked)') : tr('raw events are not stored')}</div>
-          <button
-            className="btn sm"
-            style={{ alignSelf: 'flex-start' }}
-            onClick={async () => {
-              await api.put('/settings/ingest', { storeRaw: !ingest.storeRaw });
-              toast(tr('Raw path {0}', [ingest.storeRaw ? tr('disabled') : tr('enabled')]));
-            }}
-          >
-            <Tr text={'{0} the raw path'} args={[ingest.storeRaw ? tr('Disable') : tr('Enable')]} />
-          </button>
+        <Setting label={tr('What is kept')} help={tr('the sampling of the raw path, the pseudonymisation of personal data and the retention of each path')}>
+          <Link to="/gateway/ingestion" className="btn sm" style={{ alignSelf: 'flex-start' }}>
+            {tr('Ingestion policy')}
+          </Link>
         </Setting>
       </div>
     </div>
+  );
+}
+
+// what the ingester keeps of the events of the gateway, and how long: the computed path counts every
+// call; the raw path keeps a share of them; personal data are pseudonymised before anything is stored
+const since = (at, more) => (at ? tr('since {0} · {1}', [fmtDate(at), more]) : more);
+
+function Ingestion() {
+  const toast = useToast();
+  const confirm = useConfirm();
+  const settings = useLoad(() => api.get('/settings'), []);
+  const status = useLoad(() => api.get('/gateway/status'), []);
+  const [form, setForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const current = form || settings.data?.ingest;
+  const set = (section, key) => (v) => setForm({ ...current, [section]: { ...current[section], [key]: v } });
+  const save = async (extra = {}) => {
+    setBusy(true);
+    try {
+      const { ingest } = await api.put('/settings/ingest', { storeRaw: current.storeRaw, raw: current.raw, privacy: current.privacy, retention: current.retention, ...extra });
+      setForm(null);
+      settings.reload();
+      toast(extra.rotateKey ? tr('A new key: the pseudonyms made from now on do not match the former ones') : tr('Ingestion policy saved'));
+      return ingest;
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const rotate = async () => {
+    if (!(await confirm({ title: tr('Rotate the key of the pseudonyms?'), message: tr('A caller keeps one pseudonym per key: after the rotation, its calls before and after can no longer be linked. The key is never shown.'), confirmLabel: tr('Rotate') }))) return;
+    await save({ rotateKey: true });
+  };
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post('/settings/ingest/run');
+      toast(r.skipped ? tr('Another ingester is running it') : tr('{0} call(s) rolled up, {1} deleted', [r.rolled.calls, r.deleted.calls + r.deleted.raw + r.deleted.ai + r.deleted.rollups]));
+      status.reload();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pct = (v) => Math.round((v ?? 1) * 1000) / 10;
+  return (
+    <Loader state={settings}>
+      {() => (
+        <div className="col gap-16">
+          <Callout kind="info">
+            {tr('The computed path counts every call — the dashboards, the consumption of a subscription, the attribution to a plan — and is never sampled. The raw path keeps the events themselves, for diagnosis: optional, sampled, lightened. Both are pseudonymised before anything is stored. A change applies to what is received from now on; what was stored before goes with its retention.')}
+          </Callout>
+          {status.data?.ingest && (
+            <div className="grid-4">
+              <StatTile label={tr('Calls kept')} value={fmtNumber(status.data.ingest.calls)} hint={since(status.data.ingest.oldest_at, tr('{0} not rolled up yet', [fmtNumber(status.data.ingest.rollup_pending)]))} />
+              <StatTile label={tr('Hourly rollups')} value={fmtNumber(status.data.ingest.rollups)} hint={since(status.data.ingest.rollups_oldest_at, tr('the dashboards beyond the calls'))} />
+              <StatTile label={tr('Raw events')} value={fmtNumber(status.data.ingest.raw)} hint={since(status.data.ingest.raw_oldest_at, current.storeRaw ? tr('{0} % of the requests, their errors always', [pct(current.raw.sampleRate)]) : tr('the raw path is off'))} />
+              <StatTile
+                label={tr('Last run')}
+                value={status.data.ingest.last_run ? fmtRelative(status.data.ingest.last_run.at) : tr('never')}
+                hint={status.data.ingest.last_run ? tr('{0} rolled up, {1} deleted', [fmtNumber(status.data.ingest.last_run.rolled?.calls || 0), fmtNumber(Object.values(status.data.ingest.last_run.deleted || {}).reduce((a, b) => a + b, 0))]) : tr('every 5 minutes')}
+              />
+            </div>
+          )}
+          <div className="card">
+            <div className="card-head">
+              <Icon name="box" />
+              <h3 className="grow">{tr('Raw path')}</h3>
+            </div>
+            <div className="card-body">
+              <Setting label={tr('Raw events')} help={tr('the events as Otoroshi sends them, minus the embedded configurations, their url secrets masked: the path of the diagnosis and of the export')}>
+                <Switch checked={current.storeRaw} onChange={(v) => setForm({ ...current, storeRaw: v })} label={current.storeRaw ? tr('stored') : tr('not stored')} />
+              </Setting>
+              <Setting label={tr('Sampling')} help={tr('the share of the requests kept, decided by request: the events of one request are kept together')}>
+                <div className="row gap-6">
+                  <NumberInput value={pct(current.raw.sampleRate)} min={0} max={100} step={1} style={{ width: 100 }} onChange={(v) => set('raw', 'sampleRate')(v === null ? 1 : Math.max(0, Math.min(100, v)) / 100)} />
+                  <span className="muted">%</span>
+                </div>
+                <Switch checked={current.raw.keepErrors} onChange={set('raw', 'keepErrors')} label={tr('keep every error (status ≥ 400), whatever the share')} />
+              </Setting>
+              <Setting label={tr('Headers')} help={tr('Otoroshi masks the credential headers; the others can be left out')}>
+                <div style={{ alignSelf: 'flex-start' }}>
+                  <Seg value={current.raw.headers} onChange={set('raw', 'headers')} options={[{ value: 'keep', label: tr('kept') }, { value: 'drop', label: tr('left out') }]} />
+                </div>
+              </Setting>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <Icon name="lock" />
+              <h3 className="grow">{tr('Personal data')}</h3>
+            </div>
+            <div className="card-body">
+              <Setting label={tr('Address of the caller')} help={tr('its ip, and the headers that carry it (x-forwarded-for…); a hash is a pseudonym: one caller, one token, never the address back without the key')}>
+                <Select
+                  style={{ maxWidth: 360 }}
+                  value={current.privacy.ip}
+                  onChange={set('privacy', 'ip')}
+                  options={[
+                    { value: 'keep', label: tr('kept') },
+                    { value: 'truncate', label: tr('truncated to its network (/24, /48)') },
+                    { value: 'hash', label: tr('replaced by a pseudonym') },
+                    { value: 'drop', label: tr('left out') },
+                  ]}
+                />
+              </Setting>
+              <Setting label={tr('Signed-in user')} help={tr('the email and the name of a user signed in on the gateway (a private app): the client id of an application is not personal and stays')}>
+                <Select
+                  style={{ maxWidth: 360 }}
+                  value={current.privacy.user}
+                  onChange={set('privacy', 'user')}
+                  options={[
+                    { value: 'keep', label: tr('kept') },
+                    { value: 'hash', label: tr('replaced by a pseudonym') },
+                    { value: 'drop', label: tr('left out') },
+                  ]}
+                />
+              </Setting>
+              <Setting label={tr('User agent')}>
+                <div style={{ alignSelf: 'flex-start' }}>
+                  <Seg value={current.privacy.userAgent} onChange={set('privacy', 'userAgent')} options={[{ value: 'keep', label: tr('kept') }, { value: 'drop', label: tr('left out') }]} />
+                </div>
+              </Setting>
+              <Setting label={tr('Paths')} help={tr('a path can name someone: /users/jane@example.com/orders/42. Templated, it is kept as /users/{email}/orders/{n}, and the values of the query are left out. The rollups always group by the template')}>
+                <div style={{ alignSelf: 'flex-start' }}>
+                  <Seg value={current.privacy.paths} onChange={set('privacy', 'paths')} options={[{ value: 'keep', label: tr('kept') }, { value: 'template', label: tr('templated') }]} />
+                </div>
+              </Setting>
+              <Setting label={tr('Key of the pseudonyms')} help={tr('made by the product, kept by it, never shown nor exported')}>
+                <button className="btn sm" style={{ alignSelf: 'flex-start' }} disabled={busy} onClick={rotate}>
+                  <Icon name="refresh" /> {tr('Rotate the key')}
+                </button>
+              </Setting>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <Icon name="layers" />
+              <h3 className="grow">{tr('Retention')}</h3>
+            </div>
+            <div className="card-body">
+              {[
+                ['callsDays', tr('Calls'), tr('each call: the request log, the exact dashboards. Deleted once rolled up')],
+                ['rollupsDays', tr('Hourly rollups'), tr('the calls counted by hour, api, plan, subscription, application, path and status class: the dashboards beyond the calls')],
+                ['aiDays', tr('AI and MCP usage'), tr('each audit of the AI gateway and of MCP; its tokens are rolled up by the hour too')],
+                ['rawDays', tr('Raw events'), tr('the path of the diagnosis')],
+              ].map(([key, label, help]) => (
+                <Setting key={key} label={label} help={help}>
+                  <div className="row gap-6">
+                    <NumberInput value={current.retention[key]} min={1} max={3650} style={{ width: 100 }} onChange={set('retention', key)} />
+                    <span className="muted">{tr('days')}</span>
+                  </div>
+                </Setting>
+              ))}
+            </div>
+          </div>
+          <div className="row gap-6" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn" disabled={busy} onClick={run}>
+              <Icon name="refresh" /> {tr('Roll up and purge now')}
+            </button>
+            <button className="btn primary" disabled={busy || !form} onClick={() => save()}>
+              {tr('Save')}
+            </button>
+          </div>
+        </div>
+      )}
+    </Loader>
   );
 }
 
@@ -343,6 +504,7 @@ export function GatewayPage({ tab }) {
           ['status', tr('Status & queue')],
           ['drift', tr('Drift')],
           ['connection', tr('Connection & events')],
+          ['ingestion', tr('Ingestion')],
         ].map(([id, label]) => (
           <button key={id} className={tab === id ? 'on' : ''} onClick={() => navigate(`/gateway/${id}`)}>
             {label}
@@ -352,6 +514,7 @@ export function GatewayPage({ tab }) {
       {tab === 'status' && <Status />}
       {tab === 'drift' && <Drift />}
       {tab === 'connection' && <Connection />}
+      {tab === 'ingestion' && <Ingestion />}
     </div>
   );
 }

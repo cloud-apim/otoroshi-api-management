@@ -17,7 +17,7 @@ Last update: 2026-11-18.
 
 ## Next, in the proposed order
 
-1. **R-8** — raw path retention, sampling, pseudonymisation (D-33, Q-8).
+1. **R-49** — one compiled binary: the server, the two faces, the migrations and the command line.
 2. **R-41** — a setup mode of the binary, given an Otoroshi admin api key (D-14).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
@@ -83,7 +83,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-8 | D-33, Q-8 | **Raw path**: retention, sampling, lightening policy; **pseudonymisation** of personal data (ip, email, identifiers); what the computed path aggregates and at which granularity (rollups) | M | or upstream in the data exporters |
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
 | R-32 | §8 | A **correlation id** carried beyond the gateway, to follow a request through the backends | S | |
 | R-33 | §8, G-7 | Tie Otoroshi's deployment history to the product snapshot from the gateway side | — | G-7 |
@@ -93,6 +92,8 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-47 | D-36, D-30 | A move from a **free plan to a paid one** through a Checkout, the subscription staying on its plan until it is paid — refused today: the consumer subscribes to the paid plan | S | |
+| R-48 | D-33 | **Apply a stricter privacy policy to what is already stored** (the calls and the raw events of the retention window), instead of waiting for their retention; a daily compaction of the hourly rollups past a few months | S | |
+| R-49 | D-14 | **One compiled binary** (`bun build --compile`): the server and its roles, the console and the portal, the migrations, and the command line as a sub-command; built for linux and macos, x64 and arm64 | S | |
 | R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
 
@@ -151,7 +152,7 @@ waits for the data plane rather than working around it.
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | multi-api credential: R-12 |
 | D-32 MVP scope, captured events | 🟡 | GatewayEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
-| D-33 two storage paths | 🟡 | computed + raw with url masking ✅; retention, sampling, pseudonymisation: R-8 |
+| D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated, hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19; the past under a new policy: R-48 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
 | D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move: R-47; usage billing: R-34 |
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
@@ -187,7 +188,7 @@ waits for the data plane rather than working around it.
 | Question | Status |
 |---|---|
 | Q-6 inventory of D-15 | ⬜ R-9 |
-| Q-8 computed path content, raw path lightening | 🟡 boundary implemented; content and retention: R-8 |
+| Q-8 computed path content, raw path lightening | ✅ hourly rollups by catalogue dimension, method, templated path and status class, durations as a histogram; calls 30 days, rollups 400, AI usage 90, raw 7 — set in the console; the cleaning at ingestion, its upstream counterpart logged as G-19 |
 | Q-11 declarative format | 🟡 implemented, to validate: R-28 |
 | Q-12 monetisation | ⬜ owner decision: R-35; connector: R-7 |
 
@@ -203,4 +204,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-18), to be fixed in the data plane.
+Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-19), to be fixed in the data plane.

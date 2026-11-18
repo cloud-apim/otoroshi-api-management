@@ -337,7 +337,8 @@ async function consoleTour(page) {
   for (const [path, name, title] of [
     ['/backoffice/gateway/status', 'console-gateway-status', 'Gateway — health, projection queue, ingestion'],
     ['/backoffice/gateway/drift', 'console-gateway-drift', 'Gateway — drift reports'],
-    ['/backoffice/gateway/connection', 'console-gateway-connection', 'Gateway — connection, data exporter, raw path'],
+    ['/backoffice/gateway/connection', 'console-gateway-connection', 'Gateway — connection and data exporter'],
+    ['/backoffice/gateway/ingestion', 'console-gateway-ingestion', 'Gateway — ingestion: the sampling of the raw path, the pseudonymisation of personal data, the retention of each path'],
     ['/backoffice/settings/workspaces', 'console-global-workspaces', 'Global settings — workspaces, portal exposure'],
     ['/backoffice/settings/users', 'console-global-users', 'Global settings — users'],
     ['/backoffice/settings/authentication', 'console-global-auth', 'Global settings — authentication'],

@@ -2,32 +2,15 @@
 // exporter, and stores them twice:
 //  - computed (mandatory, exhaustive): attributed to the catalogue — api, plan, subscription,
 //    application — at ingestion time. A quota, an attribution, a token count are counted, not sampled.
-//  - raw (optional): where lightening, sampling and masking belong.
+//  - raw (optional): where lightening and sampling belong.
+// Both are pseudonymised before they are stored (ingest-policy.js); what is kept and how long is
+// in retention.js.
 
 import { adb, db } from '../db/index.js';
-import { config } from '../config.js';
+import { agentOf, ipOf, maskUrl, policy, pseudonymise, sampled, templatePath, urlOf } from './ingest-policy.js';
 
-const SECRET_QUERY = /^(.*token.*|.*secret.*|.*password.*|.*passwd.*|api[_-]?key|apikey|key|sig|signature|code|auth.*)$/i;
-
-// what Otoroshi does not mask at export: a secret in the url
-export function maskUrl(url) {
-  if (!url || !url.includes('?')) return url;
-  try {
-    const u = new URL(url, 'http://x');
-    let changed = false;
-    for (const k of [...u.searchParams.keys()]) {
-      if (SECRET_QUERY.test(k)) {
-        u.searchParams.set(k, '********');
-        changed = true;
-      }
-    }
-    if (!changed) return url;
-    const masked = u.toString();
-    return url.startsWith('http') ? masked : masked.replace(/^http:\/\/x/, '');
-  } catch (e) {
-    return url;
-  }
-}
+// the masking of url secrets lives with the rest of the policy of the ingester
+export { maskUrl } from './ingest-policy.js';
 
 // ------------------------------------------------------------- attribution cache
 
@@ -81,28 +64,27 @@ function ts(v) {
   return isNaN(d.getTime()) ? new Date() : d;
 }
 
-function lighten(event) {
-  // the raw path keeps the event, minus the heavy embedded configurations
+// an event as it is kept: minus the heavy embedded configurations, its url masked, its personal
+// data pseudonymised; the raw path can leave its headers out
+function lighten(p, event, { headers = 'keep' } = {}) {
   const { route, descriptor, matcheJwtVerifier, viz, ...rest } = event;
-  return {
+  const out = {
     ...rest,
-    url: maskUrl(rest.url),
+    ...('url' in rest ? { url: urlOf(p, rest.url) } : {}),
     route: route ? { id: route.id, name: route.name, metadata: route.metadata } : null,
   };
-}
-
-let rawEnabled = null;
-async function storeRaw() {
-  if (rawEnabled && rawEnabled.at > Date.now() - 10000) return rawEnabled.value;
-  const rows = await db`select value from settings where key = 'ingest'`;
-  const value = rows[0]?.value?.storeRaw ?? config.ingest.storeRaw;
-  rawEnabled = { at: Date.now(), value };
-  return value;
+  if (headers === 'drop') {
+    delete out.headers;
+    delete out.headersOut;
+    delete out.otoroshiHeadersIn;
+    delete out.otoroshiHeadersOut;
+  }
+  return pseudonymise(p, out);
 }
 
 export async function ingest(events) {
   await refreshCache();
-  const raw = await storeRaw();
+  const p = await policy();
   const calls = [];
   const ai = [];
   const raws = [];
@@ -122,6 +104,7 @@ export async function ingest(events) {
       try {
         path = new URL(maskUrl(e.url || ''), 'http://x').pathname;
       } catch (err) {}
+      const template = templatePath(path);
       calls.push({
         at,
         req_id: e.reqId ? String(e.reqId) : null,
@@ -134,7 +117,8 @@ export async function ingest(events) {
         application_id: attr.application_id,
         client_id: clientId,
         method: e.method || null,
-        path,
+        path: p.privacy.paths === 'template' ? template : path,
+        path_template: template,
         status: e.status ?? null,
         duration_ms: e.duration ?? null,
         overhead_ms: e.overhead ?? null,
@@ -142,8 +126,8 @@ export async function ingest(events) {
         bytes_in: e.data?.dataIn ?? null,
         bytes_out: e.data?.dataOut ?? null,
         err: !!e.err,
-        from_ip: e.from || null,
-        user_agent: (e.headers || []).find((h) => (h.key || '').toLowerCase() === 'user-agent')?.value || null,
+        from_ip: ipOf(p, e.from || null),
+        user_agent: agentOf(p, (e.headers || []).find((h) => (h.key || '').toLowerCase() === 'user-agent')?.value || null),
       });
     } else if (type === 'LLMUsageAudit' || type === 'McpAudit') {
       const clientId = e.apikey?.clientId || e.consumer?.apikey || e.user?.apikey || null;
@@ -162,10 +146,11 @@ export async function ingest(events) {
         input_tokens: usage.prompt_tokens ?? usage.input_tokens ?? null,
         output_tokens: usage.generation_tokens ?? usage.completion_tokens ?? usage.output_tokens ?? null,
         cost_micro_usd: e.cost?.micro_usd ?? null,
-        payload: lighten(e),
+        payload: lighten(p, e),
       });
     }
-    if (raw) raws.push({ at, type: type || 'unknown', payload: type === 'GatewayEvent' ? lighten(e) : e });
+    // the raw path: a share of the requests, their errors always
+    if (p.storeRaw && sampled(p, e)) raws.push({ at, type: type || 'unknown', payload: lighten(p, e, { headers: p.raw.headers }) });
   }
   if (calls.length) await adb`insert into calls ${adb(calls)}`;
   if (ai.length) await adb`insert into ai_usage ${adb(ai)}`;

@@ -58,6 +58,8 @@ export const config = {
     // the /ingest url as the gateway reaches it (the data exporter target)
     url: env.APIM_INGEST_URL || null,
     storeRaw: bool(env.APIM_INGEST_STORE_RAW, true),
+    // how often the ingester rolls the computed path up and applies the retention
+    retentionMs: parseInt(env.APIM_INGEST_RETENTION_MS || '300000', 10),
   },
 
   // the admin api accepts a static bootstrap token, plus personal tokens stored in db

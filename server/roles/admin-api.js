@@ -11,6 +11,8 @@ import * as deployments from '../domain/deployments.js';
 import * as applications from '../domain/applications.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import * as analytics from '../domain/analytics.js';
+import { invalidatePolicy as invalidateIngestPolicy, normalize as normalizeIngest, policy as ingestPolicy, publicPolicy } from '../domain/ingest-policy.js';
+import { runRetention } from '../domain/retention.js';
 import { listAudit, searchAudit, audit } from '../domain/audit.js';
 import { pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
@@ -96,7 +98,8 @@ r.get('/settings', async ({ ctx }) => {
   return {
     gateway: { ...gw, clientSecret: mask(gw.clientSecret) },
     portal: { tenancy: config.tenancy, exposure: config.portal.exposure, domain: config.portal.domain, url: portalBase(), form: currentForm(), history: portalHistory() },
-    ingest: { storeRaw: config.ingest.storeRaw, url: config.ingest.url || `${config.publicUrl}/ingest`, ...(rows.find((x) => x.key === 'ingest')?.value || {}) },
+    // the policy of the ingester, but never the key of its hashes
+    ingest: { ...publicPolicy(await ingestPolicy()), url: config.ingest.url || `${config.publicUrl}/ingest` },
     drift: rows.find((x) => x.key === 'drift.last_run')?.value || null,
     auth: await consoleAuth().then((a) => ({
       ...a,
@@ -123,11 +126,24 @@ r.put('/settings/:key', async ({ ctx, params, body }) => {
       throw badRequest('the otoroshi mode needs the secret shared with the route that exposes the console');
   }
   if (params.key === 'gateway' && (!body.clientSecret || body.clientSecret.includes('••'))) value.clientSecret = current.clientSecret || config.otoroshi.clientSecret;
-  await db`insert into settings (key, value) values (${params.key}, ${value}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  // the policy of the ingester: checked, completed, its key kept unless rotated
+  const stored = params.key === 'ingest' ? normalizeIngest(body, { ...current, key: (await ingestPolicy()).key }) : value;
+  await db`insert into settings (key, value) values (${params.key}, ${stored}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   invalidateGatewaySettings();
   invalidateAuthSettings();
-  await audit(ctx, { action: `settings.${params.key}.update`, entityKind: 'settings', entityId: params.key, summary: `${params.key} settings updated` });
-  return { updated: params.key };
+  invalidateIngestPolicy();
+  // what an ingestion policy changes is a processing of personal data: the audit keeps its old and new values
+  const data = params.key === 'ingest' ? { before: publicPolicy(normalizeIngest({}, current)), after: publicPolicy(stored), rotatedKey: !!body.rotateKey } : undefined;
+  await audit(ctx, { action: `settings.${params.key}.update`, entityKind: 'settings', entityId: params.key, summary: `${params.key} settings updated`, data });
+  return params.key === 'ingest' ? { updated: params.key, ingest: publicPolicy(stored) } : { updated: params.key };
+});
+
+// rolls the computed path up and applies the retention now, instead of at the next run
+r.post('/settings/ingest/run', async ({ ctx }) => {
+  identity.requireAdmin(ctx);
+  const run = await runRetention();
+  await audit(ctx, { action: 'settings.ingest.run', entityKind: 'settings', entityId: 'ingest', summary: 'ingestion rollups and retention run', data: run });
+  return run;
 });
 
 // ---------------------------------------------------------------- gateway (the single cluster)
