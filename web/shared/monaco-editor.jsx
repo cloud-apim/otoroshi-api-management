@@ -100,6 +100,10 @@ export default function MonacoEditor({ value, onChange, language = 'json', readO
       padding: { top: 8, bottom: 8 },
       fixedOverflowWidgets: true,
       formatOnPaste: true,
+      // no schema behind these documents: word suggestions are noise, and Enter must stay a newline
+      quickSuggestions: false,
+      wordBasedSuggestions: 'off',
+      suggestOnTriggerCharacters: false,
       wordWrap,
       placeholder,
       ariaLabel,
@@ -123,8 +127,10 @@ export default function MonacoEditor({ value, onChange, language = 'json', readO
       changes.dispose();
       sizes.dispose();
       themes.disconnect();
-      editor.getModel()?.dispose();
+      // the editor first: it still holds the model
+      const model = editor.getModel();
       editor.dispose();
+      model?.dispose();
     };
   }, []);
 
