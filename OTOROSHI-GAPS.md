@@ -32,11 +32,11 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-16 | [#2955](https://github.com/MAIF/otoroshi/issues/2955) | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | M | — | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
 | G-17 | [#2937](https://github.com/MAIF/otoroshi/issues/2937) | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity**: suspending or closing it changes nothing at the gateway | high | M | — | the application declares its client id and certificates; the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion; the certificates of an application are trusted only while it has an active mtls subscription |
 | G-18 | [#2938](https://github.com/MAIF/otoroshi/issues/2938) | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | M (key migration) | — | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
-| G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | L | — | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
+| G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | **Not fixed (owner)**: the job of the ingester, and other uses need these data. A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | — | — | — | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | M | — | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | **By design, not fixed (owner).** The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | — | — | — | the product's key keeps every right |
 
-Total: 9 S + 8 M + 2 L (G-11 and G-21 are not fixed). Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
+Total: 9 S + 8 M + 1 L (G-11, G-19 and G-21 are not fixed). Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
 
 ## Roadmap
 
@@ -45,10 +45,10 @@ depend on it, the rest along the way.
 
 **Why not everything at once.**
 
-- 14 gaps out of the 19 to fix block nothing in the product: it has a workaround or a warning. Only five
+- 13 gaps out of the 18 to fix block nothing in the product: it has a workaround or a warning. Only five
   unblock an item: G-4 (R-15), G-6 (R-14), G-7 (R-33), G-12 (R-24), G-13 (R-16).
-- The two large ones (G-6, G-19, about two weeks on their own) are the least blocking: G-6
-  unblocks R-14, G-19 nothing. Doing them first would freeze the product for little.
+- The large one, G-6 (about a week), only unblocks R-14. Doing it first would freeze the product
+  for little.
 - The other way round, going on with the product without Otoroshi means building on a contract
   that is going to change, and doing it again.
 
@@ -68,7 +68,7 @@ R-38, R-47, R-27, R-22, R-23, R-42, R-20, R-34 — several days of work with no 
 - R-15 and R-16, unblocked.
 - The items that touch the projection: R-12, R-17, R-25, R-10.
 
-**4. The rest, along the way:** G-5, G-6, G-12, G-16, the low ones, then G-19. G-20
+**4. The rest, along the way:** G-5, G-6, G-12, G-16, the low ones. G-20
 as well: nobody uses narrowed keys.
 
 **The minimum version.** One version of Otoroshi only: the product requires the release that
@@ -414,9 +414,11 @@ an existing key whose `apiRef` names another api or plan; a one-shot migration m
 already minted to the new ids, keeping their secret and their enabled flag; deleting an Api
 deletes the keys minted for it, its ApiSubscriptions and their keys.
 
-## G-19 — data exporters send personal data and url secrets in clear, unsampled — medium
+## G-19 — data exporters send personal data and url secrets in clear, unsampled — not fixed
 
-Upstream: [MAIF/otoroshi#2956](https://github.com/MAIF/otoroshi/issues/2956).
+Upstream: [MAIF/otoroshi#2956](https://github.com/MAIF/otoroshi/issues/2956), closed. **Not fixed (owner)**: masking,
+pseudonymising and sampling are the job of whoever stores the events — here the ingester —, and
+other uses of the same events need these data.
 
 **Observed.** Since the 18, `GatewayEvent.writes` masks the credential headers and, by name, the
 secret fields of the configurations it embeds (`app/events/analytics.scala:478`, unless
@@ -430,18 +432,10 @@ transform, a wasm plugin or a workflow (`customTransformAsync`, `:489`), can do 
 operator. So every exporter of the gateway — Kafka, Elastic, a webhook, a file — receives the same
 personal data in clear, and keeps everything.
 
-**Product meanwhile.** The ingester masks the url secrets, pseudonymises (truncation of the
+**The product.** The ingester masks the url secrets, pseudonymises (truncation of the
 address, keyed hash of the address or of the user, path templates) and samples its raw path before
 anything is stored, as its policy says (**Gateway → Ingestion**). What reaches it has transited in
 clear on the exporter's connection; the other exporters of the gateway are not covered.
-
-**Upstream fix.** A `privacy` block on the data exporter, applied before its projection:
-`maskQuerySecrets` (parameter names matching a list, as the secret headers), `ip`
-(`keep | truncate | hash | drop`, applied to `from` and to the forwarding headers), `user`
-(`keep | hash | drop`), `userAgent` (`keep | drop`), and a keyed hash whose key is a vault reference,
-so that two exporters can share pseudonyms or not. And a `sampling` block: a rate decided by
-`reqId`, so that the events of one request stay together, with `keepErrors`. The same options
-belong to the analytics module of the 18, which stores the same events.
 
 ## G-20 — a narrowed admin key reads the secrets of the other admin keys — high
 

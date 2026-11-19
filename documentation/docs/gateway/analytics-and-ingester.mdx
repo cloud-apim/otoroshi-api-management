@@ -87,8 +87,9 @@ geolocation and the parsed user agent go with the address and the agent.
 A change applies to what is received from then on. Every change of the policy is in the audit
 trail, with its values before and after.
 
-Otoroshi itself does not pseudonymise what it exports ([G-19](../otoroshi-gaps.mdx)): what reaches
-the ingester has the personal data in clear, over the exporter's connection.
+Otoroshi exports the events whole — other uses need them — and leaves masking, pseudonymising and
+sampling to whoever stores them ([G-19](../otoroshi-gaps.mdx)): what reaches the ingester has the
+personal data in clear, over the exporter's connection.
 
 ## Rollups and retention
 
