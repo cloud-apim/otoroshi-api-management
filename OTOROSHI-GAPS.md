@@ -24,7 +24,7 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path is borrowed by a control plane via a **naming convention** | medium | S | — | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
 | G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | S | — | attribution via the key's metadata + a client id cache at ingestion |
 | G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused as **unauthorized**; the upsert (`POST` on the id) has its `Otoroshi-Entity-Updated` header inverted | low | S | — | the `Api`, the JWT verifiers and the auth modules are written with the upsert; the certificates through their controller, to be enriched |
-| G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | L | — | tests poll; the console says "deployed" once the write is accepted |
+| G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | **Not fixed (owner)**: not feasible in a distributed cluster without a shared store. A new route / apikey becomes routable only after a few seconds, with no way to know when | — | — | — | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | M | R-24 | the console replays requests through the gateway without the trace |
 | G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | S | R-16 | validation warning on the plan |
 | G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only has an **absolute** `validUntil`: no validity relative to the subscription | low | S | — | not offered (the field was removed from the model) |
@@ -36,7 +36,7 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | M | — | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | **By design, not fixed (owner).** The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | — | — | — | the product's key keeps every right |
 
-Total: 9 S + 8 M + 3 L (G-21 is by design, not fixed). Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
+Total: 9 S + 8 M + 2 L (G-11 and G-21 are not fixed). Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
 
 ## Roadmap
 
@@ -45,10 +45,10 @@ depend on it, the rest along the way.
 
 **Why not everything at once.**
 
-- 15 gaps out of the 20 to fix block nothing in the product: it has a workaround or a warning. Only five
+- 14 gaps out of the 19 to fix block nothing in the product: it has a workaround or a warning. Only five
   unblock an item: G-4 (R-15), G-6 (R-14), G-7 (R-33), G-12 (R-24), G-13 (R-16).
-- The three large ones (G-6, G-11, G-19, about three weeks on their own) are the least blocking:
-  G-6 unblocks R-14, G-11 and G-19 nothing. Doing them first would freeze the product for little.
+- The two large ones (G-6, G-19, about two weeks on their own) are the least blocking: G-6
+  unblocks R-14, G-19 nothing. Doing them first would freeze the product for little.
 - The other way round, going on with the product without Otoroshi means building on a contract
   that is going to change, and doing it again.
 
@@ -68,7 +68,7 @@ R-38, R-47, R-27, R-22, R-23, R-42, R-20, R-34 — several days of work with no 
 - R-15 and R-16, unblocked.
 - The items that touch the projection: R-12, R-17, R-25, R-10.
 
-**4. The rest, along the way:** G-5, G-6, G-12, G-16, the low ones, then G-11 and G-19. G-20
+**4. The rest, along the way:** G-5, G-6, G-12, G-16, the low ones, then G-19. G-20
 as well: nobody uses narrowed keys.
 
 **The minimum version.** One version of Otoroshi only: the product requires the release that
@@ -237,19 +237,18 @@ api enriches them too; then they move to the upsert (`DERIVED_PATHS` in `server/
 comparing the stored entity before and after the write; the certificates enriched on the generic
 api as on their controller.
 
-## G-11 — no signal when a write becomes routable — low
+## G-11 — no signal when a write becomes routable — not fixed
 
-Upstream: [MAIF/otoroshi#2950](https://github.com/MAIF/otoroshi/issues/2950).
+Upstream: [MAIF/otoroshi#2950](https://github.com/MAIF/otoroshi/issues/2950), closed. **Not fixed (owner)**: in a
+distributed cluster — several nodes, several clocks — knowing when a write is live everywhere
+would take a shared store.
 
 **Observed.** After a deployment or a new apikey, the first calls get `404 no route found` /
 `401` for a few seconds, until the proxy state picks the change up. Nothing tells a writer when the
 change is live.
 
-**Product meanwhile.** Tests poll the gateway; the console says "deployed" when the write is
-accepted.
-
-**Upstream fix.** Expose the proxy state version (or a "live since" timestamp per entity) on the
-admin API so a control plane can wait for it.
+**The product.** Tests poll the gateway; the console says "deployed" when the write is accepted —
+and stays so.
 
 ## G-12 — the request tester with the execution trace is backoffice-only — medium
 
