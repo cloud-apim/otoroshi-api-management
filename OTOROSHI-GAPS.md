@@ -211,7 +211,8 @@ re-correlation, for every consumer of the data exporters.
 
 ## G-10 — a PUT on a missing entity is refused as unauthorized — low
 
-Upstream: [MAIF/otoroshi#2949](https://github.com/MAIF/otoroshi/issues/2949).
+Upstream: [MAIF/otoroshi#2949](https://github.com/MAIF/otoroshi/issues/2949); the certificates in
+[a comment](https://github.com/MAIF/otoroshi/issues/2949#issuecomment-7004726159).
 
 **Observed.** The generic api has an **upsert**: `POST /apis/<group>/<version>/<plural>/<id>`
 creates the entity (`201`) or replaces it (`200`), with the same write hooks as a `POST` on the
