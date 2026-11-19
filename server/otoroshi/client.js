@@ -94,13 +94,9 @@ export const oto = {
   getApi: (id) => otoroshi('GET', `${API_BASE}/${id}`),
   listApis: () => otoroshi('GET', API_BASE),
   // a catalog-marked write is a deploy: production_readonly is lifted, the api may be created
-  // already published, and the write is recorded as an ApiDeployment. Otoroshi refuses a
-  // PUT on an entity that does not exist yet, so a first projection is a POST.
-  upsertApi: async (entity) => {
-    const existing = await otoroshi('GET', `${API_BASE}/${entity.id}`);
-    if (existing) return otoroshi('PUT', `${API_BASE}/${entity.id}`, entity);
-    return otoroshi('POST', API_BASE, entity);
-  },
+  // already published, and the write is recorded as an ApiDeployment. The upsert of the generic
+  // api: a POST on the id creates or replaces (a PUT refuses an entity that does not exist yet).
+  upsertApi: (entity) => otoroshi('POST', `${API_BASE}/${entity.id}`, entity),
   deleteApi: (id) => otoroshi('DELETE', `${API_BASE}/${id}`),
   getSubscription: (id) => otoroshi('GET', `${SUB_BASE}/${id}`),
   listSubscriptions: () => otoroshi('GET', SUB_BASE),
@@ -112,7 +108,8 @@ export const oto = {
   deleteApikey: (clientId) => otoroshi('DELETE', `/api/apikeys/${clientId}`),
   apikeyQuotas: (clientId) => otoroshi('GET', `/api/apikeys/${clientId}/quotas`),
   listJwtVerifiers: () => otoroshi('GET', '/api/verifiers'),
-  // a derived object is written like the Api: GET, then PUT or POST (G-10)
+  // a derived object goes through its own controller, which has no upsert: GET, then PUT or POST.
+  // Not the generic api: its certificates are not enriched (subject, issuer, validity from the chain)
   upsertEntity: async (path, entity) => {
     const existing = await otoroshi('GET', `${path}/${entity.id}`);
     if (existing) return otoroshi('PUT', `${path}/${entity.id}`, entity);

@@ -23,7 +23,7 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` cannot carry the **external snapshot id**, and keeps only 5 entries | medium | S | R-33 | snapshot id written in `Api.metadata` |
 | G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path is borrowed by a control plane via a **naming convention** | medium | S | — | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
 | G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | S | — | attribution via the key's metadata + a client id cache at ingestion |
-| G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused (`resource does not exists`) | low | S | — | `GET` then `POST` or `PUT` |
+| G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused as **unauthorized**; the upsert (`POST` on the id) has its `Otoroshi-Entity-Updated` header inverted | low | S | — | the `Api` is written with the upsert; the derived objects through their own controllers, `GET` then `POST` or `PUT` |
 | G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | L | — | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | M | R-24 | the console replays requests through the gateway without the trace |
 | G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | S | R-16 | validation warning on the plan |
@@ -209,17 +209,32 @@ api, plan, subscription and application.
 **Upstream fix.** Add `apiRef` to the exported identity (or the event) — attribution without
 re-correlation, for every consumer of the data exporters.
 
-## G-10 — PUT on a missing entity is refused — low
+## G-10 — a PUT on a missing entity is refused as unauthorized — low
 
 Upstream: [MAIF/otoroshi#2949](https://github.com/MAIF/otoroshi/issues/2949).
 
-**Observed.** `PUT /apis/apis.otoroshi.io/v1/apis/<id>` on an id that does not exist answers
-`unauthorized: resource does not exists` (`api/api.scala:2677`); creation has to be a `POST`.
+**Observed.** The generic api has an **upsert**: `POST /apis/<group>/<version>/<plural>/<id>`
+creates the entity (`201`) or replaces it (`200`), with the same write hooks as a `POST` on the
+collection or a `PUT` (`GenericApiController.upsert`, `api/api.scala:2592`; checked on 18.0.1: a
+catalog-marked `Api` written through it is deployed as with a `PUT`). What stays:
 
-**Product meanwhile.** `GET` then `POST` or `PUT` (`oto.upsertApi`).
+- a `PUT` on an id that does not exist answers `401 unauthorized: resource does not exists`
+  (`api/api.scala:2677`), a `POST` on the collection with an id already used
+  `401 unauthorized: resource already exists` (`api/api.scala:2456`): a `404` and a `409` would say
+  what happens;
+- the `Otoroshi-Entity-Updated` header of the upsert is inverted: `hasChanged = oldEntity ==
+  newEntity` (`api/api.scala:2636`) — `false` when the entity changed;
+- the generic api does not enrich the certificates it writes (subject, issuer, validity read from
+  the chain): `CertificatesController` does (`entity.enrich()`), the generic resource does not.
 
-**Upstream fix.** An upsert semantics on `PUT` (as `kubectl apply` does), or at least a `404` with
-an explicit message instead of `unauthorized`.
+**Product meanwhile.** The `Api` is written with the upsert, one call (`oto.upsertApi`). The
+derived objects — JWT verifiers, certificates, auth modules — go through their own controllers
+(`/api/verifiers`, `/api/certificates`, `/api/auths`), which have no upsert: `GET`, then `PUT` or
+`POST` (`oto.upsertEntity`); the certificates have to, to be enriched.
+
+**Upstream fix.** A `404` and a `409` instead of the `401`s; the header the right way round,
+comparing the stored entity before and after the write; the certificates enriched on the generic
+api as on their controller.
 
 ## G-11 — no signal when a write becomes routable — low
 
