@@ -13,7 +13,7 @@ Last update: 2026-11-18.
 
 ## Now
 
-- Every gap still open is fixed upstream (Otoroshi `18.1.0-dev`; G-11, G-19, G-21 not fixed by decision). Next session: the stack on a build of it — `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up` — and step 3 of the [roadmap](./OTOROSHI-GAPS.md#roadmap): the tests that asserted the gaps, the workarounds and warnings dropped, R-14, R-15, R-16, R-24, R-33 unblocked, Otoroshi ≥ 18.1.0 required. The certificates stay on their controller until the generic api enriches them.
+- Every gap still open is fixed upstream (Otoroshi `18.1.0-dev`; G-11, G-19, G-21 not fixed by decision). Next session: the stack on a build of it — `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up` — and step 3 of the [roadmap](./OTOROSHI-GAPS.md#roadmap): the tests that asserted the gaps, the workarounds and warnings dropped, R-14, R-15, R-16, R-24, R-33 unblocked, Otoroshi ≥ 18.1.0 required. The generic api enriches the certificates too (owner, in the rebuilt jar): the derived certificates move to the upsert (`DERIVED_PATHS.Certificate`).
 
 ## Next, in the proposed order
 
