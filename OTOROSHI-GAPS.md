@@ -34,9 +34,9 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-18 | [#2938](https://github.com/MAIF/otoroshi/issues/2938) | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the **plan id alone**, and outlive their Api: two Apis with a plan of the same id share them | high | M (key migration) | — | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment; the end-to-end tests remove the keys the gateway minted for them |
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear — caller address, forwarding headers, signed-in user, user agent — and **samples** nothing: only a custom transform (wasm, workflow) can | medium | L | — | the ingester masks, pseudonymises and samples before it stores, as its policy says; the events reach it in clear |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **reads the secret of every admin key** of its teams, the super admin ones included: the narrowing does not hold | high | M | — | the setup makes the product a key of its own, with every right, rather than a narrowed one that would protect nothing |
-| G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | medium | M | — | the product's key keeps every right; with a narrowed key the vault references and the TLS checks would fail |
+| G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | **By design, not fixed (owner).** The **global configuration** is readable by super admins only: a narrowed key cannot read the TLS settings nor the `env` of the local vault | — | — | — | the product's key keeps every right |
 
-Total: 9 S + 9 M + 3 L. Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
+Total: 9 S + 8 M + 3 L (G-21 is by design, not fixed). Quick wins among the high ones: G-1, G-2, G-13, G-15 (S each).
 
 ## Roadmap
 
@@ -45,7 +45,7 @@ depend on it, the rest along the way.
 
 **Why not everything at once.**
 
-- 16 gaps out of 21 block nothing in the product: it has a workaround or a warning. Only five
+- 15 gaps out of the 20 to fix block nothing in the product: it has a workaround or a warning. Only five
   unblock an item: G-4 (R-15), G-6 (R-14), G-7 (R-33), G-12 (R-24), G-13 (R-16).
 - The three large ones (G-6, G-11, G-19, about three weeks on their own) are the least blocking:
   G-6 unblocks R-14, G-11 and G-19 nothing. Doing them first would freeze the product for little.
@@ -68,7 +68,7 @@ R-38, R-47, R-27, R-22, R-23, R-42, R-20, R-34 — several days of work with no 
 - R-15 and R-16, unblocked.
 - The items that touch the projection: R-12, R-17, R-25, R-10.
 
-**4. The rest, along the way:** G-5, G-6, G-12, G-16, G-21, the low ones, then G-11 and G-19. G-20
+**4. The rest, along the way:** G-5, G-6, G-12, G-16, the low ones, then G-11 and G-19. G-20
 as well: nobody uses narrowed keys.
 
 **The minimum version.** One version of Otoroshi only: the product requires the release that
@@ -465,19 +465,20 @@ Only personal admin keys are spared (`PersonalAdminApikey.canRead`).
 
 **Product meanwhile.** The setup makes the product an admin key of its own, `apim_product_admin`,
 with every right: distinct from the operator's, rotated without it (`--rotate-key`), named in the
-audit of the gateway. It does not narrow it — the narrowing would protect nothing, and G-21 would
-break the product.
+audit of the gateway. It does not narrow it: the narrowing would protect nothing, and the product
+reads the global configuration, for super admins only by design (G-21).
 
 **Upstream fix.** The secret of an apikey authorized on the admin api (the back office group or
 descriptor) is never written to a caller who could not grant that key (`canUserGrantApikeyRights`
 false): masked in the reads, the lists and the exports, like the personal admin keys. Then the
 product's key can be narrowed to the tenant, the teams and the kinds it uses — apis and
-apisubscriptions, apikeys, certificates, auth modules, jwt verifiers, data exporters, routes — and
-read the global configuration (G-21).
+apisubscriptions, apikeys, certificates, auth modules, jwt verifiers, data exporters, routes. The
+product's key stays super admin all the same: it reads the global configuration (G-21).
 
-## G-21 — the global configuration is readable by super admins only — medium
+## G-21 — the global configuration is readable by super admins only — by design
 
-Upstream: [MAIF/otoroshi#2958](https://github.com/MAIF/otoroshi/issues/2958).
+Upstream: [MAIF/otoroshi#2958](https://github.com/MAIF/otoroshi/issues/2958). **Not fixed: the expected and intended
+behaviour (owner).**
 
 **Observed.** `GET /api/globalconfig` checks `RightsChecker.SuperAdminOnly`
 (`app/controllers/adminapi/GlobalConfigController.scala:27`): a right on
@@ -485,10 +486,7 @@ Upstream: [MAIF/otoroshi#2958](https://github.com/MAIF/otoroshi/issues/2958).
 settings (`tlsSettings.clientAuth`, `trustedCAsServer`) nor the `env` the local vault resolves
 `${vault://local/…}` against.
 
-**Product meanwhile.** Its key keeps every right (G-20). With a narrowed key, the warnings about the
-TLS client authentication of mtls plans and the vault references of the promotion would fail.
-
-**Upstream fix.** Read access to the global configuration for a right on
-`config.otoroshi.io/global-configs` (its secrets masked, as in the exports), and the `fields`
-parameter it already takes for narrower reads.
+**The product.** Its key is a super admin key, and stays one: the warnings about the TLS client
+authentication of mtls plans and the vault references of the promotion read the global
+configuration.
 

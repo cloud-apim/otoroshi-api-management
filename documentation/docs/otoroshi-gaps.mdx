@@ -36,7 +36,7 @@ Reference: Otoroshi 18.0.1.
 | G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the plan id alone, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment |
 | G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing | medium | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | An admin key narrowed by its access rights **reads the secret of every admin key** of its teams: the narrowing does not hold | high | the setup makes the product a key of its own, with every right |
-| G-21 | The global configuration is readable by super admins only | medium | the product's key keeps every right |
+| G-21 | The global configuration is readable by super admins only — by design, not a gap | — | the product's key keeps every right |
 
 ## The ones to keep in mind
 
