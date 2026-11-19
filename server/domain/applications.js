@@ -9,7 +9,7 @@ import { findTeam, isTeamMember } from './identity.js';
 import { checkValues } from './metadata.js';
 import { readCertificate } from './pki.js';
 import { enqueue, registerTaskHandler } from './tasks.js';
-import { oto } from '../otoroshi/client.js';
+import { DERIVED_PATHS, oto } from '../otoroshi/client.js';
 import { IDENTITY_KINDS, applicationCertificates } from '../otoroshi/projection.js';
 
 export async function listApplications(workspaceId, { userId = null, teamId = null } = {}) {
@@ -70,7 +70,7 @@ registerTaskHandler('sync_application_certificates', async ({ application_id }) 
   const stale = ((await oto.listCertificates()) || []).filter(
     (c) => c.metadata?.apim_application_id === application_id && c.metadata?.apim_derived === 'true' && !wanted.some((w) => w.id === c.id),
   );
-  for (const c of stale) await oto.deleteEntity('/api/certificates', c.id).catch(() => null);
+  for (const c of stale) await oto.deleteEntity(DERIVED_PATHS.Certificate, c.id).catch(() => null);
   return { projected: wanted.map((w) => w.id), removed: stale.map((c) => c.id) };
 });
 

@@ -74,6 +74,15 @@ export async function otoroshi(method, path, body, { timeoutMs = 10000, creds = 
 const API_BASE = '/apis/apis.otoroshi.io/v1/apis';
 const SUB_BASE = '/apis/apis.otoroshi.io/v1/apisubscriptions';
 
+// where the derived objects are written: the generic api, which has an upsert; the certificates
+// through their controller until the generic api enriches them (subject, issuer, validity from
+// the chain), as the controller does
+export const DERIVED_PATHS = {
+  JwtVerifier: '/apis/security.otoroshi.io/v1/jwt-verifiers',
+  AuthModule: '/apis/security.otoroshi.io/v1/auth-modules',
+  Certificate: '/api/certificates',
+};
+
 export const oto = {
   health: async () => {
     const s = await gatewaySettings();
@@ -108,9 +117,9 @@ export const oto = {
   deleteApikey: (clientId) => otoroshi('DELETE', `/api/apikeys/${clientId}`),
   apikeyQuotas: (clientId) => otoroshi('GET', `/api/apikeys/${clientId}/quotas`),
   listJwtVerifiers: () => otoroshi('GET', '/api/verifiers'),
-  // a derived object goes through its own controller, which has no upsert: GET, then PUT or POST.
-  // Not the generic api: its certificates are not enriched (subject, issuer, validity from the chain)
+  // the upsert of the generic api, one call; a controller has none: GET, then PUT or POST
   upsertEntity: async (path, entity) => {
+    if (path.startsWith('/apis/')) return otoroshi('POST', `${path}/${entity.id}`, entity);
     const existing = await otoroshi('GET', `${path}/${entity.id}`);
     if (existing) return otoroshi('PUT', `${path}/${entity.id}`, entity);
     return otoroshi('POST', path, entity);

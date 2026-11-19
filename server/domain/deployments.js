@@ -11,14 +11,14 @@ import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
 import { MINTED_KINDS, normalizeDraft, sharedPlanWarnings, validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
-import { META } from '../otoroshi/client.js';
+import { DERIVED_PATHS, META } from '../otoroshi/client.js';
 
 // the kinds of objects the product derives from api descriptions (JWT verifiers, certificates,
 // auth modules), each recognised by its markers
 const DERIVED_KINDS = [
-  { path: '/api/verifiers', list: () => oto.listJwtVerifiers() },
-  { path: '/api/certificates', list: () => oto.listCertificates() },
-  { path: '/api/auths', list: () => oto.listAuthModules() },
+  { path: DERIVED_PATHS.JwtVerifier, list: () => oto.listJwtVerifiers() },
+  { path: DERIVED_PATHS.Certificate, list: () => oto.listCertificates() },
+  { path: DERIVED_PATHS.AuthModule, list: () => oto.listAuthModules() },
 ];
 
 // the derived objects are written before the Api (it references them); `between` writes the Api;

@@ -25,7 +25,7 @@ Reference: Otoroshi 18.0.1.
 | G-7 | An `ApiDeployment` cannot carry the **external snapshot id**, and only the last five are kept | medium | writes the snapshot id in the `Api` metadata and keeps the full history itself |
 | G-8 | The catalog-deploy path is borrowed through a **naming convention** | medium | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
 | G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | attributes calls from the key metadata and a client id cache at ingestion |
-| G-10 | A `PUT` on an entity that does not exist is refused as unauthorized | low | writes the `Api` with the upsert of the generic api (`POST` on its id) |
+| G-10 | A `PUT` on an entity that does not exist is refused as unauthorized | low | writes with the upsert of the generic api (`POST` on the id); the certificates through their controller, which enriches them |
 | G-11 | Nothing says when a new route or key becomes routable | low | the console says *deployed* once the gateway accepted the write |
 | G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | the console replays requests through the gateway without the trace |
 | G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | warns on the plan |

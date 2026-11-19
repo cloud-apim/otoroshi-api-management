@@ -23,7 +23,7 @@ Size of the fix in Otoroshi, tests included — an estimate from the work each i
 | G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` cannot carry the **external snapshot id**, and keeps only 5 entries | medium | S | R-33 | snapshot id written in `Api.metadata` |
 | G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path is borrowed by a control plane via a **naming convention** | medium | S | — | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
 | G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | S | — | attribution via the key's metadata + a client id cache at ingestion |
-| G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused as **unauthorized**; the upsert (`POST` on the id) has its `Otoroshi-Entity-Updated` header inverted | low | S | — | the `Api` is written with the upsert; the derived objects through their own controllers, `GET` then `POST` or `PUT` |
+| G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on an entity that does not exist is refused as **unauthorized**; the upsert (`POST` on the id) has its `Otoroshi-Entity-Updated` header inverted | low | S | — | the `Api`, the JWT verifiers and the auth modules are written with the upsert; the certificates through their controller, to be enriched |
 | G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | low | L | — | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session, not through the Admin API | medium | M | R-24 | the console replays requests through the gateway without the trace |
 | G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | S | R-16 | validation warning on the plan |
@@ -228,10 +228,10 @@ catalog-marked `Api` written through it is deployed as with a `PUT`). What stays
 - the generic api does not enrich the certificates it writes (subject, issuer, validity read from
   the chain): `CertificatesController` does (`entity.enrich()`), the generic resource does not.
 
-**Product meanwhile.** The `Api` is written with the upsert, one call (`oto.upsertApi`). The
-derived objects — JWT verifiers, certificates, auth modules — go through their own controllers
-(`/api/verifiers`, `/api/certificates`, `/api/auths`), which have no upsert: `GET`, then `PUT` or
-`POST` (`oto.upsertEntity`); the certificates have to, to be enriched.
+**Product meanwhile.** The `Api`, the JWT verifiers and the auth modules are written with the
+upsert, one call each (`oto.upsertApi`, `oto.upsertEntity`). The certificates go through their
+controller, `/api/certificates`, to be enriched — `GET`, then `PUT` or `POST` — until the generic
+api enriches them too; then they move to the upsert (`DERIVED_PATHS` in `server/otoroshi/client.js`).
 
 **Upstream fix.** A `404` and a `409` instead of the `401`s; the header the right way round,
 comparing the stored entity before and after the write; the certificates enriched on the generic

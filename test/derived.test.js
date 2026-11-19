@@ -89,7 +89,7 @@ describe('oauth2-remote plans', () => {
     const snap = snapshot([remotePlan(described)]);
     const [mod] = derivedEntities(snap);
     expect(mod.kind).toBe('AuthModule');
-    expect(mod.path).toBe('/api/auths');
+    expect(mod.path).toBe('/apis/security.otoroshi.io/v1/auth-modules');
     expect(mod.entity.type).toBe('oauth2');
     expect(mod.entity.jwtVerifier).toMatchObject({ type: 'JWKSAlgoSettings', url: 'https://idp/jwks' });
     expect(mod.entity.userInfoUrl).toBe('https://idp/userinfo');

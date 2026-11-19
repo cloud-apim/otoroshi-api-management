@@ -5,7 +5,7 @@
 
 import { normalizeDraft } from '../domain/model.js';
 import { certificateKey, issuerPatterns, readCertificate } from '../domain/pki.js';
-import { META, OWNER_MARKER } from './client.js';
+import { DERIVED_PATHS, META, OWNER_MARKER } from './client.js';
 
 const MAX = 10000000; // what Otoroshi uses as "no limit" in a quota
 
@@ -244,7 +244,7 @@ function derivedCertificates(api, p) {
     const id = derivedCaId(api.id, p.id, pem);
     return {
       kind: 'Certificate',
-      path: '/api/certificates',
+      path: DERIVED_PATHS.Certificate,
       id,
       entity: {
         _loc: { tenant: 'default', teams: ['default'] },
@@ -277,7 +277,7 @@ function derivedAuthModule(api, p) {
   const id = derivedAuthModuleId(api.id, p.id);
   return {
     kind: 'AuthModule',
-    path: '/api/auths',
+    path: DERIVED_PATHS.AuthModule,
     id,
     entity: {
       _loc: { tenant: 'default', teams: ['default'] },
@@ -346,7 +346,7 @@ export function derivedEntities(snapshot) {
     if (d.audience) fields.aud = d.audience;
     out.push({
       kind: 'JwtVerifier',
-      path: '/api/verifiers',
+      path: DERIVED_PATHS.JwtVerifier,
       id: derivedVerifierId(api.id, p.id),
       entity: {
         _loc: { tenant: 'default', teams: ['default'] },
@@ -382,7 +382,7 @@ export function applicationCertificates(app) {
     const id = derivedApplicationCertId(app.id, pem);
     return {
       kind: 'Certificate',
-      path: '/api/certificates',
+      path: DERIVED_PATHS.Certificate,
       id,
       entity: {
         _loc: { tenant: 'default', teams: ['default'] },
