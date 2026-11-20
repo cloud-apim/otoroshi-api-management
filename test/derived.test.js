@@ -47,7 +47,7 @@ describe('mtls plans', () => {
     const snap = snapshot([mtlsPlan({ clientIdField: 'CN', trustedCAs: [CA] })]);
     const [cert] = derivedEntities(snap);
     expect(cert.kind).toBe('Certificate');
-    expect(cert.path).toBe('/api/certificates');
+    expect(cert.path).toBe('/apis/pki.otoroshi.io/v1/certificates');
     expect(cert.id).toBe(derivedCaId('api_atlas', 'plan_bulk', CA));
     expect(cert.entity.ca).toBe(true);
     expect(cert.entity.privateKey).toBe('');

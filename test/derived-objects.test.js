@@ -141,6 +141,9 @@ describe('derived objects', () => {
     expect(certs.length).toBe(1);
     expect(certs[0].ca).toBe(true);
     expect(certs[0].privateKey || '').toBe('');
+    // written with the upsert of the generic api, which reads the subject and the dates from the chain
+    expect(certs[0].subject).toContain('CN=Atlas Partner CA');
+    expect(certs[0].to).toBeGreaterThan(Date.now());
     state.certIds = certs.map((c) => c.id);
   });
 
