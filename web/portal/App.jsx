@@ -11,6 +11,7 @@ import { SignIn, SignUp } from './pages/Auth.jsx';
 import { Apps, AppDetail } from './pages/Apps.jsx';
 import { Usage } from './pages/Usage.jsx';
 import { Teams } from './pages/Teams.jsx';
+import { Page } from './pages/Page.jsx';
 
 export function App() {
   const portal = usePortal();
@@ -214,6 +215,13 @@ function Shell() {
             <NavLink to="/apis" onClick={close}>
               {t('nav.apis')}
             </NavLink>
+            {(portal?.pages || [])
+              .filter((p) => p.nav)
+              .map((p) => (
+                <NavLink key={p.slug} to={`/pages/${p.slug}`} onClick={close}>
+                  {portalText(p.title)}
+                </NavLink>
+              ))}
             {user && (
               <>
                 <NavLink to="/apps" onClick={close}>
@@ -253,6 +261,7 @@ function Shell() {
             ['/apps/:app', (p) => <AppDetail id={p.app} />],
             ['/usage', () => <Usage />],
             ['/teams', () => <Teams />],
+            ['/pages/:slug', (p) => <Page slug={p.slug} />],
           ]}
           fallback={
             <div className="pt-container pt-section">

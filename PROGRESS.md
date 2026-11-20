@@ -31,13 +31,13 @@ Last update: 2026-11-20.
   - R-38: the interface tested in a headless Chromium (`test/ui.test.js`): every page of the console opens without an error or a 5xx, a producer makes an api and a plan from the console and saves the draft, the console speaks French, a consumer subscribes from the portal and sees its credentials. `mise run test` builds the interfaces first.
   - R-47: a move from a free plan to a paid one, once agreed, waits for the consumer's payment — the subscription on its free plan, its key working — and is applied when the Checkout of the paid plan is paid, with the same key; either side can drop it (`test/payments.test.js`).
   - R-27: remote catalogs from an object store — `s3://<bucket>/<prefix>`, AWS or any store that speaks its api (endpoint, region) — every yaml and json object under the prefix, the digest of the keys and etags as revision, the access key sealed at rest (`test/catalogs.test.js`, `test/secrets.test.js`, against a local store that speaks the api).
+  - R-42: the pages a workspace writes for its portal — Markdown per language, at `/pages/<slug>`, in its navigation or reached by their link — edited in Workspace settings › Developer portal or by the admin API (`test/ui.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-42** — free pages of the portal.
-2. **R-22** — metadata field labels in several languages.
-3. **R-23** — the shared request composer on the portal.
+1. **R-22** — metadata field labels in several languages.
+2. **R-23** — the shared request composer on the portal.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -47,7 +47,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (17)**
+**Doable (16)**
 
 | # | Effort | What |
 |---|---|---|
@@ -55,7 +55,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-32 | S | Correlation id carried to the backends |
 | R-22 | S | Metadata field labels in several languages |
 | R-23 | S | The shared request composer on the portal (apis without OpenAPI) |
-| R-42 | S | Free pages of the portal |
 | R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
@@ -110,7 +109,6 @@ waits for the data plane rather than working around it.
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 | R-22 | D-11, D-18 | Metadata field **labels and help in several languages** (one language today) | S | |
 | R-23 | D-17 | Testing on the portal is Scalar's; D-17 wants **one composer** for both faces — use the shared composer on the portal for apis without an OpenAPI specification | S | |
-| R-42 | D-11 | **Pages of the portal** beyond its home: pages a workspace writes (multilingual markdown, like the home and the documentation pages), in the portal's navigation | S | |
 
 ### Console
 

@@ -22,6 +22,15 @@ languages (English and French ship today) and default language, self signup, the
 the home page, and the workspace's [identity provider](./authentication.mdx#portal). The portal
 follows the visitor's light / dark / system preference.
 
+## Pages
+
+Beyond its home, a portal has the **pages** its workspace writes — terms of use, a getting-started
+guide, a contact page — in Markdown, in each language of the portal (the default one shown where a
+translation is missing), at `/pages/<slug>`. A page is in the navigation of the portal, in the order
+of the list, or reached by its link only. They are written in **Workspace settings → Developer
+portal › Pages**, or by the admin API (`PUT …/workspaces/<ws>` with `portal.pages`: a slug made of
+lowercase letters, digits and dashes, unique; a title; a content per language; `nav`).
+
 ## Catalogue
 
 The catalogue shows the APIs whose snapshot **runs on the gateway** — never a draft — in the

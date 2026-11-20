@@ -157,10 +157,31 @@ export async function createWorkspace(ctx, { name, slug, description = '' }) {
   return rows[0];
 }
 
+// the pages a workspace writes for its portal, beyond its home: a slug, a title and a markdown
+// content per language, in the navigation or not. The order of the list is the order of the
+// navigation.
+export function normalizePages(pages) {
+  if (pages === undefined || pages === null) return [];
+  if (!Array.isArray(pages)) throw badRequest('the pages of the portal are a list');
+  if (pages.length > 30) throw badRequest('a portal holds 30 pages at most');
+  const texts = (v) => (v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([, t]) => typeof t === 'string')) : typeof v === 'string' ? { en: v } : {});
+  const seen = new Set();
+  return pages.map((p, i) => {
+    const slug = slugify(p?.slug || '');
+    if (!p?.slug || slug !== String(p.slug)) throw badRequest(`page #${i + 1}: its slug is made of lowercase letters, digits and dashes`);
+    if (seen.has(slug)) throw badRequest(`two pages of the portal have the slug ${slug}`);
+    seen.add(slug);
+    const title = texts(p.title);
+    if (!Object.values(title).some((t) => t.trim())) throw badRequest(`page ${slug}: give it a title`);
+    return { slug, title, content: texts(p.content), nav: p.nav !== false };
+  });
+}
+
 export async function updateWorkspace(ctx, ws, patch) {
   const name = patch.name ?? ws.name;
   const description = patch.description ?? ws.description;
   const portal = patch.portal ? { ...ws.portal, ...patch.portal } : ws.portal;
+  if (patch.portal?.pages !== undefined) portal.pages = normalizePages(patch.portal.pages);
   // a masked secret sent back by the console keeps the stored one
   if (patch.portal?.oidc && (!patch.portal.oidc.clientSecret || String(patch.portal.oidc.clientSecret).includes('••')))
     portal.oidc = { ...portal.oidc, clientSecret: ws.portal?.oidc?.clientSecret || '' };

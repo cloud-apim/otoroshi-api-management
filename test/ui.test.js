@@ -107,6 +107,15 @@ beforeAll(async () => {
   const app = await call('POST', ws('/applications'), { name: 'Shelf', team_id: team.id });
   state.appId = app.id;
   state.subId = (await call('POST', ws('/subscriptions'), { api_id: api.id, plan_id: api.draft.plans[0].id, application_id: app.id })).id;
+  // pages the workspace writes for its portal: one in the navigation, one reached by its link
+  await call('PUT', ws(''), {
+    portal: {
+      pages: [
+        { slug: 'terms', title: { en: 'Terms of use', fr: 'Conditions' }, content: { en: '# Terms\n\nBe kind to the library.' }, nav: true },
+        { slug: 'contact', title: { en: 'Contact' }, content: { en: 'Write to the librarians.' }, nav: false },
+      ],
+    },
+  });
   const consumer = await call('POST', '/users', CONSUMER);
   await call('POST', ws('/members'), { user_id: consumer.id, role: 'consumer' });
   state.consumerId = consumer.id;
@@ -217,6 +226,28 @@ describe.skipIf(!ready)('the console', () => {
 });
 
 describe.skipIf(!ready)('the portal', () => {
+  test('the pages a workspace writes: checked, in the navigation, reached by their link', async () => {
+    // a slug of its own, a title
+    await expect(call('PUT', ws(''), { portal: { pages: [{ slug: 'a', title: { en: 'A' } }, { slug: 'a', title: { en: 'B' } }] } })).rejects.toThrow(/400/);
+    await expect(call('PUT', ws(''), { portal: { pages: [{ slug: 'Not A Slug', title: { en: 'A' } }] } })).rejects.toThrow(/400/);
+    await expect(call('PUT', ws(''), { portal: { pages: [{ slug: 'untitled', title: {} }] } })).rejects.toThrow(/400/);
+    const context = await browser.createBrowserContext();
+    const page = await watchedPage(context);
+    await go(page, `/${WS}/`);
+    await click(page, 'Terms of use', 'nav a');
+    await page.waitForFunction((ws) => location.pathname === `/${ws}/pages/terms`, { timeout: 10000 }, WS);
+    await settle();
+    expect(await text(page)).toContain('Be kind to the library.');
+    // not in the navigation, still at its link
+    expect(await page.evaluate(() => [...document.querySelectorAll('nav a')].map((a) => a.innerText.trim()))).not.toContain('Contact');
+    await go(page, `/${WS}/pages/contact`);
+    expect(await text(page)).toContain('Write to the librarians.');
+    await go(page, `/${WS}/pages/nowhere`);
+    expect(await text(page)).toContain('404');
+    expect(page.problems).toEqual([]);
+    await context.close();
+  });
+
   test('a consumer subscribes from the portal, and gets its credentials', async () => {
     const context = await browser.createBrowserContext();
     const page = await watchedPage(context);

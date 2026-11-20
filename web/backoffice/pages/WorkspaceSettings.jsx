@@ -65,6 +65,85 @@ function General() {
 // a text of the portal: one string per language; a plain string is the default language's
 const asLocalized = (v, def) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
 
+// the pages a workspace writes for its portal, beyond its home: in the language chosen above, in
+// the navigation of the portal or reached by their link only
+function PortalPages({ pages, onChange, lang, def, ro }) {
+  const [open, setOpen] = useState(null);
+  const update = (i, patch) => onChange(pages.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  const localized = (v) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
+  const move = (i, d) => {
+    const next = [...pages];
+    [next[i], next[i + d]] = [next[i + d], next[i]];
+    onChange(next);
+  };
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3 className="grow">{tr('Pages')}</h3>
+        {!ro && (
+          <button className="btn sm" onClick={() => (onChange([...pages, { slug: `page-${pages.length + 1}`, title: { [def]: tr('New page') }, content: {}, nav: true }]), setOpen(pages.length))}>
+            <Icon name="plus" /> {tr('Add a page')}
+          </button>
+        )}
+      </div>
+      <div className="card-body col gap-12">
+        <p className="muted small">{tr('Pages of the portal beyond its home — terms, a guide, a contact page — written in markdown, in each language of the portal; at /pages/<slug>.')}</p>
+        {!pages.length && <span className="faint small">{tr('No page yet.')}</span>}
+        {pages.map((p, i) => (
+          <div key={i} className="panel col gap-8">
+            <div className="row">
+              <button className="btn ghost sm" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+                <Icon name={open === i ? 'chevronDown' : 'chevronRight'} size={14} /> {localized(p.title)[lang] || localized(p.title)[def] || p.slug}
+              </button>
+              <span className="faint mono small">{`/pages/${p.slug}`}</span>
+              {p.nav && <Badge>{tr('in the navigation')}</Badge>}
+              <span className="spacer" />
+              {!ro && (
+                <>
+                  <button className="btn ghost sm icon" aria-label={tr('move up')} disabled={i === 0} onClick={() => move(i, -1)}>
+                    <Icon name="chevronUp" size={14} />
+                  </button>
+                  <button className="btn ghost sm icon" aria-label={tr('move down')} disabled={i === pages.length - 1} onClick={() => move(i, 1)}>
+                    <Icon name="chevronDown" size={14} />
+                  </button>
+                  <button className="btn ghost sm icon" aria-label={tr('delete the page')} onClick={() => onChange(pages.filter((_, j) => j !== i))}>
+                    <Icon name="trash" />
+                  </button>
+                </>
+              )}
+            </div>
+            {open === i && (
+              <fieldset disabled={ro} className="ro-fieldset col gap-8">
+                <div className="grid-2">
+                  <Field label={tr('Slug')}>
+                    <Input value={p.slug} onChange={(v) => update(i, { slug: v })} mono />
+                  </Field>
+                  <Field label={tr('Title ({0})', [lang])}>
+                    <Input value={localized(p.title)[lang] || ''} onChange={(v) => update(i, { title: { ...localized(p.title), [lang]: v } })} placeholder={lang !== def ? localized(p.title)[def] : ''} />
+                  </Field>
+                </div>
+                <Switch checked={p.nav !== false} onChange={(v) => update(i, { nav: v })} label={tr('In the navigation of the portal')} />
+                <CodeEditor
+                  key={`${i}-${lang}`}
+                  value={localized(p.content)[lang] || ''}
+                  onChange={(v) => update(i, { content: { ...localized(p.content), [lang]: v } })}
+                  readOnly={ro}
+                  language="markdown"
+                  wordWrap="on"
+                  minHeight={200}
+                  maxHeight={520}
+                  ariaLabel={tr('page {0} ({1})', [p.slug, lang])}
+                  placeholder={tr('# Markdown')}
+                />
+              </fieldset>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Portal() {
   const { wapi, ws, session, isAdmin } = useWs();
   const ro = !isAdmin;
@@ -137,6 +216,7 @@ function Portal() {
           </Setting>
         </div>
       </div>
+      <PortalPages pages={p.pages || []} onChange={set('pages')} lang={current} def={def} ro={ro} />
       <div className="card">
         <div className="card-head">
           <h3>{tr('Settings')}</h3>
