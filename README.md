@@ -128,9 +128,6 @@ Two PostgreSQL databases: application data, and events + analytics.
 - **A European payment provider**, beside Stripe Connect, for the paid plans.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
-
-And what is still missing among the important things:
-
 - **One credential for several APIs** — a consumer subscribed to several APIs calls them with one
   key; waits for Otoroshi ([#2963](https://github.com/MAIF/otoroshi/issues/2963)).
 - **Notifications outside the product** — email and outgoing webhooks: a subscription to review or
@@ -140,9 +137,6 @@ And what is still missing among the important things:
   Prometheus or OpenTelemetry; today a health check and `gateway status`.
 - **API quality** — the specifications linted, an API scored and reviewed before it is published.
 - **GraphQL and gRPC APIs.**
-- **Dynamic client registration** — the application's client created at the identity provider.
-- **Hardening for 1.0** — the suite run by the CI on every push, upgrades tested from one release
-  to the next, an accessibility audit of both faces, a security review.
 
 ## Otoroshi gaps
 
