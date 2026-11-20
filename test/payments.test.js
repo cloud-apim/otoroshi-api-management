@@ -90,7 +90,6 @@ beforeAll(async () => {
     },
   ];
   await ok('PUT', `/workspaces/${WS}/apis/${api.id}/draft`, { draft });
-  await ok('POST', `/workspaces/${WS}/apis/${api.id}/publish`, { comment: 'paid', deploy: true });
   // a consumer of the portal, with an application of its own
   await ok('POST', `/workspaces/${WS}/members`, { email, name: 'Buyer', password: PASSWORD, role: 'consumer' });
   const login = await fetch(`${ROOT}/${WS}/front/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, password: PASSWORD }) });
@@ -118,10 +117,14 @@ afterAll(async () => {
 });
 
 describe('selling the paid plans of a workspace', () => {
-  test('nothing is sold before the workspace links its Stripe account', async () => {
-    const r = await portal('/subscriptions', { method: 'POST', body: JSON.stringify({ api_id: state.apiId, plan_id: PLAN, application_id: state.appId }) });
+  test('nothing is sold before the workspace links its Stripe account: its paid plans are not published', async () => {
+    const r = await call('POST', `/workspaces/${WS}/apis/${state.apiId}/publish`, { comment: 'paid' });
     expect(r.status).toBe(400);
-    expect((await r.json()).error).toContain('link a Stripe account first');
+    const messages = r.body.details.errors.map((e) => e.message);
+    expect(messages).toContain('plan "Premium" is paid: the workspace sells its paid plans through its Stripe account — link one (Workspace settings › Payments)');
+    // the free plan is not concerned; the draft shows why, before any publication
+    expect(messages.some((m) => m.includes('"Basic"'))).toBe(false);
+    expect((await ok('GET', `/workspaces/${WS}/apis/${state.apiId}`)).validation.errors.length).toBe(3);
   });
 
   test('an administrator links it, through Stripe: the product keeps its id only', async () => {
@@ -137,6 +140,8 @@ describe('selling the paid plans of a workspace', () => {
     // a link forged, or replayed by someone else, is refused
     const forged = await fetch(`${ROOT}/payments/stripe/callback?code=x&state=forged.state`, { redirect: 'manual' });
     expect(forged.status).toBe(400);
+    // linked, the paid plans are published and deployed
+    await ok('POST', `/workspaces/${WS}/apis/${state.apiId}/publish`, { comment: 'paid', deploy: true });
   });
 
   test('a consumer pays on the Checkout; the key is made once Stripe says it is paid', async () => {

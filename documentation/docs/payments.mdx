@@ -6,6 +6,9 @@ description: The paid plans, sold through Stripe — Stripe Connect, Checkout, w
 
 # Payments
 
+Payments are **optional**: off on an installation without a Connect client id, and without effect
+on a workspace that links no account. Who does not sell does not see them.
+
 **The product decides access; Stripe decides the money.** The product takes no payment, computes
 no invoice, handles no tax and stores no means of payment. Nothing of it is in the request path:
 the gateway sees an apikey, enabled or disabled — if the product is down, the traffic flows, the
@@ -19,6 +22,10 @@ who authorises the installation and comes back. The product keeps the id of the 
 and whether it is live — never a key of it; it calls Stripe with the key of the installation, on
 behalf of the account. Unlinking is refused while paid subscriptions are open; an account that
 takes its authorisation back from Stripe is unlinked.
+
+**A paid plan is published only once the account is linked**: before, the draft says why and the
+publication is refused — a consumer never meets a plan nobody can pay. The same with payments off
+on the installation.
 
 The installation sets, once:
 

@@ -7,7 +7,7 @@ import { db, newId, slugify } from '../db/index.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
-import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
+import { defaultDraft, defaultPlan, normalizeDraft, SERVED_STATUSES, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
 import { resolveResources } from './resources.js';
@@ -238,6 +238,19 @@ export async function validateWithMetadata(workspaceId, draft, { apiId = null } 
   const metered = normalizeDraft(draft).plans.filter((p) => p.pricing.kind === 'paid' && p.pricing.usage.enabled);
   if (metered.length && !(await import('../payments/usage.js')).meteringAvailable())
     metered.forEach((p) => v.errors.push({ path: `plans[${p.name}].pricing.usage`, message: `plan "${p.name}": the payment provider of the installation cannot meter a usage` }));
+  // a paid plan offered to consumers needs the means to sell it: refused here, not found out at the
+  // first Pay of a consumer
+  const sold = normalizeDraft(draft).plans.filter((p) => p.pricing.kind === 'paid' && SERVED_STATUSES.includes(p.status));
+  if (sold.length) {
+    const { paymentProvider } = await import('../payments/billing.js');
+    const ws = (await db`select payments from workspaces where id = ${workspaceId}`)[0];
+    const reason = !paymentProvider()
+      ? 'payments are off on this installation (APIM_PAYMENTS_PROVIDER)'
+      : !ws?.payments?.account?.id
+        ? 'the workspace sells its paid plans through its Stripe account — link one (Workspace settings › Payments)'
+        : null;
+    if (reason) sold.forEach((p) => v.errors.push({ path: `plans[${p.name}].pricing`, message: `plan "${p.name}" is paid: ${reason}` }));
+  }
   v.ok = v.errors.length === 0;
   return v;
 }
