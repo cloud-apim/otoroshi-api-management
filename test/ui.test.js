@@ -278,6 +278,17 @@ describe.skipIf(!ready)('the portal', () => {
     const detail = await call('GET', ws(`/subscriptions/${subs[0].id}`));
     expect(await text(page)).toContain(detail.credentials[0].client_id);
     expect(detail.metadata).toEqual({ project: 'a reading list' });
+    // the api has no specification: the composer of the portal tries it, with these credentials
+    await go(page, `/${WS}/apis/${state.apiId}/try`);
+    expect(await page.evaluate(() => [...document.querySelectorAll('select option')].map((o) => o.innerText))).toContain('My reading list — Default');
+    await click(page, 'Send');
+    await page.waitForFunction(() => document.querySelector('.badge')?.innerText.match(/^\d{3}$/), { timeout: 30000 });
+    // a key is routable a few seconds after it is minted
+    for (let i = 0; i < 20 && !(await page.evaluate(() => [...document.querySelectorAll('.badge')].some((b) => b.innerText === '200'))); i++) {
+      await settle(1000);
+      await click(page, 'Send');
+    }
+    expect(await page.evaluate(() => [...document.querySelectorAll('.badge')].map((b) => b.innerText))).toContain('200');
     // in French, the question is asked in French
     await page.evaluate(() => localStorage.setItem('apim.portal.lang', 'fr'));
     await go(page, `/${WS}/apis/${state.apiId}/plans`);

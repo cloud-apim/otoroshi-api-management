@@ -60,6 +60,12 @@ The proxy only talks to the hosts of the workspace's deployed APIs, never forwar
 cookies, and reaches the gateway at its own address with the API's `Host` header — so the browser
 needs no CORS on the API. The consumer tests the API with its own credentials.
 
+An API without an OpenAPI specification has a **Try it** tab instead: the request composer the
+console uses too — a method, a path among the resources of the API, a query, headers, a body. The
+request goes through the gateway with the credentials of one of the consumer's own active
+subscriptions to the API (an API key or client credentials), or none, and the composer shows the
+response: status, headers, body, duration.
+
 ## Subscribing
 
 **Subscribe** on a plan opens a dialog: pick an application or create one (it goes to the visitor's

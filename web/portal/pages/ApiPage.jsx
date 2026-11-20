@@ -5,6 +5,7 @@ import { api, usePortal } from '../context.jsx';
 import { pickLang, useI18n } from '../i18n.jsx';
 import { LifecycleBadge, authLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
+import { RequestComposer } from '../../shared/composer.jsx';
 
 const ApiReference = lazy(() => import('./ApiReference.jsx'));
 
@@ -37,7 +38,8 @@ function ApiView({ a, tab, page }) {
   const tabs = [
     { id: 'overview', label: t('api.tab.overview'), to: base },
     { id: 'docs', label: t('api.tab.docs'), to: `${base}/docs` },
-    ...(a.has_openapi ? [{ id: 'reference', label: t('api.tab.reference'), to: `${base}/reference` }] : []),
+    // the reference of an api with its specification lets one try it (Scalar); the composer otherwise
+    ...(a.has_openapi ? [{ id: 'reference', label: t('api.tab.reference'), to: `${base}/reference` }] : [{ id: 'try', label: t('api.tab.try'), to: `${base}/try` }]),
     { id: 'plans', label: t('api.tab.plans'), to: `${base}/plans`, count: a.plans.length },
   ];
   return (
@@ -104,6 +106,7 @@ function ApiView({ a, tab, page }) {
         {tab === 'overview' && <Overview a={a} />}
         {tab === 'docs' && <Docs a={a} page={page} />}
         {tab === 'reference' && <Reference a={a} />}
+        {tab === 'try' && <Try a={a} />}
         {tab === 'plans' && <Plans a={a} />}
       </div>
     </>
@@ -339,6 +342,30 @@ function DocPage({ page, docLang, fallback }) {
         <Markdown source={pickLang(page.content, docLang, fallback)} />
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------- try (the composer shared with the console)
+
+function Try({ a }) {
+  const { t } = useI18n();
+  const { user } = usePortal();
+  const subs = useLoad(() => api.get(`/apis/${a.id}/my-subscriptions`), [a.id, user?.id]);
+  return (
+    <div className="col gap-16">
+      <p className="muted small">{t('try.help')}</p>
+      <Loader state={subs}>
+        {(list) => (
+          <RequestComposer
+            baseLabel={a.base_url}
+            paths={a.resources.map((r) => r.path)}
+            credentials={list.map((s) => ({ value: s.id, label: `${s.application_name} — ${s.plan_name}` }))}
+            labels={{ send: t('try.send'), credential: t('try.credentials'), none: t('try.none'), headers: t('try.headers'), body: t('try.body'), response: t('try.response') }}
+            send={(r) => api.post(`/apis/${a.id}/test`, { method: r.method, path: r.path, query: r.query, headers: r.headers, body: r.body, subscription_id: r.credential || undefined })}
+          />
+        )}
+      </Loader>
+    </div>
   );
 }
 

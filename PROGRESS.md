@@ -33,13 +33,13 @@ Last update: 2026-11-20.
   - R-27: remote catalogs from an object store — `s3://<bucket>/<prefix>`, AWS or any store that speaks its api (endpoint, region) — every yaml and json object under the prefix, the digest of the keys and etags as revision, the access key sealed at rest (`test/catalogs.test.js`, `test/secrets.test.js`, against a local store that speaks the api).
   - R-42: the pages a workspace writes for its portal — Markdown per language, at `/pages/<slug>`, in its navigation or reached by their link — edited in Workspace settings › Developer portal or by the admin API (`test/ui.test.js`).
   - R-22: the label and the help of a metadata field in other languages (`translations`), shown in the reader's language on the console and the portal — a request form asks its questions in French on a French portal (`test/ui.test.js`).
+  - R-23: an api without an OpenAPI specification has a *Try it* tab on the portal — the request composer of the console, through the gateway, with the credentials of the consumer's own subscriptions (`test/ui.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-23** — the shared request composer on the portal.
-2. **R-32** — a correlation id carried to the backends.
-3. **R-9** — the written inventory of the Otoroshi entities.
+1. **R-32** — a correlation id carried to the backends.
+2. **R-9** — the written inventory of the Otoroshi entities.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -49,13 +49,12 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (15)**
+**Doable (14)**
 
 | # | Effort | What |
 |---|---|---|
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-32 | S | Correlation id carried to the backends |
-| R-23 | S | The shared request composer on the portal (apis without OpenAPI) |
 | R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
@@ -108,7 +107,6 @@ waits for the data plane rather than working around it.
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
-| R-23 | D-17 | Testing on the portal is Scalar's; D-17 wants **one composer** for both faces — use the shared composer on the portal for apis without an OpenAPI specification | S | |
 
 ### Console
 
@@ -177,7 +175,7 @@ waits for the data plane rather than working around it.
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, and it reads the global configuration, super admin only by design (G-21) |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
-| D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ with the trace of the policies (the request tester of the gateway); one composer: R-23 |
+| D-17 testing | ✅ | portal: Scalar + proxy for an api with its specification, the composer shared with the console otherwise ✅; console ✅ with the trace of the policies (the request tester of the gateway) |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
 | D-19 workspace + teams, global users | ✅ | an admin only sees the members of its workspaces |
 | D-20 one portal per workspace, resolved from the url | ✅ | by root path, by hostname, or one workspace at the root (`APIM_TENANCY=single`: no prefix, no selector); the forms served before are recorded and their urls redirected (`301`/`308`) to the same page — `test/portal-exposure.test.js`, `test/portal-forms.test.js`; `portal_url` given by the admin api |

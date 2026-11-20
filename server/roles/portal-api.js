@@ -273,6 +273,65 @@ const mySub = async (ctx, id) => {
   return sub;
 };
 
+// the consumer's own subscriptions to an api, the ones it can call with: what the composer offers
+r.get('/apis/:api/my-subscriptions', async ({ ctx, params }) => {
+  if (!ctx.user) return [];
+  const entry = await findEntry(ctx, params.api);
+  const apps = await applications.listApplications(ctx.workspace.id, { userId: ctx.user.id });
+  const ids = new Set(apps.map((a) => a.id));
+  const subs = await db`select s.id, s.plan_id, s.auth_kind, s.status, s.request->>'plan_name' as plan_name, s.application_id
+    from subscriptions s where s.api_id = ${entry.row.id} and s.status = 'active'`;
+  return subs
+    .filter((s) => ids.has(s.application_id) && ['apikey', 'oauth2-local'].includes(s.auth_kind))
+    .map((s) => ({ id: s.id, plan_name: s.plan_name || s.plan_id, application_name: apps.find((a) => a.id === s.application_id)?.name }));
+});
+
+// the composer of the portal, for the apis without an OpenAPI specification (D-17: one composer for
+// both faces): the request goes through the gateway — its routing, its plans, its quotas — with the
+// credentials of one of the consumer's own subscriptions, or none
+r.post('/apis/:api/test', async ({ ctx, params, body }) => {
+  const entry = await findEntry(ctx, params.api);
+  const draft = normalizeDraft(entry.row.content.draft);
+  const cp = draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
+  const rel = String(body.path || '/');
+  const path = `${cp}${rel.startsWith('/') ? rel : `/${rel}`}`;
+  const headers = {};
+  for (const [k, v] of Object.entries(body.headers || {})) if (!['host', 'cookie'].includes(k.toLowerCase())) headers[k] = String(v);
+  headers.host = await resolveLocal(draft.entrypoint.domain);
+  if (body.subscription_id) {
+    const sub = await mySub(ctx, body.subscription_id);
+    if (sub.api_id !== entry.row.id) throw badRequest('this subscription is not to this api');
+    const cred = (await subscriptions.credentialsOf(sub.id)).find((c) => c.status === 'active');
+    if (!cred) throw badRequest('this subscription has no credentials to call with');
+    headers.authorization = 'Basic ' + Buffer.from(`${cred.client_id}:${cred.client_secret}`).toString('base64');
+  }
+  const method = String(body.method || 'GET').toUpperCase();
+  const gw = await gatewaySettings();
+  const started = performance.now();
+  let res;
+  try {
+    res = await fetch(`${gw.url}${path}${body.query ? `?${String(body.query).replace(/^\?/, '')}` : ''}`, {
+      method,
+      headers,
+      body: ['GET', 'HEAD'].includes(method) ? undefined : body.body || undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (e) {
+    throw badRequest(`gateway unreachable: ${e.message}`);
+  }
+  const buf = await res.arrayBuffer();
+  const out = Object.fromEntries([...res.headers].filter(([k]) => !['set-cookie'].includes(k.toLowerCase())));
+  return {
+    status: res.status,
+    durationMs: Math.round(performance.now() - started),
+    headers: out,
+    body: new TextDecoder().decode(buf.slice(0, 256 * 1024)),
+    truncated: buf.byteLength > 256 * 1024,
+    size: buf.byteLength,
+  };
+});
+
 r.post('/subscriptions/:sub/close', async ({ ctx, params }) => subscriptions.closeSubscription(ctx, await mySub(ctx, params.sub)));
 
 // from the consumer's side: ask to move to an equivalent plan, or answer a proposal
