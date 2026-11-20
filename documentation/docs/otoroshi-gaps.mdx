@@ -10,18 +10,14 @@ A gap in the data plane is fixed in the data plane — in Otoroshi or one of its
 worked around in the product: a workaround there would freeze the product's model for nothing.
 Meanwhile, the product says what really applies rather than promising what the gateway cannot hold.
 
-This page lists what still limits the product: the gaps **open** (⬜), reported upstream, and the
-ones **not fixed by decision** (➖), with what the product does meanwhile. The gaps already fixed are
-not here: the product requires Otoroshi 18.1, which holds their fixes. The full history — every gap
-found, its source references, its fix — is kept in
+This page lists what still limits the product: the gaps **open**, reported upstream, with what the
+product does meanwhile. The gaps already fixed are not here: the product requires Otoroshi 18.1,
+which holds their fixes. The full history — every gap found, its source references, its fix — is
+kept in
 [`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
 
 | # | Gap | Severity | Status | What the product does |
 |---|---|---|---|---|
-| G-11 | Nothing says when a new route or key becomes routable — not feasible in a distributed cluster without a shared store | — | ➖ | the console says *deployed* once the gateway accepted the write |
-| G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — the job of whoever stores the events | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
-| G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |
-| G-22 | An extractor that does not identify the caller sends an error event for a call that then succeeds, or is refused: the call is counted twice | medium | ⬜ open | nothing: the dashboards count these as errors |
 | G-23 | A key cannot serve several subscriptions: a key is its subscription's own, one api, one plan ([#2963](https://github.com/MAIF/otoroshi/issues/2963)) | medium | ⬜ open | one key per subscription; a credential for several subscriptions waits for it |
 | G-24 | Threat Protection Suite: the global table of Threat Studio does not see the plan plugins: a second firewall runs on a plan already protected, the scores add up and the policy of the table decides ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)) | high | ⬜ open | keep the global table off the apis protected per plan |
 | G-26 | Threat Protection Suite: a security event names the api, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)) | low | ⬜ open | the plan from the key that called; the api only otherwise |
