@@ -340,7 +340,8 @@ A call **refused** in the end is counted twice as well: a call without a key, on
 are apikey plans, gives the `400 no apikey` event of `ApikeyCalls` ("no apikey detected in the http
 request"), then the `401` the client gets, from the consumer enforcer ("no consumer identified on the
 call", `next/plugins/apimgmt.scala:1301`) — two `reqId`, the same url and time, a status the client
-never saw. Captured again on the data exporter of 18.1.0-dev.
+never saw. Captured again on the data exporter of 18.1.0-dev, and added to the issue
+([comment](https://github.com/MAIF/otoroshi/issues/2962#issuecomment-7040987713)).
 
 **The product.** Nothing: an error event is an event. The dashboards count these as calls and as
 errors — the error rate of an api with several plans is overstated, and every refused call counts
@@ -350,7 +351,11 @@ twice.
 the error it lets go: `sendEvent = false` on the verification of `NgJwtApikeyExtractor` and
 `NgOidcApikeyExtractor`, and on `passWithApiKeyFromCache` when `ApikeyCalls` is not mandatory — the
 call then has one event, its own, which already carries the reason of a refusal
-(`apikey_rejection_reason`, `token_rejection_reason`) when the call is refused in the end.
+(`apikey_rejection_reason`, `token_rejection_reason`) when the call is refused in the end — provided
+the consumer enforcer stops overwriting that reason: its `error` helper writes
+`apikey_rejection_reason` too (`next/plugins/apimgmt.scala:1245`), so the final event says "no
+consumer identified on the call" and loses "no apikey detected in the http request". Its own key
+(`consumer_rejection_reason`), or leaving an existing reason untouched, keeps both.
 
 ## G-23 — a key cannot serve several subscriptions — medium — open
 
