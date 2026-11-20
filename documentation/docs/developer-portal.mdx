@@ -109,8 +109,19 @@ The consumer's applications: their subscriptions with their status, the credenti
 
 ## Usage
 
-Calls, errors and latency over 24 hours, 7 or 30 days, by API, plan and application — restricted to
-the visitor's own applications.
+The calls of the visitor's own applications — never anyone else's — in two views that share their
+filters: the timeframe (from the last 5 minutes to the last 90 days, or a custom range), the
+application, the API and the status class. Each application links to both.
+
+- **Analytics**: calls and requests per second, error rate and server errors, latency (average,
+  minimum, maximum, p95) and the gateway overhead, data; the responses over time (successes, client
+  errors, server errors), the latency over time, the hits by API and by application; the top APIs,
+  the failed and the slow ones, the top paths, the status codes, the plans. Every chart has its
+  legend and a table view.
+- **Logs**: the request log of these applications, filtered also by method and path, searched by
+  path, status or request id — the `Otoroshi-Request-Id` a consumer quotes to the producer to find
+  a call — with the detail of a call, and **Export as CSV** (10,000 calls at most, recorded in the
+  audit trail of the workspace).
 
 ## Teams
 

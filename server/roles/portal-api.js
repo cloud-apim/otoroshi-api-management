@@ -4,6 +4,7 @@
 
 import { readCertificate } from '../domain/pki.js';
 import { Router, badRequest, forbidden, notFound, unauthorized } from '../http/router.js';
+import { pageParams } from '../http/paging.js';
 import { db } from '../db/index.js';
 import * as identity from '../domain/identity.js';
 import * as applications from '../domain/applications.js';
@@ -470,6 +471,45 @@ r.get('/subscriptions/:sub/quotas', async ({ ctx, params }) => {
     }
   }
   return out;
+});
+
+// the calls of the consumer's own applications: the request log of the portal, and its export
+async function myCallFilter(ctx, query) {
+  requireUser(ctx);
+  const ids = await myApplicationIds(ctx);
+  const app = query.get('application');
+  if (app && !ids.includes(app)) throw forbidden();
+  return {
+    workspaceId: ctx.workspace.id,
+    applicationIds: ids.length ? ids : ['__none__'],
+    applicationId: app,
+    apiId: query.get('api'),
+    planId: query.get('plan'),
+    status: query.get('status'),
+    method: query.get('method'),
+    path: query.get('path'),
+    from: query.get('from'),
+    to: query.get('to'),
+  };
+}
+
+r.get('/analytics/calls', async ({ ctx, query }) => {
+  const filter = await myCallFilter(ctx, query);
+  const { limit, offset, q } = pageParams(query, { defaultLimit: 50, max: 200 });
+  return analytics.searchCalls(filter, { limit, offset, q });
+});
+
+r.get('/analytics/calls/export', async ({ ctx, query }) => {
+  const filter = await myCallFilter(ctx, query);
+  const out = await analytics.exportCalls(filter, { q: (query.get('q') || '').trim(), max: 10000 });
+  await audit(ctx, { action: 'analytics.calls.export', workspaceId: ctx.workspace.id, entityKind: 'workspace', entityId: ctx.workspace.id, summary: `request log of the applications of ${ctx.user.email} exported: ${out.count} calls`, data: { filter: Object.fromEntries(query), count: out.count } });
+  return new Response(out.csv, {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="calls-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv"`,
+      'cache-control': 'no-store',
+    },
+  });
 });
 
 r.get('/analytics', async ({ ctx, query }) => {

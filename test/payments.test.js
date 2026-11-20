@@ -306,6 +306,19 @@ describe('selling the paid plans of a workspace', () => {
     expect(mine().map((e) => e.value).sort()).toEqual([2, 3]);
     // the consumer sees what it is billed for
     expect((await (await portal(`/subscriptions/${created.id}/usage`)).json())).toMatchObject({ sent: 5, pending: 0 });
+    // and the calls themselves, on the portal: its own applications only, exported as CSV
+    const from = new Date(Date.now() - 3600e3).toISOString();
+    // (the calls the test made through the gateway are exported to the ingester too)
+    const own = await (await portal(`/analytics/calls?application=${state.appId}&from=${from}&path=/premium&limit=200`)).json();
+    expect(own.items.map((c) => c.req_id)).toEqual(expect.arrayContaining([`usage-${RUN}-1-0`, `usage-${RUN}-2-3`]));
+    expect(own.items.every((c) => c.application_id === state.appId)).toBe(true);
+    expect((await portal(`/analytics/calls?application=app_of_someone_else&from=${from}`)).status).toBe(403);
+    const dash = await (await portal(`/analytics?application=${state.appId}&from=${from}&status=4xx`)).json();
+    expect(dash.totals.calls).toBeGreaterThanOrEqual(2);
+    expect(dash.statuses.map((r) => r.class)).toEqual([400]);
+    const csv = await portal(`/analytics/calls/export?application=${state.appId}&from=${from}&path=/premium`);
+    expect(csv.headers.get('content-type')).toContain('text/csv');
+    expect((await csv.text()).trim().split('\r\n').length).toBe(own.total + 1);
     await portal(`/subscriptions/${created.id}/close`, { method: 'POST', body: '{}' });
   });
 

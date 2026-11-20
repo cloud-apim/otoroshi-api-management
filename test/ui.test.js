@@ -300,6 +300,12 @@ describe.skipIf(!ready)('the portal', () => {
     await page.waitForFunction(() => document.body.innerText.includes('clear and quick') && document.body.innerText.includes('1 review'), { timeout: 10000 });
     await go(page, `/${WS}/apis`);
     expect(await page.evaluate(() => document.querySelector('.pt-api-card .stars')?.getAttribute('aria-label'))).toBe('4 out of 5');
+    // its consumption: the analytics of its applications, then their request log, without an error
+    await go(page, `/${WS}/usage?range=1h`);
+    await page.waitForFunction(() => document.body.innerText.includes('Calls'), { timeout: 10000 });
+    await click(page, 'Logs');
+    await page.waitForFunction(() => document.body.innerText.includes('Request log') && location.search.includes('view=logs'), { timeout: 10000 });
+    expect(await page.evaluate(() => [...document.querySelectorAll('a')].some((a) => a.innerText.includes('Export as CSV') && a.href.includes('/front/api/analytics/calls/export?')))).toBe(true);
     // in French, the question is asked in French
     await page.evaluate(() => localStorage.setItem('apim.portal.lang', 'fr'));
     await go(page, `/${WS}/apis/${state.apiId}/plans`);

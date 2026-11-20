@@ -201,10 +201,16 @@ function AppDetailView({ id }) {
               title={app.name}
               subtitle={app.description}
               actions={
-                <Link to={`/usage?application=${app.id}`} className="btn">
-                  <Icon name="chart" />
-                  {t('apps.usage')}
-                </Link>
+                <div className="row gap-6">
+                  <Link to={`/usage?application=${app.id}`} className="btn">
+                    <Icon name="chart" />
+                    {t('apps.usage')}
+                  </Link>
+                  <Link to={`/usage?view=logs&application=${app.id}`} className="btn">
+                    <Icon name="doc" />
+                    {t('apps.logs')}
+                  </Link>
+                </div>
               }
             />
             <div className="pt-two-col">
