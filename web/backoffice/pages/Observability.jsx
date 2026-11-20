@@ -155,7 +155,7 @@ export function AnalyticsDashboard({ fixed = {} }) {
           </span>
         </div>
         <div className="card-body" style={{ paddingBottom: 0 }}>
-          <ListToolbar paging={paging} placeholder={tr('search path, method, status, client id, address')} onReload={calls.reload} loading={calls.loading} />
+          <ListToolbar paging={paging} placeholder={tr('search path, method, status, client id, address, request id')} onReload={calls.reload} loading={calls.loading} />
         </div>
         <Loader state={calls}>
           {({ items: rows, total }) =>
@@ -204,6 +204,11 @@ export function AnalyticsDashboard({ fixed = {} }) {
           <p className="muted small">
             <Tr text={'{0} · {1} ms{2}{3}'} args={[fmtDate(open.at), open.duration_ms, nameOf(apis, open.api_id) ? ` · ${nameOf(apis, open.api_id).name} ${nameOf(apis, open.api_id).version}` : '', nameOf(apps, open.application_id) ? ` · ${nameOf(apps, open.application_id).name}` : '']} />
           </p>
+          {open.req_id && (
+            <p className="small">
+              <Tr text={'Request id {0} — the Otoroshi-Request-Id the caller got back and the backend received'} args={[<code key="id">{open.req_id}</code>]} />
+            </p>
+          )}
           <CodeView value={open} maxHeight={520} ariaLabel={tr('call')} />
         </Modal>
       )}

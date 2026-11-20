@@ -34,12 +34,13 @@ Last update: 2026-11-20.
   - R-42: the pages a workspace writes for its portal — Markdown per language, at `/pages/<slug>`, in its navigation or reached by their link — edited in Workspace settings › Developer portal or by the admin API (`test/ui.test.js`).
   - R-22: the label and the help of a metadata field in other languages (`translations`), shown in the reader's language on the console and the portal — a request form asks its questions in French on a French portal (`test/ui.test.js`).
   - R-23: an api without an OpenAPI specification has a *Try it* tab on the portal — the request composer of the console, through the gateway, with the credentials of the consumer's own subscriptions (`test/ui.test.js`).
+  - R-32: one request id from the caller to the backends — the `Otoroshi-Request-Id` the caller gets back is sent to the backends (`Otoroshi headers in` added to the flows, an api setting) and kept by the request log, where it is searched (`test/reference-catalogue.test.js`, `test/ingestion.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-32** — a correlation id carried to the backends.
-2. **R-9** — the written inventory of the Otoroshi entities.
+1. **R-9** — the written inventory of the Otoroshi entities.
+2. **R-48** — compaction of old rollups (only if the volume calls for it).
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -49,12 +50,11 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (14)**
+**Doable (13)**
 
 | # | Effort | What |
 |---|---|---|
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
-| R-32 | S | Correlation id carried to the backends |
 | R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
@@ -127,7 +127,6 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
-| R-32 | §8 | A **correlation id** carried beyond the gateway, to follow a request through the backends | S | |
 
 ### Monetisation
 
@@ -214,7 +213,7 @@ waits for the data plane rather than working around it.
 | Topic | Status |
 |---|---|
 | Default portal template | ✅; customer templates: R-19 |
-| Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; correlation id: R-32 |
+| Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; one request id from the caller to the backends, found in the request log |
 | Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
 | The catalogue as a discovery system | 🟡 search and tags: R-20 |
 | IdP integration beyond validation | ⬜ R-21, not a priority (owner) |

@@ -73,11 +73,17 @@ function expandGroups(plugins, groups = {}) {
   });
 }
 
-function flowJson(f, groups) {
+// the request id of the gateway, sent to the backends: the one the caller gets back
+// (Otoroshi-Request-Id) and the request log keeps — a request followed beyond the gateway
+export const CORRELATION_PLUGIN = 'cp:otoroshi.next.plugins.OtoroshiHeadersIn';
+
+function flowJson(f, groups, { correlationId = true } = {}) {
+  const plugins = expandGroups(f.plugins, groups);
+  if (correlationId && !plugins.some((p) => p.plugin === CORRELATION_PLUGIN)) plugins.push({ plugin: CORRELATION_PLUGIN, enabled: true, include: [], exclude: [], config: {} });
   return {
     id: f.id,
     name: f.name,
-    plugins: expandGroups(f.plugins, groups).map((p) => ({
+    plugins: plugins.map((p) => ({
       enabled: p.enabled !== false,
       debug: false,
       plugin: p.plugin,
@@ -490,7 +496,7 @@ export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecyc
     plans: draft.plans.map((p) => planJson(p, draft)),
     routes: draft.resources.map(routeJson),
     backends: draft.backends.map(backendJson),
-    flows: draft.flows.map((f) => flowJson(f, snapshot.policyGroups)),
+    flows: draft.flows.map((f) => flowJson(f, snapshot.policyGroups, { correlationId: draft.settings.correlationId !== false })),
     clients_backend_config: draft.backends.map(clientJson),
     // the documentation stays in the product, even though Otoroshi has ApiDocumentation
     documentation: null,

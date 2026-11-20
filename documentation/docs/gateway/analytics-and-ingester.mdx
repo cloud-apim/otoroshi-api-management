@@ -119,6 +119,11 @@ They speak the catalogue's vocabulary — APIs, plans, applications — not the 
   application, top endpoints (by templated path), recent calls, from the last hour to the last year.
   Filters live in the URL, so a filtered view is a bookmark.
   Reading the request log is recorded in the audit trail: it is personal data.
+- **One request id, end to end.** The gateway gives every call an id, `Otoroshi-Request-Id`: the
+  caller gets it back in the response, the backends receive it with the request (the projection
+  adds `Otoroshi headers in` to the flows of an API, unless its settings say otherwise:
+  **Settings › Correlation**), and the request log keeps it — a request id a consumer or a backend
+  quotes finds its call in the search of the request log.
 - **Portal → Usage**: the same, restricted to the consumer's own applications.
 - **Portal → My apps**: the live quotas of each key, as the gateway counts them (read-only, never on
   the request path).

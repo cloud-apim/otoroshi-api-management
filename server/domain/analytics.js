@@ -124,7 +124,8 @@ async function fromRollups(filter, { start, end, bucket }) {
 }
 
 // the request log as a paged list; the search matches the path, the method, the status, the
-// client id and the caller's address
+// client id, the caller's address, and the request id (the Otoroshi-Request-Id a caller or a
+// backend quotes)
 export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {}) {
   const { start, end } = range(filter);
   const appsArr = filter.applicationIds ? '{' + filter.applicationIds.join(',') + '}' : null;
@@ -136,7 +137,7 @@ export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {
       and (${filter.applicationId || null}::text is null or application_id = ${filter.applicationId || null})
       and (${filter.subscriptionId || null}::text is null or subscription_id = ${filter.subscriptionId || null})
       and (${appsArr}::text[] is null or application_id = any(${appsArr}::text[]))
-      and (${pattern}::text is null or path ilike ${pattern} or method ilike ${pattern} or client_id ilike ${pattern} or from_ip ilike ${pattern}
+      and (${pattern}::text is null or path ilike ${pattern} or method ilike ${pattern} or client_id ilike ${pattern} or from_ip ilike ${pattern} or req_id = ${q || null}
            or (${status}::int is not null and status = ${status}))`;
   const [items, [{ total }]] = await Promise.all([
     adb`select at, req_id, method, path, status, duration_ms, api_id, plan_id, application_id, subscription_id, client_id, from_ip

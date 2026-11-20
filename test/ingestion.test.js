@@ -217,6 +217,10 @@ describe('the attribution', () => {
       [`attr-${RUN}-sub`, planId, sub.id, app.id],
     ]);
     expect(rows[1].workspace_id).toBe(api.workspace_id);
+    // the request id a caller quotes finds its call in the request log
+    const { searchCalls } = await import('../server/domain/analytics.js');
+    const found = await searchCalls({ workspaceId: api.workspace_id, range: '24h' }, { q: `attr-${RUN}-sub` });
+    expect(found.items.map((c) => c.req_id)).toEqual([`attr-${RUN}-sub`]);
     // the api leaves the gateway, its subscription with it
     await ok('DELETE', `/workspaces/${WS}/apis/${apiId}`);
   });

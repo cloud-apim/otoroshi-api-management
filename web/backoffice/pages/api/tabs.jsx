@@ -875,6 +875,9 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
             <Switch checked={draft.settings.debugFlow} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, debugFlow: v } }))} label={tr('Debug flow')} disabled={readOnly} />
             <Switch checked={draft.settings.exportReporting} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, exportReporting: v } }))} label={tr('Export reporting')} disabled={readOnly} />
           </Setting>
+          <Setting label={tr('Correlation')} help={tr('the request id of the gateway sent to the backends (Otoroshi-Request-Id): the one the caller gets back, the one the request log keeps — a request followed beyond the gateway')}>
+            <Switch checked={draft.settings.correlationId !== false} onChange={(v) => setDraft((d) => ({ ...d, settings: { ...d.settings, correlationId: v } }))} label={tr('Send the request id to the backends')} disabled={readOnly} />
+          </Setting>
         </div>
       </div>
 

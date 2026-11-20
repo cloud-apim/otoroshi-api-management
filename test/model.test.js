@@ -44,6 +44,13 @@ describe('validation', () => {
     expect(validateDraft(draft([{ ...key('a'), selection: [{ path: '$.request.ip', value: 'x' }] }])).ok).toBe(false);
   });
 
+  test('the request id of the gateway is sent to the backends, unless the api says otherwise', () => {
+    const snap = (settings) => ({ api: { id: 'api_1', name: 'x', version: '1' }, draft: { ...draft([]), settings: { ...draft([]).settings, ...settings } } });
+    const plugins = (s) => buildOtoroshiApi(snap(s)).flows[0].plugins.map((p) => p.plugin);
+    expect(plugins({})).toContain('cp:otoroshi.next.plugins.OtoroshiHeadersIn');
+    expect(plugins({ correlationId: false })).not.toContain('cp:otoroshi.next.plugins.OtoroshiHeadersIn');
+  });
+
   test('the selection, the counter failure strategy and the circuit breaker are projected on the plan', () => {
     const p = defaultPlan({ id: 'gold', status: 'published', auth: { kind: 'jwt', config: { verifier: 'v' } }, selection: [{ path: '$.token.tier', value: 'gold' }], counterFailure: 'deny', circuitBreaker: 'subscription' });
     const plan = buildOtoroshiApi({ api: { id: 'api_1', name: 'x', version: '1' }, draft: draft([p]) }).plans[0];

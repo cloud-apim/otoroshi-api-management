@@ -166,7 +166,9 @@ export function defaultDraft({ domain, contextPath } = {}) {
     plans: [],
     openapi: { content: '', format: 'yaml' },
     documentation: { languages: ['en'], defaultLanguage: 'en' },
-    settings: { capture: false, debugFlow: false, exportReporting: false },
+    // correlationId: the request id of the gateway sent to the backends (Otoroshi-Request-Id), the one
+    // the caller gets back and the request log keeps
+    settings: { capture: false, debugFlow: false, exportReporting: false, correlationId: true },
   };
 }
 

@@ -234,6 +234,10 @@ describe('reference catalogue', () => {
       expect: (r) => r.status === 200,
     });
     expect(res.status).toBe(200);
+    // one request id from the caller to the backend: the one the caller gets back is the one the backend received
+    const id = res.headers.get('otoroshi-request-id');
+    expect(id).toBeTruthy();
+    expect((await res.json()).headers['otoroshi-request-id']).toBe(id);
   });
 
   test('open tier: without any credential the keyless plan serves the caller', async () => {
