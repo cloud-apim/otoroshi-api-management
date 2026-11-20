@@ -4,6 +4,7 @@ import { Callout, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Selec
 import { useWs } from '../../context.jsx';
 import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
+import { channelsOf } from '../../../shared/asyncapi.js';
 
 // documentation stays in the product, never in the gateway, and is multilingual from the
 // start: the languages belong to the customer
@@ -272,6 +273,105 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
                       .map((m) => m.toUpperCase())
                       .join(' ')}{' '}
                     {p}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function AsyncApiTab({ draft, setDraft, readOnly }) {
+  const [url, setUrl] = useState('');
+  const toast = useToast();
+  const content = draft.asyncapi?.content || '';
+  let parsed = null;
+  let error = null;
+  if (content.trim()) {
+    try {
+      parsed = content.trim().startsWith('{') ? JSON.parse(content) : YAML.parse(content);
+      if (!parsed?.asyncapi) error = tr('not an AsyncAPI document: no "asyncapi" field');
+    } catch (e) {
+      error = e.message;
+    }
+  }
+  const channels = parsed && !error ? channelsOf(parsed) : [];
+  const set = (v) => setDraft((d) => ({ ...d, asyncapi: { ...(d.asyncapi || { format: 'yaml' }), content: v } }));
+  return (
+    <div className="col gap-16">
+      <p className="muted small">
+        {tr('The AsyncAPI specification of an event-driven api — its channels, its operations, its messages — is rendered on the portal, its servers pointing at the gateway: the brokers stay private, the consumers reach them through the routes of the api. It never reaches the gateway.')}
+      </p>
+      {!readOnly && (
+        <div className="row">
+          <input className="input" style={{ maxWidth: 480 }} value={url} onChange={(e) => setUrl(e.target.value)} placeholder={tr('https://…/asyncapi.yaml — import from a url')} aria-label={tr('asyncapi url')} />
+          <button
+            className="btn"
+            disabled={!url}
+            onClick={async () => {
+              try {
+                const res = await fetch(url);
+                set(await res.text());
+                toast(tr('Specification imported into the draft'));
+              } catch (e) {
+                toast(tr('cannot fetch {0}: {1}', [url, e.message]), 'error');
+              }
+            }}
+          >
+            <Icon name="download" /> {tr('Import')}
+          </button>
+          <span className="faint small">{tr('or')}</span>
+          <FileButton
+            accept=".json,.yaml,.yml,application/json,application/yaml,text/yaml"
+            onFile={(text, file) => {
+              set(text);
+              toast(tr('{0} imported into the draft', [file.name]));
+            }}
+          >
+            {tr('From a local file…')}
+          </FileButton>
+        </div>
+      )}
+      <div className="grid-2" style={{ alignItems: 'start' }}>
+        <div className="card">
+          <div className="card-head">
+            <h3 className="grow">{tr('Specification (YAML or JSON)')}</h3>
+          </div>
+          <div className="card-body">
+            <CodeEditor
+              value={content}
+              onChange={set}
+              language={codeLanguage(content)}
+              readOnly={readOnly}
+              minHeight={520}
+              maxHeight={760}
+              wordWrap="on"
+              ariaLabel={tr('asyncapi specification')}
+              placeholder={tr('asyncapi: 3.0.0\ninfo:\n  title: My events\n  version: 1.0.0\nchannels: {}')}
+            />
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-head">
+            <h3 className="grow">{tr('Outline')}</h3>
+          </div>
+          <div className="card-body col">
+            {!content.trim() && <p className="muted small">{tr('No specification yet.')}</p>}
+            {error && <Callout kind="negative">{error}</Callout>}
+            {parsed && !error && (
+              <>
+                <div>
+                  <div className="bold">{parsed.info?.title}</div>
+                  <div className="muted small">
+                    <Tr text={'AsyncAPI {0} · version {1} · {2} channels'} args={[parsed.asyncapi, parsed.info?.version, channels.length]} />
+                  </div>
+                </div>
+                {channels.map((c) => (
+                  <div key={c.name} className="mono small">
+                    {c.operations.map((o) => (o.side === 'send' ? tr('consumers send') : tr('consumers receive'))).join(' · ') || '—'} — {c.address}
                   </div>
                 ))}
               </>

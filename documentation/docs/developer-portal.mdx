@@ -73,6 +73,11 @@ portal in **Settings → Portal → Discovery**.
   gateway.
 - **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled — the resources a plan gives access to, terms, approval mode and price.
 - **Reviews**: the ratings and comments of the consumers, and the visitor's own when they subscribed.
+- **Events**: when the API has an AsyncAPI specification, its channels and what a consumer does on
+  each — what it sends, what it receives —, the messages with their payload schemas and examples.
+  Its servers are the gateway: the brokers stay private, the consumers reach them through the routes
+  of the API, with the credentials of their subscription. A specification the portal cannot read is
+  said on the draft (`asyncapi_unreadable`).
 - A version switcher when several versions of the API are in the catalogue.
 
 ### Testing

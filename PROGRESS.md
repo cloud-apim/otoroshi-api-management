@@ -46,13 +46,14 @@ Last update: 2026-11-20.
   - R-53: the analytics and the logs of the consumer's applications on the portal — the same filters (timeframes, application, api, status class), the figures, the responses and the latency over time, the hits by api and application, the tops; the request log of its applications, filtered by method and path, with the detail of a call and a CSV export traced in the audit trail; each application links to both (`test/payments.test.js`, `test/ui.test.js`).
   - R-25 checked on a gateway running the Threat Protection Suite 1.0.0 and the LLM extension 0.0.90 (their latest releases, on the classpath of the development gateway: `OTOROSHI_EXTENSIONS`): a legitimate call served, an injection refused by the threat response, its security event attributed to the api, the plan, the subscription and the application (`test/threat-protection.test.js`, which runs either case). On the way: **G-24** confirmed (the global table of Threat Studio runs a second firewall on a plan already protected, the scores add up), **G-26** confirmed, **G-27** (every call scores a firewall match with the core rule set) and **G-28** (a firewall that blocks on its own sends no security event) found; **G-25** withdrawn — a challenge is for a person in a browser. G-24, G-26, G-27 and G-28 reported to the extension (cloud-apim/otoroshi-waf-extension#60 to #63); the threat protection is left aside for now (owner). Also found on the way, in the product: the ingester read its attribution cache every 15 seconds, so the first calls of an api or a key made meanwhile were unattributed — an unknown api, subscription or key now reads it again, once a second at most (`test/ingestion.test.js`).
   - R-31: the AI audits checked with real calls on the gateway running the LLM extension — a chat completion through an api whose flow proxies a provider (a fake one, a route of the gateway answering as OpenAI), an MCP tool called through another api. What the real events showed: the audits are generic `AuditEvent`s (`audit: LLMUsageAudit | McpAudit`), so the exporter never sent them and the ingester did not know them — both fixed; the tokens are under `usage` (`generation_tokens`), the cost under `costs.total_cost` in dollars, the tool of an MCP call under `mcp_request_payload.params.name`; and an audit carries the prompt, the answer, the arguments and the result of a tool, and the whole key with its secret — the ingester now keeps the usage only, the key named, the address and the end user pseudonymised (`test/ai-usage.test.js`, `test/ingestion.test.js`).
+  - R-55: an AsyncAPI specification (2.x or 3.x) in the draft and the snapshots of an api — a tab of the console, an outline of its channels — never projected; the portal renders it in an Events tab: its channels from the side of a consumer (what it sends, what it receives, whatever the version), the messages with their payloads and examples, its local references resolved, its servers the gateway (the brokers stay private); a specification the portal cannot read is said on the draft (`test/discovery.test.js`, `test/model.test.js`, `test/ui.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
 1. **R-48** — compaction of old rollups (only if the volume calls for it).
 
-Then the large ones: R-10, R-19, and the event-driven apis (R-54, with R-55).
+Then the large ones: R-10, R-19, and the event-driven apis (R-54).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -60,12 +61,11 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (8)**
+**Doable (7)**
 
 | # | Effort | What |
 |---|---|---|
 | R-54 | L | Event-driven apis: the events of the event brokers extension (owner's request) |
-| R-55 | M | An AsyncAPI document exposed on the portal (owner's request) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
@@ -109,7 +109,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-55 | §8 | **An AsyncAPI document on the portal** (owner's request, 2026-11-20): the AsyncAPI specification of an event-driven api in its draft and its snapshots, beside the OpenAPI one, rendered on the portal (its channels, its messages, its servers pointing at the gateway) — goes with R-54 | M | |
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 

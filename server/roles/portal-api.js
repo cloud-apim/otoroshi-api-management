@@ -11,7 +11,7 @@ import * as applications from '../domain/applications.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import * as analytics from '../domain/analytics.js';
 import { audit } from '../domain/audit.js';
-import { normalizeDraft } from '../domain/model.js';
+import { normalizeDraft, parseSpec } from '../domain/model.js';
 import { gatewaySettings, oto } from '../otoroshi/client.js';
 import YAML from 'yaml';
 import { listFields } from '../domain/metadata.js';
@@ -123,6 +123,7 @@ async function apiView(entry, { full = false, sig = null } = {}) {
     published_at: row.published_at,
     plans_count: draft.plans.filter((p) => p.status === 'published').length,
     has_openapi: !!draft.openapi.content?.trim(),
+    has_asyncapi: !!parseSpec(draft.asyncapi.content)?.asyncapi,
     ...(sig ? placementOf(row, sig) : {}),
   };
   if (!full) return base;
@@ -265,6 +266,21 @@ r.get('/apis/:api/openapi', async ({ ctx, params }) => {
     throw badRequest('the openapi specification of this api cannot be parsed');
   }
   spec.servers = [{ url: await gatewayBaseUrl(draft), description: 'Otoroshi gateway' }];
+  return spec;
+});
+
+// the AsyncAPI specification of an event-driven api, its servers the gateway: the brokers stay
+// private, the consumers reach them through the routes of the api
+r.get('/apis/:api/asyncapi', async ({ ctx, params }) => {
+  const entry = await findEntry(ctx, params.api);
+  const draft = normalizeDraft(entry.row.content.draft);
+  const spec = parseSpec(draft.asyncapi.content);
+  if (!spec?.asyncapi) throw notFound('this api has no AsyncAPI specification');
+  const base = new URL(await gatewayBaseUrl(draft));
+  const pathname = base.pathname === '/' ? '' : base.pathname;
+  spec.servers = String(spec.asyncapi).startsWith('2')
+    ? { gateway: { url: `${base.origin}${pathname}`, protocol: base.protocol.replace(':', ''), description: 'Otoroshi gateway' } }
+    : { gateway: { host: base.host, pathname: pathname || undefined, protocol: base.protocol.replace(':', ''), description: 'Otoroshi gateway' } };
   return spec;
 });
 

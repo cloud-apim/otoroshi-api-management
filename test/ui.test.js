@@ -153,7 +153,7 @@ describe.skipIf(!ready)('the console', () => {
     const routes = [
       W,
       `${W}/apis`,
-      ...['overview', 'resources', 'backends', 'flows', 'plans', 'documentation', 'openapi', 'catalogue', 'subscriptions', 'deployment', 'test', 'analytics', 'settings'].map((t) => `${W}/apis/${state.apiId}/${t}`),
+      ...['overview', 'resources', 'backends', 'flows', 'plans', 'documentation', 'openapi', 'asyncapi', 'catalogue', 'subscriptions', 'deployment', 'test', 'analytics', 'settings'].map((t) => `${W}/apis/${state.apiId}/${t}`),
       `${W}/policy-groups`,
       `${W}/applications`,
       `${W}/applications/${state.appId}`,

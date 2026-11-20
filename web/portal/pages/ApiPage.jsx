@@ -6,6 +6,7 @@ import { pickLang, useI18n } from '../i18n.jsx';
 import { LifecycleBadge, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
 import { Reviews } from './Reviews.jsx';
+import { Events } from './AsyncApi.jsx';
 import { Stars } from '../../shared/stars.jsx';
 import { RequestComposer } from '../../shared/composer.jsx';
 
@@ -42,6 +43,7 @@ function ApiView({ a, tab, page }) {
     { id: 'docs', label: t('api.tab.docs'), to: `${base}/docs` },
     // the reference of an api with its specification lets one try it (Scalar); the composer otherwise
     ...(a.has_openapi ? [{ id: 'reference', label: t('api.tab.reference'), to: `${base}/reference` }] : [{ id: 'try', label: t('api.tab.try'), to: `${base}/try` }]),
+    ...(a.has_asyncapi ? [{ id: 'events', label: t('api.tab.events'), to: `${base}/events` }] : []),
     { id: 'plans', label: t('api.tab.plans'), to: `${base}/plans`, count: a.plans.length },
     ...(a.rating !== undefined ? [{ id: 'reviews', label: t('api.tab.reviews'), to: `${base}/reviews`, count: a.rating?.count || 0 }] : []),
   ];
@@ -124,6 +126,7 @@ function ApiView({ a, tab, page }) {
         {tab === 'try' && <Try a={a} />}
         {tab === 'plans' && <Plans a={a} />}
         {tab === 'reviews' && <Reviews a={a} />}
+        {tab === 'events' && <Events a={a} />}
       </div>
     </>
   );

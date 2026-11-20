@@ -5,6 +5,7 @@
 
 import { newId } from '../db/index.js';
 import { readCertificate } from './pki.js';
+import YAML from 'yaml';
 
 export const AUTH_KINDS = ['keyless', 'apikey', 'jwt', 'mtls', 'oauth2-local', 'oauth2-remote'];
 
@@ -217,6 +218,9 @@ export function defaultDraft({ domain, contextPath } = {}) {
     resources: [defaultResource(backend.id, flow.id)],
     plans: [],
     openapi: { content: '', format: 'yaml' },
+    // the AsyncAPI specification of an event-driven api: its channels and messages, for the portal.
+    // Like the documentation, it never reaches the gateway
+    asyncapi: { content: '', format: 'yaml' },
     documentation: { languages: ['en'], defaultLanguage: 'en' },
     // correlationId: the request id of the gateway sent to the backends (Otoroshi-Request-Id), the one
     // the caller gets back and the request log keeps
@@ -285,6 +289,7 @@ export function normalizeDraft(input = {}) {
     return plan;
   });
   d.openapi = { ...base.openapi, ...(input.openapi || {}) };
+  d.asyncapi = { ...base.asyncapi, ...(input.asyncapi || {}) };
   d.documentation = { ...base.documentation, ...(input.documentation || {}) };
   if (!asArray(d.documentation.languages).length) d.documentation.languages = ['en'];
   d.settings = { ...base.settings, ...(input.settings || {}) };
@@ -448,7 +453,26 @@ export function validateDraft(draft) {
       message: 'a keyless plan always resolves an identity: it runs last (extractor index 900), after every credential based plan.',
     });
   }
+  // an AsyncAPI specification the portal cannot read is said before it is published
+  const asyncapi = (d.asyncapi?.content || '').trim();
+  if (asyncapi) {
+    const spec = parseSpec(asyncapi);
+    if (!spec) warnings.push({ path: 'asyncapi', code: 'asyncapi_unreadable', message: 'the AsyncAPI specification cannot be parsed: the portal will not show it' });
+    else if (!spec.asyncapi) warnings.push({ path: 'asyncapi', code: 'asyncapi_unreadable', message: 'the AsyncAPI specification has no "asyncapi" field: the portal will not show it' });
+  }
   return { errors, warnings, ok: errors.length === 0 };
+}
+
+// a specification, in YAML or in JSON; null when it cannot be read
+export function parseSpec(text) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  try {
+    const out = t.startsWith('{') ? JSON.parse(t) : YAML.parse(t);
+    return out && typeof out === 'object' ? out : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // effective plan resolution order, as the gateway will evaluate it: the extractor index of each

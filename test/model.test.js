@@ -120,6 +120,7 @@ describe('projection', () => {
   test('the api entity is managed as code and never carries portal-only data', () => {
     const plan = defaultPlan({ id: 'p', status: 'published', usageStatement: { enabled: true, required: true, prompt: 'SECRET-PROMPT' }, pricing: { kind: 'paid', amount: 42 } });
     const d = draft([plan]);
+    d.asyncapi = { content: 'asyncapi: 3.0.0\ninfo:\n  title: SECRET-CHANNELS\n  version: 1.0.0', format: 'yaml' };
     const e = buildOtoroshiApi({ api: { id: 'api_1', name: 'Pets', version: '1.0.0', workspace_id: 'ws', tags: [] }, draft: d }, { snapshotId: 'snap_1', snapshotNumber: 3 });
     expect(e.metadata.created_by).toBe('external=otoroshi-api-management');
     expect(e.metadata.deployment_ref).toBe('snap_1');
@@ -127,6 +128,7 @@ describe('projection', () => {
     expect(e.state).toBe('published');
     expect(e.documentation).toBeNull();
     expect(JSON.stringify(e)).not.toContain('SECRET-PROMPT');
+    expect(JSON.stringify(e)).not.toContain('SECRET-CHANNELS');
     expect(JSON.stringify(e.plans)).not.toContain('"price"');
     expect(e.routes.map((r) => r.frontend.domains[0])).toEqual(['/pets', '/store']);
   });
@@ -217,5 +219,43 @@ describe('ingestion', () => {
   test('secrets in the url are masked on the raw path', () => {
     expect(maskUrl('http://x.oto.tools/v1/books?page=2&api_key=abc&access_token=t')).toBe('http://x.oto.tools/v1/books?page=2&api_key=********&access_token=********');
     expect(maskUrl('/v1/books?q=x')).toBe('/v1/books?q=x');
+  });
+});
+
+describe('asyncapi', () => {
+  test('the channels of a specification, from the side of a consumer, in AsyncAPI 3 and 2', async () => {
+    const { channelsOf } = await import('../web/shared/asyncapi.js');
+    const v3 = {
+      asyncapi: '3.0.0',
+      channels: { orders: { address: 'orders.created', messages: { created: { $ref: '#/components/messages/OrderCreated' } } }, returns: { address: 'returns' } },
+      operations: { publishOrder: { action: 'send', channel: { $ref: '#/channels/orders' }, summary: 'the api publishes the orders' }, takeReturn: { action: 'receive', channel: { $ref: '#/channels/returns' } } },
+      components: { messages: { OrderCreated: { name: 'OrderCreated', payload: { $ref: '#/components/schemas/Order' } } }, schemas: { Order: { type: 'object', properties: { id: { type: 'string' } } } } },
+    };
+    const c3 = channelsOf(v3);
+    expect(c3.map((c) => [c.address, c.operations.map((o) => o.side)])).toEqual([
+      ['orders.created', ['receive']],
+      ['returns', ['send']],
+    ]);
+    // the references are resolved, the payload with them
+    expect(c3[0].operations[0].messages[0]).toEqual({ name: 'OrderCreated', payload: { type: 'object', properties: { id: { type: 'string' } } } });
+    // AsyncAPI 2 describes the operations of the others: publish is what a consumer sends
+    const v2 = { asyncapi: '2.6.0', channels: { 'user/signedup': { subscribe: { message: { oneOf: [{ name: 'a' }, { name: 'b' }] } }, publish: { message: { name: 'c' } } } } };
+    expect(channelsOf(v2)[0].operations.map((o) => [o.side, o.messages.map((m) => m.name)])).toEqual([
+      ['send', ['c']],
+      ['receive', ['a', 'b']],
+    ]);
+    // a reference that loops is left as it is
+    const loop = { asyncapi: '3.0.0', channels: { c: { messages: { m: { $ref: '#/components/messages/m' } } } }, components: { messages: { m: { payload: { $ref: '#/components/messages/m' } } } } };
+    expect(() => channelsOf(loop)).not.toThrow();
+  });
+
+  test('a specification the portal cannot read is said before it is published', () => {
+    const d = draft([defaultPlan({ status: 'published' })]);
+    d.asyncapi = { content: 'asyncapi: [', format: 'yaml' };
+    expect(validateDraft(d).warnings.map((w) => w.code)).toContain('asyncapi_unreadable');
+    d.asyncapi.content = 'openapi: 3.1.0';
+    expect(validateDraft(d).warnings.map((w) => w.code)).toContain('asyncapi_unreadable');
+    d.asyncapi.content = 'asyncapi: 3.0.0\ninfo: { title: x, version: 1.0.0 }';
+    expect(validateDraft(d).warnings.map((w) => w.code)).not.toContain('asyncapi_unreadable');
   });
 });

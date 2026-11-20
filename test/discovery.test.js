@@ -185,3 +185,25 @@ describe('what the portal shows', () => {
     expect((await catalogue()).find((a) => a.name === 'Beacon').categories).toEqual([]);
   });
 });
+
+describe('an event-driven api', () => {
+  test('its AsyncAPI specification is served by the portal, its servers the gateway', async () => {
+    const api = await ok('GET', `/workspaces/${WS}/apis/${state.atlas.id}`);
+    const draft = api.draft;
+    draft.asyncapi = {
+      format: 'yaml',
+      content: ['asyncapi: 3.0.0', 'info:', '  title: Atlas events', '  version: 1.0.0', 'servers:', '  kafka:', '    host: broker.internal:9092', '    protocol: kafka', 'channels:', '  updates:', '    address: maps.updated'].join('\n'),
+    };
+    await ok('PUT', `/workspaces/${WS}/apis/${state.atlas.id}/draft`, { draft });
+    await ok('POST', `/workspaces/${WS}/apis/${state.atlas.id}/publish`, { comment: 'events', deploy: true });
+    expect((await portal(null, 'GET', '/apis/atlas')).body.has_asyncapi).toBe(true);
+    const spec = (await portal(null, 'GET', '/apis/atlas/asyncapi')).body;
+    expect(spec.info.title).toBe('Atlas events');
+    expect(spec.channels.updates.address).toBe('maps.updated');
+    // the brokers stay private: the consumers reach them through the gateway
+    expect(spec.servers).toEqual({ gateway: { host: `atlas-${RUN}.oto.tools:8080`, protocol: 'http', description: 'Otoroshi gateway' } });
+    expect(JSON.stringify(spec)).not.toContain('broker.internal');
+    expect((await portal(null, 'GET', '/apis/beacon/asyncapi')).status).toBe(404);
+  });
+});
+
