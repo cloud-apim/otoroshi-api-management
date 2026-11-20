@@ -9,6 +9,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { config } from '../config.js';
 import { db } from '../db/index.js';
+import { open, seal } from './secrets.js';
 import { badRequest } from '../http/router.js';
 
 export const IP_MODES = ['keep', 'truncate', 'hash', 'drop'];
@@ -68,7 +69,7 @@ function merge(stored = {}) {
     raw: { ...DEFAULTS.raw, ...(stored.raw || {}) },
     privacy: { ...DEFAULTS.privacy, ...(stored.privacy || {}) },
     retention: { ...DEFAULTS.retention, ...(stored.retention || {}) },
-    key: stored.key || null,
+    key: open(stored.key) || null,
   };
 }
 
@@ -83,8 +84,9 @@ export async function policy() {
   // a hash needs a key: made at first use
   if (!value.key) {
     value = normalize({}, rows[0]?.value || {});
-    await db`insert into settings (key, value) values ('ingest', ${{ ...(rows[0]?.value || {}), key: value.key }})
-      on conflict (key) do update set value = settings.value || jsonb_build_object('key', ${value.key}::text), updated_at = now()`;
+    const key = seal(value.key);
+    await db`insert into settings (key, value) values ('ingest', ${{ ...(rows[0]?.value || {}), key }})
+      on conflict (key) do update set value = settings.value || jsonb_build_object('key', ${key}::text), updated_at = now()`;
   }
   cached = { at: Date.now(), value };
   return value;

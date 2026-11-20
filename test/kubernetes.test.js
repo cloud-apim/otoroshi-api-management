@@ -140,7 +140,7 @@ describe('the manifests', () => {
   });
 
   test.skipIf(!hasHelm)('the Helm chart lints, renders, and the api server accepts what it renders', () => {
-    const secrets = 'secrets.databaseUrl=postgres://a,secrets.analyticsDatabaseUrl=postgres://b,secrets.otoroshiClientId=id,secrets.otoroshiClientSecret=s,secrets.adminToken=t,secrets.ingestToken=i,secrets.bootstrapPassword=p';
+    const secrets = 'secrets.databaseUrl=postgres://a,secrets.analyticsDatabaseUrl=postgres://b,secrets.otoroshiClientId=id,secrets.otoroshiClientSecret=s,secrets.adminToken=t,secrets.ingestToken=i,secrets.bootstrapPassword=p,secrets.secretsKey=k';
     expect(helm('lint', '--strict', 'otoroshi-api-management', '--set', secrets)).toContain('0 chart(s) failed');
     // without its secrets, it says which one is missing
     const missing = Bun.spawnSync(['docker', 'run', '--rm', '-v', `${join(import.meta.dir, '..', 'deploy/helm')}:/charts`, '-w', '/charts', HELM, 'template', 'apim', 'otoroshi-api-management'], { stderr: 'pipe' });

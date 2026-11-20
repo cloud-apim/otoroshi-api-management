@@ -37,6 +37,12 @@ export const config = {
     idleTimeoutS: parseInt(env.APIM_DATABASE_IDLE_TIMEOUT_S || '30', 10),
   },
 
+  // the key the secrets the product keeps are sealed with, and the previous ones on a rotation
+  secrets: {
+    key: env.APIM_SECRETS_KEY || null,
+    previousKeys: list(env.APIM_SECRETS_PREVIOUS_KEYS, []),
+  },
+
   // bootstrap administrators: in-memory identities that depend on nothing
   bootstrap: {
     admins: list(env.APIM_BOOTSTRAP_ADMINS, ['admin@otoroshi.io']),

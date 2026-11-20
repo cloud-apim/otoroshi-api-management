@@ -57,6 +57,9 @@ secrets:
   adminToken: ""
   ingestToken: ""
   bootstrapPassword: ""
+  # the key the product seals the secrets it keeps with; on a rotation, the previous ones, comma-separated
+  secretsKey: ""
+  secretsPreviousKeys: ""
 
 service:
   type: ClusterIP

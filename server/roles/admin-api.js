@@ -12,6 +12,7 @@ import * as applications from '../domain/applications.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import * as analytics from '../domain/analytics.js';
 import { invalidatePolicy as invalidateIngestPolicy, normalize as normalizeIngest, policy as ingestPolicy, publicPolicy } from '../domain/ingest-policy.js';
+import { sealSettings } from '../domain/secrets-store.js';
 import { EXPORTER_ID, runSetup, setupState } from '../domain/setup.js';
 import { runRetention } from '../domain/retention.js';
 import { listAudit, searchAudit, audit } from '../domain/audit.js';
@@ -128,7 +129,7 @@ r.put('/settings/:key', async ({ ctx, params, body }) => {
   if (params.key === 'gateway' && (!body.clientSecret || body.clientSecret.includes('••'))) value.clientSecret = current.clientSecret || config.otoroshi.clientSecret;
   // the policy of the ingester: checked, completed, its key kept unless rotated
   const stored = params.key === 'ingest' ? normalizeIngest(body, { ...current, key: (await ingestPolicy()).key }) : value;
-  await db`insert into settings (key, value) values (${params.key}, ${stored}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
+  await db`insert into settings (key, value) values (${params.key}, ${sealSettings(params.key, stored)}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   invalidateGatewaySettings();
   invalidateAuthSettings();
   invalidateIngestPolicy();

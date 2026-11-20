@@ -24,6 +24,8 @@ node = "24"
 # the cli and the smoke tasks talk to the local product with the bootstrap admin token
 APIM_URL = "http://localhost:9000"
 APIM_TOKEN = "apim-admin-token"
+# the key the development stack seals its secrets with (docker-compose.yml, test/preload.js)
+APIM_SECRETS_KEY = "development-only-secrets-key"
 COMPOSE_FILE = "{{config_root}}/docker/docker-compose.yml"
 COMPOSE_PROFILES = "apim"
 

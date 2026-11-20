@@ -14,20 +14,24 @@ import YAML from 'yaml';
 import { db, newId } from '../db/index.js';
 import { badRequest, notFound } from '../http/router.js';
 import { audit } from './audit.js';
+import { openValues, sealValues } from './secrets.js';
 import { diff } from './diff.js';
 import { normalizeDraft } from './model.js';
 import { API_KIND, apiDocument, applyApiDocument } from './exchange.js';
 
 export const MODES = ['draft', 'publish', 'deploy'];
 
+// the headers of a catalog (a token of the git host...) are sealed at rest
+const opened = (c) => c && { ...c, headers: openValues(c.headers) };
+
 export async function listCatalogs(workspaceId) {
-  return db`select * from remote_catalogs where workspace_id = ${workspaceId} order by name`;
+  return (await db`select * from remote_catalogs where workspace_id = ${workspaceId} order by name`).map(opened);
 }
 
 export async function getCatalog(workspaceId, id) {
   const rows = await db`select * from remote_catalogs where workspace_id = ${workspaceId} and id = ${id}`;
   if (!rows[0]) throw notFound('catalog not found');
-  return rows[0];
+  return opened(rows[0]);
 }
 
 function checkInput(input) {
@@ -41,20 +45,20 @@ export async function createCatalog(ctx, workspaceId, input) {
   const id = newId('cat');
   const rows = await db`insert into remote_catalogs (id, workspace_id, name, kind, url, ref, path, headers, mode, prune, interval_seconds, enabled)
     values (${id}, ${workspaceId}, ${input.name || input.url}, ${input.kind}, ${input.url}, ${input.ref || null}, ${input.path || null},
-      ${input.headers || {}}, ${input.mode || 'draft'}, ${!!input.prune}, ${input.interval_seconds || 300}, ${input.enabled !== false}) returning *`;
+      ${sealValues(input.headers)}, ${input.mode || 'draft'}, ${!!input.prune}, ${input.interval_seconds || 300}, ${input.enabled !== false}) returning *`;
   await audit(ctx, { action: 'catalog.create', workspaceId, entityKind: 'catalog', entityId: id, summary: `remote catalog ${rows[0].name} (${input.kind}) created` });
-  return rows[0];
+  return opened(rows[0]);
 }
 
 export async function updateCatalog(ctx, cat, patch) {
   const next = { ...cat, ...patch };
   checkInput(next);
   const rows = await db`update remote_catalogs set name = ${next.name}, kind = ${next.kind}, url = ${next.url}, ref = ${next.ref || null},
-      path = ${next.path || null}, headers = ${next.headers || {}}, mode = ${next.mode}, prune = ${!!next.prune},
+      path = ${next.path || null}, headers = ${sealValues(next.headers)}, mode = ${next.mode}, prune = ${!!next.prune},
       interval_seconds = ${next.interval_seconds || 300}, enabled = ${next.enabled !== false}, updated_at = now()
     where id = ${cat.id} returning *`;
   await audit(ctx, { action: 'catalog.update', workspaceId: cat.workspace_id, entityKind: 'catalog', entityId: cat.id, summary: `remote catalog ${next.name} updated` });
-  return rows[0];
+  return opened(rows[0]);
 }
 
 export async function deleteCatalog(ctx, cat) {
@@ -219,5 +223,5 @@ export async function sync(ctx, cat, { deployments, apis }) {
 export async function syncDue(deps) {
   const due = await db`select * from remote_catalogs where enabled = true
     and (last_sync_at is null or last_sync_at < now() - make_interval(secs => interval_seconds))`;
-  for (const cat of due) await sync({ via: 'catalog-scheduler' }, cat, deps).catch((e) => console.error('[apim] catalog sync failed', e.message));
+  for (const cat of due.map(opened)) await sync({ via: 'catalog-scheduler' }, cat, deps).catch((e) => console.error('[apim] catalog sync failed', e.message));
 }

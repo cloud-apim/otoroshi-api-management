@@ -2,6 +2,7 @@
 // An administrator only sees the users who are members of its workspaces.
 
 import { db, newId, slugify } from '../db/index.js';
+import { open, seal } from './secrets.js';
 import { config } from '../config.js';
 import { badRequest, conflict, forbidden, notFound, unauthorized } from '../http/router.js';
 import { audit } from './audit.js';
@@ -112,7 +113,7 @@ export function maskSecret(secret) {
 // never hand an idp secret back to a client
 export function maskWorkspace(ws) {
   if (!ws?.portal?.oidc) return ws;
-  return { ...ws, portal: { ...ws.portal, oidc: { ...ws.portal.oidc, clientSecret: maskSecret(ws.portal.oidc.clientSecret) } } };
+  return { ...ws, portal: { ...ws.portal, oidc: { ...ws.portal.oidc, clientSecret: maskSecret(open(ws.portal.oidc.clientSecret)) } } };
 }
 
 // the workspaces of a person, with its role in each (an installation administrator is the
@@ -163,6 +164,8 @@ export async function updateWorkspace(ctx, ws, patch) {
   // a masked secret sent back by the console keeps the stored one
   if (patch.portal?.oidc && (!patch.portal.oidc.clientSecret || String(patch.portal.oidc.clientSecret).includes('••')))
     portal.oidc = { ...portal.oidc, clientSecret: ws.portal?.oidc?.clientSecret || '' };
+  // sealed at rest
+  if (portal?.oidc?.clientSecret) portal.oidc = { ...portal.oidc, clientSecret: seal(portal.oidc.clientSecret) };
   const metadata = patch.metadata ?? ws.metadata;
   const rows = await db`update workspaces set name = ${name}, description = ${description}, portal = ${portal},
     metadata = ${metadata}, updated_at = now() where id = ${ws.id} returning *`;

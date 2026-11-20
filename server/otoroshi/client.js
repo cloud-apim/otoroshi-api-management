@@ -3,6 +3,7 @@
 
 import { config } from '../config.js';
 import { db } from '../db/index.js';
+import { open } from '../domain/secrets.js';
 
 // an outside tool that manages its apis as code: each write of an Api so marked is a deploy, recorded
 // in the deployment history of the Api, owned by this marker
@@ -26,6 +27,7 @@ export async function gatewaySettings() {
   if (cached && cached.at > Date.now() - 5000) return cached.value;
   const rows = await db`select value from settings where key = 'gateway'`;
   const value = { ...config.otoroshi, ...(rows[0]?.value || {}) };
+  value.clientSecret = open(value.clientSecret);
   cached = { at: Date.now(), value };
   return value;
 }

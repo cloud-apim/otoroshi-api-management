@@ -25,4 +25,6 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 - { name: OTOROSHI_CLIENT_ID, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: otoroshi-client-id } } }
 - { name: OTOROSHI_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: otoroshi-client-secret } } }
 - { name: APIM_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: bootstrap-password } } }
+- { name: APIM_SECRETS_KEY, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: secrets-key } } }
+- { name: APIM_SECRETS_PREVIOUS_KEYS, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: secrets-previous-keys, optional: true } } }
 {{- end -}}

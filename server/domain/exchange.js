@@ -4,7 +4,7 @@
 
 import { db, newId } from '../db/index.js';
 import { badRequest, forbidden } from '../http/router.js';
-import { isTeamMember } from './identity.js';
+import { isTeamMember, maskWorkspace } from './identity.js';
 import { audit } from './audit.js';
 import { normalizeDraft } from './model.js';
 
@@ -43,7 +43,8 @@ export async function exportWorkspace(ws) {
     kind: EXPORT_KIND,
     version: 1,
     exported_at: new Date().toISOString(),
-    workspace: { slug: ws.slug, name: ws.name, description: ws.description, portal: ws.portal },
+    // the secret of the identity provider of the portal stays in the installation
+    workspace: { slug: ws.slug, name: ws.name, description: ws.description, portal: maskWorkspace(ws).portal },
     teams,
     apis,
     applications,

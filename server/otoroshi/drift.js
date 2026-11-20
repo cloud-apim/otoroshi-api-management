@@ -7,6 +7,7 @@ import { db, newId } from '../db/index.js';
 import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
+import { open } from '../domain/secrets.js';
 import { IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
@@ -76,7 +77,7 @@ export async function checkSubscription(sub) {
           changes.push({ op: 'change', path: `apikey[${c.client_id}].enabled`, before: sub.status === 'active', after: key.enabled });
         if (key.apiRef?.plan && key.apiRef.plan !== sub.plan_id)
           changes.push({ op: 'change', path: `apikey[${c.client_id}].apiRef.plan`, before: sub.plan_id, after: key.apiRef.plan });
-        if (key.clientSecret !== c.client_secret)
+        if (key.clientSecret !== open(c.client_secret))
           changes.push({ op: 'change', path: `apikey[${c.client_id}].clientSecret`, before: '(product secret)', after: '(changed on the gateway)' });
       }
     }

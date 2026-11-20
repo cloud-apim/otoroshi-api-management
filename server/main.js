@@ -314,6 +314,10 @@ async function start() {
   checkConfig();
   (await import('./payments/billing.js')).checkPaymentsConfig();
   await migrateAll();
+  // the secrets stored in clear, or with a previous key, sealed with the current one
+  const sealedNow = await (await import('./domain/secrets-store.js')).resealAll();
+  if (sealedNow.resealed) console.log(`[apim] ${sealedNow.resealed} secret(s) sealed with the current key`);
+  for (const e of sealedNow.errors || []) console.error(`[apim] secret not sealed: ${e}`);
   await identity.bootstrap();
   await identity.checkTenancy();
   await recordPortalForm();

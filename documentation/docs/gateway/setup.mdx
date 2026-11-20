@@ -49,7 +49,7 @@ Each run reads, and reports: the version of Otoroshi (18.1 at least: the release
 product calls the gateway with — its own, or one it did not make; the key pairs the oauth2-local
 plans sign their tokens with (Otoroshi makes `otoroshi-jwt-signing` again at start and every day);
 a certificate for each host served over https; the events reaching the ingester in the last
-fifteen minutes.
+fifteen minutes; whether the secrets the product keeps are sealed ([secrets at rest](../install.mdx#secrets-at-rest)).
 
 ## The key of the product
 

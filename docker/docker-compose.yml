@@ -83,6 +83,8 @@ services:
       APIM_PUBLIC_URL: http://localhost:9000
       # the fake Stripe of the development: a Checkout is a page of the product
       APIM_PAYMENTS_PROVIDER: fake
+      # the key the secrets are sealed with — the one of mise.toml and of the tests: they share the database
+      APIM_SECRETS_KEY: development-only-secrets-key
     ports:
       - "9000:9000"
     volumes:

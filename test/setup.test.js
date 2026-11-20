@@ -21,6 +21,7 @@ const { start } = await import('../server/main.js');
 const { db } = await import('../server/db/index.js');
 const { gatewaySettings, invalidateGatewaySettings, oto } = await import('../server/otoroshi/client.js');
 const { invalidateAuthSettings } = await import('../server/auth/settings.js');
+const { open } = await import('../server/domain/secrets.js');
 const { CONSOLE_ROUTE, EXPORTER_ID, KEY_ID, PORTALS_ROUTE } = await import('../server/domain/setup.js');
 
 const RUN = Date.now().toString(36);
@@ -188,7 +189,8 @@ describe('the setup of the gateway', () => {
     expect(part(report, 'console').status).toBe('changed');
     const route = (await gw('GET', `/apis/proxy.otoroshi.io/v1/routes/${CONSOLE_ROUTE}`)).body;
     expect(route.plugins.map((p) => p.plugin)).toEqual(['cp:otoroshi.next.plugins.AuthModule', 'cp:otoroshi.next.plugins.OtoroshiInfos']);
-    const secret = (await db`select value from settings where key = 'auth'`)[0].value.otoroshi.secret;
+    // kept sealed at rest, shared with the route in clear
+    const secret = open((await db`select value from settings where key = 'auth'`)[0].value.otoroshi.secret);
     expect(route.plugins[1].config.algo).toMatchObject({ type: 'HSAlgoSettings', size: 512, secret });
     // nobody signed in: the gateway sends to its login page
     const res = await through(CONSOLE_HOST, '/backoffice/', (s) => s >= 300 && s < 400);
@@ -204,7 +206,7 @@ describe('the setup of the gateway', () => {
       // signed in on the module of the gateway, the console answers as that person (the product of
       // the stack reads its settings again within a few seconds)
       let me;
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 40; i++) {
         me = await nav(`http://${CONSOLE_HOST}:8080/backoffice/api/me`);
         if (me.status === 200) break;
         await Bun.sleep(500);

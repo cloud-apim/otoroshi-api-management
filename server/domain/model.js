@@ -275,6 +275,15 @@ export function validateDraft(draft) {
         message: `plan "${p.name}" meters ${p.unit}: tokens and budget need an LLM backend, not available in this version`,
       });
     const derive = ['jwt', 'oauth2-remote'].includes(p.auth.kind) && p.auth.config.derive?.enabled ? p.auth.config.derive : null;
+    // a secret described in a plan is in the draft, in every snapshot and in their exports: a vault
+    // reference keeps it out of them
+    const plainSecret = derive && (p.auth.kind === 'jwt' ? (derive.kind === 'hmac' ? derive.secret : null) : derive.clientSecret);
+    if (plainSecret && !/^\$\{vault:\/\/.+\}$/.test(String(plainSecret).trim()))
+      warnings.push({
+        path: `plans[${i}].auth.config.derive`,
+        code: 'secret_in_clear',
+        message: `plan "${p.name}": its ${p.auth.kind === 'jwt' ? 'HMAC secret' : 'client secret'} is kept in clear in the draft, in every snapshot and in their exports — give a vault reference instead (\${vault://local/…})`,
+      });
     if (derive && p.auth.kind === 'jwt') {
       if (derive.kind === 'jwks' && !derive.jwksUrl) errors.push({ path: `plans[${i}].auth.config.derive.jwksUrl`, message: `plan "${p.name}" derives its verifier from a JWKS: give its url` });
       if (derive.kind === 'hmac' && !derive.secret) errors.push({ path: `plans[${i}].auth.config.derive.secret`, message: `plan "${p.name}" derives an HMAC verifier: give its secret (or a vault reference)` });

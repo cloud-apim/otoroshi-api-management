@@ -16,6 +16,7 @@ import { checkValues } from './metadata.js';
 import { notify } from './notifications.js';
 import { requireUnmanaged } from './applications.js';
 import { config } from '../config.js';
+import { open, seal } from './secrets.js';
 
 export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
 
@@ -43,8 +44,11 @@ export async function getSubscription(workspaceId, id) {
   return rows[0];
 }
 
+// the secret of a credential is sealed at rest
+const openCredential = (c) => c && { ...c, client_secret: open(c.client_secret) };
+
 export async function credentialsOf(subscriptionId) {
-  return db`select * from credentials where subscription_id = ${subscriptionId} order by created_at`;
+  return (await db`select * from credentials where subscription_id = ${subscriptionId} order by created_at`).map(openCredential);
 }
 
 // the plans a consumer can subscribe to are those of the snapshot running on the gateway
@@ -360,9 +364,9 @@ export async function rotateCredential(ctx, sub, credentialId) {
   if (!key) throw badRequest('the key does not exist on the gateway yet');
   const secret = [...crypto.getRandomValues(new Uint8Array(40))].map((b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
   await oto.updateApikey({ ...key, clientSecret: secret });
-  await db`update credentials set client_secret = ${secret}, rotated_at = now() where id = ${cred.id}`;
+  await db`update credentials set client_secret = ${seal(secret)}, rotated_at = now() where id = ${cred.id}`;
   await audit(ctx, { action: 'credential.rotate', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `secret of ${cred.client_id} rotated` });
-  return (await db`select * from credentials where id = ${cred.id}`)[0];
+  return openCredential((await db`select * from credentials where id = ${cred.id}`)[0]);
 }
 
 // ---------------------------------------------------------------- projection (idempotent)
@@ -422,11 +426,11 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
         const found = (await db`select id from credentials where subscription_id = ${sub.id} and client_id = ${key.clientId}`)[0];
         const otoInfo = { enabled: key.enabled, apiRef: key.apiRef, authorizations: key.authorizations };
         if (found) {
-          await db`update credentials set client_secret = ${key.clientSecret}, status = 'active', otoroshi = ${otoInfo}, revoked_at = null where id = ${found.id}`;
+          await db`update credentials set client_secret = ${seal(key.clientSecret)}, status = 'active', otoroshi = ${otoInfo}, revoked_at = null where id = ${found.id}`;
         } else {
           await db`insert into credentials (id, subscription_id, application_id, kind, client_id, client_secret, otoroshi)
             values (${newId('cred')}, ${sub.id}, ${sub.application_id}, ${sub.auth_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'},
-              ${key.clientId}, ${key.clientSecret}, ${otoInfo})`;
+              ${key.clientId}, ${seal(key.clientSecret)}, ${otoInfo})`;
         }
       }
     }

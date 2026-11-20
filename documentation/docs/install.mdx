@@ -131,6 +131,32 @@ subscriptions, audit…) and the **events and analytics**. They do not have the 
 retention or criticality, so they are two connection URLs — they may live on the same server.
 Migrations run at startup.
 
+## Secrets at rest
+
+What the product keeps that opens something is **sealed** before it is stored — AES-256-GCM, with
+the key of the installation, `APIM_SECRETS_KEY`: the secrets of the credentials it shows to
+consumers, the key it calls the gateway with, the client secrets of the identity providers of the
+console and of the portals, the secret of the "via Otoroshi" info token, the headers of the remote
+catalogs and of the audit exporters, the key of the pseudonyms of the ingester. A database dump, a
+backup, a replica hold them sealed; the product reads them in clear. Every instance of an
+installation has the same key.
+
+```
+enc:v1:<key id>:<iv, tag and ciphertext>
+```
+
+**Rotation.** Set the new key in `APIM_SECRETS_KEY`, list the previous one in
+`APIM_SECRETS_PREVIOUS_KEYS`, restart: at start, every secret sealed with another key — or stored
+in clear before a key was set — is sealed again with the current one. Once every instance runs with
+the new key, the previous one can go.
+
+Without a key, secrets are stored in clear, and the [setup check](./gateway/setup.mdx) says so.
+
+The secrets a plan describes — the HMAC secret of a jwt plan, the client secret of an authorization
+server — are in its draft, in every snapshot and in their exports: give a **vault reference**
+(`${vault://local/partner_hmac}`), resolved by the gateway, and the draft warns otherwise
+(`secret_in_clear`). The secrets of the payments are not in the database: they come from the environment of the instances (`APIM_STRIPE_SECRET_KEY`, `APIM_STRIPE_WEBHOOK_SECRET`).
+
 ## Configuration
 
 Installation-level settings come from the environment. Everything per workspace lives in the
@@ -150,6 +176,8 @@ console (*Gateway* and *Global settings*); stored values take precedence.
 | `APIM_DATABASE_POOL` | `20` | connections an instance may open to the application database |
 | `APIM_ANALYTICS_DATABASE_POOL` | `10` | connections an instance may open to the analytics database |
 | `APIM_DATABASE_IDLE_TIMEOUT_S` | `30` | an idle connection is closed after that many seconds |
+| `APIM_SECRETS_KEY` | — | the key the secrets kept by the product are sealed with ([secrets at rest](#secrets-at-rest)); without it they are stored in clear |
+| `APIM_SECRETS_PREVIOUS_KEYS` | — | previous keys, comma-separated: still read, their secrets sealed again with the current key at start |
 | `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |
 | `APIM_PROJECTION_INTERVAL_MS` | `2000` | how often the projection queue is polled |
 | `APIM_DRIFT_INTERVAL_MS` | `60000` | how often drift is detected |

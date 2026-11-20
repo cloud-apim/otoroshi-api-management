@@ -34,6 +34,8 @@ spec:
             - { name: OTOROSHI_CLIENT_ID, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-id } } }
             - { name: OTOROSHI_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: otoroshi-client-secret } } }
             - { name: APIM_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: bootstrap-password } } }
+            - { name: APIM_SECRETS_KEY, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: secrets-key } } }
+            - { name: APIM_SECRETS_PREVIOUS_KEYS, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: secrets-previous-keys, optional: true } } }
           envFrom:
             - configMapRef: { name: otoroshi-api-management }
           readinessProbe:

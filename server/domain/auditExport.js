@@ -5,15 +5,19 @@
 import { db, newId } from '../db/index.js';
 import { badRequest, notFound } from '../http/router.js';
 import { audit } from './audit.js';
+import { openValues, sealValues } from './secrets.js';
+
+// the headers of an exporter (the token of the SIEM...) are sealed at rest
+const opened = (e) => e && { ...e, headers: openValues(e.headers) };
 
 export async function listExporters() {
-  return db`select e.*, (select max(id) from audit_events) - e.cursor as lag from audit_exporters e order by e.name`;
+  return (await db`select e.*, (select max(id) from audit_events) - e.cursor as lag from audit_exporters e order by e.name`).map(opened);
 }
 
 export async function getExporter(id) {
   const rows = await db`select * from audit_exporters where id = ${id}`;
   if (!rows[0]) throw notFound('exporter not found');
-  return rows[0];
+  return opened(rows[0]);
 }
 
 export async function saveExporter(ctx, input, existing = null) {
@@ -26,19 +30,19 @@ export async function saveExporter(ctx, input, existing = null) {
   const v = { ...existing, ...input };
   if (existing) {
     const rows = await db`update audit_exporters set name = ${v.name || v.url}, workspace_id = ${v.workspace_id || null}, url = ${v.url},
-        headers = ${v.headers || {}}, actions = ${v.actions || []}, enabled = ${v.enabled !== false}, batch_size = ${v.batch_size || 100}
+        headers = ${sealValues(v.headers)}, actions = ${v.actions || []}, enabled = ${v.enabled !== false}, batch_size = ${v.batch_size || 100}
       where id = ${existing.id} returning *`;
     await audit(ctx, { action: 'audit.exporter.update', entityKind: 'audit_exporter', entityId: existing.id, summary: `audit exporter ${v.name} updated` });
-    return rows[0];
+    return opened(rows[0]);
   }
   // a new exporter starts from now on, unless asked to replay the whole trail
   const start = input.from_beginning ? 0 : (await db`select coalesce(max(id), 0)::bigint as m from audit_events`)[0].m;
   const id = newId('aexp');
   const rows = await db`insert into audit_exporters (id, name, workspace_id, url, headers, actions, enabled, batch_size, cursor)
-    values (${id}, ${v.name || v.url}, ${v.workspace_id || null}, ${v.url}, ${v.headers || {}}, ${v.actions || []}, ${v.enabled !== false}, ${v.batch_size || 100}, ${start})
+    values (${id}, ${v.name || v.url}, ${v.workspace_id || null}, ${v.url}, ${sealValues(v.headers)}, ${v.actions || []}, ${v.enabled !== false}, ${v.batch_size || 100}, ${start})
     returning *`;
   await audit(ctx, { action: 'audit.exporter.create', entityKind: 'audit_exporter', entityId: id, summary: `audit exporter ${rows[0].name} created` });
-  return rows[0];
+  return opened(rows[0]);
 }
 
 export async function deleteExporter(ctx, ex) {
@@ -80,7 +84,7 @@ export async function deliver(ex) {
 }
 
 export async function deliverAll() {
-  const exporters = await db`select * from audit_exporters where enabled = true`;
+  const exporters = (await db`select * from audit_exporters where enabled = true`).map(opened);
   for (const ex of exporters) {
     // drain the backlog, a few batches per tick
     for (let i = 0; i < 10; i++) {

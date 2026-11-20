@@ -26,13 +26,13 @@ Last update: 2026-11-20.
   - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
   - R-39: the "via Otoroshi" console login verified end to end, through a basic auth module of the gateway in front of the console route the setup makes.
   - R-30: four instances on one database — two consoles with their workers, an ingester alone, a portal alone — each answers its roles and nothing else, a session made on one console is good on the other, sixty tasks run once each (`test/roles.test.js`). Found on the way: each instance kept up to 30 connections open, so a few instances exhausted PostgreSQL; the pools are set by instance now (`APIM_DATABASE_POOL`, `APIM_ANALYTICS_DATABASE_POOL`) and idle connections closed after 30 s.
+  - R-36: the secrets the product keeps — credentials, the key of the gateway, the secrets of the identity providers and of the info token, the headers of the catalogs and of the audit exporters, the key of the pseudonyms — are sealed with AES-256-GCM and the key of the installation (`APIM_SECRETS_KEY`); a rotation lists the previous keys (`APIM_SECRETS_PREVIOUS_KEYS`), and every instance seals again at start what another key, or none, sealed. The setup check says when there is no key; a plan secret in clear is flagged (`secret_in_clear`): a vault reference keeps it out of the snapshots. Workspace exports leave the secret of the portal's identity provider out (`test/secrets.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-36** — secrets at rest.
-2. **R-13** — subscription expiry.
-3. **R-38** — UI tests.
+1. **R-13** — subscription expiry.
+2. **R-38** — UI tests.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -42,7 +42,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (22)**
+**Doable (21)**
 
 | # | Effort | What |
 |---|---|---|
@@ -56,7 +56,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-42 | S | Free pages of the portal |
 | R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
-| R-36 | M | Secrets at rest encrypted or in a vault |
 | R-38 | M | UI tests (the screens tour only today) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-12 | M | One credential for several subscriptions |
@@ -148,7 +147,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
 | R-37 | — | Not a priority (owner). An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
 | R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
 

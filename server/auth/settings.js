@@ -8,6 +8,7 @@
 
 import { config } from '../config.js';
 import { db } from '../db/index.js';
+import { open } from '../domain/secrets.js';
 
 const env = process.env;
 
@@ -23,7 +24,7 @@ export async function consoleAuth() {
       label: stored.oidc?.label || env.APIM_OIDC_LABEL || 'single sign-on',
       issuer: stored.oidc?.issuer || env.APIM_OIDC_ISSUER || '',
       clientId: stored.oidc?.clientId || env.APIM_OIDC_CLIENT_ID || '',
-      clientSecret: stored.oidc?.clientSecret || env.APIM_OIDC_CLIENT_SECRET || '',
+      clientSecret: open(stored.oidc?.clientSecret) || env.APIM_OIDC_CLIENT_SECRET || '',
       scopes: stored.oidc?.scopes || env.APIM_OIDC_SCOPES || 'openid email profile',
       emailClaim: stored.oidc?.emailClaim || 'email',
       nameClaim: stored.oidc?.nameClaim || 'name',
@@ -32,7 +33,7 @@ export async function consoleAuth() {
     },
     otoroshi: {
       header: stored.otoroshi?.header || env.APIM_OTOROSHI_CLAIM_HEADER || 'Otoroshi-Claim',
-      secret: stored.otoroshi?.secret || env.APIM_OTOROSHI_CLAIM_SECRET || '',
+      secret: open(stored.otoroshi?.secret) || env.APIM_OTOROSHI_CLAIM_SECRET || '',
       issuer: stored.otoroshi?.issuer || '',
     },
   };
@@ -55,7 +56,7 @@ export function publicAuthConfig(a) {
 export function portalAuth(ws) {
   const o = ws.portal?.oidc || {};
   return {
-    oidc: { enabled: !!(o.enabled && o.issuer && o.clientId), label: o.label || 'single sign-on', issuer: o.issuer, clientId: o.clientId, clientSecret: o.clientSecret, scopes: o.scopes || 'openid email profile', emailClaim: o.emailClaim || 'email', nameClaim: o.nameClaim || 'name' },
+    oidc: { enabled: !!(o.enabled && o.issuer && o.clientId), label: o.label || 'single sign-on', issuer: o.issuer, clientId: o.clientId, clientSecret: open(o.clientSecret), scopes: o.scopes || 'openid email profile', emailClaim: o.emailClaim || 'email', nameClaim: o.nameClaim || 'name' },
     localLogin: ws.portal?.localLogin !== false,
   };
 }

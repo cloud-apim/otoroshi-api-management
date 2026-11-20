@@ -21,6 +21,7 @@ import { META, gatewaySettings, invalidateGatewaySettings, otoroshi } from '../o
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import { currentForm, portalBase } from '../portal-exposure.js';
 import { diff } from './diff.js';
+import { seal, secretsStatus } from './secrets.js';
 
 export const PARTS = ['key', 'exporter', 'console', 'portals', 'tls'];
 export const SETUP_MARKER = 'otoroshi-apim-setup';
@@ -155,7 +156,7 @@ async function partKey(run) {
     if (!run.dryRun) {
       await accepted({ clientId: KEY_ID, clientSecret: secret });
       const value = (await db`select value from settings where key = 'gateway'`)[0]?.value || {};
-      await db`insert into settings (key, value) values ('gateway', ${{ ...value, clientId: KEY_ID, clientSecret: secret }})
+      await db`insert into settings (key, value) values ('gateway', ${{ ...value, clientId: KEY_ID, clientSecret: seal(secret) }})
         on conflict (key) do update set value = excluded.value, updated_at = now()`;
       invalidateGatewaySettings();
     }
@@ -262,7 +263,7 @@ async function partConsole(run) {
       secret = randomBytes(32).toString('hex');
       if (!run.dryRun) {
         const value = (await db`select value from settings where key = 'auth'`)[0]?.value || {};
-        await db`insert into settings (key, value) values ('auth', ${{ ...value, otoroshi: { ...(value.otoroshi || {}), secret } }})
+        await db`insert into settings (key, value) values ('auth', ${{ ...value, otoroshi: { ...(value.otoroshi || {}), secret: seal(secret) } }})
           on conflict (key) do update set value = excluded.value, updated_at = now()`;
         invalidateAuthSettings();
       }
@@ -348,6 +349,15 @@ async function checks(run) {
     const supported = v.major > MIN_OTOROSHI.major || (v.major === MIN_OTOROSHI.major && v.minor >= MIN_OTOROSHI.minor);
     add(supported ? 'ok' : 'error', 'gateway_version', `Otoroshi ${infos.otoroshi_version}, cluster ${infos.otoroshi_cluster_id}, ${infos.datastore} datastore${supported ? '' : `: the product needs Otoroshi ${MIN_OTOROSHI.major}.${MIN_OTOROSHI.minor} or later`}`);
   }
+  // what the product keeps that opens something: sealed with the key of the installation
+  const sec = secretsStatus();
+  add(
+    sec.encrypted ? 'ok' : 'warning',
+    'secrets_at_rest',
+    sec.encrypted
+      ? `the secrets the product keeps are sealed with the key ${sec.keyId}${sec.previousKeys ? `, ${sec.previousKeys} previous key(s) still read` : ''}`
+      : 'the secrets the product keeps (credentials, identity providers, the key of the gateway, catalog and exporter tokens) are stored in clear: set APIM_SECRETS_KEY'
+  );
   const s = await gatewaySettings();
   add(s.clientId === KEY_ID ? 'ok' : 'warning', 'product_key', s.clientId === KEY_ID ? `the product calls the gateway with its own key, ${KEY_ID}` : `the product calls the gateway with ${s.clientId}, a key it did not make (part key)`);
   // the key pairs the oauth2-local plans sign their tokens with

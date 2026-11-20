@@ -1,0 +1,3 @@
+[test]
+# the environment of the development stack the tests share a database with
+preload = ["./test/preload.js"]

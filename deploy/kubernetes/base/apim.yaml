@@ -33,6 +33,8 @@ spec:
             - { name: APIM_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: admin-token } } }
             - { name: APIM_INGEST_TOKEN, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: ingest-token } } }
             - { name: APIM_BOOTSTRAP_PASSWORD, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: bootstrap-password } } }
+            - { name: APIM_SECRETS_KEY, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: secrets-key } } }
+            - { name: APIM_SECRETS_PREVIOUS_KEYS, valueFrom: { secretKeyRef: { name: otoroshi-api-management, key: secrets-previous-keys, optional: true } } }
           envFrom:
             - configMapRef: { name: otoroshi-api-management }
           readinessProbe:
