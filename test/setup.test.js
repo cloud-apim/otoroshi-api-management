@@ -29,6 +29,8 @@ const ADMIN = { clientId: 'apim-admin-client', clientSecret: 'apim-admin-secret'
 const CONSOLE_HOST = `console-${RUN}.oto.tools`;
 const PORTAL_HOST = `portal-${RUN}.oto.tools`;
 const MODULE = `apim_test_module_${RUN}`;
+// the person who signs in on the auth module of the gateway, in front of the console
+const OPS = { email: `ops-${RUN}@example.com`, password: `pass-${RUN}` };
 const OPTIONS = { productUrl: 'http://apim:9000', consoleHost: CONSOLE_HOST, portalHost: PORTAL_HOST };
 let server;
 const saved = {};
@@ -62,12 +64,44 @@ async function through(host, path, want, init = {}) {
   return last;
 }
 
+// a browser: cookies by host, redirects followed, the basic challenge of the module answered
+function browser(credentials) {
+  const jar = new Map();
+  return async function nav(url, init = {}) {
+    let basic = false;
+    for (let i = 0; i < 15; i++) {
+      const host = new URL(url).hostname;
+      const cookie = Object.entries(jar.get(host) || {}).map(([k, v]) => `${k}=${v}`).join('; ');
+      const auth = basic ? { authorization: `Basic ${btoa(`${credentials.email}:${credentials.password}`)}` } : {};
+      const res = await fetch(url, { ...init, redirect: 'manual', headers: { ...(init.headers || {}), ...auth, cookie } });
+      for (const c of res.headers.getSetCookie()) {
+        const [k, ...v] = c.split(';')[0].split('=');
+        jar.set(host, { ...(jar.get(host) || {}), [k.trim()]: v.join('=') });
+      }
+      if (res.status >= 300 && res.status < 400) {
+        url = new URL(res.headers.get('location'), url).toString();
+        basic = false;
+        continue;
+      }
+      if (res.status === 401 && res.headers.get('www-authenticate')?.startsWith('Basic') && !basic) {
+        basic = true;
+        continue;
+      }
+      return res;
+    }
+    throw new Error('too many redirects');
+  };
+}
+
 beforeAll(async () => {
   server = await start();
   for (const key of ['gateway', 'setup', 'auth']) saved[key] = (await db`select value from settings where key = ${key}`)[0]?.value ?? null;
   saved.clientAuth = (await gw('GET', '/api/globalconfig')).body.tlsSettings.clientAuth;
   const template = (await gw('GET', '/api/auths/_template')).body;
-  expect((await gw('POST', '/api/auths', { ...template, id: MODULE, name: `Setup test ${RUN}`, users: [] })).status).toBeLessThan(300);
+  // a basic module: the browser answers its challenge (jBCrypt reads the $2a$ form of the hash)
+  const password = (await Bun.password.hash(OPS.password, { algorithm: 'bcrypt', cost: 10 })).replace(/^\$2b\$/, '$2a$');
+  const users = [{ name: 'Ops', email: OPS.email, password, metadata: {}, tags: [], rights: [], adminEntityValidators: {} }];
+  expect((await gw('POST', '/api/auths', { ...template, id: MODULE, name: `Setup test ${RUN}`, basicAuth: true, users })).status).toBeLessThan(300);
 });
 
 afterAll(async () => {
@@ -160,6 +194,40 @@ describe('the setup of the gateway', () => {
     const res = await through(CONSOLE_HOST, '/backoffice/', (s) => s >= 300 && s < 400);
     expect([302, 303]).toContain(res.status);
     expect(part(report, 'console').notes.join(' ')).toContain('via Otoroshi');
+  });
+
+  test('"via Otoroshi": the person the auth module signed in is the user of the console', async () => {
+    const auth = (body) => fetch(`${ROOT}/api/settings/auth`, { method: 'PUT', headers: { authorization: 'Bearer setup-test-token', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    expect((await auth({ mode: 'otoroshi' })).status).toBe(200);
+    try {
+      const nav = browser(OPS);
+      // signed in on the module of the gateway, the console answers as that person (the product of
+      // the stack reads its settings again within a few seconds)
+      let me;
+      for (let i = 0; i < 20; i++) {
+        me = await nav(`http://${CONSOLE_HOST}:8080/backoffice/api/me`);
+        if (me.status === 200) break;
+        await Bun.sleep(500);
+      }
+      expect(me.status).toBe(200);
+      const body = await me.json();
+      expect((body.user || body).email).toBe(OPS.email);
+      // provisioned at the first visit, as a person of the installation without any right yet
+      const user = (await db`select * from users where email = ${OPS.email}`)[0];
+      expect(user.is_admin).toBe(false);
+      // straight to the product, past the gateway: no identity, nothing answered
+      const direct = await fetch(`${ROOT}/backoffice/api/me`);
+      expect(direct.status).toBe(401);
+      // an info token the gateway did not sign is refused too
+      const forged = `${btoa(JSON.stringify({ alg: 'HS512', typ: 'JWT' }))}.${btoa(JSON.stringify({ email: 'admin@otoroshi.io', exp: Date.now() + 60000 }))}.c2lnbmF0dXJl`.replace(/=/g, '');
+      expect((await fetch(`${ROOT}/backoffice/api/me`, { headers: { 'Otoroshi-Claim': forged } })).status).toBe(401);
+      // the local form is gone in this mode
+      expect((await fetch(`${ROOT}/backoffice/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@otoroshi.io', password: 'password' }) })).status).toBe(400);
+      await db`delete from users where email = ${OPS.email}`;
+    } finally {
+      expect((await auth({ mode: 'local' })).status).toBe(200);
+      invalidateAuthSettings();
+    }
   });
 
   test('the TLS client authentication of the gateway, asked for', async () => {

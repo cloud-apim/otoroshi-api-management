@@ -24,15 +24,14 @@ Last update: 2026-11-20.
   - A bug of the product, found on the way: a subscription made again on the gateway (gone from it) kept its old credential active beside the new one; it is revoked now.
   - A bug of the product, found on the way: the restriction paths are regexes, and `/v1/pets*` did not allow `/v1/pets/42`; they are `/v1/pets(/.*)?` now.
   - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
-  - Left to do: the screens tour (`bun run screenshots`) is to run again — the plan editor, the *Test* tab, the deploy dialog and the technical details of a deployment changed. The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
+  - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-39** — the "via Otoroshi" console login end to end, behind the route and the auth module the setup makes.
-2. **R-30** — the roles split across instances, several instances of a role.
-3. **R-36** — secrets at rest.
-4. **R-13** — subscription expiry.
-5. **R-38** — UI tests.
+1. **R-30** — the roles split across instances, several instances of a role.
+2. **R-36** — secrets at rest.
+3. **R-13** — subscription expiry.
+4. **R-38** — UI tests.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -42,11 +41,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (24)**
+**Doable (23)**
 
 | # | Effort | What |
 |---|---|---|
-| R-39 | S | "Via Otoroshi" console login tested end to end |
 | R-30 | S | Roles split across instances, several instances of a role |
 | R-13 | S | Subscription expiry at a date |
 | R-47 | S | Free → paid plan move through a Checkout |
@@ -154,7 +152,6 @@ waits for the data plane rather than working around it.
 | R-36 | D-9, D-24 | **Secrets at rest**: credential secrets, IdP secrets and catalog tokens are stored in clear in the product database — encrypt them, or reference a vault | M | |
 | R-37 | — | Not a priority (owner). An **accessibility** audit of both faces (labels and focus are there, no audit done) | M | |
 | R-38 | — | **UI tests**: the screens tour exercises every screen without assertions; the API is covered by tests, the UI is not | M | |
-| R-39 | D-25 | Test the **Otoroshi authentication mode** end to end behind a real route with an auth module (unit-tested only) | S | |
 
 ### Out of the MVP, by decision (kept for later)
 
@@ -194,7 +191,7 @@ waits for the data plane rather than working around it.
 | D-20 one portal per workspace, resolved from the url | ✅ | by root path, by hostname, or one workspace at the root (`APIM_TENANCY=single`: no prefix, no selector); the forms served before are recorded and their urls redirected (`301`/`308`) to the same page — `test/portal-exposure.test.js`, `test/portal-forms.test.js`; `portal_url` given by the admin api |
 | D-22 described / deployed state, diff before acting | ✅ | dry-run before every deployment |
 | D-24 `default` location + ownership marking | ✅ | |
-| D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; Otoroshi mode unit-tested: R-39 |
+| D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; "via Otoroshi" verified end to end: a person signed in on a basic auth module of the gateway, in front of the console route the setup makes, is the user of the console (`test/setup.test.js`) |
 | D-26 application, expected `client_id`, `id_ref` | ✅ | client certificates read and checked (console and portal), derived as certificates of the gateway while an mtls subscription is active (`test/derived-objects.test.js`); a subscription of a token or certificate plan carries no consumer identity on Otoroshi (G-17, MAIF/otoroshi#2937): its ApiSubscription carries the application's client id as metadata meanwhile |
 | D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37: R-26): failed projections, waiting ones and drift counted apart, leading to the first of them; a failed task says what it works on, is retried or dismissed, and dismissed by itself when its object is gone |
 | D-28 administrable by program | 🟡 | admin API ✅, CLI ✅, remote catalogs http/git ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests and the Helm chart (linted, rendered) validated by a k3s api server — `test/kubernetes.test.js`; object store: R-27 |
