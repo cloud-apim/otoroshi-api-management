@@ -1,8 +1,9 @@
 name: release
 
-# A tag v<version> publishes the product: its executables for linux and macos, x64 and arm64,
-# attached to the GitHub release with their checksums, and its image for linux/amd64 and
-# linux/arm64 on the GitHub container registry. Run by hand, it builds both and publishes nothing.
+# A tag v<version> publishes the product: its executables for linux and macos, x64 and arm64, and
+# its documentation as a zip, attached to the GitHub release with their checksums, and its image for
+# linux/amd64 and linux/arm64 on the GitHub container registry. Run by hand, it builds all of them
+# and publishes nothing.
 on:
   push:
     tags: ['v*']
@@ -13,7 +14,53 @@ permissions:
   packages: write
 
 jobs:
+  # the documentation site, built to be served from the root of any static server
+  documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: documentation/package-lock.json
+
+      - name: install
+        working-directory: documentation
+        run: npm ci
+
+      - name: build
+        working-directory: documentation
+        env:
+          DOCS_BASE_URL: /
+        run: npm run build
+
+      - name: zip
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          name="otoroshi-api-management-docs-$version"
+          mkdir -p dist
+          mv documentation/build "dist/$name"
+          {
+            echo "The documentation of otoroshi-api-management $version, a static site."
+            echo
+            echo "Serve this directory from its root with any static web server, then open http://localhost:8000/ :"
+            echo
+            echo "  python3 -m http.server 8000"
+            echo "  npx serve -l 8000"
+            echo
+            echo "Opened as files (file://), its pages do not work."
+          } > "dist/$name/README.txt"
+          (cd dist && zip -qr "$name.zip" "$name")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: dist/otoroshi-api-management-docs-*.zip
+
   executables:
+    needs: documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,9 +83,15 @@ jobs:
       - name: compile the executables
         run: bun scripts/build-binary.js --all
 
+      # the zip of the documentation, beside the executables
+      - uses: actions/download-artifact@v4
+        with:
+          name: documentation
+          path: dist/bin
+
       - name: checksums
         working-directory: dist/bin
-        run: sha256sum otoroshi-apim-* | tee SHA256SUMS
+        run: sha256sum otoroshi-apim-* otoroshi-api-management-docs-*.zip | tee SHA256SUMS
 
       # the notes of the release: the section of its version in CHANGELOG.md, which has to exist
       - name: release notes
@@ -52,6 +105,7 @@ jobs:
           name: executables
           path: |
             dist/bin/otoroshi-apim-*
+            dist/bin/otoroshi-api-management-docs-*.zip
             dist/bin/SHA256SUMS
 
       - uses: softprops/action-gh-release@v2
@@ -59,6 +113,7 @@ jobs:
         with:
           files: |
             dist/bin/otoroshi-apim-*
+            dist/bin/otoroshi-api-management-docs-*.zip
             dist/bin/SHA256SUMS
           body_path: dist/release-notes.md
           prerelease: ${{ startsWith(github.ref_name, 'v0.') }}

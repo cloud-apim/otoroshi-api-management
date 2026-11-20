@@ -13,6 +13,8 @@ Otoroshi, one executable or one image, with its documentation.
 - **Otoroshi 18.1** — until it is released, built from the `master` branch of Otoroshi — and an
   admin key with every right.
 - **PostgreSQL 14** or later, two databases created beforehand (the application, the analytics).
+- Its documentation is attached to the release (`otoroshi-api-management-docs-0.1.0.zip`): a static
+  site, served from its root by any static web server (`python3 -m http.server`, its `README.txt`).
 - The configuration of the documentation, *Install › Configuration*: an instance that lacks a
   variable it needs names it and does not start. `DEV=true` is for the development stack of the
   repository only.

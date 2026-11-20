@@ -18,13 +18,22 @@ export function Architecture() {
   );
 }
 
+export function FullSize() {
+  return (
+    <small>
+      The diagram at full size: <a href={useBaseUrl('/img/architecture-light.svg')}>light</a>,{' '}
+      <a href={useBaseUrl('/img/architecture-dark.svg')}>dark</a>.
+    </small>
+  );
+}
+
 # Install
 
 ## The architecture
 
 <Architecture />
 
-<small>The diagram at full size: [light](pathname:///otoroshi-api-management/img/architecture-light.svg), [dark](pathname:///otoroshi-api-management/img/architecture-dark.svg).</small>
+<FullSize />
 
 An installation is **the product** — one executable, or one container image — beside **an Otoroshi
 cluster** it drives, with **two PostgreSQL databases**. The product describes the APIs, their plans
@@ -190,7 +199,10 @@ platforms, `docker buildx build --platform linux/amd64,linux/arm64 .` cross-comp
 ### Releases
 
 A tag `v<version>` — the version of `package.json` — publishes the executables for linux and
-macos, x64 and arm64, with their `SHA256SUMS`, on the GitHub release, and the image for
+macos, x64 and arm64, and this documentation as a zip (`otoroshi-api-management-docs-<version>.zip`,
+a static site to serve from its root: `python3 -m http.server` in its directory), with their
+`SHA256SUMS`, on the GitHub release — its notes are the section of the version in `CHANGELOG.md`,
+a pre-release while in `0.x` —, and the image for
 `linux/amd64` and `linux/arm64` on `ghcr.io/cloud-apim/otoroshi-api-management` (tags `<version>`,
 `<major>.<minor>`, `latest`). The Kubernetes manifests and the Helm chart use that image; the chart
 defaults to its `appVersion`.

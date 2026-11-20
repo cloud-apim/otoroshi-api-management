@@ -10,7 +10,8 @@ const config = {
   favicon: 'img/favicon.svg',
 
   url: 'https://cloud-apim.github.io',
-  baseUrl: '/otoroshi-api-management/',
+  // the path of GitHub Pages; DOCS_BASE_URL=/ for the archive of a release, served from its root
+  baseUrl: process.env.DOCS_BASE_URL || '/otoroshi-api-management/',
 
   organizationName: 'cloud-apim',
   projectName: 'otoroshi-api-management',

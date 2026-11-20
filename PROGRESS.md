@@ -74,11 +74,13 @@ Last update: 2026-11-20.
 
 **Release 0.1.0** (a beta, before the types of api). Done: the notes, written by hand in
 `CHANGELOG.md` — what it needs (Otoroshi `master`), what it does, its known limitations, upgrades —,
-the body of the GitHub release (marked pre-release while in 0.x); migrations append-only from now on
+the body of the GitHub release (marked pre-release while in 0.x); the documentation attached to the
+release as a zip, built to be served from the root of any static server (`DOCS_BASE_URL=/`), for
+the testers; migrations append-only from now on
 (`CLAUDE.md`, `server/db/migrations.js`); the documentation says beta. Left: the release workflow
 tried once by hand (it builds, publishes nothing), access for the testers to the private repository
-and its image, the documentation for them (GitHub Pages is not enabled: the documentation workflow
-fails at its deploy step on every push, its build passes); the tag, by the owner.
+and its image; GitHub Pages is not enabled, so the documentation workflow fails at its deploy step
+on every push (its build passes); the tag, by the owner.
 
 The types of api (D-44, the owner's direction on 2026-11-20): an api has a type, which says how its
 route is set up — REST today; MCP and AI with the LLM extension; event-driven with the event
