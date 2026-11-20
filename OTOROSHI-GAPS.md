@@ -15,7 +15,8 @@ dropped its workarounds rather than keeping them for 18.0: nothing depends on th
 
 On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
 they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
-contract on the gateway. Found on the way: G-22 and G-23, reported upstream; G-24, G-26, G-27 and
+contract on the gateway. Found on the way: G-22 and G-23, reported upstream — G-22 fixed and followed
+the same day; G-24, G-26, G-27 and
 G-28 in the Threat Protection Suite, checked on a gateway running its release 1.0.0 and reported to
 it (G-25 is not a gap). Status: ✅ **followed** — the
 product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
@@ -44,7 +45,7 @@ yet.
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
-| G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds, or is refused: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
+| G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sent an error event** for a call that then succeeded, or was refused: the call was counted twice, once as a `400` | medium | ✅ | nothing: the dashboards count these events as errors |
 | G-23 | [#2963](https://github.com/MAIF/otoroshi/issues/2963) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
 | G-24 | [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60) | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
 | G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
@@ -312,7 +313,16 @@ settings (`tlsSettings.clientAuth`, `trustedCAsServer`) nor the `env` the local 
 authentication of mtls plans and the vault references of the promotion read the global
 configuration.
 
-## G-22 — a non-identifying extractor sends an error event for a call that succeeds — medium — open
+## G-22 — a non-identifying extractor sends an error event for a call that succeeds — medium — fixed
+
+**Fixed** upstream in `18.1.0-dev` (`d7a52d731`, fix #2962): a plan that does not identify the caller
+sends no gateway event and lets the next plan try; a call no plan identifies is the event of the
+refusal of the enforcer. **Followed** on 2026-11-20: the product had no workaround, nothing to drop.
+Checked on the ingester, the same day: on the previous jar, 3,876 of 60,453 calls (6.4 %) were such
+`400` events — no identity, no backend, a duration of 0; on the new one, none on the apis of the
+product over the 2,120 calls of the whole test suite (the 13 `400` left are calls of the Otoroshi
+admin api with a key it did not accept yet, real refusals).
+
 
 Upstream: [MAIF/otoroshi#2962](https://github.com/MAIF/otoroshi/issues/2962), with the fix proposed
 below and the tests. Seen on 18.0.1 and on 18.1.0-dev.

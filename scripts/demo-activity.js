@@ -33,7 +33,8 @@ const pick = (list) => list[Math.floor(rnd() * list.length)];
 // what the gateway lost, as the drift detection sees it: an api deployed again on the snapshot that
 // ran, then the keys of its subscriptions
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-for (const ws of ['default', 'gitops']) {
+// the workspaces of the demo (the showcase made after this script, on a first run: nothing to catch up)
+for (const ws of ['default', 'gitops', 'showcase']) {
   const found = await call('POST', `/workspaces/${ws}/drift`).catch(() => null);
   if (!found?.missing) continue;
   const reports = await call('GET', `/workspaces/${ws}/drift`);

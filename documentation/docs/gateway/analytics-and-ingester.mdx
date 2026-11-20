@@ -35,9 +35,9 @@ call from it: the api, the plan, and the subscription with its application. A co
 plan identified has a plan and no subscription. An event without `apiRef` (an AI audit) is
 attributed from the client id of a credential the product holds.
 
-On an API with several plans, a plan that does not identify the caller sends an error event of its
-own for a call that then succeeds, or is refused: the dashboards count it as a call, and as an
-error — a refused call counts twice.
+A call is **one event**, served or refused, whatever the number of plans of its API: a plan that does
+not identify the caller lets the next one try and sends nothing of its own; a call no plan
+identifies is the event of its refusal.
 
 A quota consumed, an attribution, a token count are **counted, never sampled**.
 
