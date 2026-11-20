@@ -3,6 +3,9 @@
 // The application side gets real tables because it carries heavy content, relations and reporting
 // queries. An API has three objects with three lifetimes: the draft (mutable, one per api),
 // the snapshots (immutable, append-only) and the deployment state (which snapshot runs on the gateway).
+//
+// Append-only: a migration that shipped in a release (0.1.0 on) is never edited — a change is a new
+// migration, so that an installation upgrades in place.
 
 export const appMigrations = [
   {

@@ -40,6 +40,13 @@ jobs:
         working-directory: dist/bin
         run: sha256sum otoroshi-apim-* | tee SHA256SUMS
 
+      # the notes of the release: the section of its version in CHANGELOG.md, which has to exist
+      - name: release notes
+        run: |
+          version="$(bun -e 'console.log(require("./package.json").version)')"
+          awk -v v="$version" '/^## /{on = index($0, "## " v " ") == 1 || $0 == "## " v; next} on' CHANGELOG.md > dist/release-notes.md
+          test -s dist/release-notes.md || { echo "no section for $version in CHANGELOG.md"; exit 1; }
+
       - uses: actions/upload-artifact@v4
         with:
           name: executables
@@ -53,7 +60,8 @@ jobs:
           files: |
             dist/bin/otoroshi-apim-*
             dist/bin/SHA256SUMS
-          generate_release_notes: true
+          body_path: dist/release-notes.md
+          prerelease: ${{ startsWith(github.ref_name, 'v0.') }}
 
   image:
     runs-on: ubuntu-latest

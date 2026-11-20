@@ -68,6 +68,10 @@ ingester when the product runs inside the compose stack (`http://apim:9000/inges
 ## Conventions
 
 - Commit as you go, small and descriptive.
+- Migrations (`server/db/migrations.js`) are append-only: a migration that shipped in a release is
+  never edited — a change is a new migration, so that an installation upgrades in place.
+- A release is a `v<version>` tag on the version of `package.json`; its notes are its section of
+  `CHANGELOG.md`, written by hand.
 - Postgres via `Bun.SQL`: pass objects and arrays directly for jsonb columns; jsonb does not keep
   key order, so compare documents with `diff()` / `stable()` from `server/domain/diff.js`.
 - Ids are prefixed uuidv7 (`api_…`, `plan_…`, `sub_…`); the Otoroshi `Api` id is the product api id.
