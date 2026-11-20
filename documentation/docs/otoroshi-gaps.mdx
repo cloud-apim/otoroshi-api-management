@@ -14,7 +14,7 @@ The full list, with the source references and the fixes, is kept in
 [`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
 Found on Otoroshi 18.0.1; every gap was fixed in Otoroshi 18.1 but three, not fixed by decision. The
 product requires 18.1, and follows the fixes one by one: ✅ followed, 🔜 fixed upstream, still to
-follow, ➖ not fixed.
+follow, ➖ not fixed, ⬜ open.
 
 | # | Gap | Severity | Status | What the product does |
 |---|---|---|---|---|
@@ -26,7 +26,7 @@ follow, ➖ not fixed.
 | G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | 🔜 | stores them, projects them as plan metadata, flags them as not enforced |
 | G-7 | An `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the ref of each deployment Otoroshi records |
 | G-8 | The catalog-deploy path was borrowed through a **naming convention** | medium | ✅ | the `Api` is managed as code: `created_by=external=otoroshi-api-management` |
-| G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | 🔜 | attributes calls from the key metadata and a client id cache at ingestion |
+| G-9 | `GatewayEvent` did not carry the key's `apiRef` | low | ✅ | attributes each call from the `apiRef` of its event |
 | G-10 | A `PUT` on a missing entity was refused as unauthorized | low | ✅ | writes everything with the upsert of the generic api (`POST` on the id) |
 | G-11 | Nothing says when a new route or key becomes routable — not feasible in a distributed cluster without a shared store | — | ➖ | the console says *deployed* once the gateway accepted the write |
 | G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | 🔜 | the console replays requests through the gateway without the trace |
@@ -39,3 +39,4 @@ follow, ➖ not fixed.
 | G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — the job of whoever stores the events | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | An admin key narrowed by its access rights **read the secret of every admin key** of its teams | high | ✅ | nothing to change: the product's key is its own, super admin |
 | G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |
+| G-22 | An extractor that does not identify the caller sends an error event for a call that then succeeds | medium | ⬜ open | nothing: the dashboards count these as errors |

@@ -194,3 +194,30 @@ describe('the retention', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('the attribution', () => {
+  test('a call is attributed from the apiRef the gateway gives its event', async () => {
+    const api = await ok('GET', `/workspaces/${WS}/apis/${apiId}`);
+    const planId = api.draft.plans[0].id;
+    const team = (await ok('GET', `/workspaces/${WS}/teams`))[0];
+    const app = await ok('POST', `/workspaces/${WS}/applications`, { name: 'Dashboards', team_id: team.id });
+    await ok('POST', `/workspaces/${WS}/apis/${apiId}/publish`, { comment: 'attribution', deploy: true });
+    const sub = await ok('POST', `/workspaces/${WS}/subscriptions`, { api_id: apiId, plan_id: planId, application_id: app.id });
+    invalidateAttributionCache();
+    const consumer = (reqId, apiRef) => ({ ...event(reqId), identity: { identityType: 'APIKEY', identity: `key-${reqId}`, label: 'k', metadata: {}, apiRef } });
+    await ingest([
+      // the consumer of a subscription: the api, the plan, the subscription and its application
+      consumer(`attr-${RUN}-sub`, { api: apiId, plan: planId, sub: sub.id }),
+      // a consumer a keyless plan identified: no subscription, the plan still
+      consumer(`attr-${RUN}-open`, { api: apiId, plan: 'plan_open', sub: '' }),
+    ]);
+    const rows = await adb`select req_id, plan_id, subscription_id, application_id, workspace_id from calls where api_id = ${apiId} and req_id like ${`attr-${RUN}-%`} order by req_id`;
+    expect(rows.map((r) => [r.req_id, r.plan_id, r.subscription_id, r.application_id])).toEqual([
+      [`attr-${RUN}-open`, 'plan_open', null, null],
+      [`attr-${RUN}-sub`, planId, sub.id, app.id],
+    ]);
+    expect(rows[1].workspace_id).toBe(api.workspace_id);
+    // the api leaves the gateway, its subscription with it
+    await ok('DELETE', `/workspaces/${WS}/apis/${apiId}`);
+  });
+});

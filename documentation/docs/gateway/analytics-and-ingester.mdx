@@ -28,13 +28,15 @@ Every `GatewayEvent` becomes one row, **attributed to the catalogue at ingestion
 plan, subscription, application, client id, method, path, status, duration, gateway overhead,
 backend duration, bytes in and out, error flag, caller IP and user agent.
 
-A `GatewayEvent` carries the route and the identity, not the key's `apiRef`
-([G-9](../otoroshi-gaps.mdx)), so the ingester attributes each call from:
+A `GatewayEvent` names the api, the plan and the subscription of the key that called — its
+`identity.apiRef`, as the key said it at the time of the call — and the ingester attributes the
+call from it: the api, the plan, and the subscription with its application. A consumer a `keyless`
+plan identified has a plan and no subscription. An event without `apiRef` (an AI audit) is
+attributed from the client id of a credential the product holds.
 
-1. the client id, matched against the credentials the product minted;
-2. the key metadata the product projects (`apim_subscription_id`, `id_ref`);
-3. for consumers the gateway mints on `jwt`, `mtls`, `oauth2` and `keyless` plans, their
-   `<kind>_<planId>_<clientId>` name, matched against the applications' declared `client_id`.
+On an API with several plans, a plan that does not identify the caller sends an error event of its
+own for a call that then succeeds ([G-22](../otoroshi-gaps.mdx)): the dashboards count it as a
+call, and as an error.
 
 A quota consumed, an attribution, a token count are **counted, never sampled**. `LLMUsageAudit` and
 `McpAudit` go to an AI usage table (provider, model, tool, tokens, cost): collected from day one,

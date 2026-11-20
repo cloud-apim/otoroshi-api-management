@@ -15,7 +15,8 @@ drops its workarounds rather than keeping them for 18.0: nothing depends on the 
 
 The product now **follows** the fixes, gap by gap: its workarounds and warnings go, the items they
 blocked are done. Status: ✅ **followed** — the product relies on the fix; 🔜 **to follow** — fixed
-upstream, the product still does what the last column says; ➖ **not fixed**, by decision.
+upstream, the product still does what the last column says; ➖ **not fixed**, by decision; ⬜ **open**, found
+since, not reported upstream yet.
 
 | # | Issue | Gap | Severity | Status | The product |
 |---|---|---|---|---|---|
@@ -27,7 +28,7 @@ upstream, the product still does what the last column says; ➖ **not fixed**, b
 | G-6 | [#2945](https://github.com/MAIF/otoroshi/issues/2945) | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | 🔜 | stored, projected as plan metadata, flagged as not enforced; R-14 waits for it |
 | G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records (R-33) |
 | G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path was borrowed by a control plane via a **naming convention** | medium | ✅ | the `Api` is managed as code, `created_by=external=otoroshi-api-management` |
-| G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` does not carry `apiRef` (plan, subscription) | low | 🔜 | attribution via the key's metadata + a client id cache at ingestion |
+| G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` did not carry `apiRef` (plan, subscription) | low | ✅ | each call is attributed from the `apiRef` of its event |
 | G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on a missing entity was refused as **unauthorized**; the upsert said the opposite of what changed; certificates not enriched by the generic api | low | ✅ | the `Api` and every derived object are written with the upsert of the generic api |
 | G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | — | ➖ | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session | medium | 🔜 | the console replays requests through the gateway without the trace; R-24 waits for it |
@@ -40,6 +41,7 @@ upstream, the product still does what the last column says; ➖ **not fixed**, b
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
+| G-22 | — | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
 
 ---
 
@@ -137,20 +139,17 @@ such an api is a deploy, and a remote catalog never takes it over.
 **The product.** Its `Api`s carry `created_by=external=otoroshi-api-management`
 (`OWNER_MARKER`, `server/otoroshi/client.js`).
 
-## G-9 — GatewayEvent does not carry apiRef — low
+## G-9 — GatewayEvent did not carry apiRef — low — followed
 
-Upstream: [MAIF/otoroshi#2948](https://github.com/MAIF/otoroshi/issues/2948).
+Upstream: [MAIF/otoroshi#2948](https://github.com/MAIF/otoroshi/issues/2948), fixed in 18.1: the
+`identity` of a `GatewayEvent` carries the `apiRef` of the key that called, as the key said it at the
+time of the call — `sub` empty for a consumer minted on the fly, `null` for a classic apikey.
 
-**Observed.** `GatewayEvent` carries the route (with `Otoroshi-Api-Ref` in its metadata) and the
-identity (client id, and the key's metadata), not the key's `apiRef = {api, plan, sub}`.
-
-**Product meanwhile.** The ingester attributes each call from a client id → subscription cache,
-falls back on the key metadata the product projects (`apim_subscription_id`, `id_ref`), and parses
-the `<kind>_<planId>_` prefix of gateway-minted consumers. Verified: real calls are attributed to
-api, plan, subscription and application.
-
-**Upstream fix.** Add `apiRef` to the exported identity (or the event) — attribution without
-re-correlation, for every consumer of the data exporters.
+**The product.** The ingester attributes each call from it: the api, the plan, and the subscription
+with its application (`attribute`, `server/domain/ingest.js`); the client id of a credential the
+product holds only when an event has no `apiRef` (an AI audit). The parsing of the
+`<kind>_<planId>_` prefix of minted consumers is gone. Checked with real traffic: a jwt consumer
+provisioned by a subscription is attributed to its plan, its subscription and its application.
 
 ## G-10 — writes of the generic api — low — followed
 
@@ -338,4 +337,36 @@ settings (`tlsSettings.clientAuth`, `trustedCAsServer`) nor the `env` the local 
 **The product.** Its key is a super admin key, and stays one: the warnings about the TLS client
 authentication of mtls plans and the vault references of the promotion read the global
 configuration.
+
+## G-22 — a non-identifying extractor sends an error event for a call that succeeds — medium — open
+
+Not reported upstream yet. Seen on 18.0.1 and on 18.1.0-dev.
+
+**Observed.** On an `Api` with several plans, every extractor that does not identify the caller
+builds an error response and lets the call go on — and building it sends a `GatewayEvent`:
+
+- `ApikeyCalls` (apikey and oauth2-local plans), not mandatory: `ApiKeyHelper.passWithApiKeyFromCache`
+  answers `400 invalid apikey tuple` (or `no apikey`) through `Errors.craftResponseResult`, which
+  sends the event (`models/apikey.scala:2384`, `:2431`); the plugin then turns that `400` into
+  `NgAllowed` (`next/plugins/apikey.scala:216`);
+- `NgJwtApikeyExtractor` (jwt plans): `JwtVerifier.verify` calls `internalVerify` with
+  `sendEvent = true` (`models/JWTVerifier.scala:1268`); a strict verifier answers
+  `400 error.expected.token.not.found` (`:1386`) for a call that carries no token, or another
+  error for a token of another kind; the extractor turns it into a non-strict failure
+  (`next/plugins/apimgmt.scala`, `outcome`).
+
+So a call made with an apikey on an api that also has a jwt plan produces two events: the error of
+the jwt verifier (`400`, no identity, `duration: 0`, `backendDuration: -1`, the url of the backend,
+its own `reqId`), then the call itself (`200`, the key). A jwt call produces the `400 invalid apikey
+tuple` of `ApikeyCalls`, then itself. Seen on the development stack: about one call in ten of the
+end-to-end tests was such an event.
+
+**The product.** Nothing: an error event is an event. The dashboards count these as calls and as
+errors — the error rate of an api with several plans is overstated.
+
+**Fix to propose.** An extractor that only tries to identify the caller does not send the event of
+the error it lets go: `sendEvent = false` on the verification of `NgJwtApikeyExtractor` and
+`NgOidcApikeyExtractor`, and on `passWithApiKeyFromCache` when `ApikeyCalls` is not mandatory — the
+call then has one event, its own, which already carries the reason of a refusal
+(`apikey_rejection_reason`, `token_rejection_reason`) when the call is refused in the end.
 

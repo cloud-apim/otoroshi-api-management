@@ -14,21 +14,17 @@ export { maskUrl } from './ingest-policy.js';
 
 // ------------------------------------------------------------- attribution cache
 
-const cache = { at: 0, byClientId: new Map(), apis: new Map(), plansByPrefix: [] };
+const cache = { at: 0, byClientId: new Map(), apis: new Map(), subs: new Map() };
 
 async function refreshCache() {
   if (Date.now() - cache.at < 15000) return;
   const creds = await db`select c.client_id, s.id as subscription_id, s.application_id, s.plan_id, s.api_id, s.workspace_id
     from credentials c join subscriptions s on s.id = c.subscription_id`;
   const apis = await db`select id, workspace_id from apis`;
-  // gateway-minted consumers (jwt, mtls, oauth2-remote, keyless) are named <kind>_<planId>_<clientId>
-  const subsByApp = await db`select s.id as subscription_id, s.application_id, s.plan_id, s.api_id, s.workspace_id, a.client_id
-    from subscriptions s join applications a on a.id = s.application_id where s.status in ('active', 'suspended')`;
+  const subs = await db`select id as subscription_id, application_id, plan_id, api_id, workspace_id from subscriptions`;
   cache.byClientId = new Map(creds.map((c) => [c.client_id, c]));
   cache.apis = new Map(apis.map((a) => [a.id, a]));
-  cache.subsByApp = subsByApp;
-  // <planId>_<clientId> → the subscription: a plan id can itself hold underscores
-  cache.byPlanClient = new Map(subsByApp.filter((s) => s.client_id).map((s) => [`${s.plan_id}_${s.client_id}`, s]));
+  cache.subs = new Map(subs.map((s) => [s.subscription_id, s]));
   cache.at = Date.now();
 }
 
@@ -36,25 +32,25 @@ export function invalidateAttributionCache() {
   cache.at = 0;
 }
 
-function attribute(clientId, otoroshiApiId) {
+// the event names the api, the plan and the subscription of the key that called (`apiRef`, as the
+// key said it at the time of the call); the ids are the product's. Without it (an event that does not
+// carry it: an AI audit), the client id of a credential the product holds.
+function attribute(clientId, otoroshiApiId, apiRef = null) {
   const out = { api_id: null, workspace_id: null, plan_id: null, subscription_id: null, application_id: null };
-  const api = otoroshiApiId ? cache.apis.get(otoroshiApiId) : null;
+  const api = cache.apis.get(apiRef?.api || otoroshiApiId || '');
   if (api) {
     out.api_id = api.id;
     out.workspace_id = api.workspace_id;
   }
-  if (!clientId) return out;
-  const c = cache.byClientId.get(clientId);
-  if (c) return { ...out, ...c };
-  const m = /^(jwt|mtls|oauth2|keyless)_(.+)$/.exec(clientId);
-  if (m) {
-    const sub = cache.byPlanClient?.get(m[2]);
+  if (apiRef?.api) {
+    out.plan_id = apiRef.plan || null;
+    // `sub` is empty for a consumer a keyless plan identified
+    const sub = apiRef.sub ? cache.subs.get(apiRef.sub) : null;
     if (sub) return { ...out, ...sub };
-    // not a subscribed consumer: at least the plan, when the api is known
-    const plan = (cache.subsByApp || []).find((s) => m[2].startsWith(`${s.plan_id}_`));
-    if (plan) out.plan_id = plan.plan_id;
+    return out;
   }
-  return out;
+  const c = clientId ? cache.byClientId.get(clientId) : null;
+  return c ? { ...out, ...c } : out;
 }
 
 function ts(v) {
@@ -95,10 +91,10 @@ export async function ingest(events) {
     if (type === 'GatewayEvent') {
       const otoApiId = e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref || null;
       const clientId = e.identity?.identityType === 'APIKEY' ? e.identity.identity : null;
-      const attr = attribute(clientId, otoApiId);
-      // the key carries the subscription and the application itself (apiRef + id_ref)
+      const attr = attribute(clientId, otoApiId, e.identity?.apiRef);
+      // a subscription the product no longer knows: the key still names its application (id_ref)
       const md = e.identity?.metadata || {};
-      if (!attr.subscription_id && md.apim_subscription_id) attr.subscription_id = md.apim_subscription_id;
+      if (!attr.subscription_id && e.identity?.apiRef?.sub) attr.subscription_id = e.identity.apiRef.sub;
       if (!attr.application_id && md.id_ref) attr.application_id = md.id_ref;
       let path = null;
       try {
