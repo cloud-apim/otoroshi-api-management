@@ -9,7 +9,7 @@ import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { getSnapshot, lastSnapshot } from './apis.js';
 import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
-import { MINTED_KINDS, normalizeDraft, sharedPlanWarnings, validateDraft } from './model.js';
+import { normalizeDraft, validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
 import { DERIVED_PATHS, META } from '../otoroshi/client.js';
@@ -43,16 +43,7 @@ async function syncDerived(apiId, snapshotContent, between = async () => null) {
 // what the gateway's own settings make of the snapshot: they are infrastructure the product
 // consumes and does not change, so it says when they defeat a plan
 async function gatewayWarnings(content, derived) {
-  return [...(await sharedOnGateway(content)), ...(await tlsWarnings(content, derived))];
-}
-
-// the other Apis of the gateway, the product's or not, with a plan of the same id and kind (G-18)
-async function sharedOnGateway(content) {
-  if (!normalizeDraft(content.draft).plans.some((p) => MINTED_KINDS.includes(p.auth.kind))) return [];
-  const others = ((await oto.listApis().catch(() => null)) || [])
-    .filter((a) => a.id !== content.api.id)
-    .flatMap((a) => (a.plans || []).map((p) => ({ name: a.name, product: !!a.metadata?.[META.api], planId: p.id, kind: p.access_mode_configuration_type })));
-  return sharedPlanWarnings(content.draft, others, (o) => `the Api "${o.name}" on the gateway${o.product ? '' : ', not managed by the product,'}`);
+  return tlsWarnings(content, derived);
 }
 
 async function tlsWarnings(content, derived) {
@@ -215,11 +206,14 @@ registerTaskHandler('deploy_api', async ({ deployment_id }) => {
   }
 });
 
+// undeploying stops serving the api: the Api is disabled (no route), not deleted — deleting it would
+// delete its subscriptions and their keys with it, and the consumers would get new keys at the next
+// deployment. The derived objects it references stay with it.
 registerTaskHandler('undeploy_api', async ({ deployment_id, api_id }) => {
   const dep = (await db`select * from api_deployments where id = ${deployment_id}`)[0];
   try {
-    await oto.deleteApi(api_id);
-    await syncDerived(api_id, null);
+    const actual = await oto.getApi(api_id);
+    if (actual?.enabled) await oto.upsertApi({ ...actual, enabled: false });
   } catch (e) {
     if (dep) await db`update api_deployments set error = ${e.message} where id = ${dep.id}`;
     throw e;
@@ -228,22 +222,16 @@ registerTaskHandler('undeploy_api', async ({ deployment_id, api_id }) => {
   return { removed: api_id };
 });
 
-// removing an api from the gateway, used when the api is deleted from the product: keys first,
-// because deleting a subscription in Otoroshi 18 revokes nothing
-registerTaskHandler('purge_api', async ({ api_id, subscriptions = [] }) => {
-  for (const s of subscriptions) {
-    for (const clientId of s.client_ids || []) await oto.deleteApikey(clientId).catch(() => null);
-    await oto.deleteSubscription(s.id).catch(() => null);
-  }
+// removing an api from the gateway, used when the api is deleted from the product: Otoroshi deletes
+// its subscriptions, their keys and the keys its plans minted with it; the derived objects follow
+registerTaskHandler('purge_api', async ({ api_id }) => {
   await oto.deleteApi(api_id);
   await syncDerived(api_id, null);
   return { purged: api_id };
 });
 
 export async function purgeFromGateway(api) {
-  const subs = await db`select s.id, coalesce(jsonb_agg(c.client_id) filter (where c.client_id is not null), '[]') as client_ids
-    from subscriptions s left join credentials c on c.subscription_id = s.id where s.api_id = ${api.id} group by s.id`;
-  return enqueue('purge_api', { api_id: api.id, subscriptions: subs }, { dedupeKey: `deploy:${api.id}` });
+  return enqueue('purge_api', { api_id: api.id }, { dedupeKey: `deploy:${api.id}` });
 }
 
 export async function deploymentStatus(api) {
@@ -253,6 +241,8 @@ export async function deploymentStatus(api) {
   const lastSnap = await lastSnapshot(api.id);
   return {
     deployed: !!current,
+    // an undeployed api stays on the gateway, disabled: removing it from the product purges it there
+    on_gateway: !!last,
     current: current ? { id: current.id, snapshot_id: current.snapshot_id, snapshot_number: current.snapshot_number, at: current.finished_at } : null,
     last: last || null,
     latest_snapshot: lastSnap ? { id: lastSnap.id, number: lastSnap.number } : null,

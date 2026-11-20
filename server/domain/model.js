@@ -23,25 +23,6 @@ export const AUTH_KIND_ORDER = {
 // gateway builds the consumer at call time from a token or a certificate.
 export const CREDENTIAL_KINDS = ['apikey', 'oauth2-local'];
 
-// kinds whose consumer the gateway mints at call time and names after the plan id alone, without
-// the api (G-18): two apis with a plan of the same id share their consumers
-export const MINTED_KINDS = ['jwt', 'mtls', 'oauth2-remote', 'keyless'];
-
-// the plans of a draft whose id another api uses for a plan of the same kind
-export function sharedPlanWarnings(draft, others, where) {
-  const out = [];
-  normalizeDraft(draft).plans.forEach((p, i) => {
-    if (!MINTED_KINDS.includes(p.auth.kind) || p.status === 'closed') return;
-    for (const o of others.filter((o) => o.planId === p.id && o.kind === p.auth.kind))
-      out.push({
-        path: `plans[${i}]`,
-        code: 'plan_id_shared',
-        message: `plan "${p.name}" (${p.auth.kind}): ${where(o)} has a ${p.auth.kind} plan with the same id "${p.id}" — the gateway names the consumers of both after the plan id alone, so a consumer of one is counted against the quotas of the other (upstream gap G-18). Give this plan an id of its own.`,
-      });
-  });
-  return out;
-}
-
 export const PLAN_STATUSES = ['staging', 'published', 'deprecated', 'closed'];
 export const VISIBILITIES = ['public', 'authenticated', 'restricted'];
 

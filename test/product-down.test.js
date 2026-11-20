@@ -171,15 +171,12 @@ afterAll(async () => {
     await databaseBack();
     if (!(await listening(config.port))) server = await start();
     // what an administrator created by hand on the gateway is not the product's to delete: the test
-    // removes its own, the key first (deleting an ApiSubscription revokes nothing, G-2)
-    if (state.handKey) await otoroshiAdmin('DELETE', `/api/apikeys/${state.handKey}`);
+    // removes its own subscription, and Otoroshi its key with it
     if (state.handSub) await otoroshiAdmin('DELETE', `/apis/apis.otoroshi.io/v1/apisubscriptions/${state.handSub}`);
-    // the keys the gateway minted for the consumers of the api stay when it is deleted (G-18)
-    state.minted = ((await otoroshiAdmin('GET', '/api/apikeys')) || []).filter((k) => k.apiRef?.api === state.apiId && k.metadata?.created_by === 'apikey-extractor');
+    if (state.handKey) expect(await otoroshiAdmin('GET', `/api/apikeys/${state.handKey}`)).toBeNull();
     for (const s of (await call('GET', ws('/subscriptions'))).items || []) if (['active', 'suspended'].includes(s.status)) await call('POST', ws(`/subscriptions/${s.id}/close`), {});
     if (state.apiId) await call('DELETE', ws(`/apis/${state.apiId}`));
     await call('DELETE', `/workspaces/${WS}`);
-    for (const k of state.minted || []) await otoroshiAdmin('DELETE', `/api/apikeys/${k.clientId}`);
   } catch (e) {
     console.error('cleanup', e.message);
   } finally {

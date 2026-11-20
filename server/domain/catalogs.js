@@ -181,7 +181,7 @@ export async function sync(ctx, cat, { deployments, apis }) {
       try {
         if (item.action === 'delete') {
           const api = await apis.getApi(ws.id, item.slug);
-          if ((await deployments.deploymentStatus(api)).deployed) await deployments.purgeFromGateway(api);
+          if ((await deployments.deploymentStatus(api)).on_gateway) await deployments.purgeFromGateway(api);
           await apis.deleteApiRow(sysCtx, api);
           out.push(item);
           continue;

@@ -109,8 +109,6 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     if (state.prodApi) await prod('DELETE', `/workspaces/default/apis/${state.prodApi}`);
-    for (const k of (await otoroshi('GET', '/api/apikeys')) || [])
-      if (k.apiRef?.api === state.apiId && k.metadata?.created_by === 'apikey-extractor') await otoroshi('DELETE', `/api/apikeys/${k.clientId}`);
     if (state.apiId) await rec('DELETE', `/workspaces/${WS}/apis/${state.apiId}`);
     await rec('DELETE', `/workspaces/${WS}`);
     await gatewayEnv((env) => Object.fromEntries(Object.entries(env).filter(([k]) => k !== ENV_KEY)));

@@ -76,12 +76,6 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     if (state.apiId) await call('DELETE', ws(`/apis/${state.apiId}`));
-    // deleting the api removed its derived verifier from the gateway
-    if (state.verifierId) expect(await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).toBeNull();
-    // the keys the gateway minted for the consumers of the api stay when it is deleted (G-18): the
-    // test removes the ones it caused
-    for (const k of (await otoroshi('GET', '/api/apikeys')) || [])
-      if (k.apiRef?.api === state.apiId && k.metadata?.created_by === 'apikey-extractor') await otoroshi('DELETE', `/api/apikeys/${k.clientId}`);
     // leave nothing behind: the workspace, and the consumer the test created
     await call('DELETE', `/workspaces/${WS}`);
   } catch (e) {
@@ -253,7 +247,7 @@ describe('reference catalogue', () => {
     const app = await call('POST', ws('/applications'), { name: 'City university', team_id: state.teamId });
     const sub = await call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_research', application_id: app.id });
     expect(sub.status).toBe('pending');
-    // Otoroshi 18 would enable the key of a pending subscription: it is never projected
+    // a pending subscription waits in the product: nothing on the gateway before it is accepted
     expect(await oto.getSubscription(sub.id)).toBeNull();
     const accepted = await call('POST', ws(`/subscriptions/${sub.id}/accept`), { message: 'welcome' });
     expect(accepted.status).toBe('active');
@@ -374,6 +368,37 @@ describe('reference catalogue', () => {
     expect(report.diff.map((d) => d.path).join(' ')).toContain('derived[JwtVerifier');
     await call('POST', ws(`/apis/${state.apiId}/deploy`), {});
     expect((await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).strategy.verificationSettings.fields.iss).toBe('https://id.atlas.example');
+  });
+
+  test('undeploy stops serving the api, and the next deployment serves the same consumers', async () => {
+    const bulk = (await call('GET', ws('/subscriptions?plan=plan_bulk')))[0];
+    const cred = (await call('GET', ws(`/subscriptions/${bulk.id}`))).credentials[0];
+    const partner = { Authorization: `Bearer ${jwt({ client_id: `agency-north-${RUN}`, iss: 'https://id.atlas.example' })}` };
+    await call('POST', ws(`/apis/${state.apiId}/undeploy`));
+    // the Api stays on the gateway, disabled: its subscriptions and their keys stay with it
+    expect((await oto.getApi(state.apiId)).enabled).toBe(false);
+    expect((await gatewayCall('/documents/2026-0042', { headers: partner, expect: (r) => r.status === 404 })).status).toBe(404);
+    expect(await oto.getApikey(cred.client_id)).toBeTruthy();
+    await call('POST', ws(`/apis/${state.apiId}/deploy`), {});
+    expect((await oto.getApi(state.apiId)).enabled).toBe(true);
+    expect((await gatewayCall('/documents/2026-0042', { headers: partner, expect: (r) => r.status === 200 })).status).toBe(200);
+    expect((await oto.getApikey(cred.client_id)).clientSecret).toBe(cred.client_secret);
+  });
+
+  test('deleting the api removes it from the gateway, with its subscriptions and the keys of its consumers', async () => {
+    const keys = async () => ((await otoroshi('GET', '/api/apikeys')) || []).filter((k) => k.apiRef?.api === state.apiId);
+    // the jwt consumer of the partner plan has a key on the gateway, the bulk subscription its own
+    expect((await keys()).length).toBeGreaterThan(0);
+    const subs = (await call('GET', ws('/subscriptions'))).filter((s) => s.status === 'active');
+    await call('DELETE', ws(`/apis/${state.apiId}`));
+    const gone = async () => !(await oto.getApi(state.apiId)) && (await keys()).length === 0;
+    for (let i = 0; i < 40 && !(await gone()); i++) await Bun.sleep(250);
+    expect(await oto.getApi(state.apiId)).toBeNull();
+    expect(await keys()).toEqual([]);
+    for (const s of subs) expect(await oto.getSubscription(s.id)).toBeNull();
+    // and the derived verifier with it
+    expect(await otoroshi('GET', `/api/verifiers/${state.verifierId}`)).toBeNull();
+    state.apiId = null;
   });
 
   test('every action is audited', async () => {

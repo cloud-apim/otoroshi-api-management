@@ -532,7 +532,7 @@ r.delete('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
   const api = await apiOf(c, params, { manage: true });
   const status = await deployments.deploymentStatus(api);
   let task = null;
-  if (status.deployed) task = await deployments.purgeFromGateway(api);
+  if (status.on_gateway) task = await deployments.purgeFromGateway(api);
   await apis.deleteApiRow(c, api);
   return { deleted: true, gateway: task ? { task: task.id, status: task.status, error: task.last_error } : null };
 });

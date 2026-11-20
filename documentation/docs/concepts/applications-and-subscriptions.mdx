@@ -55,9 +55,8 @@ is declared for token-based plans, and that the application has no open subscrip
 
 ## Credentials
 
-A subscription becomes an Otoroshi apikey — **only once it is active**. Otoroshi 18 would
-enable the key of a pending subscription, so pending subscriptions are never projected
-([G-1](../otoroshi-gaps.mdx)).
+A subscription becomes an Otoroshi apikey — **only once it is effective**: a subscription waiting
+for a producer or a payment is not on the gateway at all.
 
 - On `apikey` and `oauth2-local` plans the gateway mints a client id and secret; the product reads
   them back and shows them in the portal and in the console.
@@ -66,8 +65,7 @@ enable the key of a pending subscription, so pending subscriptions are never pro
   above).
 - **Rotate secret** replaces the secret on the gateway at once.
 - **Suspend** disables the key; **resume** enables it again.
-- **Close** deletes the key from the gateway, then the subscription — deleting a subscription in
-  Otoroshi 18 revokes nothing on its own ([G-2](../otoroshi-gaps.mdx)).
+- **Close** deletes the subscription from the gateway, and Otoroshi revokes its key with it.
 
 Every operation is projected asynchronously and replayed if the gateway is unreachable: the
 console shows the projection state (`synced`, `waiting`, `error`) and offers to replay it.

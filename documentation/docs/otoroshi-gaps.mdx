@@ -10,60 +10,32 @@ A gap in the data plane is fixed in the data plane — in Otoroshi or one of its
 worked around in the product: a workaround there would freeze the product's model for nothing.
 Meanwhile, the product says what really applies rather than promising what the gateway cannot hold.
 
-The full list, with the source references and the proposed upstream fixes, is kept in
+The full list, with the source references and the fixes, is kept in
 [`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
-Reference: Otoroshi 18.0.1.
+Found on Otoroshi 18.0.1; every gap was fixed in Otoroshi 18.1 but three, not fixed by decision. The
+product requires 18.1, and follows the fixes one by one: ✅ followed, 🔜 fixed upstream, still to
+follow, ➖ not fixed.
 
-| # | Gap | Severity | What the product does meanwhile |
-|---|---|---|---|
-| G-1 | A `pending` ApiSubscription gets an **enabled** apikey | high | never projects a pending subscription |
-| G-2 | Deleting an ApiSubscription **revokes nothing** | high | deletes the keys first, then the subscription |
-| G-3 | An `Api` without a published plan has **open routes** | high | warns, and asks for an explicit acknowledgement before deploying |
-| G-4 | On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, **any valid token passes**, subscribed or not | high | flags it on the plan |
-| G-5 | Resource filtering only exists on **apikey** plans | medium | flags the filter as not enforced on the other kinds |
-| G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | stores them, projects them as plan metadata, flags them as not enforced |
-| G-7 | An `ApiDeployment` cannot carry the **external snapshot id**, and only the last five are kept | medium | writes the snapshot id in the `Api` metadata and keeps the full history itself |
-| G-8 | The catalog-deploy path is borrowed through a **naming convention** | medium | writes `created_by=remote_catalog=otoroshi-apim-deployment` |
-| G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | attributes calls from the key metadata and a client id cache at ingestion |
-| G-10 | A `PUT` on an entity that does not exist is refused as unauthorized | low | writes with the upsert of the generic api (`POST` on the id); the certificates through their controller, which enriches them |
-| G-11 | Nothing says when a new route or key becomes routable — not fixed: not feasible in a distributed cluster without a shared store | — | the console says *deployed* once the gateway accepted the write |
-| G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | the console replays requests through the gateway without the trace |
-| G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | warns on the plan |
-| G-14 | No key validity relative to the subscription, only an absolute date | low | not offered |
-| G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | warns on the plan |
-| G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
-| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity: suspending or closing it changes nothing at the gateway | high | client id carried as metadata of the subscription; calls attributed at ingestion; application certificates trusted only while an mtls subscription is active |
-| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan are keyed by the plan id alone, and outlive their Api: two Apis with a plan of the same id share them | high | plan ids created in the console are unique; warning `plan_id_shared` on the draft and on the deployment |
-| G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — not fixed: the job of whoever stores the events, and other uses need them | — | the ingester masks, pseudonymises and samples before it stores |
-| G-20 | An admin key narrowed by its access rights **reads the secret of every admin key** of its teams: the narrowing does not hold | high | the setup makes the product a key of its own, with every right |
-| G-21 | The global configuration is readable by super admins only — by design, not a gap | — | the product's key keeps every right |
-
-## The ones to keep in mind
-
-**G-1 and G-2 — subscriptions.** The product's workflow carries the fix: a subscription reaches the
-gateway only once accepted, and closing it deletes its keys explicitly. Writing ApiSubscriptions by
-hand in Otoroshi does not get those guarantees.
-
-**G-3 — an API without a published plan is open.** Deprecating or closing the last plan opens the
-API to anyone. The console warns at validation and at deployment.
-
-**G-4 — token-based plans.** Declaring the expected `client_id` on the application reconciles what
-the gateway sees with the catalogue, but does not stop an unsubscribed caller holding a valid token.
-Until a "subscription required" mode exists upstream, treat these plans as open to anyone your
-identity provider issues tokens to.
-
-**G-17 — suspending a token or certificate subscription.** On jwt, mtls and oauth2-remote plans,
-suspending or closing a subscription does not stop its consumer at the gateway: Otoroshi builds
-the consumer from the token or the certificate at each call, unrelated to the subscription. The
-only exception is a self-signed client certificate, which the gateway stops trusting. The
-subscription already carries the client id its application declares (metadata `apim_client_id`),
-ready for the upstream fix ([MAIF/otoroshi#2937](https://github.com/MAIF/otoroshi/issues/2937)).
-Until then, revoke such a consumer at its identity provider or its certificate authority.
-
-**G-18 — plan ids of token, certificate and open plans.** The gateway names the consumers of these
-plans after the plan id alone, and keeps them when their API is deleted. Two APIs with a plan of the
-same id — possible with declarative documents, which choose their plan ids — share the quotas of
-their consumers; the console warns (`plan_id_shared`). Give the plans of your documents ids unique
-across the installation (prefix them with the API, as `plan_petstore_discovery` does). Upstream:
-[MAIF/otoroshi#2938](https://github.com/MAIF/otoroshi/issues/2938).
-
+| # | Gap | Severity | Status | What the product does |
+|---|---|---|---|---|
+| G-1 | A `pending` ApiSubscription got an **enabled** apikey | high | ✅ | projects a subscription once it is effective |
+| G-2 | Deleting an ApiSubscription **revoked nothing** | high | ✅ | deletes the subscription, Otoroshi revokes its keys |
+| G-3 | An `Api` without a published plan has **open routes** | high | 🔜 | warns, and asks for an explicit acknowledgement before deploying |
+| G-4 | On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, **any valid token passes**, subscribed or not | high | 🔜 | flags it on the plan |
+| G-5 | Resource filtering only exists on **apikey** plans | medium | 🔜 | flags the filter as not enforced on the other kinds |
+| G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | 🔜 | stores them, projects them as plan metadata, flags them as not enforced |
+| G-7 | An `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the ref of each deployment Otoroshi records |
+| G-8 | The catalog-deploy path was borrowed through a **naming convention** | medium | ✅ | the `Api` is managed as code: `created_by=external=otoroshi-api-management` |
+| G-9 | `GatewayEvent` does not carry the key's `apiRef` | low | 🔜 | attributes calls from the key metadata and a client id cache at ingestion |
+| G-10 | A `PUT` on a missing entity was refused as unauthorized | low | ✅ | writes everything with the upsert of the generic api (`POST` on the id) |
+| G-11 | Nothing says when a new route or key becomes routable — not feasible in a distributed cluster without a shared store | — | ➖ | the console says *deployed* once the gateway accepted the write |
+| G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | 🔜 | the console replays requests through the gateway without the trace |
+| G-13 | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | 🔜 | warns on the plan |
+| G-14 | No key validity relative to the subscription, only an absolute date | low | 🔜 | not offered |
+| G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | 🔜 | warns on the plan |
+| G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | 🔜 | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
+| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity | high | 🔜 | client id carried as metadata of the subscription; calls attributed at ingestion |
+| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan were keyed by the plan id alone, and outlived their Api | high | ✅ | nothing to do: they are named after the api and the plan, and leave with it |
+| G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — the job of whoever stores the events | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
+| G-20 | An admin key narrowed by its access rights **read the secret of every admin key** of its teams | high | ✅ | nothing to change: the product's key is its own, super admin |
+| G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |

@@ -68,7 +68,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
               <button
                 className="btn sm danger"
                 onClick={async () => {
-                  if (!(await confirm({ title: tr('Undeploy?'), message: tr('The Api entity is removed from the gateway: calls to {0} return 404. Subscriptions stay in the product and are projected again at the next deployment.', [api.base_url]), danger: true, confirmLabel: tr('Undeploy') }))) return;
+                  if (!(await confirm({ title: tr('Undeploy?'), message: tr('The Api entity is disabled on the gateway: calls to {0} return 404. Its subscriptions and their keys stay: the next deployment serves them again.', [api.base_url]), danger: true, confirmLabel: tr('Undeploy') }))) return;
                   try {
                     await wapi.post(`/apis/${api.id}/undeploy`);
                     toast(tr('Undeployed'));

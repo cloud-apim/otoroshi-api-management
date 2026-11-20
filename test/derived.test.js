@@ -158,22 +158,3 @@ describe('subscriptions of token and certificate plans', () => {
     expect(buildOtoroshiSubscription(sub('jwt'), { application: { ...app, client_id: null } }).metadata.apim_client_id).toBeUndefined();
   });
 });
-
-describe('plan ids shared between apis (G-18)', () => {
-  test('a token, certificate or open plan warns when another api has a plan of the same id and kind', async () => {
-    const { sharedPlanWarnings } = await import('../server/domain/model.js');
-    const draft = snapshot([remotePlan({ verifier: 'm' }), defaultPlan({ id: 'plan_keys', name: 'Keys', auth: { kind: 'apikey' } }), mtlsPlan({ trustedCAs: [CA] })]).draft;
-    const others = [
-      { name: 'Other', planId: 'plan_sso', kind: 'oauth2-remote' },
-      { name: 'Other', planId: 'plan_keys', kind: 'apikey' }, // the keys of an apikey plan come from its subscriptions
-      { name: 'Other', planId: 'plan_bulk', kind: 'jwt' }, // another kind, another prefix
-    ];
-    const warnings = sharedPlanWarnings(draft, others, (o) => `the API "${o.name}"`);
-    expect(warnings.map((w) => [w.code, w.path])).toEqual([['plan_id_shared', 'plans[0]']]);
-    expect(warnings[0].message).toContain('the API "Other"');
-    // a closed plan has no extractor any more
-    draft.plans[0].status = 'closed';
-    expect(sharedPlanWarnings(draft, others, () => '')).toEqual([]);
-  });
-});
-

@@ -1,9 +1,7 @@
 // Subscriptions: (application x plan) -> state + credentials. The approval workflow belongs entirely
-// to the product: Otoroshi 18 only carries `validation` as a label.
-//
-// Projection rules learned from Otoroshi 18, fixed here by construction:
-//  - a pending subscription gets an enabled key in Otoroshi -> pending subscriptions are never projected
-//  - deleting a subscription revokes nothing -> keys are deleted explicitly before the subscription
+// to the product: Otoroshi only carries `validation` as a label. A subscription is projected once it
+// is effective (active, or suspended: its keys disabled) — a pending one, waiting for a producer or a
+// payment, is not on the gateway at all.
 
 import { db, newId } from '../db/index.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
@@ -357,11 +355,9 @@ export async function rotateCredential(ctx, sub, credentialId) {
 
 // ---------------------------------------------------------------- projection (idempotent)
 
+// Otoroshi revokes the keys of a subscription with it: deleted on apikey and oauth2-local plans,
+// disabled on the others (the plan would mint them again at the next call)
 async function removeFromGateway(sub, existing) {
-  const refs = existing?.token_refs || sub.projection?.token_refs || [];
-  for (const ref of refs) if (ref.apikey) await oto.deleteApikey(ref.apikey).catch(() => null);
-  const creds = await credentialsOf(sub.id);
-  for (const c of creds) if (c.status === 'active') await oto.deleteApikey(c.client_id).catch(() => null);
   if (existing) await oto.deleteSubscription(sub.id);
   await db`update credentials set status = 'revoked', revoked_at = now() where subscription_id = ${sub.id} and status = 'active'`;
 }

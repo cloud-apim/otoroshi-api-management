@@ -7,7 +7,7 @@ import { db, newId, slugify } from '../db/index.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
-import { defaultDraft, defaultPlan, MINTED_KINDS, normalizeDraft, sharedPlanWarnings, validateDraft, VISIBILITIES } from './model.js';
+import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
 import { checkValues, listFields, validateValues } from './metadata.js';
@@ -227,26 +227,8 @@ export async function validateWithMetadata(workspaceId, draft, { apiId = null } 
     const { errors } = validateValues(fields, p.metadata);
     errors.forEach((e) => v.errors.push({ path: `plans[${p.name}].metadata.${e.key}`, message: `plan "${p.name}": ${e.message}` }));
   }
-  if (apiId) v.warnings.push(...(await sharedPlanIds(apiId, draft)));
   v.ok = v.errors.length === 0;
   return v;
-}
-
-const pgArray = (list) => `{${list.map((x) => `"${String(x).replace(/(["\\])/g, '\\$1')}"`).join(',')}}`;
-
-// the drafts of the other apis, in every workspace: the gateway's namespace is the installation's
-async function sharedPlanIds(apiId, draft) {
-  const ids = normalizeDraft(draft).plans.filter((p) => MINTED_KINDS.includes(p.auth.kind)).map((p) => p.id);
-  if (!ids.length) return [];
-  const rows = await db`select a.name, a.version, w.slug as workspace, p->>'id' as plan_id, coalesce(p->'auth'->>'kind', 'apikey') as kind
-    from apis a join workspaces w on w.id = a.workspace_id
-    cross join lateral jsonb_array_elements(coalesce(a.draft->'plans', '[]'::jsonb)) p
-    where a.id <> ${apiId} and p->>'id' = any(${pgArray(ids)}::text[])`;
-  return sharedPlanWarnings(
-    draft,
-    rows.map((r) => ({ ...r, planId: r.plan_id })),
-    (o) => `the API "${o.name}" ${o.version} (workspace ${o.workspace})`
-  );
 }
 
 export async function lastSnapshot(apiId) {

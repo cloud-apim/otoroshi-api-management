@@ -13,9 +13,10 @@ Last update: 2026-11-20.
 
 ## Now
 
-- **Following the upstream fixes** (Otoroshi `18.1.0-dev`, step 3 of the [roadmap](./OTOROSHI-GAPS.md#roadmap)), on the stack run with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up`. The suite passed on it unchanged (152/152): the new behaviours are opt-in. Done so far:
+- **Following the upstream fixes** (Otoroshi `18.1.0-dev`, [where we are](./OTOROSHI-GAPS.md#where-we-are)), on the stack run with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up`. The suite passed on it unchanged (152/152): the new behaviours are opt-in. Done so far:
   - G-10: the derived certificates are written with the upsert of the generic api, which computes their subject and dates from the chain.
   - Otoroshi 18.1 required by the setup check. G-8: the `Api` is managed as code, `created_by=external=otoroshi-api-management`. G-7, R-33: the snapshot id is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records; the console lists the gateway's deployments by snapshot.
+  - G-1, G-2, G-18, G-20: closing a subscription deletes it, Otoroshi revokes its keys; deleting an api deletes its `Api`, Otoroshi its subscriptions and keys; the warning `plan_id_shared` and the cleanup of minted keys in the tests are gone. Undeploying now disables the `Api` rather than deleting it, so that the consumers keep their keys at the next deployment.
 
 ## Next, in the proposed order
 
@@ -25,7 +26,7 @@ Last update: 2026-11-20.
 4. **R-13** — subscription expiry.
 5. **R-38** — UI tests.
 
-These do not depend on the projection: they go on while the gaps that change the contract are fixed in Otoroshi ([roadmap](./OTOROSHI-GAPS.md#roadmap)).
+These do not depend on the projection: they come once the product follows the upstream fixes ([where we are](./OTOROSHI-GAPS.md#where-we-are)).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -250,4 +251,4 @@ waits for the data plane rather than working around it.
 
 ## Otoroshi gaps
 
-Logged as they are found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), to be fixed in the data plane — G-11 (not feasible in a distributed cluster), G-19 (the ingester's job) and G-21 (by design) apart, not fixed (owner) — each with its upstream issue, the size of the fix and the item it unblocks. Its [roadmap](./OTOROSHI-GAPS.md#roadmap): the gaps that change the contract first (G-1, G-2, G-13, G-15, G-17, G-18, G-4, G-3, G-7), the product meanwhile on what does not depend on the projection, then the product follows the fixes and requires the release that carries them. The `Api`, the JWT verifiers and the auth modules are written with the upsert of the generic api (`POST` on the id); the certificates move to it once the generic api enriches them (owner, in progress). What stays of G-10: the `401`s, the inverted `Otoroshi-Entity-Updated` header.
+Logged as they were found in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md) (G-1 to G-21), each with its upstream issue. All fixed upstream in `18.1.0-dev` (2026-11-19) but G-11 (not feasible in a distributed cluster), G-19 (the ingester's job) and G-21 (by design), not fixed by decision. The product requires 18.1 and follows the fixes gap by gap: the [table](./OTOROSHI-GAPS.md#where-we-are) says which are followed and which are still to follow.

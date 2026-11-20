@@ -88,7 +88,7 @@ export function createController(kube) {
         const ctx = ctxFor({ id: owned.workspace_id }, marker);
         if (detaching(cr)) await db`update apis set managed_by = null where id = ${owned.id}`;
         else {
-          if ((await deployments.deploymentStatus(owned)).deployed) await deployments.purgeFromGateway(owned);
+          if ((await deployments.deploymentStatus(owned)).on_gateway) await deployments.purgeFromGateway(owned);
           await apis.deleteApiRow(ctx, owned);
         }
       }

@@ -33,7 +33,7 @@ bun cli/apim.js help
 | `apis changes <ws> <api>` | what the draft changes since the last snapshot |
 | `apis publish <ws> <api> [--comment c] [--deploy]` | freeze a snapshot, optionally deploy it |
 | `apis deploy <ws> <api> [--snapshot n] [--dry-run]` | deploy the latest (or a given) snapshot; `--dry-run` prints the catalogue and gateway diffs |
-| `apis undeploy <ws> <api>` | remove the API from the gateway |
+| `apis undeploy <ws> <api>` | stop serving the API: its `Api` is disabled on the gateway, its subscriptions and keys kept |
 | `apis snapshots <ws> <api>` | the snapshot history |
 | `apply <ws> -f <file> [--publish] [--deploy] [--managed-by <source>] [--comment c]` | upsert declarative documents |
 | `subscriptions list <ws> [--status s] [--api id]` | |
