@@ -114,3 +114,10 @@ by hand.
 
 Over HTTP: `POST /api/workspaces/<ws>/apply?publish=true&deploy=true` with one document, a list, or
 `{"items": […]}`.
+
+## The design of a portal
+
+The developer portal of a workspace has a declarative document too, `kind: Portal`: its
+[design](../portal-design.mdx#a-folder-a-catalog) — mode, texts, theme, navigation, home, pages,
+templates, style sheet, script and assets —, a folder that `apim portal pull` writes and
+`apim portal push` sends back, and that a remote catalog reads beside the `Api` documents.

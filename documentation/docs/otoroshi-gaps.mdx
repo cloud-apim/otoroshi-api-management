@@ -10,38 +10,20 @@ A gap in the data plane is fixed in the data plane — in Otoroshi or one of its
 worked around in the product: a workaround there would freeze the product's model for nothing.
 Meanwhile, the product says what really applies rather than promising what the gateway cannot hold.
 
-The full list, with the source references and the fixes, is kept in
+This page lists what still limits the product: the gaps **open** (⬜), reported upstream, and the
+ones **not fixed by decision** (➖), with what the product does meanwhile. The gaps already fixed are
+not here: the product requires Otoroshi 18.1, which holds their fixes. The full history — every gap
+found, its source references, its fix — is kept in
 [`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
-Found on Otoroshi 18.0.1; every gap was fixed in Otoroshi 18.1 but three, not fixed by decision, and
-one found since. The product requires 18.1, and relies on the fixes: ✅ followed, ➖ not fixed, ⬜ open.
 
 | # | Gap | Severity | Status | What the product does |
 |---|---|---|---|---|
-| G-1 | A `pending` ApiSubscription got an **enabled** apikey | high | ✅ | projects a subscription once it is effective |
-| G-2 | Deleting an ApiSubscription **revoked nothing** | high | ✅ | deletes the subscription, Otoroshi revokes its keys |
-| G-3 | An `Api` without a published plan had **open routes** | high | ✅ | nothing: such an api is closed; the draft says so |
-| G-4 | On `jwt`, `mtls` and `oauth2-remote` plans, **any valid token passed**, subscribed or not | high | ✅ | these plans serve only the client ids of enabled subscriptions |
-| G-5 | Resource filtering only existed on **apikey** plans | medium | ✅ | the filter is projected on every kind but oauth2-local |
-| G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | ✅ | projects them as `selection`, `counter_failure`, `circuit_breaker_scope` |
-| G-7 | An `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the ref of each deployment Otoroshi records |
-| G-8 | The catalog-deploy path was borrowed through a **naming convention** | medium | ✅ | the `Api` is managed as code: `created_by=external=otoroshi-api-management` |
-| G-9 | `GatewayEvent` did not carry the key's `apiRef` | low | ✅ | attributes each call from the `apiRef` of its event |
-| G-10 | A `PUT` on a missing entity was refused as unauthorized | low | ✅ | writes everything with the upsert of the generic api (`POST` on the id) |
 | G-11 | Nothing says when a new route or key becomes routable — not feasible in a distributed cluster without a shared store | — | ➖ | the console says *deployed* once the gateway accepted the write |
-| G-12 | Otoroshi's request tester with the policy execution trace was only reachable from its backoffice | medium | ✅ | the console tries requests with it, and shows the trace |
-| G-13 | A **deprecated** plan lost its extractor: its consumers were no longer identified | high | ✅ | nothing: a deprecated plan keeps its consumers |
-| G-14 | No key validity relative to the subscription, only an absolute date | low | ✅ | an apikey plan offers a key validity in days |
-| G-15 | **oauth2-remote** plans checked neither the issuer nor the audience of the token | high | ✅ | the plan names its issuer and audiences |
-| G-16 | On **mtls** plans the subject and issuer patterns combined with **OR**, over a trust store shared by the whole gateway | medium | ✅ | the plan trusts its own CAs; both lists of patterns must match |
-| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carried no consumer identity | high | ✅ | the subscription carries the client id of the application; the gateway provisions its consumer |
-| G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan were keyed by the plan id alone, and outlived their Api | high | ✅ | nothing to do: they are named after the api and the plan, and leave with it |
 | G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — the job of whoever stores the events | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
-| G-20 | An admin key narrowed by its access rights **read the secret of every admin key** of its teams | high | ✅ | nothing to change: the product's key is its own, super admin |
 | G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |
 | G-22 | An extractor that does not identify the caller sends an error event for a call that then succeeds, or is refused: the call is counted twice | medium | ⬜ open | nothing: the dashboards count these as errors |
 | G-23 | A key cannot serve several subscriptions: a key is its subscription's own, one api, one plan ([#2963](https://github.com/MAIF/otoroshi/issues/2963)) | medium | ⬜ open | one key per subscription; a credential for several subscriptions waits for it |
 | G-24 | Threat Protection Suite: the global table of Threat Studio does not see the plan plugins: a second firewall runs on a plan already protected, the scores add up and the policy of the table decides ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)) | high | ⬜ open | keep the global table off the apis protected per plan |
-| G-25 | ~~Threat Protection Suite: a challenge answers a page with status 200~~ | — | ➖ not a gap | a challenge is for a person in a browser |
 | G-26 | Threat Protection Suite: a security event names the api, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)) | low | ⬜ open | the plan from the key that called; the api only otherwise |
 | G-27 | Threat Protection Suite: with the core rule set, every call scores a firewall match — its initialization rules count as matches ([waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62)) | medium | ⬜ open | a policy that refuses at 90 |
 | G-28 | Threat Protection Suite: a firewall that blocks on its own sends no security event, only its trail ([waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63)) | medium | ⬜ open | the firewall reports, the threat response decides |

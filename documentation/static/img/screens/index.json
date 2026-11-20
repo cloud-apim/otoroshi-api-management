@@ -256,10 +256,6 @@
     "title": "Workspace settings — general"
   },
   {
-    "file": "console-ws-portal.png",
-    "title": "Workspace settings — its developer portal, its identity provider"
-  },
-  {
     "file": "console-ws-members.png",
     "title": "Workspace settings — members and roles"
   },
@@ -278,6 +274,50 @@
   {
     "file": "console-ws-export.png",
     "title": "Workspace settings — export and import"
+  },
+  {
+    "file": "console-portal-overview.png",
+    "title": "Developer portal — the published design, the changes of the draft, publish and preview"
+  },
+  {
+    "file": "console-portal-settings.png",
+    "title": "Developer portal — its settings: languages, signup, identity provider, categories"
+  },
+  {
+    "file": "console-portal-design.png",
+    "title": "Developer portal — its design: the mode (default, themed, templates), the texts, the theme"
+  },
+  {
+    "file": "console-portal-home.png",
+    "title": "Developer portal — the home written as a template (Markdoc), the tags of the portal beside it"
+  },
+  {
+    "file": "console-portal-templates.png",
+    "title": "Developer portal — the template of an api, its variables"
+  },
+  {
+    "file": "console-portal-navigation.png",
+    "title": "Developer portal — the links of its header and its footer"
+  },
+  {
+    "file": "console-portal-styles.png",
+    "title": "Developer portal — its style sheet and its script, scripts off by default"
+  },
+  {
+    "file": "console-portal-assets.png",
+    "title": "Developer portal — its assets: images, fonts, style sheets"
+  },
+  {
+    "file": "console-portal-versions.png",
+    "title": "Developer portal — the versions of its design, restored into the draft"
+  },
+  {
+    "file": "console-portal-sync.png",
+    "title": "Developer portal — a folder synchronised with the cli, or a remote catalog"
+  },
+  {
+    "file": "console-portal-scripts.png",
+    "title": "Allowing scripts on a portal — the warning, to acknowledge"
   },
   {
     "file": "console-ws-catalogs.png",
@@ -426,6 +466,30 @@
   {
     "file": "portal-french.png",
     "title": "Portal — in French"
+  },
+  {
+    "file": "portal-themed-home.png",
+    "title": "A themed portal — its colors, font, radius and logo, its links, a home made of blocks"
+  },
+  {
+    "file": "portal-themed-catalogue.png",
+    "title": "A themed portal — its catalogue, themed"
+  },
+  {
+    "file": "portal-themed-page.png",
+    "title": "A themed portal — a page of its own, linked from its header"
+  },
+  {
+    "file": "portal-templates-home.png",
+    "title": "A portal written as templates (Markdoc) — its home, previewed before it is published"
+  },
+  {
+    "file": "portal-templates-api.png",
+    "title": "A portal written as templates — the overview of an api, its variables and its reference as tags"
+  },
+  {
+    "file": "portal-themed-dark.png",
+    "title": "A themed portal — its colors for the dark theme"
   },
   {
     "file": "portal-dark-home.png",

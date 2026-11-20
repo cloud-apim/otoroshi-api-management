@@ -36,8 +36,8 @@ plan identified has a plan and no subscription. An event without `apiRef` (an AI
 attributed from the client id of a credential the product holds.
 
 On an API with several plans, a plan that does not identify the caller sends an error event of its
-own for a call that then succeeds ([G-22](../otoroshi-gaps.mdx)): the dashboards count it as a
-call, and as an error.
+own for a call that then succeeds, or is refused ([G-22](../otoroshi-gaps.mdx)): the dashboards count
+it as a call, and as an error — a refused call counts twice.
 
 A quota consumed, an attribution, a token count are **counted, never sampled**.
 

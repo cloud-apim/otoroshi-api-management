@@ -29,9 +29,11 @@ visitor's light / dark / system preference.
 Beyond its home, a portal has the **pages** its workspace writes — terms of use, a getting-started
 guide, a contact page — in Markdown, in each language of the portal (the default one shown where a
 translation is missing), at `/pages/<slug>`. A page is in the navigation of the portal, in the order
-of the list, or reached by its link only. They are written in **Workspace settings → Developer
-portal › Pages**, or by the admin API (`PUT …/workspaces/<ws>` with `portal.pages`: a slug made of
-lowercase letters, digits and dashes, unique; a title; a content per language; `nav`).
+of the list, or reached by its link only. They are part of the [design](./portal-design.mdx) of the
+portal, written in **Developer portal › Pages** and published with it, from a folder with
+`apim portal push`, or by the admin API (`PUT …/workspaces/<ws>/portal/design` with `pages`: a slug made
+of lowercase letters, digits and dashes, unique; a title; a content per language; `nav`). In a portal
+written as templates, a page is a template, its tags and variables included.
 
 ## Catalogue
 

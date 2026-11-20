@@ -8,6 +8,7 @@
 //  - a (fake) Stripe account linked to the default workspace, for its paid plans
 //  - then scripts/demo-activity.js: the gateway caught up, an event-driven api, a dictionary, a shared
 //    resource, the catalogue of the portal, and activity for every dashboard
+//  - then scripts/demo-showcase.js: a workspace whose portal is designed (themed, and templates in draft)
 import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 
@@ -91,4 +92,7 @@ if (payments.available && !payments.account) {
 // what the screens show beyond the apis: an event-driven api, a dictionary, a shared resource, the
 // catalogue of the portal, and activity for every dashboard
 await import('./demo-activity.js');
+
+// a workspace whose portal is designed: themed and published, its next design written as templates
+await import('./demo-showcase.js');
 

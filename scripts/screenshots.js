@@ -351,7 +351,6 @@ async function consoleTour(page) {
 
   for (const [tab, name, title] of [
     ['general', 'console-ws-general', 'Workspace settings — general'],
-    ['portal', 'console-ws-portal', 'Workspace settings — its developer portal, its identity provider'],
     ['members', 'console-ws-members', 'Workspace settings — members and roles'],
     ['teams', 'console-ws-teams', 'Workspace settings — teams'],
     ['metadata', 'console-ws-metadata', 'Workspace settings — typed metadata fields'],
@@ -359,9 +358,38 @@ async function consoleTour(page) {
     ['export', 'console-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);
-    if (tab === 'export' || tab === 'portal') await editors(page);
+    if (tab === 'export') await editors(page);
     await shot(page, name, title);
   }
+  // the page of a developer portal: the showcase workspace, its portal themed, its next design
+  // written as templates in the draft
+  const D = '/backoffice/ws/showcase/portal';
+  for (const [section, name, title, edit] of [
+    ['', 'console-portal-overview', 'Developer portal — the published design, the changes of the draft, publish and preview'],
+    ['settings', 'console-portal-settings', 'Developer portal — its settings: languages, signup, identity provider, categories'],
+    ['design', 'console-portal-design', 'Developer portal — its design: the mode (default, themed, templates), the texts, the theme'],
+    ['home', 'console-portal-home', 'Developer portal — the home written as a template (Markdoc), the tags of the portal beside it', true],
+    ['templates', 'console-portal-templates', 'Developer portal — the template of an api, its variables', true],
+    ['navigation', 'console-portal-navigation', 'Developer portal — the links of its header and its footer'],
+    ['styles', 'console-portal-styles', 'Developer portal — its style sheet and its script, scripts off by default', true],
+    ['assets', 'console-portal-assets', 'Developer portal — its assets: images, fonts, style sheets'],
+    ['versions', 'console-portal-versions', 'Developer portal — the versions of its design, restored into the draft'],
+    ['sync', 'console-portal-sync', 'Developer portal — a folder synchronised with the cli, or a remote catalog'],
+  ]) {
+    await go(page, section ? `${D}/${section}` : D);
+    if (edit) await editors(page);
+    await shot(page, name, title, { full: section !== 'home' && section !== 'templates' });
+  }
+  // allowing scripts is an act of its own: the warning, never accepted by the tour
+  await go(page, `${D}/styles`);
+  await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.setting, .card-body > div')].find((e) => e.innerText.includes('Allow scripts on this portal'));
+    row?.querySelector('input[type=checkbox]')?.click();
+  });
+  await settle(page, 500);
+  await shot(page, 'console-portal-scripts', 'Allowing scripts on a portal — the warning, to acknowledge', { full: false });
+  await page.keyboard.press('Escape');
+
   await go(page, '/backoffice/ws/gitops/settings/catalogs');
   await shot(page, 'console-ws-catalogs', 'Workspace settings — remote catalogs');
   await click(page, 'Preview & sync');
@@ -481,10 +509,37 @@ async function portalTour(page) {
   await page.evaluate(() => localStorage.setItem('apim.portal.lang', 'fr'));
   await go(page, `${P}/apis/books/plans`);
   await shot(page, 'portal-french', 'Portal — in French');
+  // a designed portal: the showcase workspace, themed and published, its next design in templates
+  await api(page, '/showcase/front/api/auth/logout', 'POST', {});
+  await page.evaluate(() => {
+    localStorage.setItem('apim.theme', 'light');
+    localStorage.setItem('apim.portal.lang', 'en');
+  });
+  await go(page, '/showcase/');
+  await shot(page, 'portal-themed-home', 'A themed portal — its colors, font, radius and logo, its links, a home made of blocks');
+  await go(page, '/showcase/apis');
+  await shot(page, 'portal-themed-catalogue', 'A themed portal — its catalogue, themed');
+  await go(page, '/showcase/pages/guide');
+  await shot(page, 'portal-themed-page', 'A themed portal — a page of its own, linked from its header');
+  // the preview link is the console's: signed in again as an administrator (the console tour ended as a consumer)
+  await api(page, '/backoffice/api/auth/login', 'POST', ADMIN);
+  const preview = await api(page, '/backoffice/api/workspaces/showcase/portal/preview', 'POST', {});
+  if (!preview?.url) console.warn(`    ! no preview link: ${JSON.stringify(preview).slice(0, 160)}`);
+  if (preview?.url) {
+    await go(page, new URL(preview.url).pathname + new URL(preview.url).search);
+    await sleep(800);
+    await shot(page, 'portal-templates-home', 'A portal written as templates (Markdoc) — its home, previewed before it is published');
+    await go(page, '/showcase/apis/forecasts');
+    await sleep(1500);
+    await shot(page, 'portal-templates-api', 'A portal written as templates — the overview of an api, its variables and its reference as tags');
+    await page.evaluate(() => sessionStorage.removeItem('apim.portal.preview'));
+  }
   await page.evaluate(() => {
     localStorage.setItem('apim.theme', 'dark');
     localStorage.setItem('apim.portal.lang', 'en');
   });
+  await go(page, '/showcase/');
+  await shot(page, 'portal-themed-dark', 'A themed portal — its colors for the dark theme');
   await go(page, `${P}/`);
   await shot(page, 'portal-dark-home', 'Portal — dark theme');
   await go(page, `${P}/apis/books/reference`);
@@ -511,7 +566,8 @@ description: Every screen of the console and of the developer portal, captured f
 # Screens tour
 
 Every screen of the console and of the developer portal, captured from a running installation with
-demo data (the Books, Petstore, Weather and Geocoding apis). Regenerate them with
+demo data (the Books, Petstore, Weather and Geocoding apis, and the Weather Co workspace for the design
+of a portal). Regenerate them with
 \`bun run screenshots\` after a change of the interface.
 
 ## Console
