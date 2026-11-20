@@ -9,6 +9,7 @@ import { db, newId } from '../db/index.js';
 import { badRequest, conflict, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
+import { requireFreeName } from './references.js';
 
 function normalizePlugins(plugins) {
   return (Array.isArray(plugins) ? plugins : []).map((p) => ({
@@ -34,6 +35,7 @@ export async function getGroup(workspaceId, id) {
 
 export async function createGroup(ctx, workspaceId, { name, description = '', plugins = [] }) {
   if (!name) throw badRequest('name is required');
+  await requireFreeName('group', workspaceId, name);
   const id = newId('pg');
   const rows = await db`insert into policy_groups (id, workspace_id, name, description, draft)
     values (${id}, ${workspaceId}, ${name}, ${description}, ${{ plugins: normalizePlugins(plugins) }}) returning *`;
@@ -42,6 +44,7 @@ export async function createGroup(ctx, workspaceId, { name, description = '', pl
 }
 
 export async function updateGroup(ctx, group, patch) {
+  if (patch.name && patch.name !== group.name) await requireFreeName('group', group.workspace_id, patch.name, group.id);
   const draft = patch.plugins ? { plugins: normalizePlugins(patch.plugins) } : group.draft;
   const rows = await db`update policy_groups set name = ${patch.name ?? group.name}, description = ${patch.description ?? group.description},
     draft = ${draft}, updated_at = now() where id = ${group.id} returning *`;

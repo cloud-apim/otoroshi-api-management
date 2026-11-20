@@ -22,6 +22,10 @@ An HTTP catalog can send a header (a token, for instance); an S3 catalog signs i
 access key id and its secret. Both are sealed at rest ([secrets at rest](../install.mdx#secrets-at-rest))
 and never shown again. Documents of another kind than `Api` are ignored and counted.
 
+The content of a page can be [a file beside the document](./declarative-documents.mdx#the-pages):
+a git catalog reads it from the repository, an S3 catalog under its prefix, an HTTP catalog from the
+origin of its url, with its header. A path that leaves the source fails the sync, saying so.
+
 ## What a sync does
 
 The mode is explicit, per catalog:

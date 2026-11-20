@@ -8,6 +8,8 @@
 
 import YAML from 'yaml';
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { inlinePageFiles } from '../server/domain/page-files.js';
 import { SETUP_HELP, failed, formatSetup, setupRequest } from './setup.js';
 
 const HELP = `apim — otoroshi-api-management command line
@@ -122,6 +124,13 @@ function readDocs(file) {
     return Array.isArray(d) ? d : [d];
   }
   return YAML.parseAllDocuments(text).map((d) => d.toJSON()).filter(Boolean);
+}
+
+// the documents of a file, the content of their pages given by file read beside it
+async function readApiDocs(file) {
+  const docs = readDocs(file);
+  for (const d of docs) await inlinePageFiles(d, async (f) => readFileSync(join(dirname(file), f), 'utf8'));
+  return docs;
 }
 
 const need = (v, what) => {
@@ -251,7 +260,7 @@ async function main() {
       }
     }
     case 'apply': {
-      const docs = readDocs(need(flags.file, '-f <file>'));
+      const docs = await readApiDocs(need(flags.file, '-f <file>'));
       const q = new URLSearchParams();
       if (flags.publish) q.set('publish', 'true');
       if (flags.deploy) q.set('deploy', 'true');

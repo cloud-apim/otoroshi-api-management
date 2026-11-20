@@ -51,6 +51,7 @@ Last update: 2026-11-20.
   - R-10, second half: **shared resources** (D-16) — an authorization server described once for the workspace (issuer, keys, discovery, user info, the client of the gateway), published by immutable versions; a jwt or oauth2-remote plan pins a version instead of describing its server, the snapshot freezes it, and the projection derives from it the very JWT verifier or auth module a description derives; a new version changes nothing until an api is upgraded, the apis behind listed; a resource still pinned is not deleted; checked with a real token of the identity provider of the stack (`test/shared-resources.test.js`, `test/model.test.js`).
   - The screens tour taken again (109 captures, `docs/screens.mdx`): the AsyncAPI tab and the events of the portal, the catalogue placement and the reviews, the threat protection of a plan, shared resources and dictionaries, the observability tops, the request log and a call, the security events, the analytics and the request log of the portal.
   - The demo feeds every dashboard (`scripts/demo-activity.js`, run by `mise run demo`): what the drift detection finds missing on the gateway is deployed again (the snapshot that ran) and provisioned again — the development gateway keeps nothing across a restart; an event-driven api with its AsyncAPI specification, a dictionary, a shared authorization server pinned behind its latest version, the categories and a review of the portal; calls through the gateway now, under the rate limits of the plans, and fourteen days of calls and security events fed to the ingester once.
+  - R-28 settled by the owner: the declarative format becomes a contract, with four changes. The version is `spec.version`, as in a Kubernetes resource (`metadata.version` still read, the two differing refused). The policy groups and the shared resources a document pins are named — an id still accepted —, the export writes names, so a document moves between installations; a name is unique in a workspace. A document that lists its pages is their truth (a page it no longer lists is deleted; without `pages`, they are left alone). The content of a page can be a file beside the document, read by `apim apply` and by the remote catalogs (git, S3, HTTP), within the source (`test/declarative.test.js`, `test/catalogs.test.js`).
   - R-26 settled by the owner: the gateway pill at the bottom of the sidebar and the Gateway page stay as they are, on one condition met — the settings of the gateway are the installation administrators' only: the connection, ingestion and setup tabs are hidden from anyone else (refused by the admin api already), and the status a non-admin reads drops the url of the gateway, its errors and the volumes of the installation, its drift counted on their own workspaces (`test/permissions.test.js`).
   - The banner of an api says what the drift detection saw since its deployment: "no longer on the gateway" (a restart without storage, a hand in its console) or "changed on the gateway", with a redeploy of the snapshot that ran; `on_gateway` still means "the product put it there" (`deployment.gateway`, `test/derived-objects.test.js`).
   - Every list is searchable and paged, in the console and the portal — top-level pages, the lists of a detail page, a card, a modal or a drawer (`web/shared/lists.jsx`: `useLocalPaging`, `usePaging`, `local` for a modal, the page brought back when the list shrinks; the reference is the applications list). Searched and paged on the server where they grow: the people (`GET /users`, formerly cut at 200), the deployment history of an api (formerly cut at 50), the usage billed for a subscription (its sums now over every batch, not the last 200), the security events (`q`), the notifications of the portal. Editable ordered compositions (the plugins of a flow, the pages and categories of the portal settings, key/value editors) stay as they are.
@@ -82,7 +83,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions).
 
-**Owner decisions (3):** R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
+**Owner decisions (2):** R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
 
 **Waiting for a go:** building the real image (downloads).
 
@@ -121,7 +122,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
 
 ### Analytics and audit
@@ -150,6 +150,7 @@ waits for the data plane rather than working around it.
 | — | D-32 | AI and MCP apis as product types (the events are captured from day one) |
 | — | D-32, D-34 | Event-driven apis — needs per-message events in the event-brokers extension first |
 | — | D-32, Q-7 | Api scoring, quality review before publication |
+| — | Q-11 | Declarative kinds beyond `Api` (`PolicyGroup`, `SharedResource`, `Dictionary`), when the need comes: they live in the workspace export meanwhile |
 
 ---
 
@@ -226,7 +227,7 @@ waits for the data plane rather than working around it.
 |---|---|
 | Q-6 inventory of D-15 | ✅ [Inventory of the Otoroshi entities](./documentation/docs/gateway/inventory.mdx): every kind the gateway declares, projected, derived, made by the setup, minted, consumed or not used — checked against the gateway (`test/inventory.test.js`) |
 | Q-8 computed path content, raw path lightening | ✅ hourly rollups by catalogue dimension, method, templated path and status class, durations as a histogram; calls 30 days, rollups 400, AI usage 90, raw 7 — set in the console; the cleaning at ingestion, its upstream counterpart logged as G-19 |
-| Q-11 declarative format | 🟡 implemented, to validate: R-28 |
+| Q-11 declarative format | ✅ settled by the owner on 2026-11-20 (R-28): one document per api-version, the version in `spec.version` (`metadata.version` still read), plans inside, pages beside — their truth when listed, their content inline or a file beside the document —, the policy groups and shared resources it pins by name (unique in a workspace) |
 | Q-12 monetisation | ⬜ owner decision: R-35; connector: R-7 |
 
 ## Reference catalogue test

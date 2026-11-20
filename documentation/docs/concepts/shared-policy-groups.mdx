@@ -24,7 +24,9 @@ Like an API, a group has a **draft** and **published versions**, immutable and n
 ## Pinned, never floating
 
 An API references a group **at a version**. Its snapshot freezes the plugins of that version, and
-the projection expands them in place. Publishing v2 of the group changes nothing in production:
+the projection expands them in place. Its name is one in the workspace: a
+[declarative document](../gitops/declarative-documents.mdx#what-it-pins-by-name) pins it by that name,
+and so moves from one installation to the next. Publishing v2 of the group changes nothing in production:
 snapshots are immutable.
 
 The group page lists the APIs that use it and which ones are behind; the flow of each API shows

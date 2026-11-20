@@ -34,6 +34,27 @@ describe('git remote catalog', () => {
       await rm(repo, { recursive: true, force: true });
     }
   });
+
+  test('the content of a page given by a file beside the document, read from the repository', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'apim-catalog-test-'));
+    const page = (file) => `apiVersion: otoroshi-apim.io/v1\nkind: Api\nmetadata: { name: docs }\nspec:\n  version: 1.0.0\n  pages:\n    - slug: start\n      title: { en: Start }\n      content: { en: { file: ${file} } }\n`;
+    try {
+      git(repo, 'init', '-q', '-b', 'main');
+      await mkdir(join(repo, 'apis', 'docs'), { recursive: true });
+      await writeFile(join(repo, 'apis', 'docs', 'start.en.md'), '# Started from a file');
+      await writeFile(join(repo, 'apis', 'docs.yaml'), page('docs/start.en.md'));
+      git(repo, 'add', '.');
+      git(repo, 'commit', '-q', '-m', 'catalog');
+      const res = await fetchGit({ url: `file://${repo}`, path: 'apis' });
+      expect(res.docs[0].spec.pages[0].content.en).toBe('# Started from a file');
+      // a path that leaves the document is refused, the source with it
+      await writeFile(join(repo, 'apis', 'docs.yaml'), page('../../etc/passwd'));
+      git(repo, 'commit', '-q', '-am', 'escape');
+      await expect(fetchGit({ url: `file://${repo}`, path: 'apis' })).rejects.toThrow(/within its source/);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
 });
 
 // an object store that speaks the api of S3, enough of it: the listing (two keys a page) and the objects
@@ -89,6 +110,21 @@ describe('s3 remote catalog', () => {
       objects['apis/one.yaml'] = doc('one');
       expect((await fetchS3(cat)).revision).not.toBe(res.revision);
       await expect(fetchS3({ ...cat, url: 'https://not-s3' })).rejects.toThrow(/s3:\/\//);
+    } finally {
+      s3.server.stop(true);
+    }
+  });
+
+  test('the content of a page given by a file beside the document, under the prefix', async () => {
+    const { fetchS3 } = await import('../server/domain/catalogs.js');
+    const objects = {
+      'apis/docs.yaml': 'apiVersion: otoroshi-apim.io/v1\nkind: Api\nmetadata: { name: docs }\nspec:\n  pages:\n    - slug: start\n      content: { en: { file: docs/start.en.md } }\n',
+      'apis/docs/start.en.md': '# From the bucket',
+    };
+    const s3 = fakeS3(objects);
+    try {
+      const cat = { url: 's3://catalog/apis/', options: { endpoint: s3.endpoint, region: 'us-east-1' }, headers: { access_key_id: 'AKIACATALOG', secret_access_key: 'catalog-secret' } };
+      expect((await fetchS3(cat)).docs[0].spec.pages[0].content.en).toBe('# From the bucket');
     } finally {
       s3.server.stop(true);
     }

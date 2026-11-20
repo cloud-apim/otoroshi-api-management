@@ -2,11 +2,13 @@
 // (a version is an api): one document per api, carrying its plans, with the documentation pages
 // beside it and its snapshot history.
 
-import { db, newId } from '../db/index.js';
+import { db, newId, slugify } from '../db/index.js';
 import { badRequest, forbidden } from '../http/router.js';
 import { isTeamMember, maskWorkspace } from './identity.js';
 import { audit } from './audit.js';
 import { normalizeDraft } from './model.js';
+import { refsToIds, refsToNames } from './references.js';
+export { inlinePageFiles } from './page-files.js';
 
 export const EXPORT_KIND = 'otoroshi-apim.io/WorkspaceExport';
 
@@ -109,41 +111,57 @@ export async function importWorkspace(ctx, ws, doc) {
 export const API_KIND = 'Api';
 export const API_VERSION = 'otoroshi-apim.io/v1';
 
+// what identifies a document: its name (the slug) and its version, in `spec.version` — as a resource
+// of Kubernetes, whose metadata cannot carry it — or, the first form of the format, `metadata.version`
+export function docKey(doc) {
+  const slug = doc?.metadata?.name;
+  const inSpec = doc?.spec?.version;
+  const inMeta = doc?.metadata?.version;
+  if (inSpec && inMeta && String(inSpec) !== String(inMeta)) throw badRequest(`${slug}: spec.version (${inSpec}) and metadata.version (${inMeta}) differ`);
+  return { slug, version: String(inSpec || inMeta || '1.0.0') };
+}
+
 export async function apiDocument(api) {
   const pages = await db`select slug, position, title, content from api_doc_pages where api_id = ${api.id} order by position`;
   const team = api.team_id ? (await db`select id, name from teams where id = ${api.team_id}`)[0] : null;
   return {
     apiVersion: API_VERSION,
     kind: API_KIND,
-    metadata: { workspace: (await db`select slug from workspaces where id = ${api.workspace_id}`)[0]?.slug, name: api.slug, version: api.version, id: api.id },
+    metadata: { workspace: (await db`select slug from workspaces where id = ${api.workspace_id}`)[0]?.slug, name: api.slug, id: api.id },
     spec: {
+      version: api.version,
       name: api.name,
       description: api.description,
       team: team?.name || null,
       tags: api.tags,
       visibility: api.visibility,
       acl: api.acl,
-      draft: normalizeDraft(api.draft),
+      // the policy groups and the shared resources it pins, by name: the document moves between installations
+      draft: await refsToNames(normalizeDraft(api.draft)),
       pages: pages.map((p) => ({ slug: p.slug, position: p.position, title: p.title, content: p.content })),
     },
   };
 }
 
 // upsert by (workspace, slug, version). Writes the draft: publishing and deploying stay explicit
-// acts, unless the caller asks for them (the GitOps gesture).
+// acts, unless the caller asks for them (the GitOps gesture). A document that lists its pages is
+// their truth: a page it no longer lists is deleted; a document without pages leaves them alone.
 export async function applyApiDocument(ctx, ws, doc, { managedBy = null, checkManage = false } = {}) {
   if (doc?.kind !== API_KIND) throw badRequest(`expected kind ${API_KIND}`);
-  const slug = doc.metadata?.name;
-  const version = doc.metadata?.version || '1.0.0';
+  const { slug, version } = docKey(doc);
   if (!slug) throw badRequest('metadata.name is required');
   const spec = doc.spec || {};
+  for (const page of spec.pages || [])
+    for (const [lang, c] of Object.entries(page.content || {}))
+      if (c && typeof c === 'object') throw badRequest(`page ${page.slug}: its content in ${lang} is a file — the client that holds the file inlines it (apim apply, a remote catalog do)`);
   let teamId = null;
   if (spec.team) {
     const t = (await db`select id from teams where workspace_id = ${ws.id} and (id = ${spec.team} or name = ${spec.team})`)[0];
     if (!t) throw badRequest(`unknown team ${spec.team}`);
     teamId = t.id;
   }
-  const { createApi, updateApi, createPage, updatePage, requireManageApi } = await import('./apis.js');
+  const draft = spec.draft ? normalizeDraft(await refsToIds(ws.id, spec.draft)) : null;
+  const { createApi, updateApi, createPage, updatePage, deletePage, requireManageApi } = await import('./apis.js');
   const existing = (await db`select * from apis where workspace_id = ${ws.id} and slug = ${slug} and version = ${version}`)[0];
   let api;
   let action;
@@ -159,7 +177,7 @@ export async function applyApiDocument(ctx, ws, doc, { managedBy = null, checkMa
       tags: spec.tags || [],
       visibility: spec.visibility || 'public',
       acl: spec.acl || [],
-      draft: normalizeDraft(spec.draft || {}),
+      draft: draft || normalizeDraft({}),
       managed_by: managedBy,
       pages: [],
     });
@@ -175,16 +193,22 @@ export async function applyApiDocument(ctx, ws, doc, { managedBy = null, checkMa
       visibility: spec.visibility ?? existing.visibility,
       acl: spec.acl ?? existing.acl,
       team_id: spec.team !== undefined ? teamId : existing.team_id,
-      draft: spec.draft ? normalizeDraft(spec.draft) : existing.draft,
+      draft: draft || existing.draft,
       force: true,
     });
     if (managedBy !== existing.managed_by) await db`update apis set managed_by = ${managedBy} where id = ${api.id}`;
     action = 'updated';
   }
-  for (const p of spec.pages || []) {
-    const cur = (await db`select * from api_doc_pages where api_id = ${api.id} and slug = ${p.slug}`)[0];
-    if (cur) await updatePage(ctx, api, cur, p);
-    else await createPage(ctx, api, p, { silent: true });
+  if (Array.isArray(spec.pages)) {
+    const listed = new Set();
+    for (const p of spec.pages) {
+      const pageSlug = slugify(p.slug || p.title?.en || Object.values(p.title || {})[0] || 'page');
+      listed.add(pageSlug);
+      const cur = (await db`select * from api_doc_pages where api_id = ${api.id} and slug = ${pageSlug}`)[0];
+      if (cur) await updatePage(ctx, api, cur, { ...p, slug: pageSlug });
+      else await createPage(ctx, api, { ...p, slug: pageSlug }, { silent: true });
+    }
+    for (const gone of await db`select * from api_doc_pages where api_id = ${api.id}`) if (!listed.has(gone.slug)) await deletePage(ctx, api, gone);
   }
   return { action, api: { id: api.id, slug: api.slug, version: api.version } };
 }

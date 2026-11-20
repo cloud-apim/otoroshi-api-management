@@ -15,8 +15,8 @@ apiVersion: otoroshi-apim.io/v1
 kind: Api
 metadata:
   name: petstore          # the slug: the document is upserted by (workspace, name, version)
-  version: 1.0.0
 spec:
+  version: 1.0.0
   name: Petstore
   description: Pets, as a product.
   team: Platform team     # a team name or id of the workspace
@@ -32,7 +32,9 @@ spec:
     flows:
       - id: default_flow
         name: Default flow
-        plugins: [{ plugin: cp:otoroshi.next.plugins.OverrideHost }]
+        plugins:
+          - { plugin: cp:otoroshi.next.plugins.OverrideHost }
+          - { group: Company security headers, version: 1 }   # a shared policy group, by name
     resources:
       - { id: res_pets, name: Pets, path: /pets, methods: [GET, POST], backendId: backend_echo, flowId: default_flow }
     plans:
@@ -53,7 +55,9 @@ spec:
   pages:
     - slug: getting-started
       title: { en: Getting started, fr: Démarrage }
-      content: { en: "# Petstore …", fr: "# Petstore …" }
+      content:
+        en: "# Petstore …"
+        fr: { file: docs/getting-started.fr.md }   # a file beside the document
 ```
 
 The complete file is [`examples/petstore.yaml`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/examples/petstore.yaml);
@@ -64,6 +68,34 @@ Every attribute of a plan described in [Plans](../concepts/plans.mdx) can be set
 takes its default. Ids are yours to choose: they are stable, so a plan keeps its subscriptions from
 one apply to the next.
 
+The **version** is `spec.version`, as in a [Kubernetes resource](./kubernetes.mdx), whose metadata
+cannot carry it. `metadata.version`, the first form of the format, is still read; both given and
+different, the document is refused.
+
+## What it pins, by name
+
+A flow pins a [shared policy group](../concepts/shared-policy-groups.mdx), a plan a
+[shared resource](../concepts/shared-resources.mdx): the document names them —
+`{ group: Company security headers, version: 1 }`,
+`sharedResource: { name: Corporate IdP, version: 1 }` — so that it moves from one installation to the
+next, where the same names are published. An id (`pgrp_…`, `res_…`) is accepted too, as it is for a
+team. The export writes names; the product keeps ids. A name names one object of its kind in a
+workspace: a second group or resource of the same name is refused, and a name that is unknown —
+or, in older data, shared by two — refuses the document, saying so.
+
+## The pages
+
+The documentation pages are beside the draft, in `spec.pages`, by slug. **A document that lists
+its pages is their truth**: a page it no longer lists is deleted. A document without `pages` leaves
+them alone.
+
+The content of a page, in a language, is the text itself or **a file beside the document**:
+`{ file: docs/getting-started.fr.md }`, a path relative to the document that stays within its
+source — no absolute path, no `..`, 1 MB at most. Whoever holds the files reads them: `apim apply`
+from the disk, a [remote catalog](./remote-catalogs.mdx) from its repository, its bucket or the
+origin of its url. Over HTTP the content is given inline: the admin API refuses a file it cannot
+read, and so does a Kubernetes resource.
+
 ## Applying
 
 ```bash
@@ -72,9 +104,10 @@ bun cli/apim.js apply default -f petstore.yaml --publish            # + freezes 
 bun cli/apim.js apply default -f petstore.yaml --publish --deploy   # + projects it
 ```
 
-`apply` upserts by `(workspace, metadata.name, metadata.version)` and writes the **draft**: publishing
+`apply` upserts by `(workspace, metadata.name, spec.version)` and writes the **draft**: publishing
 and deploying stay explicit acts unless asked for. A document applied twice changes nothing
-(`snapshot unchanged`). Pages are upserted by slug.
+(`snapshot unchanged`). The draft it carries replaces the draft; the attributes it leaves out (its
+name, its tags…) keep their value; its pages are their truth when it lists them.
 
 `--managed-by <source>` marks the API as owned by that source: the console then refuses to edit it
 by hand.

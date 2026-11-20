@@ -4,8 +4,8 @@ apiVersion: otoroshi-apim.io/v1
 kind: Api
 metadata:
   name: petstore
-  version: 1.0.0
 spec:
+  version: 1.0.0
   name: Petstore
   description: Pets, as a product. Declared from a file.
   tags: [demo, gitops]

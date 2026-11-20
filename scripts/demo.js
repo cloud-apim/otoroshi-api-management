@@ -40,7 +40,7 @@ if (!group) {
 
 const petstore = YAML.parseAllDocuments(readFileSync(new globalThis.URL('../examples/petstore.yaml', import.meta.url), 'utf8')).map((d) => d.toJSON());
 for (const doc of petstore.filter((d) => d.kind === 'Api')) {
-  doc.spec.draft.flows.find((f) => f.id === 'default_flow')?.plugins.push({ group: group.id, version: 1 });
+  doc.spec.draft.flows.find((f) => f.id === 'default_flow')?.plugins.push({ group: group.name, version: 1 });
 }
 const applied = await call('POST', '/workspaces/default/apply?publish=true&deploy=true&comment=demo', petstore);
 applied.forEach((r) => console.log(`default   api ${r.api.slug} ${r.api.version}: ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));

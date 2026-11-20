@@ -22,7 +22,10 @@ Like a [shared policy group](./shared-policy-groups.mdx), it creates no gateway 
 - **publishing a new version changes nothing** that runs: the page of the resource lists the APIs
   that pin it, and the ones **behind** the latest version, upgraded one by one, each by a new
   snapshot;
-- a resource that a plan still pins cannot be deleted.
+- a resource that a plan still pins cannot be deleted;
+- its name is one in the workspace: a [declarative document](../gitops/declarative-documents.mdx#what-it-pins-by-name)
+  pins it by that name (`sharedResource: { name: Corporate IdP, version: 1 }`), and so moves from one
+  installation to the next.
 
 What stays the plan's own: the claim the client id is read in, the audiences a token must carry (the
 audience of this API at the server), the user profile an `oauth2-remote` plan fetches. The issuer is

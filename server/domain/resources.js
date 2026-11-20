@@ -10,6 +10,7 @@ import { db, newId } from '../db/index.js';
 import { badRequest, conflict, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
+import { requireFreeName } from './references.js';
 
 export const RESOURCE_KINDS = ['authorization-server'];
 // the kinds of plan a kind of resource serves
@@ -50,6 +51,7 @@ export async function getResource(workspaceId, id) {
 export async function createResource(ctx, workspaceId, { name, description = '', kind = 'authorization-server', content = {} }) {
   if (!name) throw badRequest('name is required');
   if (!RESOURCE_KINDS.includes(kind)) throw badRequest(`a resource is one of ${RESOURCE_KINDS.join(', ')}`);
+  await requireFreeName('resource', workspaceId, name);
   const id = newId('res');
   const rows = await db`insert into resources (id, workspace_id, name, description, kind, draft)
     values (${id}, ${workspaceId}, ${name}, ${description}, ${kind}, ${normalizeContent(kind, content)}) returning *`;
@@ -58,6 +60,7 @@ export async function createResource(ctx, workspaceId, { name, description = '',
 }
 
 export async function updateResource(ctx, r, patch = {}) {
+  if (patch.name && patch.name !== r.name) await requireFreeName('resource', r.workspace_id, patch.name, r.id);
   const draft = patch.content ? normalizeContent(r.kind, patch.content) : r.draft;
   const rows = await db`update resources set name = ${patch.name ?? r.name}, description = ${patch.description ?? r.description},
     draft = ${draft}, updated_at = now() where id = ${r.id} returning *`;

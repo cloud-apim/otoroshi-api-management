@@ -32,10 +32,11 @@ export const markerOf = (plural, cr) => `kubernetes:${cr.metadata.namespace}/${p
 // not a failure: something to wait for, such as the application of a subscription not reconciled yet
 class Waiting extends Error {}
 
-// the declarative document a resource Api describes: its spec is the document's spec
+// the declarative document a resource Api describes: its spec is the document's spec, its version in
+// `spec.version` as in a file
 export function documentOf(cr) {
-  const { slug, version, ...spec } = cr.spec || {};
-  return { apiVersion: API_VERSION, kind: API_KIND, metadata: { name: slug || cr.metadata.name, version: version || '1.0.0' }, spec };
+  const { slug, ...spec } = cr.spec || {};
+  return { apiVersion: API_VERSION, kind: API_KIND, metadata: { name: slug || cr.metadata.name }, spec: { ...spec, version: String(spec.version || '1.0.0') } };
 }
 
 const b64 = (s) => Buffer.from(String(s ?? ''), 'utf8').toString('base64');

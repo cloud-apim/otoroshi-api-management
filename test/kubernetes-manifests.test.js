@@ -51,11 +51,12 @@ describe('a resource Api', () => {
     expect(documentOf(cr)).toEqual({
       apiVersion: 'otoroshi-apim.io/v1',
       kind: 'Api',
-      metadata: { name: 'forecasts', version: '2.0.0' },
-      spec: { name: 'Forecasts', team: 'Weather team', draft: { plans: [] } },
+      metadata: { name: 'forecasts' },
+      spec: { version: '2.0.0', name: 'Forecasts', team: 'Weather team', draft: { plans: [] } },
     });
     // the slug may differ from the name of the resource; the version defaults as in a document
-    expect(documentOf({ ...cr, spec: { slug: 'weather-forecasts' } }).metadata).toEqual({ name: 'weather-forecasts', version: '1.0.0' });
+    const other = documentOf({ ...cr, spec: { slug: 'weather-forecasts' } });
+    expect([other.metadata, other.spec.version]).toEqual([{ name: 'weather-forecasts' }, '1.0.0']);
   });
 
   test('marks what it owns with its namespace, its kind and its name', () => {

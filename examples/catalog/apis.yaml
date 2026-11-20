@@ -4,8 +4,8 @@ apiVersion: otoroshi-apim.io/v1
 kind: Api
 metadata:
   name: weather
-  version: 1.0.0
 spec:
+  version: 1.0.0
   name: Weather
   description: Forecasts, managed from a catalog.
   tags: [gitops]
@@ -32,8 +32,8 @@ apiVersion: otoroshi-apim.io/v1
 kind: Api
 metadata:
   name: geocoding
-  version: 1.0.0
 spec:
+  version: 1.0.0
   name: Geocoding
   description: Addresses to coordinates, managed from a catalog.
   tags: [gitops]

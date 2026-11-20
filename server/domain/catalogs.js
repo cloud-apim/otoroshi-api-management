@@ -8,7 +8,7 @@
 // - apis that disappeared from the source are reported, and only removed if the catalog prunes.
 
 import { mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
-import { join, relative } from 'node:path';
+import { dirname, join, posix, relative } from 'node:path';
 import { tmpdir } from 'node:os';
 import YAML from 'yaml';
 import { db, newId } from '../db/index.js';
@@ -17,7 +17,8 @@ import { audit } from './audit.js';
 import { openValues, sealValues } from './secrets.js';
 import { diff } from './diff.js';
 import { normalizeDraft } from './model.js';
-import { API_KIND, apiDocument, applyApiDocument } from './exchange.js';
+import { API_KIND, apiDocument, applyApiDocument, docKey, inlinePageFiles } from './exchange.js';
+import { refsToIds } from './references.js';
 
 export const MODES = ['draft', 'publish', 'deploy'];
 
@@ -93,6 +94,16 @@ async function fetchHttp(cat) {
   const res = await fetch(cat.url, { headers: cat.headers || {}, signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`${cat.url} answered ${res.status}`);
   const docs = parseDocuments(await res.text(), cat.url);
+  // the files of the pages, beside the catalog: on its origin, with its headers
+  const base = new URL(cat.url);
+  const read = async (file) => {
+    const url = new URL(file, base);
+    if (url.origin !== base.origin) throw new Error(`${file} leaves the origin of the catalog`);
+    const r = await fetch(url, { headers: cat.headers || {}, signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error(`${url} answered ${r.status}`);
+    return r.text();
+  };
+  for (const d of docs) await inlinePageFiles(d, read);
   return { docs, revision: res.headers.get('etag') || res.headers.get('last-modified') || null };
 }
 
@@ -122,7 +133,13 @@ export async function fetchGit(cat) {
     await stat(root);
     const docs = [];
     for (const f of await walk(root)) {
-      for (const d of parseDocuments(await readFile(f, 'utf8'), f)) docs.push({ ...d, _source: relative(dir, f) });
+      // the files of the pages, beside the document, within the repository
+      const read = async (file) => {
+        const target = join(dirname(f), file);
+        if (relative(dir, target).startsWith('..')) throw new Error(`${file} leaves the repository`);
+        return readFile(target, 'utf8');
+      };
+      for (const d of parseDocuments(await readFile(f, 'utf8'), f)) docs.push({ ...(await inlinePageFiles(d, read)), _source: relative(dir, f) });
     }
     return { docs, revision: rev };
   } finally {
@@ -153,7 +170,15 @@ export async function fetchS3(cat) {
   } while (token);
   const files = objects.filter((o) => /\.(ya?ml|json)$/.test(o.key) && !o.key.split('/').some((s) => s.startsWith('.'))).sort((a, b) => a.key.localeCompare(b.key));
   const docs = [];
-  for (const o of files) for (const d of parseDocuments(await client.file(o.key).text(), o.key)) docs.push({ ...d, _source: o.key });
+  for (const o of files) {
+    // the files of the pages, beside the document, under the prefix of the catalog
+    const read = async (file) => {
+      const key = posix.normalize(posix.join(posix.dirname(o.key), file));
+      if (key.startsWith('..') || (prefix && !key.startsWith(prefix.replace(/\/$/, '')))) throw new Error(`${file} leaves the prefix of the catalog`);
+      return client.file(key).text();
+    };
+    for (const d of parseDocuments(await client.file(o.key).text(), o.key)) docs.push({ ...(await inlinePageFiles(d, read)), _source: o.key });
+  }
   const revision = new Bun.CryptoHasher('sha256').update(files.map((o) => `${o.key}:${o.eTag}`).join('\n')).digest('hex').slice(0, 16);
   return { docs, revision };
 }
@@ -168,9 +193,19 @@ async function fetchSource(cat) {
 
 // ---------------------------------------------------------------- preview and sync
 
-function specOf(doc) {
+// what a document says, in the form of the product: the references it pins as ids, its pages only
+// when it lists them (a document without pages leaves them alone)
+async function specOf(workspaceId, doc, { pages = true } = {}) {
   const s = doc.spec || {};
-  return { name: s.name, description: s.description || '', tags: s.tags || [], visibility: s.visibility || 'public', acl: s.acl || [], draft: normalizeDraft(s.draft || {}), pages: (s.pages || []).map(({ slug, title, content }) => ({ slug, title, content })) };
+  return {
+    name: s.name,
+    description: s.description || '',
+    tags: s.tags || [],
+    visibility: s.visibility || 'public',
+    acl: s.acl || [],
+    draft: normalizeDraft(await refsToIds(workspaceId, s.draft || {})),
+    ...(pages ? { pages: (s.pages || []).map(({ slug, title, content }) => ({ slug, title, content })) } : {}),
+  };
 }
 
 // what a sync would do, without writing anything
@@ -181,8 +216,14 @@ export async function preview(cat, fetched = null) {
   const items = [];
   const seen = new Set();
   for (const doc of src.apis) {
-    const slug = doc.metadata?.name;
-    const version = doc.metadata?.version || '1.0.0';
+    let key;
+    try {
+      key = docKey(doc);
+    } catch (e) {
+      items.push({ slug: doc.metadata?.name, version: null, action: 'error', error: e.message, source: doc._source || null });
+      continue;
+    }
+    const { slug, version } = key;
     seen.add(`${slug}@${version}`);
     const existing = (await db`select * from apis where workspace_id = ${ws.id} and slug = ${slug} and version = ${version}`)[0];
     if (!existing) {
@@ -193,8 +234,14 @@ export async function preview(cat, fetched = null) {
       items.push({ slug, version, action: 'conflict', reason: `managed by ${existing.managed_by}` });
       continue;
     }
-    const current = await apiDocument(existing);
-    const changes = diff(specOf(current), specOf(doc));
+    let changes;
+    try {
+      const listed = Array.isArray(doc.spec?.pages);
+      changes = diff(await specOf(ws.id, await apiDocument(existing), { pages: listed }), await specOf(ws.id, doc, { pages: listed }));
+    } catch (e) {
+      items.push({ slug, version, action: 'error', error: e.message, source: doc._source || null });
+      continue;
+    }
     items.push({ slug, version, action: changes.length ? 'update' : 'unchanged', changes: changes.slice(0, 30), adopt: !existing.managed_by, source: doc._source || null });
   }
   const managed = await db`select slug, version from apis where workspace_id = ${ws.id} and managed_by = ${marker}`;
@@ -212,7 +259,7 @@ export async function sync(ctx, cat, { deployments, apis }) {
     const plan = await preview(cat, await fetchSource(cat));
     const out = [];
     for (const item of plan.items) {
-      if (['unchanged', 'conflict', 'orphaned'].includes(item.action)) {
+      if (['unchanged', 'conflict', 'orphaned', 'error'].includes(item.action)) {
         out.push(item);
         continue;
       }
@@ -224,7 +271,14 @@ export async function sync(ctx, cat, { deployments, apis }) {
           out.push(item);
           continue;
         }
-        const doc = plan.docs.find((d) => d.metadata?.name === item.slug && (d.metadata?.version || '1.0.0') === item.version);
+        const doc = plan.docs.find((d) => {
+          try {
+            const k = docKey(d);
+            return k.slug === item.slug && k.version === item.version;
+          } catch {
+            return false;
+          }
+        });
         const res = await applyApiDocument(sysCtx, ws, doc, { managedBy: marker });
         if (cat.mode !== 'draft') {
           const api = await apis.getApi(ws.id, res.api.id);
