@@ -16,7 +16,7 @@ drops its workarounds rather than keeping them for 18.0: nothing depends on the 
 The product now **follows** the fixes, gap by gap: its workarounds and warnings go, the items they
 blocked are done. Status: ✅ **followed** — the product relies on the fix; 🔜 **to follow** — fixed
 upstream, the product still does what the last column says; ➖ **not fixed**, by decision; ⬜ **open**, found
-since, not reported upstream yet.
+since, reported upstream, not fixed yet.
 
 | # | Issue | Gap | Severity | Status | The product |
 |---|---|---|---|---|---|
@@ -41,7 +41,7 @@ since, not reported upstream yet.
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
-| G-22 | — | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
+| G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
 
 ---
 
@@ -340,7 +340,8 @@ configuration.
 
 ## G-22 — a non-identifying extractor sends an error event for a call that succeeds — medium — open
 
-Not reported upstream yet. Seen on 18.0.1 and on 18.1.0-dev.
+Upstream: [MAIF/otoroshi#2962](https://github.com/MAIF/otoroshi/issues/2962), with the fix proposed
+below and the tests. Seen on 18.0.1 and on 18.1.0-dev.
 
 **Observed.** On an `Api` with several plans, every extractor that does not identify the caller
 builds an error response and lets the call go on — and building it sends a `GatewayEvent`:

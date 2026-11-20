@@ -19,7 +19,7 @@ Last update: 2026-11-20.
   - G-1, G-2, G-18, G-20: closing a subscription deletes it, Otoroshi revokes its keys; deleting an api deletes its `Api`, Otoroshi its subscriptions and keys; the warning `plan_id_shared` and the cleanup of minted keys in the tests are gone. Undeploying now disables the `Api` rather than deleting it, so that the consumers keep their keys at the next deployment.
   - G-17, G-4, R-15: the subscription of a jwt, mtls or oauth2-remote plan carries the application's `client_id`, and Otoroshi provisions its consumer; these plans are projected with `subscription_required`: a valid token or certificate alone is not served. A client id changed by the application makes the subscription again on the gateway; two applications cannot subscribe to a plan with the same client id.
   - G-9: the ingester attributes each call from the `apiRef` of its event (api, plan, subscription, application), checked with real traffic; the parsing of minted consumer names is gone.
-  - Found on the way, logged as **G-22** (open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
+  - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
 
 ## Next, in the proposed order
 
