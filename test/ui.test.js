@@ -160,6 +160,8 @@ describe.skipIf(!ready)('the console', () => {
       `${W}/subscriptions`,
       `${W}/subscriptions?open=${state.subId}`,
       `${W}/observability`,
+      `${W}/observability?view=logs&range=7d&status=4xx`,
+      `${W}/observability?view=security`,
       `${W}/audit`,
       `${W}/notifications`,
       ...['general', 'portal', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),

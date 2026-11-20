@@ -970,19 +970,49 @@ r.get('/workspaces/:ws/analytics', async ({ ctx, params, query }) => {
   });
 });
 
+// the filters of a request log, from its url
+const callFilter = (c, query) => ({
+  workspaceId: c.workspace.id,
+  apiId: query.get('api'),
+  planId: query.get('plan'),
+  applicationId: query.get('application'),
+  subscriptionId: query.get('subscription'),
+  status: query.get('status'),
+  method: query.get('method'),
+  path: query.get('path'),
+  clientId: query.get('client'),
+  from: query.get('from'),
+  to: query.get('to'),
+});
+
 r.get('/workspaces/:ws/analytics/calls', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
-  const rows = await analytics.searchCalls({
-    workspaceId: c.workspace.id,
-    apiId: query.get('api'),
-    applicationId: query.get('application'),
-    subscriptionId: query.get('subscription'),
-    from: query.get('from'),
-    to: query.get('to'),
-  }, pageParams(query));
+  const rows = await analytics.searchCalls(callFilter(c, query), pageParams(query));
   // reading request logs is a processing of personal data: it is traced
   await audit(c, { action: 'analytics.calls.read', entityKind: 'workspace', entityId: c.workspace.id, summary: 'request log consulted', data: { filter: Object.fromEntries(query) } });
   return rows;
+});
+
+// the filtered calls as CSV, the most recent first: an export of personal data, traced as such
+r.get('/workspaces/:ws/analytics/calls/export', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params);
+  const out = await analytics.exportCalls(callFilter(c, query), { q: (query.get('q') || '').trim() });
+  await audit(c, {
+    action: 'analytics.calls.export',
+    entityKind: 'workspace',
+    entityId: c.workspace.id,
+    summary: `request log exported: ${out.count} calls${out.truncated ? ' (truncated)' : ''}`,
+    data: { filter: Object.fromEntries(query), count: out.count },
+  });
+  return new Response(out.csv, {
+    headers: {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename="calls-${c.workspace.slug}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv"`,
+      'x-apim-exported': String(out.count),
+      'x-apim-truncated': String(out.truncated),
+      'cache-control': 'no-store',
+    },
+  });
 });
 
 // the security events of the Threat Protection Suite, attributed to the catalogue; they carry the

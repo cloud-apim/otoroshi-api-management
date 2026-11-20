@@ -231,6 +231,31 @@ describe('the dashboards', () => {
     const long = await ok('GET', `/workspaces/${WS}/analytics?api=${apiId}&from=${new Date(Date.now() - 90 * DAY).toISOString()}`);
     expect([long.range.step, long.range.bucket]).toEqual([DAY, 'day']);
   });
+
+  test('the request log: filtered like the dashboards and by its own fields, exported as CSV, traced', async () => {
+    const from = new Date(Date.now() - 3600e3).toISOString();
+    const base = `/workspaces/${WS}/analytics/calls?api=${apiId}&from=${from}`;
+    const failed = (await ok('GET', `${base}&status=5xx`)).items;
+    expect(failed.map((c) => c.req_id)).toContain(`${RUN}-dash-3`);
+    expect(failed.every((c) => c.status >= 500)).toBe(true);
+    expect((await ok('GET', `${base}&path=/v1/dash`)).total).toBe(3);
+    expect((await ok('GET', `${base}&path=/v1/dash&method=POST`)).total).toBe(0);
+    const one = (await ok('GET', `${base}&q=${RUN}-dash-2`)).items[0];
+    expect(one).toMatchObject({ status: 404, host: `ingest-${RUN}.oto.tools`, api_name: 'Users 1.0.0' });
+    // a value a spreadsheet would run as a formula is quoted as text
+    await ingest([event(`=HYPERLINK("http://x")-${RUN}`, { path: '/v1/dash/4' })]);
+    const res = await fetch(`${ROOT}/api${`/workspaces/${WS}/analytics/calls/export?api=${apiId}&from=${from}&path=/v1/dash`}`, { headers: { authorization: 'Bearer ingestion-test-token' } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/csv');
+    expect(res.headers.get('content-disposition')).toContain(`calls-${WS}-`);
+    const lines = (await res.text()).trim().split('\r\n');
+    expect(lines[0].split(',').slice(0, 6)).toEqual(['time', 'request_id', 'method', 'host', 'path', 'status']);
+    expect(lines.length).toBe(5);
+    expect(lines.find((l) => l.includes(`${RUN}-dash-3`))).toContain(',503,');
+    expect(lines.find((l) => l.includes('/v1/dash/4'))).toContain(`,"'=HYPERLINK(""http://x"")-${RUN}",`);
+    const trail = await ok('GET', `/workspaces/${WS}/audit?action=analytics.calls.export`);
+    expect((trail.items || trail)[0].summary).toBe('request log exported: 4 calls');
+  });
 });
 
 describe('the attribution', () => {

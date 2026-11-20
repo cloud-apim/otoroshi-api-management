@@ -248,30 +248,91 @@ async function fromRollups(filter, { start, end, step }) {
   };
 }
 
-// the request log as a paged list; the search matches the path, the method, the status, the
-// client id, the caller's address, and the request id (the Otoroshi-Request-Id a caller or a
-// backend quotes)
-export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {}) {
+// the calls a request log shows: the filters of the dashboards, and its own — the method, a part of
+// the path, the client id — and a free search
+function callsWhere(filter, q) {
   const { start, end } = range(filter);
-  const appsArr = filter.applicationIds ? '{' + filter.applicationIds.join(',') + '}' : null;
   const pattern = q ? likePattern(q) : null;
   const status = /^\d{3}$/.test(q) ? parseInt(q, 10) : null;
-  const where = () => adb`at >= ${start} and at <= ${end}
-      and (${filter.workspaceId || null}::text is null or workspace_id = ${filter.workspaceId || null})
-      and (${filter.apiId || null}::text is null or api_id = ${filter.apiId || null})
-      and (${filter.applicationId || null}::text is null or application_id = ${filter.applicationId || null})
-      and (${filter.subscriptionId || null}::text is null or subscription_id = ${filter.subscriptionId || null})
-      and (${appsArr}::text[] is null or application_id = any(${appsArr}::text[]))
-      and (${pattern}::text is null or path ilike ${pattern} or method ilike ${pattern} or client_id ilike ${pattern} or from_ip ilike ${pattern} or req_id = ${q || null}
-           or (${status}::int is not null and status = ${status}))`;
+  const method = filter.method ? String(filter.method).toUpperCase() : null;
+  const path = filter.path ? likePattern(filter.path) : null;
+  const client = filter.clientId || null;
+  return adb`at >= ${start} and at <= ${end} and ${filters(filter)}
+      and (${method}::text is null or method = ${method})
+      and (${path}::text is null or path ilike ${path} or path_template ilike ${path})
+      and (${client}::text is null or client_id = ${client})
+      and (${pattern}::text is null or path ilike ${pattern} or method ilike ${pattern} or client_id ilike ${pattern} or from_ip ilike ${pattern} or host ilike ${pattern}
+           or req_id = ${q || null} or (${status}::int is not null and status = ${status}))`;
+}
+
+const CALL_COLUMNS = adb`id, at, req_id, method, host, path, status, err, duration_ms, overhead_ms, backend_duration_ms, bytes_in, bytes_out,
+  api_id, plan_id, application_id, subscription_id, client_id, from_ip, user_agent`;
+
+// the names of the apis, plans and applications of a page of calls
+async function namedCalls(items) {
+  const names = await named({ byApi: uniq(items, 'api_id'), byApp: uniq(items, 'application_id'), byPlan: uniq(items, 'api_id', 'plan_id') });
+  const api = new Map(names.byApi.map((r) => [r.api_id, r.name]));
+  const app = new Map(names.byApplication.map((r) => [r.application_id, r.name]));
+  const plan = new Map(names.byPlan.map((r) => [`${r.api_id}|${r.plan_id}`, r.plan_name]));
+  return items.map((c) => ({
+    ...c,
+    id: Number(c.id),
+    api_name: c.api_id ? api.get(c.api_id) : null,
+    plan_name: c.plan_id ? plan.get(`${c.api_id}|${c.plan_id}`) : null,
+    application_name: c.application_id ? app.get(c.application_id) : null,
+  }));
+}
+const uniq = (rows, ...keys) => [...new Map(rows.map((r) => [keys.map((k) => r[k]).join('|'), Object.fromEntries(keys.map((k) => [k, r[k]]))])).values()];
+
+// the request log as a paged list; the search matches the path, the method, the status, the host,
+// the client id, the caller's address, and the request id (the Otoroshi-Request-Id a caller or a
+// backend quotes)
+export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {}) {
   const [items, [{ total }]] = await Promise.all([
-    adb`select at, req_id, method, path, status, duration_ms, api_id, plan_id, application_id, subscription_id, client_id, from_ip
-      from calls where ${where()} order by at desc limit ${limit} offset ${offset}`,
-    adb`select count(*)::int as total from calls where ${where()}`,
+    adb`select ${CALL_COLUMNS} from calls where ${callsWhere(filter, q)} order by at desc, id desc limit ${limit} offset ${offset}`,
+    adb`select count(*)::int as total from calls where ${callsWhere(filter, q)}`,
   ]);
   // the request log is the calls themselves: it goes as far back as they are kept
   const p = await policy();
-  return { items, total, limit, offset, retention: { callsDays: p.retention.callsDays, from: await horizon() } };
+  return { items: await namedCalls(items), total, limit, offset, retention: { callsDays: p.retention.callsDays, from: await horizon() } };
+}
+
+// the calls of a request log, as CSV: the filtered calls, the most recent first, up to `max`
+export const EXPORT_MAX = 50000;
+export async function exportCalls(filter, { q = '', max = EXPORT_MAX } = {}) {
+  const items = await namedCalls(await adb`select ${CALL_COLUMNS} from calls where ${callsWhere(filter, q)} order by at desc, id desc limit ${max}`);
+  const cols = [
+    ['time', (c) => new Date(c.at).toISOString()],
+    ['request_id', (c) => c.req_id],
+    ['method', (c) => c.method],
+    ['host', (c) => c.host],
+    ['path', (c) => c.path],
+    ['status', (c) => c.status],
+    ['gateway_error', (c) => (c.err ? 'true' : 'false')],
+    ['duration_ms', (c) => c.duration_ms],
+    ['gateway_overhead_ms', (c) => c.overhead_ms],
+    ['backend_duration_ms', (c) => c.backend_duration_ms],
+    ['bytes_in', (c) => c.bytes_in],
+    ['bytes_out', (c) => c.bytes_out],
+    ['api', (c) => c.api_name],
+    ['api_id', (c) => c.api_id],
+    ['plan', (c) => c.plan_name],
+    ['application', (c) => c.application_name],
+    ['application_id', (c) => c.application_id],
+    ['subscription_id', (c) => c.subscription_id],
+    ['client_id', (c) => c.client_id],
+    ['caller_address', (c) => c.from_ip],
+    ['user_agent', (c) => c.user_agent],
+  ];
+  const cell = (v) => {
+    if (v === null || v === undefined) return '';
+    const t = String(v);
+    // a cell a spreadsheet would read as a formula is quoted as text
+    const safe = /^[=+\-@\t\r]/.test(t) ? `'${t}` : t;
+    return /[",\n\r]/.test(safe) || safe !== t ? `"${safe.replace(/"/g, '""')}"` : safe;
+  };
+  const lines = [cols.map(([h]) => h).join(','), ...items.map((c) => cols.map(([, f]) => cell(f(c))).join(','))];
+  return { csv: lines.join('\r\n') + '\r\n', count: items.length, truncated: items.length >= max };
 }
 
 // the security events of the Threat Protection Suite: what it judged, on which api and plan, and

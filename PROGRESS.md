@@ -42,15 +42,15 @@ Last update: 2026-11-20.
   - R-25: the Threat Protection Suite per plan (D-10) — a tab of the plan configures the preset of the extension (firewall, bots, IP reputation, fail2ban, sensitive data, error leakage, uploads, login guard, api contract) and references its policies, projected in the plugins of the plan and watched by the drift detection; a gateway without the extension, which would let the calls through unprotected, gets the draft and the deployment warned; the `CloudApimSecurityEvent` of the suite are exported, ingested and attributed to the api and, through the key that called, the plan, the subscription and the application — Observability › Security, and the analytics of an api (`test/threat-protection.test.js`, `test/ingestion.test.js`, `test/model.test.js`). Three gaps of the extension logged: **G-24** (the global table of Threat Studio ignores the plan plugins), **G-25** (a challenge answers a page with status 200), **G-26** (a security event does not name the plan).
   - R-34: usage-based billing (D-36) — a paid plan can bill the usage of its subscriptions with a metered price of Stripe, with its recurring price or alone; the calls counted from the computed path (success or served), pushed to the meter of the linked account in batches after the rollups, taken by id — exactly once, each report sent once with its id as identifier and replayed until it is; the calls kept until billed; the usage shown on the subscription (console, admin api, cli) and on the portal; a usage price refused on a provider that cannot meter (`test/payments.test.js`, `test/stripe.test.js`, `test/model.test.js`).
   - R-51: the analytics of the console to the level of the API management consoles of the market — one row of filters in the url (timeframes from 5 minutes to a year and a custom range, api, plan, application, status class; refresh and auto-refresh), requests per second, minimum, maximum and p95 latency, the responses over time split into successes, client and server errors (stacked columns), the latency over time, the hits of the first applications and apis (the others folded into "other"), the tops by calls, server errors and latency, the hosts (kept at ingestion) and the paths as called; buckets that follow the range (`date_bin`), empty ones shown; charts per the dataviz method, legend and table view everywhere (`test/ingestion.test.js`, `test/ui.test.js`).
+  - R-52: the request log as a view of its own (Observability › Logs) — the filters of the dashboards and its own (method, path, client id, a free search that reaches the host), the detail of a call (where its time went), a CSV export of the filtered calls (formulas quoted, 50,000 at most), both traced in the audit trail; every dashboard opens it with its filters (`test/ingestion.test.js`, `test/ui.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-52** — the request log as a page of its own, with its filters and a CSV export.
-2. **R-53** — the analytics and the logs of an application on the portal.
-3. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
-4. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
-5. **R-48** — compaction of old rollups (only if the volume calls for it).
+1. **R-53** — the analytics and the logs of an application on the portal.
+2. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
+3. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
+4. **R-48** — compaction of old rollups (only if the volume calls for it).
 
 Then the large ones: R-10, R-19.
 
@@ -60,11 +60,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (10)**
+**Doable (9)**
 
 | # | Effort | What |
 |---|---|---|
-| R-52 | M | The request log as a page: filters, detail, CSV export, reached from every dashboard |
 | R-53 | M | Portal analytics and logs of an application (owner's request) |
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
@@ -133,7 +132,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-52 | D-33 | **The request log as a page of its own**: filters (status, method, path, api, plan, application, consumer, timeframe), the detail of a call, a CSV export of the filtered calls (traced in the audit trail, personal data), reached from every dashboard with its filters | M | |
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
 
 ### Monetisation

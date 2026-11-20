@@ -140,10 +140,20 @@ They speak the catalogue's vocabulary — APIs, plans, applications — not the 
     one.
   - **The tops**: APIs by calls, by server errors and by latency; applications by calls and by
     latency; plans; status codes; hosts; endpoints by templated path, and paths as they were called.
-  - Every chart has its legend and a table view; the recent calls follow.
+  - Every chart has its legend and a table view. **View the logs** opens the request log with the
+    same filters.
   A range read from the rollups keeps its counts exact; it has no minimum, no maximum and no
   percentile per bucket, nor the hosts or the paths as they were called — the dashboard says so.
   Reading the request log is recorded in the audit trail: it is personal data.
+- **Console → Observability → Logs**: the request log — the calls themselves, as far back as they
+  are kept — with the filters of the dashboards, and its own: the method, a part of the path, the
+  client id (from a call), a free search (path, status, host, client id, address, request id). A call
+  opens on its detail: its request id, host, API, plan, application, client id, address, user agent,
+  and where its time went (backend, gateway overhead). **Export as CSV** downloads the filtered calls,
+  the most recent first (50,000 at most); a cell a spreadsheet would run as a formula is quoted as
+  text. Reading the log and exporting it are recorded in the audit trail (`analytics.calls.read`,
+  `analytics.calls.export`): it is personal data. In the admin API:
+  `GET …/analytics/calls?status=&method=&path=&client=&plan=` and `GET …/analytics/calls/export`.
 - **One request id, end to end.** The gateway gives every call an id, `Otoroshi-Request-Id`: the
   caller gets it back in the response, the backends receive it with the request (the projection
   adds `Otoroshi headers in` to the flows of an API, unless its settings say otherwise:

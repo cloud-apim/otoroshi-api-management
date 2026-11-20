@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery } from '../../shared/router.jsx';
+import { useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Badge, Callout, Icon, Loader, Modal, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
+import { Badge, Callout, Icon, Input, Loader, Modal, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
 import { CodeView } from '../../shared/code-editor.jsx';
 import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
 import { BarList, OTHER_COLOR, StackedColumns, StatTile, TimeSeries } from '../../shared/charts.jsx';
@@ -321,121 +321,179 @@ export function Dashboard({ d, fixed = {}, loading = false }) {
   );
 }
 
+// the filters of the analytics, from the url — shared by the dashboards and the request log, so
+// that going from one to the other keeps the slice
+function useAnalyticsFilters(fixed = {}) {
+  const [params, setParams] = useQuery();
+  const tf = timeframe(params);
+  const f = {
+    api: fixed.api || params.get('api') || '',
+    plan: params.get('plan') || '',
+    application: fixed.application || params.get('application') || '',
+    status: params.get('status') || '',
+    refresh: params.get('refresh') || '',
+  };
+  const key = [tf.range, tf.ms ? '' : `${tf.from}|${tf.to}`, f.api, f.plan, f.application, f.status].join('|');
+  const query = (extra = {}) => {
+    const { from, to } = timeframe(params);
+    const q = new URLSearchParams({ from });
+    if (to) q.set('to', to);
+    for (const k of ['api', 'plan', 'application', 'status']) if (f[k]) q.set(k, f[k]);
+    for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
+    return q.toString();
+  };
+  return { params, setParams, tf, f, key, query };
+}
+
+// one row of filters, above everything it scopes
+function FilterBar({ fixed = {}, filters, reset, children }) {
+  const { wapi, slug } = useWs();
+  const { params, setParams, f } = filters;
+  const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
+  const apps = useLoad(() => (fixed.application ? Promise.resolve([]) : wapi.get('/applications')), [slug]);
+  // the plans of the api the view is on, or filtered on
+  const plans = useLoad(() => (f.api ? wapi.get(`/apis/${f.api}`).then((a) => a.draft.plans) : Promise.resolve([])), [f.api]);
+  return (
+    <div className="row wrap">
+      <TimeframePicker params={params} setParams={setParams} resetPage={reset} />
+      {!fixed.api && (
+        <Select
+          value={f.api}
+          onChange={(v) => setParams({ api: v, plan: null, ...reset })}
+          options={[{ value: '', label: tr('All APIs') }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
+          style={{ width: 200 }}
+          aria-label={tr('filter by api')}
+        />
+      )}
+      {f.api && (
+        <Select
+          value={f.plan}
+          onChange={(v) => setParams({ plan: v, ...reset })}
+          options={[{ value: '', label: tr('All plans') }, ...(plans.data || []).map((p) => ({ value: p.id, label: p.name }))]}
+          style={{ width: 170 }}
+          aria-label={tr('filter by plan')}
+        />
+      )}
+      {!fixed.application && (
+        <Select
+          value={f.application}
+          onChange={(v) => setParams({ application: v, ...reset })}
+          options={[{ value: '', label: tr('All applications') }, ...(apps.data || []).map((a) => ({ value: a.id, label: a.name }))]}
+          style={{ width: 200 }}
+          aria-label={tr('filter by application')}
+        />
+      )}
+      <Select
+        value={f.status}
+        onChange={(v) => setParams({ status: v, ...reset })}
+        options={[{ value: '', label: tr('All statuses') }, ...STATUS_CLASSES.map((c) => ({ value: c, label: c }))]}
+        style={{ width: 140 }}
+        aria-label={tr('filter by status')}
+      />
+      {children}
+    </div>
+  );
+}
+
+// the request log of the observability page, with the filters of the view it comes from
+function logsPath(slug, fixed, filters) {
+  const q = new URLSearchParams(filters.params);
+  q.set('view', 'logs');
+  if (fixed.api) q.set('api', fixed.api);
+  if (fixed.application) q.set('application', fixed.application);
+  for (const k of ['calls_page', 'calls_q', 'tab']) q.delete(k);
+  return `/ws/${slug}/observability?${q}`;
+}
+
 // dashboards speak the catalogue's vocabulary: apis, plans, applications — not routes.
 // Filters live in the url, so a filtered view is a bookmark; they scope everything below them.
 export function AnalyticsDashboard({ fixed = {} }) {
   const { wapi, slug } = useWs();
-  const [params, setParams] = useQuery();
-  const tf = timeframe(params);
-  const apiFilter = fixed.api || params.get('api') || '';
-  const planFilter = params.get('plan') || '';
-  const appFilter = fixed.application || params.get('application') || '';
-  const statusFilter = params.get('status') || '';
-  const refresh = params.get('refresh') || '';
-  const key = [slug, tf.range, tf.from?.slice(0, tf.ms ? 0 : 30), tf.to, apiFilter, planFilter, appFilter, statusFilter].join('|');
-  const qs = () => {
-    const { from, to } = timeframe(params);
-    const q = new URLSearchParams({ from });
-    if (to) q.set('to', to);
-    if (apiFilter) q.set('api', apiFilter);
-    if (planFilter) q.set('plan', planFilter);
-    if (appFilter) q.set('application', appFilter);
-    if (statusFilter) q.set('status', statusFilter);
-    return q.toString();
-  };
-  const state = useLoad(() => wapi.get(`/analytics?${qs()}`), [key]);
-  const paging = usePaging({ prefix: 'calls', size: 25 });
-  const calls = useLoad(() => wapi.get(`/analytics/calls?${qs()}&${paging.query}`), [key, paging.key]);
-  useAutoRefresh(refresh, [state.reload, calls.reload]);
-  const [open, setOpen] = useState(null);
-  const nameOf = (list, id) => (list.data || []).find((x) => x.id === id);
-  const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
-  const apps = useLoad(() => (fixed.application ? Promise.resolve([]) : wapi.get('/applications')), [slug]);
-  // the plans of the api the dashboard is on, or filtered on
-  const plans = useLoad(() => (apiFilter ? wapi.get(`/apis/${apiFilter}`).then((a) => a.draft.plans) : Promise.resolve([])), [apiFilter]);
-  const reset = { calls_page: null };
+  const { navigate } = useRouter();
+  const filters = useAnalyticsFilters(fixed);
+  const state = useLoad(() => wapi.get(`/analytics?${filters.query()}`), [slug, filters.key]);
+  useAutoRefresh(filters.f.refresh, [state.reload]);
   return (
     <div className="col gap-16">
-      <div className="row wrap">
-        <TimeframePicker params={params} setParams={setParams} resetPage={reset} />
-        {!fixed.api && (
-          <Select
-            value={apiFilter}
-            onChange={(v) => setParams({ api: v, plan: null, ...reset })}
-            options={[
-              { value: '', label: tr('All APIs') },
-              ...(apis.data || []).map((a) => ({
-                value: a.id,
-                label: `${a.name} ${a.version}`,
-              })),
-            ]}
-            style={{ width: 200 }}
-            aria-label={tr('filter by api')}
-          />
-        )}
-        {apiFilter && (
-          <Select
-            value={planFilter}
-            onChange={(v) => setParams({ plan: v, ...reset })}
-            options={[
-              { value: '', label: tr('All plans') },
-              ...(plans.data || []).map((p) => ({
-                value: p.id,
-                label: p.name,
-              })),
-            ]}
-            style={{ width: 170 }}
-            aria-label={tr('filter by plan')}
-          />
-        )}
-        {!fixed.application && (
-          <Select
-            value={appFilter}
-            onChange={(v) => setParams({ application: v, ...reset })}
-            options={[{ value: '', label: tr('All applications') }, ...(apps.data || []).map((a) => ({ value: a.id, label: a.name }))]}
-            style={{ width: 200 }}
-            aria-label={tr('filter by application')}
-          />
-        )}
-        <Select
-          value={statusFilter}
-          onChange={(v) => setParams({ status: v, ...reset })}
-          options={[{ value: '', label: tr('All statuses') }, ...STATUS_CLASSES.map((c) => ({ value: c, label: c }))]}
-          style={{ width: 140 }}
-          aria-label={tr('filter by status')}
-        />
+      <FilterBar fixed={fixed} filters={filters} reset={{}}>
         <span className="spacer" />
-        <Select value={refresh} onChange={(v) => setParams({ refresh: v })} options={REFRESHES} style={{ width: 170 }} aria-label={tr('auto-refresh')} />
-        <ReloadButton
-          onReload={() => {
-            state.reload();
-            calls.reload();
-          }}
-          loading={state.loading}
-        />
-        <a className="btn sm" href="#recent-calls">
+        <Select value={filters.f.refresh} onChange={(v) => filters.setParams({ refresh: v })} options={REFRESHES} style={{ width: 170 }} aria-label={tr('auto-refresh')} />
+        <ReloadButton onReload={state.reload} loading={state.loading} />
+        <button className="btn sm" onClick={() => navigate(logsPath(slug, fixed, filters))}>
           <Icon name="doc" /> {tr('View the logs')}
-        </a>
-      </div>
+        </button>
+      </FilterBar>
       <Loader state={state}>{(d) => <Dashboard d={d} fixed={fixed} loading={state.loading} />}</Loader>
-      <div className="card" id="recent-calls">
+    </div>
+  );
+}
+
+const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
+
+// The request log: the calls themselves, as far back as they are kept, filtered like the dashboards
+// and by their own fields; one call in detail; the filtered calls exported as CSV. Reading it, and
+// exporting it, is traced in the audit trail: it is personal data.
+export function RequestLog({ fixed = {} }) {
+  const { wapi, slug } = useWs();
+  const filters = useAnalyticsFilters(fixed);
+  const { params, setParams } = filters;
+  const method = params.get('method') || '';
+  const client = params.get('client') || '';
+  const [path, setPath] = useState(params.get('path') || '');
+  useEffect(() => setPath(params.get('path') || ''), [params.get('path')]);
+  const paging = usePaging({ prefix: 'calls', size: 50 });
+  const own = { method, path: params.get('path') || '', client };
+  const calls = useLoad(() => wapi.get(`/analytics/calls?${filters.query(own)}&${paging.query}`), [slug, filters.key, method, own.path, client, paging.key]);
+  useAutoRefresh(filters.f.refresh, [calls.reload]);
+  const [open, setOpen] = useState(null);
+  const reset = { calls_page: null };
+  const exportUrl = `/backoffice/api/workspaces/${slug}/analytics/calls/export?${filters.query({ ...own, q: paging.q })}`;
+  return (
+    <div className="col gap-16">
+      <FilterBar fixed={fixed} filters={filters} reset={reset}>
+        <Select
+          value={method}
+          onChange={(v) => setParams({ method: v, ...reset })}
+          options={[{ value: '', label: tr('All methods') }, ...METHODS.map((m) => ({ value: m, label: m }))]}
+          style={{ width: 140 }}
+          aria-label={tr('filter by method')}
+        />
+        <form
+          className="row gap-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setParams({ path: path || null, ...reset });
+          }}
+        >
+          <Input value={path} onChange={setPath} placeholder={tr('path contains…')} mono aria-label={tr('filter by path')} style={{ width: 200 }} />
+        </form>
+        {client && (
+          <button className="btn ghost sm" onClick={() => setParams({ client: null, ...reset })}>
+            {tr('Client {0} ×', [client])}
+          </button>
+        )}
+        <span className="spacer" />
+        <Select value={filters.f.refresh} onChange={(v) => setParams({ refresh: v })} options={REFRESHES} style={{ width: 170 }} aria-label={tr('auto-refresh')} />
+        <a className="btn sm" href={exportUrl} download>
+          <Icon name="download" /> {tr('Export as CSV')}
+        </a>
+      </FilterBar>
+      <div className="card">
         <div className="card-head">
-          <h3 className="grow">{tr('Recent calls')}</h3>
+          <h3 className="grow">{tr('Request log')}</h3>
           <span className="faint small">
-            {calls.data?.retention && new Date(calls.data.retention.from).getTime() > new Date(tf.from).getTime()
-              ? tr('each call is kept {0} days · ', [calls.data.retention.callsDays])
-              : ''}
-            {tr('reading request logs is traced in the audit trail')}
+            {calls.data?.retention ? tr('each call is kept {0} days · ', [calls.data.retention.callsDays]) : ''}
+            {tr('reading and exporting it are traced in the audit trail')}
           </span>
         </div>
         <div className="card-body" style={{ paddingBottom: 0 }}>
-          <ListToolbar paging={paging} placeholder={tr('search path, method, status, client id, address, request id')} onReload={calls.reload} loading={calls.loading} />
+          <ListToolbar paging={paging} placeholder={tr('search path, method, status, host, client id, address, request id')} onReload={calls.reload} loading={calls.loading} />
         </div>
         <Loader state={calls}>
           {({ items: rows, total }) =>
             rows.length ? (
               <>
-                <div className="table-wrap">
+                <div className="table-wrap" style={{ opacity: calls.loading ? 0.6 : 1 }}>
                   <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
                     <thead>
                       <tr>
@@ -443,23 +501,25 @@ export function AnalyticsDashboard({ fixed = {} }) {
                         <th>{tr('Request')}</th>
                         <th>{tr('Status')}</th>
                         <th className="right">{tr('Duration')}</th>
-                        <th>{tr('Consumer')}</th>
+                        {!fixed.api && <th>{tr('API')}</th>}
+                        <th>{tr('Plan')}</th>
+                        {!fixed.application && <th>{tr('Consumer')}</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r, i) => (
-                        <tr key={i} className="clickable" onClick={() => setOpen(r)}>
+                      {rows.map((r) => (
+                        <tr key={r.id} className="clickable" onClick={() => setOpen(r)}>
                           <td className="nowrap muted">{fmtDate(r.at)}</td>
                           <td className="mono">
                             {r.method} {r.path}
                           </td>
                           <td>
-                            <StatusBadge status={r.status >= 500 ? 'error' : r.status >= 400 ? 'pending' : 'active'} label={String(r.status)} />
+                            <StatusBadge status={r.status >= 500 || r.err ? 'error' : r.status >= 400 ? 'pending' : 'active'} label={String(r.status ?? '—')} />
                           </td>
-                          <td className="right">
-                            <Tr text={'{0} ms'} args={[r.duration_ms]} />
-                          </td>
-                          <td className="mono faint">{r.client_id || r.from_ip}</td>
+                          <td className="right">{fmtMs(r.duration_ms)}</td>
+                          {!fixed.api && <td>{r.api_name || '—'}</td>}
+                          <td>{r.plan_name || '—'}</td>
+                          {!fixed.application && <td className="mono faint">{r.application_name || r.client_id || r.from_ip || '—'}</td>}
                         </tr>
                       ))}
                     </tbody>
@@ -469,34 +529,65 @@ export function AnalyticsDashboard({ fixed = {} }) {
               </>
             ) : (
               <div className="card-body muted small">
-                {paging.q ? tr('No call matches.') : tr('No call in this period. Install the data exporter from the Gateway page to feed the ingester.')}
+                {paging.q || method || own.path || client || filters.f.status
+                  ? tr('No call matches.')
+                  : tr('No call in this period. Install the data exporter from the Gateway page to feed the ingester.')}
               </div>
             )
           }
         </Loader>
       </div>
-      {open && (
-        <Modal title={`${open.method} ${open.path} — ${open.status}`} size="wide" onClose={() => setOpen(null)}>
-          <p className="muted small">
-            <Tr
-              text={'{0} · {1} ms{2}{3}'}
-              args={[
-                fmtDate(open.at),
-                open.duration_ms,
-                nameOf(apis, open.api_id) ? ` · ${nameOf(apis, open.api_id).name} ${nameOf(apis, open.api_id).version}` : '',
-                nameOf(apps, open.application_id) ? ` · ${nameOf(apps, open.application_id).name}` : '',
-              ]}
-            />
-          </p>
-          {open.req_id && (
-            <p className="small">
-              <Tr text={'Request id {0} — the Otoroshi-Request-Id the caller got back and the backend received'} args={[<code key="id">{open.req_id}</code>]} />
-            </p>
-          )}
-          <CodeView value={open} maxHeight={520} ariaLabel={tr('call')} />
-        </Modal>
-      )}
+      {open && <CallDetail call={open} onClose={() => setOpen(null)} onClient={(id) => (setOpen(null), setParams({ client: id, ...reset }))} />}
     </div>
+  );
+}
+
+// one call: what it was, who made it, how long it took and where the time went
+function CallDetail({ call, onClose, onClient }) {
+  const rows = [
+    [tr('Time'), fmtDate(call.at)],
+    [tr('Request id'), call.req_id ? <code>{call.req_id}</code> : '—'],
+    [tr('Host'), call.host || '—'],
+    [tr('API'), call.api_name || '—'],
+    [tr('Plan'), call.plan_name || '—'],
+    [tr('Application'), call.application_name || '—'],
+    [
+      tr('Client id'),
+      call.client_id ? (
+        <button className="btn ghost xs mono" onClick={() => onClient(call.client_id)}>
+          {call.client_id}
+        </button>
+      ) : (
+        '—'
+      ),
+    ],
+    [tr('Caller address'), call.from_ip || '—'],
+    [tr('User agent'), call.user_agent || '—'],
+    [tr('Duration'), fmtMs(call.duration_ms)],
+    [tr('Backend'), fmtMs(call.backend_duration_ms)],
+    [tr('Gateway overhead'), fmtMs(call.overhead_ms)],
+    [tr('Data'), tr('{0} in · {1} out', [fmtBytes(call.bytes_in || 0), fmtBytes(call.bytes_out || 0)])],
+  ];
+  return (
+    <Modal title={`${call.method} ${call.path} — ${call.status ?? '—'}${call.err ? ` · ${tr('gateway failure')}` : ''}`} size="wide" onClose={onClose}>
+      {call.req_id && (
+        <p className="small muted">
+          <Tr text={'Request id {0} — the Otoroshi-Request-Id the caller got back and the backend received'} args={[<code key="id">{call.req_id}</code>]} />
+        </p>
+      )}
+      <dl className="kv">
+        {rows.map(([k, v]) => (
+          <React.Fragment key={k}>
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+      <details className="mt-16">
+        <summary className="small">{tr('As stored')}</summary>
+        <CodeView value={call} maxHeight={420} ariaLabel={tr('call')} />
+      </details>
+    </Modal>
   );
 }
 
@@ -679,7 +770,7 @@ export function SecurityEvents({ fixed = {} }) {
 
 export function ObservabilityPage() {
   const [params, setParams] = useQuery();
-  const view = params.get('view') === 'security' ? 'security' : 'usage';
+  const view = ['security', 'logs'].includes(params.get('view')) ? params.get('view') : 'usage';
   return (
     <div className="page">
       <PageHead
@@ -691,10 +782,11 @@ export function ObservabilityPage() {
         onChange={(v) => setParams({ view: v === 'usage' ? null : v })}
         tabs={[
           { id: 'usage', label: tr('Usage') },
+          { id: 'logs', label: tr('Logs') },
           { id: 'security', label: tr('Security') },
         ]}
       />
-      {view === 'security' ? <SecurityEvents /> : <AnalyticsDashboard />}
+      {view === 'security' ? <SecurityEvents /> : view === 'logs' ? <RequestLog /> : <AnalyticsDashboard />}
     </div>
   );
 }
