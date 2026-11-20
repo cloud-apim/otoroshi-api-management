@@ -5,7 +5,7 @@
   Describe your APIs as products, publish them, let consumers subscribe — without ever opening the gateway.
 </p>
 
-> **Status: first prototype**, running against a real Otoroshi 18. An end-to-end test describes a
+> **Status: first prototype**, running against a real Otoroshi 18.1.0-dev. An end-to-end test describes a
 > reference catalogue — 6 plans, 5 auth mechanisms, 4 approval modes, on one API and one set of
 > routes — projects it, reconciles it and detects its drift (`test/reference-catalogue.test.js`).
 
