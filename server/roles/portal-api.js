@@ -484,6 +484,8 @@ r.get('/analytics', async ({ ctx, query }) => {
     applicationId: app,
     subscriptionId: query.get('subscription'),
     apiId: query.get('api'),
+    planId: query.get('plan'),
+    status: query.get('status'),
     from: query.get('from'),
     to: query.get('to'),
   });

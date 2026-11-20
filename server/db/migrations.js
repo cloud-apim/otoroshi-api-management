@@ -681,4 +681,11 @@ create index security_events_ws_at on security_events(workspace_id, at);
 create index security_events_at on security_events(at);
 `,
   },
+  {
+    version: '0004_calls_host',
+    sql: `
+-- the host a call was made on (the domain of the api, or a vault reference resolved by the gateway)
+alter table calls add column host text;
+`,
+  },
 ];

@@ -125,10 +125,24 @@ templated. The request log is the calls: it goes back as far as they are kept.
 
 They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's.
 
-- **Console → Observability**, and the *Analytics* tab of each API and application: calls and errors
-  over time, latency (average, p95, gateway overhead), data, status classes, calls by API, plan and
-  application, top endpoints (by templated path), recent calls, from the last hour to the last year.
-  Filters live in the URL, so a filtered view is a bookmark.
+- **Console → Observability**, and the *Analytics* tab of each API and application. One row of
+  filters scopes everything below it, and lives in the URL, so a filtered view is a bookmark: the
+  timeframe — from the last 5 minutes to the last year, or a custom range — the API, its plan, the
+  application, the status class (2xx to 5xx); a refresh, and an auto-refresh every 10 seconds to 5
+  minutes.
+  - **The figures**: calls and the applications that made them, requests per second, errors and
+    server errors, latency — average, minimum, maximum, p95 — and the overhead of the gateway, data.
+  - **Over time**: the responses, split into successes, client errors (4xx) and server errors (5xx,
+    and the failures of the gateway); the latency (average, p95, gateway overhead); the hits of the
+    first four applications and APIs, the others folded into one gray line. The buckets follow the
+    range — a minute for an hour, a quarter of an hour for a day, an hour for three days, a day for
+    three months — and the empty ones are shown: a bucket without calls has no latency, not a zero
+    one.
+  - **The tops**: APIs by calls, by server errors and by latency; applications by calls and by
+    latency; plans; status codes; hosts; endpoints by templated path, and paths as they were called.
+  - Every chart has its legend and a table view; the recent calls follow.
+  A range read from the rollups keeps its counts exact; it has no minimum, no maximum and no
+  percentile per bucket, nor the hosts or the paths as they were called — the dashboard says so.
   Reading the request log is recorded in the audit trail: it is personal data.
 - **One request id, end to end.** The gateway gives every call an id, `Otoroshi-Request-Id`: the
   caller gets it back in the response, the backends receive it with the request (the projection

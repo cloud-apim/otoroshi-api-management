@@ -98,8 +98,11 @@ export async function ingest(events) {
       if (!attr.subscription_id && e.identity?.apiRef?.sub) attr.subscription_id = e.identity.apiRef.sub;
       if (!attr.application_id && md.id_ref) attr.application_id = md.id_ref;
       let path = null;
+      let host = null;
       try {
-        path = new URL(maskUrl(e.url || ''), 'http://x').pathname;
+        const u = new URL(maskUrl(e.url || ''), 'http://x');
+        path = u.pathname;
+        host = u.hostname && u.hostname !== 'x' ? u.hostname : null;
       } catch (err) {}
       const template = templatePath(path);
       calls.push({
@@ -114,6 +117,7 @@ export async function ingest(events) {
         application_id: attr.application_id,
         client_id: clientId,
         method: e.method || null,
+        host,
         path: p.privacy.paths === 'template' ? template : path,
         path_template: template,
         status: e.status ?? null,

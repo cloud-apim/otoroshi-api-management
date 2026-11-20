@@ -6,27 +6,43 @@ import { adb, db } from '../db/index.js';
 import { policy } from './ingest-policy.js';
 import { DURATION_BOUNDS, horizon, percentile, rolledUntil } from './retention.js';
 
+// the width of the buckets of a chart over time: the finest that keeps a range to 120 buckets at
+// most — a minute for an hour, a quarter of an hour for a day, an hour for three days, a day for
+// three months. `bucket` says how to label them: by the time of day, or by the date
+const STEPS = [60e3, 5 * 60e3, 15 * 60e3, 3600e3, 3 * 3600e3, 12 * 3600e3, 86400e3, 7 * 86400e3];
 function range({ from, to }) {
   const end = to ? new Date(to) : new Date();
   const start = from ? new Date(from) : new Date(end.getTime() - 24 * 3600 * 1000);
-  const spanH = (end - start) / 3600000;
-  const bucket = spanH <= 2 ? 'minute' : spanH <= 72 ? 'hour' : 'day';
-  return { start, end, bucket };
+  const step = STEPS.find((w) => (end - start) / w <= 120) || STEPS[STEPS.length - 1];
+  return { start, end, step, bucket: labelOf(start, end, step) };
 }
+const labelOf = (start, end, step) => (end - start > 2 * 86400e3 ? 'day' : step >= 3600e3 ? 'hour' : 'minute');
+// the bucket of a row, aligned on the epoch like the buckets the charts lay out
+const binOf = (step) => adb`date_bin(${`${Math.round(step / 1000)} seconds`}::interval, at, timestamptz '1970-01-01 00:00:00+00')`;
 
 const appsOf = (filter) => (filter.applicationIds ? '{' + filter.applicationIds.join(',') + '}' : null);
 
-// the filters of a dashboard, on the calls or on their rollups (whose dimensions are '' for none)
-function filters(filter) {
+// the status classes a dashboard filters on: 2xx, 3xx, 4xx, 5xx
+export const STATUS_CLASSES = ['2xx', '3xx', '4xx', '5xx'];
+const classOf = (v) => (STATUS_CLASSES.includes(v) ? Number(v[0]) * 100 : null);
+
+// the filters of a dashboard, on the calls or on their rollups (whose dimensions are '' for none,
+// and whose status is a class)
+function filters(filter, { rollups = false } = {}) {
   const ws = filter.workspaceId || null;
   const api = filter.apiId || null;
+  const plan = filter.planId || null;
   const app = filter.applicationId || null;
   const sub = filter.subscriptionId || null;
+  const cls = classOf(filter.status);
   const appsArr = appsOf(filter); // restricts a consumer to its own applications
+  const status = rollups ? adb`status_class = ${cls}` : adb`(status / 100)::int * 100 = ${cls}`;
   return adb`(${ws}::text is null or workspace_id = ${ws})
     and (${api}::text is null or api_id = ${api})
+    and (${plan}::text is null or plan_id = ${plan})
     and (${app}::text is null or application_id = ${app})
     and (${sub}::text is null or subscription_id = ${sub})
+    and (${cls}::int is null or ${status})
     and (${appsArr}::text[] is null or application_id = any(${appsArr}::text[]))`;
 }
 
@@ -52,75 +68,184 @@ async function named({ byApi, byApp, byPlan }) {
   };
 }
 
+// the hits of the first entities over time, the others folded into one series: a line per entity
+// is read up to a few, past them the tail is "other"
+const TOP_SERIES = 4;
+const OTHER = '__other';
+function topIds(rows, key) {
+  return rows
+    .map((r) => r[key])
+    .filter(Boolean)
+    .slice(0, TOP_SERIES);
+}
+function pivot(rows, key, ids) {
+  const out = new Map();
+  for (const r of rows) {
+    const t = new Date(r.t).toISOString();
+    const point = out.get(t) || { t };
+    const k = ids.includes(r[key]) ? r[key] : OTHER;
+    point[k] = (point[k] || 0) + Number(r.calls);
+    out.set(t, point);
+  }
+  return [...out.values()].sort((a, b) => a.t.localeCompare(b.t));
+}
+
+// every bucket of the range, the empty ones too: a chart over time shows the hours without traffic,
+// it does not join the ones around them. The buckets are the ones date_bin makes, aligned on the epoch
+function bucketsOf(start, end, step) {
+  const out = [];
+  for (let t = Math.floor(new Date(start).getTime() / step) * step; t <= new Date(end).getTime() && out.length < 2000; t += step) out.push(new Date(t).toISOString());
+  return out;
+}
+function fill(points, times, zero) {
+  const byT = new Map(points.map((p) => [new Date(p.t).toISOString(), { ...p, t: new Date(p.t).toISOString() }]));
+  return times.map((t) => ({ ...zero, ...(byT.get(t) || { t }) }));
+}
+
 // A range within the retention of the calls is read from them, exactly. A range that starts
 // before is read from the hourly rollups, plus the calls not rolled up yet: its counts are exact,
 // its buckets an hour at least, its percentiles read from histograms.
 export async function overview(filter) {
   const p = await policy();
-  const { start, end, bucket } = range(filter);
+  const { start, end, step } = range(filter);
   const from = await horizon();
   const kept = { callsDays: p.retention.callsDays, rollupsDays: p.retention.rollupsDays, from };
-  if (start >= from) return { ...(await fromCalls(filter, { start, end, bucket })), source: 'calls', retention: kept };
-  return { ...(await fromRollups(filter, { start, end, bucket: bucket === 'minute' ? 'hour' : bucket })), source: 'rollups', approximate: ['p95_ms'], retention: kept };
+  const seconds = Math.max(1, (end - start) / 1000);
+  const out =
+    start >= from
+      ? { ...(await fromCalls(filter, { start, end, step })), source: 'calls', retention: kept }
+      : // the rollups are hourly: a bucket is an hour at least
+        { ...(await fromRollups(filter, { start, end, step: Math.max(step, 3600e3) })), source: 'rollups', approximate: ['p95_ms'], retention: kept };
+  out.totals.rps = out.totals.calls / seconds;
+  // the counts of an empty bucket are zero; its latency is unknown, not zero
+  const times = bucketsOf(out.range.from, out.range.to, out.range.step);
+  out.series = fill(out.series, times, { calls: 0, errors: 0, success: 0, client_errors: 0, server_errors: 0, avg_ms: null, p95_ms: null, avg_overhead_ms: null });
+  for (const k of ['seriesByApplication', 'seriesByApi']) {
+    const zero = Object.fromEntries([...out[k].ids, '__other'].map((id) => [id, 0]));
+    if (!out[k].points.some((p) => p.__other)) delete zero.__other;
+    out[k].points = fill(out[k].points, times, zero);
+  }
+  return out;
 }
 
-async function fromCalls(filter, { start, end, bucket }) {
+const SERVER = adb`count(*) filter (where status >= 500 or (err and coalesce(status, 0) < 400))::int`;
+
+async function fromCalls(filter, { start, end, step }) {
+  const bin = binOf(step);
   const where = adb`at >= ${start} and at <= ${end} and ${filters(filter)}`;
+  // a call is a success, a client error (a 4xx) or a server error (a 5xx, or a failure of the gateway
+  // answered below 400) — the same split as the rollups, which keep the class of a status and its errors
+  const outcome = adb`count(*) filter (where coalesce(status, 0) < 400 and not err)::int as success,
+      count(*) filter (where status >= 400 and status < 500)::int as client_errors,
+      ${SERVER} as server_errors`;
   const [totals] = await adb`select count(*)::int as calls,
       count(*) filter (where status >= 400 or err)::int as errors,
+      ${SERVER} as server_errors,
       coalesce(avg(duration_ms), 0)::float8 as avg_ms,
+      coalesce(min(duration_ms), 0)::float8 as min_ms,
+      coalesce(max(duration_ms), 0)::float8 as max_ms,
       coalesce(percentile_cont(0.95) within group (order by duration_ms), 0)::float8 as p95_ms,
       coalesce(avg(overhead_ms), 0)::float8 as avg_overhead_ms,
       coalesce(sum(bytes_in), 0)::float8 as bytes_in, coalesce(sum(bytes_out), 0)::float8 as bytes_out,
       count(distinct application_id)::int as applications
     from calls where ${where}`;
-  const series = await adb`select date_trunc(${bucket}, at) as t, count(*)::int as calls,
-      count(*) filter (where status >= 400 or err)::int as errors, coalesce(avg(duration_ms), 0)::float8 as avg_ms
+  const series = await adb`select ${bin} as t, count(*)::int as calls,
+      count(*) filter (where status >= 400 or err)::int as errors, ${outcome},
+      coalesce(avg(duration_ms), 0)::float8 as avg_ms,
+      coalesce(percentile_cont(0.95) within group (order by duration_ms), 0)::float8 as p95_ms,
+      coalesce(avg(overhead_ms), 0)::float8 as avg_overhead_ms
     from calls where ${where} group by 1 order by 1`;
   const statuses = await adb`select (status / 100)::int * 100 as class, count(*)::int as calls from calls where ${where} group by 1 order by 1`;
   const byApi = await adb`select api_id, count(*)::int as calls, count(*) filter (where status >= 400 or err)::int as errors,
+      ${SERVER} as server_errors,
       coalesce(avg(duration_ms), 0)::float8 as avg_ms from calls where ${where} group by api_id order by calls desc limit 100`;
-  const byApp = await adb`select application_id, count(*)::int as calls, count(*) filter (where status >= 400 or err)::int as errors
+  const byApp = await adb`select application_id, count(*)::int as calls, count(*) filter (where status >= 400 or err)::int as errors,
+      ${SERVER} as server_errors, coalesce(avg(duration_ms), 0)::float8 as avg_ms
     from calls where ${where} group by application_id order by calls desc limit 100`;
   const byPlan = await adb`select api_id, plan_id, count(*)::int as calls from calls where ${where} group by api_id, plan_id order by calls desc limit 100`;
-  // the paths by their template: /pets/{n}, not one line per pet
-  const byPath = await adb`select method, coalesce(path_template, path) as path, count(*)::int as calls, coalesce(avg(duration_ms), 0)::float8 as avg_ms
+  // the paths by their template: /pets/{n}, not one line per pet; and as they were called
+  const byPath = await adb`select method, coalesce(path_template, path) as path, count(*)::int as calls, coalesce(avg(duration_ms), 0)::float8 as avg_ms,
+      ${SERVER} as server_errors
     from calls where ${where} group by 1, 2 order by calls desc limit 100`;
-  return { range: { from: start, to: end, bucket }, totals, series, statuses, ...(await named({ byApi, byApp, byPlan })), byPath };
+  const byRawPath = await adb`select method, path, count(*)::int as calls from calls where ${where} group by 1, 2 order by calls desc limit 100`;
+  const byHost = await adb`select host, count(*)::int as calls from calls where ${where} and host is not null group by 1 order by calls desc limit 100`;
+  const appIds = topIds(byApp, 'application_id');
+  const apiIds = topIds(byApi, 'api_id');
+  const seriesByApplication = pivot(await adb`select ${bin} as t, application_id, count(*)::int as calls from calls where ${where} group by 1, 2`, 'application_id', appIds);
+  const seriesByApi = pivot(await adb`select ${bin} as t, api_id, count(*)::int as calls from calls where ${where} group by 1, 2`, 'api_id', apiIds);
+  return {
+    range: { from: start, to: end, step, bucket: labelOf(start, end, step) },
+    totals,
+    series,
+    statuses,
+    ...(await named({ byApi, byApp, byPlan })),
+    byPath,
+    byRawPath,
+    byHost,
+    seriesByApplication: { ids: appIds, points: seriesByApplication },
+    seriesByApi: { ids: apiIds, points: seriesByApi },
+  };
 }
 
-async function fromRollups(filter, { start, end, bucket }) {
+async function fromRollups(filter, { start, end, step }) {
+  const bin = binOf(step);
   const rolled = await rolledUntil();
-  const f = filters(filter);
+  const fr = filters(filter, { rollups: true });
+  const fc = filters(filter);
   // the rollups of the range, and the calls of the range not rolled up yet, in one shape
   const rows = () => adb`(
     select hour as at, nullif(workspace_id, '') as workspace_id, nullif(api_id, '') as api_id, nullif(plan_id, '') as plan_id,
       nullif(subscription_id, '') as subscription_id, nullif(application_id, '') as application_id, nullif(method, '') as method,
       nullif(path, '') as path, status_class, calls, errors, duration_sum, overhead_sum, bytes_in, bytes_out, durations
-    from call_rollups where hour >= date_trunc('hour', ${start}::timestamptz) and hour <= ${end} and ${f}
+    from call_rollups where hour >= date_trunc('hour', ${start}::timestamptz) and hour <= ${end} and ${fr}
     union all
     select at, workspace_id, api_id, plan_id, subscription_id, application_id, method, coalesce(path_template, path), coalesce(status / 100 * 100, 0),
       1, (status >= 400 or err)::int, coalesce(duration_ms, 0), coalesce(overhead_ms, 0), coalesce(bytes_in, 0), coalesce(bytes_out, 0),
       jsonb_build_object(width_bucket(coalesce(duration_ms, 0), ${`{${DURATION_BOUNDS.join(',')}}`}::int[])::text, 1)
-    from calls where id > ${rolled} and at >= ${start} and at <= ${end} and ${f}
+    from calls where id > ${rolled} and at >= ${start} and at <= ${end} and ${fc}
   ) u`;
   const avgMs = () => adb`coalesce(sum(duration_sum)::float8 / nullif(sum(calls), 0), 0)::float8`;
-  const [totals] = await adb`select coalesce(sum(calls), 0)::int as calls, coalesce(sum(errors), 0)::int as errors,
+  // a rollup keeps the class of a status and its errors: a gateway failure below 400 is a server error
+  const serverErrors = () => adb`(coalesce(sum(calls) filter (where status_class >= 500), 0) + coalesce(sum(errors) filter (where status_class < 400), 0))::int`;
+  const outcome = adb`(coalesce(sum(calls) filter (where status_class < 400), 0) - coalesce(sum(errors) filter (where status_class < 400), 0))::int as success,
+      coalesce(sum(calls) filter (where status_class = 400), 0)::int as client_errors, ${serverErrors()} as server_errors`;
+  const [totals] = await adb`select coalesce(sum(calls), 0)::int as calls, coalesce(sum(errors), 0)::int as errors, ${serverErrors()} as server_errors,
       ${avgMs()} as avg_ms, coalesce(sum(overhead_sum)::float8 / nullif(sum(calls), 0), 0)::float8 as avg_overhead_ms,
       coalesce(sum(bytes_in), 0)::float8 as bytes_in, coalesce(sum(bytes_out), 0)::float8 as bytes_out,
       count(distinct application_id)::int as applications
     from ${rows()}`;
   const histogram = await adb`select k as b, sum(v::bigint)::float8 as n from ${rows()}, jsonb_each_text(u.durations) as d(k, v) group by 1`;
   totals.p95_ms = percentile(Object.fromEntries(histogram.map((h) => [h.b, h.n])), 0.95);
-  const series = await adb`select date_trunc(${bucket}, at) as t, sum(calls)::int as calls, sum(errors)::int as errors, ${avgMs()} as avg_ms
+  // the extremes are not kept by the rollups
+  totals.min_ms = null;
+  totals.max_ms = null;
+  const series = await adb`select ${bin} as t, sum(calls)::int as calls, sum(errors)::int as errors, ${outcome}, ${avgMs()} as avg_ms,
+      coalesce(sum(overhead_sum)::float8 / nullif(sum(calls), 0), 0)::float8 as avg_overhead_ms
     from ${rows()} group by 1 order by 1`;
   const statuses = await adb`select status_class as class, sum(calls)::int as calls from ${rows()} group by 1 order by 1`;
-  const byApi = await adb`select api_id, sum(calls)::int as calls, sum(errors)::int as errors, ${avgMs()} as avg_ms
+  const byApi = await adb`select api_id, sum(calls)::int as calls, sum(errors)::int as errors, ${serverErrors()} as server_errors, ${avgMs()} as avg_ms
     from ${rows()} group by api_id order by calls desc limit 100`;
-  const byApp = await adb`select application_id, sum(calls)::int as calls, sum(errors)::int as errors from ${rows()} group by application_id order by calls desc limit 100`;
+  const byApp = await adb`select application_id, sum(calls)::int as calls, sum(errors)::int as errors, ${serverErrors()} as server_errors, ${avgMs()} as avg_ms
+    from ${rows()} group by application_id order by calls desc limit 100`;
   const byPlan = await adb`select api_id, plan_id, sum(calls)::int as calls from ${rows()} group by api_id, plan_id order by calls desc limit 100`;
-  const byPath = await adb`select method, path, sum(calls)::int as calls, ${avgMs()} as avg_ms from ${rows()} group by 1, 2 order by calls desc limit 100`;
-  return { range: { from: start, to: end, bucket }, totals, series, statuses, ...(await named({ byApi, byApp, byPlan })), byPath };
+  const byPath = await adb`select method, path, sum(calls)::int as calls, ${avgMs()} as avg_ms, ${serverErrors()} as server_errors from ${rows()} group by 1, 2 order by calls desc limit 100`;
+  const appIds = topIds(byApp, 'application_id');
+  const apiIds = topIds(byApi, 'api_id');
+  const seriesByApplication = pivot(await adb`select ${bin} as t, application_id, sum(calls)::int as calls from ${rows()} group by 1, 2`, 'application_id', appIds);
+  const seriesByApi = pivot(await adb`select ${bin} as t, api_id, sum(calls)::int as calls from ${rows()} group by 1, 2`, 'api_id', apiIds);
+  return {
+    range: { from: start, to: end, step, bucket: labelOf(start, end, step) },
+    totals,
+    series,
+    statuses,
+    ...(await named({ byApi, byApp, byPlan })),
+    byPath,
+    // the rollups keep the templated paths only, and not the hosts
+    byRawPath: null,
+    byHost: null,
+    seriesByApplication: { ids: appIds, points: seriesByApplication },
+    seriesByApi: { ids: apiIds, points: seriesByApi },
+  };
 }
 
 // the request log as a paged list; the search matches the path, the method, the status, the

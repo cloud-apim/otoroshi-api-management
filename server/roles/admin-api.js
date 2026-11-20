@@ -961,8 +961,10 @@ r.get('/workspaces/:ws/analytics', async ({ ctx, params, query }) => {
   return analytics.overview({
     workspaceId: c.workspace.id,
     apiId: query.get('api'),
+    planId: query.get('plan'),
     applicationId: query.get('application'),
     subscriptionId: query.get('subscription'),
+    status: query.get('status'),
     from: query.get('from'),
     to: query.get('to'),
   });

@@ -41,6 +41,8 @@
   --chart-4: #eda100;
   --chart-5: #e87ba4;
   --chart-6: #008300;
+  /* the de-emphasis gray of a folded tail ("other") */
+  --chart-other: #8b8f97;
   --radius: 10px;
   --radius-sm: 6px;
   --font: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -85,6 +87,7 @@
   --chart-4: #c98500;
   --chart-5: #d55181;
   --chart-6: #0ca30c;
+  --chart-other: #7c8089;
 }
 
 * { box-sizing: border-box; }

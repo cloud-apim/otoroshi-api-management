@@ -1,156 +1,430 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Badge, Callout, Loader, Modal, Seg, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
+import { Badge, Callout, Icon, Loader, Modal, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
 import { CodeView } from '../../shared/code-editor.jsx';
 import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
-import { BarList, StatTile, TimeSeries } from '../../shared/charts.jsx';
+import { BarList, OTHER_COLOR, StackedColumns, StatTile, TimeSeries } from '../../shared/charts.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
-const RANGES = [
-  { value: '1h', label: tr('1h'), ms: 3600e3 },
-  { value: '24h', label: tr('24h'), ms: 86400e3 },
-  { value: '7d', label: tr('7 days'), ms: 7 * 86400e3 },
-  { value: '30d', label: tr('30 days'), ms: 30 * 86400e3 },
-  { value: '90d', label: tr('90 days'), ms: 90 * 86400e3 },
-  { value: '1y', label: tr('1 year'), ms: 365 * 86400e3 },
+// the timeframes of a dashboard: presets first, then a custom range
+export const RANGES = [
+  { value: '5m', label: tr('Last 5 minutes'), ms: 5 * 60e3 },
+  { value: '30m', label: tr('Last 30 minutes'), ms: 30 * 60e3 },
+  { value: '1h', label: tr('Last hour'), ms: 3600e3 },
+  { value: '3h', label: tr('Last 3 hours'), ms: 3 * 3600e3 },
+  { value: '6h', label: tr('Last 6 hours'), ms: 6 * 3600e3 },
+  { value: '12h', label: tr('Last 12 hours'), ms: 12 * 3600e3 },
+  { value: '24h', label: tr('Last 24 hours'), ms: 86400e3 },
+  { value: '3d', label: tr('Last 3 days'), ms: 3 * 86400e3 },
+  { value: '7d', label: tr('Last 7 days'), ms: 7 * 86400e3 },
+  { value: '14d', label: tr('Last 14 days'), ms: 14 * 86400e3 },
+  { value: '30d', label: tr('Last 30 days'), ms: 30 * 86400e3 },
+  { value: '90d', label: tr('Last 90 days'), ms: 90 * 86400e3 },
+  { value: '1y', label: tr('Last year'), ms: 365 * 86400e3 },
 ];
+const REFRESHES = [
+  { value: '', label: tr('Auto-refresh off') },
+  { value: '10', label: tr('Every 10 seconds') },
+  { value: '30', label: tr('Every 30 seconds') },
+  { value: '60', label: tr('Every minute') },
+  { value: '300', label: tr('Every 5 minutes') },
+];
+const STATUS_CLASSES = ['2xx', '3xx', '4xx', '5xx'];
+
+// the range a dashboard reads, from its url: a preset, or a custom range (from, to)
+export function timeframe(params) {
+  const range = params.get('range') || '24h';
+  if (range === 'custom' && params.get('from'))
+    return {
+      range,
+      from: params.get('from'),
+      to: params.get('to') || new Date().toISOString(),
+      ms: null,
+    };
+  const ms = RANGES.find((r) => r.value === range)?.ms || 86400e3;
+  return { range, from: new Date(Date.now() - ms).toISOString(), to: null, ms };
+}
+
+// a datetime-local value, in the local time of the reader
+const localInput = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60e3).toISOString().slice(0, 16);
+};
+
+function TimeframePicker({ params, setParams, resetPage }) {
+  const range = params.get('range') || '24h';
+  const [from, setFrom] = useState(localInput(params.get('from')));
+  const [to, setTo] = useState(localInput(params.get('to')));
+  return (
+    <>
+      <Select
+        value={range}
+        onChange={(v) =>
+          setParams({
+            range: v,
+            ...(v === 'custom' ? {} : { from: null, to: null }),
+            ...resetPage,
+          })
+        }
+        options={[...RANGES.map((r) => ({ value: r.value, label: r.label })), { value: 'custom', label: tr('Custom range…') }]}
+        style={{ width: 190 }}
+        aria-label={tr('timeframe')}
+      />
+      {range === 'custom' && (
+        <span className="row gap-6">
+          <input className="input" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} aria-label={tr('from')} style={{ width: 200 }} />
+          <span className="muted">→</span>
+          <input className="input" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} aria-label={tr('to')} style={{ width: 200 }} />
+          <button
+            className="btn sm"
+            disabled={!from}
+            onClick={() =>
+              setParams({
+                from: new Date(from).toISOString(),
+                to: to ? new Date(to).toISOString() : null,
+                ...resetPage,
+              })
+            }
+          >
+            {tr('Apply')}
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
+
+// refreshes the dashboard every few seconds, when asked
+function useAutoRefresh(seconds, reloads) {
+  useEffect(() => {
+    if (!seconds) return;
+    const t = setInterval(() => reloads.forEach((r) => r()), Number(seconds) * 1000);
+    return () => clearInterval(t);
+  }, [seconds]);
+}
+
+const fmtMs = (v) => (v === null || v === undefined ? '—' : `${fmtNumber(Math.round(v * 10) / 10)} ms`);
+const perSecond = (v) => (v >= 10 ? fmtNumber(Math.round(v)) : v >= 0.01 ? String(Math.round(v * 100) / 100) : v > 0 ? '< 0.01' : '0');
+
+function Card({ title, sub, span, children }) {
+  return (
+    <div className="card" style={span ? { gridColumn: `span ${span}` } : undefined}>
+      <div className="card-head">
+        <h3 className="grow">{title}</h3>
+        {sub && <span className="faint small">{sub}</span>}
+      </div>
+      <div className="card-body">{children}</div>
+    </div>
+  );
+}
+
+// the hits of the first entities over time, the others folded into one gray series
+function entitySeries(block, names) {
+  const ids = block?.ids || [];
+  const series = ids.map((id) => ({ key: id, label: names(id) }));
+  if ((block?.points || []).some((p) => p.__other)) series.push({ key: '__other', label: tr('Other'), color: OTHER_COLOR });
+  return series;
+}
+
+// the dashboard itself: the figures, the distributions over time, then the tops
+export function Dashboard({ d, fixed = {}, loading = false }) {
+  const rollups = d.source === 'rollups';
+  const appName = (id) => d.byApplication.find((r) => r.application_id === id)?.name || id;
+  const apiName = (id) => d.byApi.find((r) => r.api_id === id)?.name || id;
+  const failed = d.byApi.filter((r) => r.server_errors > 0).sort((a, b) => b.server_errors - a.server_errors);
+  const slowApis = [...d.byApi].filter((r) => r.calls > 0).sort((a, b) => b.avg_ms - a.avg_ms);
+  const slowApps = [...d.byApplication].filter((r) => r.calls > 0).sort((a, b) => b.avg_ms - a.avg_ms);
+  const t = d.totals;
+  return (
+    <div className="col gap-16" style={{ opacity: loading ? 0.6 : 1 }}>
+      <div className="grid-3">
+        <StatTile label={tr('Calls')} value={fmtNumber(t.calls)} hint={tr('{0} consuming applications', [t.applications])} />
+        <StatTile label={tr('Requests per second')} value={perSecond(t.rps)} hint={tr('on average over the range')} />
+        <StatTile
+          label={tr('Errors')}
+          value={fmtNumber(t.errors)}
+          hint={t.calls ? tr('{0} % of calls · {1} server errors', [((100 * t.errors) / t.calls).toFixed(1), fmtNumber(t.server_errors)]) : ''}
+        />
+        <StatTile
+          label={tr('Average latency')}
+          value={fmtMs(t.avg_ms)}
+          hint={rollups ? tr('the extremes are not kept by the rollups') : tr('min {0} · max {1}', [fmtMs(t.min_ms), fmtMs(t.max_ms)])}
+        />
+        <StatTile label={rollups ? tr('p95 latency ≈') : tr('p95 latency')} value={fmtMs(t.p95_ms)} hint={tr('gateway overhead {0} on average', [fmtMs(t.avg_overhead_ms)])} />
+        <StatTile label={tr('Data')} value={fmtBytes(t.bytes_out)} hint={tr('out · {0} in', [fmtBytes(t.bytes_in)])} />
+      </div>
+      {rollups && (
+        <Callout kind="info">
+          <Tr
+            text={'Each call is kept {0} days: before {1}, this range is read from the hourly rollups — its counts are exact, its percentiles approximate, its paths templated.'}
+            args={[d.retention.callsDays, fmtDate(d.retention.from)]}
+          />
+        </Callout>
+      )}
+      {!t.calls ? (
+        <div className="card">
+          <div className="empty small">{tr('No call in this period, for these filters.')}</div>
+        </div>
+      ) : (
+        <>
+          <Card title={tr('Responses over time')}>
+            <StackedColumns
+              data={d.series}
+              bucket={d.range.bucket}
+              series={[
+                { key: 'success', label: tr('Success (below 400)') },
+                { key: 'client_errors', label: tr('Client errors (4xx)') },
+                {
+                  key: 'server_errors',
+                  label: tr('Server errors (5xx, gateway failures)'),
+                },
+              ]}
+            />
+          </Card>
+          <Card title={tr('Latency over time')} sub={rollups ? tr('average only: the percentiles of a bucket are not kept by the rollups') : null}>
+            <TimeSeries
+              data={d.series}
+              bucket={d.range.bucket}
+              formatValue={fmtMs}
+              series={[
+                { key: 'avg_ms', label: tr('Average') },
+                ...(rollups ? [] : [{ key: 'p95_ms', label: tr('p95') }]),
+                { key: 'avg_overhead_ms', label: tr('Gateway overhead') },
+              ]}
+            />
+          </Card>
+          {(!fixed.application || !fixed.api) && (
+            <div className="grid-2">
+              {!fixed.application && (
+                <Card title={tr('Hits by application')}>
+                  <TimeSeries data={d.seriesByApplication.points} bucket={d.range.bucket} series={entitySeries(d.seriesByApplication, appName)} />
+                </Card>
+              )}
+              {!fixed.api && (
+                <Card title={tr('Hits by API')}>
+                  <TimeSeries data={d.seriesByApi.points} bucket={d.range.bucket} series={entitySeries(d.seriesByApi, apiName)} />
+                </Card>
+              )}
+            </div>
+          )}
+          <div className="grid-3">
+            {!fixed.api && (
+              <>
+                <Card title={tr('Top APIs')} sub={tr('by calls')}>
+                  <BarList
+                    items={d.byApi.map((r) => ({
+                      label: r.name,
+                      value: r.calls,
+                      sub: r.errors ? tr('{0} err', [r.errors]) : '',
+                    }))}
+                  />
+                </Card>
+                <Card title={tr('Top failed APIs')} sub={tr('by server errors')}>
+                  <BarList
+                    items={failed.map((r) => ({
+                      label: r.name,
+                      value: r.server_errors,
+                    }))}
+                    empty={tr('No server error')}
+                  />
+                </Card>
+                <Card title={tr('Top slow APIs')} sub={tr('by average latency')}>
+                  <BarList
+                    items={slowApis.map((r) => ({
+                      label: r.name,
+                      value: r.avg_ms,
+                    }))}
+                    formatValue={fmtMs}
+                  />
+                </Card>
+              </>
+            )}
+            {!fixed.application && (
+              <>
+                <Card title={tr('Top applications')} sub={tr('by calls')}>
+                  <BarList
+                    items={d.byApplication.map((r) => ({
+                      label: r.name,
+                      value: r.calls,
+                      sub: r.errors ? tr('{0} err', [r.errors]) : '',
+                    }))}
+                  />
+                </Card>
+                <Card title={tr('Top slow applications')} sub={tr('by average latency')}>
+                  <BarList
+                    items={slowApps.map((r) => ({
+                      label: r.name,
+                      value: r.avg_ms,
+                    }))}
+                    formatValue={fmtMs}
+                  />
+                </Card>
+              </>
+            )}
+            <Card title={tr('By plan')}>
+              <BarList
+                items={d.byPlan.map((r) => ({
+                  label: fixed.api ? r.plan_name : `${r.api_name} · ${r.plan_name}`,
+                  value: r.calls,
+                }))}
+              />
+            </Card>
+            <Card title={tr('Status codes')}>
+              <BarList
+                items={d.statuses.map((r) => ({
+                  label: r.class ? tr('{0}xx', [r.class / 100]) : tr('no status'),
+                  value: r.calls,
+                }))}
+              />
+            </Card>
+            <Card title={tr('Top hosts')}>
+              {d.byHost ? (
+                <BarList
+                  items={d.byHost.map((r) => ({
+                    label: r.host,
+                    value: r.calls,
+                  }))}
+                />
+              ) : (
+                <div className="muted small">{tr('The hosts are not kept by the rollups.')}</div>
+              )}
+            </Card>
+            <Card title={tr('Top endpoints')} sub={tr('templated paths')} span={2}>
+              <BarList
+                items={d.byPath.map((r) => ({
+                  label: `${r.method || ''} ${r.path || ''}`.trim(),
+                  value: r.calls,
+                  sub: tr('{0} ms', [fmtNumber(Math.round(r.avg_ms))]),
+                }))}
+              />
+            </Card>
+            <Card title={tr('Top paths')} sub={tr('as called')}>
+              {d.byRawPath ? (
+                <BarList
+                  items={d.byRawPath.map((r) => ({
+                    label: `${r.method || ''} ${r.path || ''}`.trim(),
+                    value: r.calls,
+                  }))}
+                />
+              ) : (
+                <div className="muted small">{tr('The rollups keep the templated paths only.')}</div>
+              )}
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // dashboards speak the catalogue's vocabulary: apis, plans, applications — not routes.
-// Filters live in the url, so a filtered view is a bookmark.
+// Filters live in the url, so a filtered view is a bookmark; they scope everything below them.
 export function AnalyticsDashboard({ fixed = {} }) {
   const { wapi, slug } = useWs();
   const [params, setParams] = useQuery();
-  const range = params.get('range') || '24h';
+  const tf = timeframe(params);
   const apiFilter = fixed.api || params.get('api') || '';
+  const planFilter = params.get('plan') || '';
   const appFilter = fixed.application || params.get('application') || '';
-  const ms = RANGES.find((r) => r.value === range)?.ms || 86400e3;
+  const statusFilter = params.get('status') || '';
+  const refresh = params.get('refresh') || '';
+  const key = [slug, tf.range, tf.from?.slice(0, tf.ms ? 0 : 30), tf.to, apiFilter, planFilter, appFilter, statusFilter].join('|');
   const qs = () => {
-    const q = new URLSearchParams({ from: new Date(Date.now() - ms).toISOString() });
+    const { from, to } = timeframe(params);
+    const q = new URLSearchParams({ from });
+    if (to) q.set('to', to);
     if (apiFilter) q.set('api', apiFilter);
+    if (planFilter) q.set('plan', planFilter);
     if (appFilter) q.set('application', appFilter);
+    if (statusFilter) q.set('status', statusFilter);
     return q.toString();
   };
-  const state = useLoad(() => wapi.get(`/analytics?${qs()}`), [slug, range, apiFilter, appFilter]);
+  const state = useLoad(() => wapi.get(`/analytics?${qs()}`), [key]);
   const paging = usePaging({ prefix: 'calls', size: 25 });
-  const calls = useLoad(() => wapi.get(`/analytics/calls?${qs()}&${paging.query}`), [slug, range, apiFilter, appFilter, paging.key]);
+  const calls = useLoad(() => wapi.get(`/analytics/calls?${qs()}&${paging.query}`), [key, paging.key]);
+  useAutoRefresh(refresh, [state.reload, calls.reload]);
   const [open, setOpen] = useState(null);
   const nameOf = (list, id) => (list.data || []).find((x) => x.id === id);
   const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
   const apps = useLoad(() => (fixed.application ? Promise.resolve([]) : wapi.get('/applications')), [slug]);
+  // the plans of the api the dashboard is on, or filtered on
+  const plans = useLoad(() => (apiFilter ? wapi.get(`/apis/${apiFilter}`).then((a) => a.draft.plans) : Promise.resolve([])), [apiFilter]);
+  const reset = { calls_page: null };
   return (
     <div className="col gap-16">
       <div className="row wrap">
-        <Seg value={range} onChange={(v) => setParams({ range: v, calls_page: null })} options={RANGES} />
+        <TimeframePicker params={params} setParams={setParams} resetPage={reset} />
         {!fixed.api && (
           <Select
             value={apiFilter}
-            onChange={(v) => setParams({ api: v, calls_page: null })}
-            options={[{ value: '', label: tr('All APIs') }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
-            style={{ width: 220 }}
+            onChange={(v) => setParams({ api: v, plan: null, ...reset })}
+            options={[
+              { value: '', label: tr('All APIs') },
+              ...(apis.data || []).map((a) => ({
+                value: a.id,
+                label: `${a.name} ${a.version}`,
+              })),
+            ]}
+            style={{ width: 200 }}
             aria-label={tr('filter by api')}
+          />
+        )}
+        {apiFilter && (
+          <Select
+            value={planFilter}
+            onChange={(v) => setParams({ plan: v, ...reset })}
+            options={[
+              { value: '', label: tr('All plans') },
+              ...(plans.data || []).map((p) => ({
+                value: p.id,
+                label: p.name,
+              })),
+            ]}
+            style={{ width: 170 }}
+            aria-label={tr('filter by plan')}
           />
         )}
         {!fixed.application && (
           <Select
             value={appFilter}
-            onChange={(v) => setParams({ application: v, calls_page: null })}
+            onChange={(v) => setParams({ application: v, ...reset })}
             options={[{ value: '', label: tr('All applications') }, ...(apps.data || []).map((a) => ({ value: a.id, label: a.name }))]}
-            style={{ width: 220 }}
+            style={{ width: 200 }}
             aria-label={tr('filter by application')}
           />
         )}
-        <span className="grow" />
+        <Select
+          value={statusFilter}
+          onChange={(v) => setParams({ status: v, ...reset })}
+          options={[{ value: '', label: tr('All statuses') }, ...STATUS_CLASSES.map((c) => ({ value: c, label: c }))]}
+          style={{ width: 140 }}
+          aria-label={tr('filter by status')}
+        />
+        <span className="spacer" />
+        <Select value={refresh} onChange={(v) => setParams({ refresh: v })} options={REFRESHES} style={{ width: 170 }} aria-label={tr('auto-refresh')} />
         <ReloadButton
           onReload={() => {
             state.reload();
             calls.reload();
           }}
-          loading={state.loading || calls.loading}
+          loading={state.loading}
         />
+        <a className="btn sm" href="#recent-calls">
+          <Icon name="doc" /> {tr('View the logs')}
+        </a>
       </div>
-      <Loader state={state}>
-        {(d) => (
-          <div className="col gap-16" style={{ opacity: state.loading ? 0.6 : 1 }}>
-            <div className="grid-4">
-              <StatTile label={tr('Calls')} value={fmtNumber(d.totals.calls)} hint={tr('{0} consuming applications', [d.totals.applications])} />
-              <StatTile label={tr('Errors')} value={fmtNumber(d.totals.errors)} hint={d.totals.calls ? tr('{0} % of calls', [((100 * d.totals.errors) / d.totals.calls).toFixed(1)]) : ''} />
-              <StatTile
-                label={tr('Latency')}
-                value={`${fmtNumber(d.totals.avg_ms)} ms`}
-                hint={(d.source === 'rollups' ? (x) => tr('p95 ≈ {0} ms · gateway overhead {1} ms', x) : (x) => tr('p95 {0} ms · gateway overhead {1} ms', x))([fmtNumber(d.totals.p95_ms), fmtNumber(d.totals.avg_overhead_ms)])}
-              />
-              <StatTile label={tr('Data')} value={fmtBytes(d.totals.bytes_out)} hint={tr('out · {0} in', [fmtBytes(d.totals.bytes_in)])} />
-            </div>
-            {d.source === 'rollups' && (
-              <Callout kind="info">
-                <Tr text={'Each call is kept {0} days: before {1}, this range is read from the hourly rollups — its counts are exact, its percentiles approximate, its paths templated.'} args={[d.retention.callsDays, fmtDate(d.retention.from)]} />
-              </Callout>
-            )}
-            <div className="card">
-              <div className="card-head">
-                <h3 className="grow">{tr('Traffic')}</h3>
-              </div>
-              <div className="card-body">
-                <TimeSeries data={d.series} bucket={d.range.bucket} series={[{ key: 'calls', label: tr('Calls') }, { key: 'errors', label: tr('Errors') }]} />
-              </div>
-            </div>
-            <div className="grid-3">
-              {!fixed.api && (
-                <div className="card">
-                  <div className="card-head">
-                    <h3>{tr('By API')}</h3>
-                  </div>
-                  <div className="card-body">
-                    <BarList items={d.byApi.map((r) => ({ label: r.name, value: r.calls, sub: r.errors ? tr('{0} err', [r.errors]) : '' }))} />
-                  </div>
-                </div>
-              )}
-              <div className="card">
-                <div className="card-head">
-                  <h3>{tr('By plan')}</h3>
-                </div>
-                <div className="card-body">
-                  <BarList items={d.byPlan.map((r) => ({ label: fixed.api ? r.plan_name : `${r.api_name} · ${r.plan_name}`, value: r.calls }))} />
-                </div>
-              </div>
-              {!fixed.application && (
-                <div className="card">
-                  <div className="card-head">
-                    <h3>{tr('By application')}</h3>
-                  </div>
-                  <div className="card-body">
-                    <BarList items={d.byApplication.map((r) => ({ label: r.name, value: r.calls, sub: r.errors ? tr('{0} err', [r.errors]) : '' }))} />
-                  </div>
-                </div>
-              )}
-              <div className="card">
-                <div className="card-head">
-                  <h3>{tr('Status codes')}</h3>
-                </div>
-                <div className="card-body">
-                  <BarList items={d.statuses.map((r) => ({ label: tr('{0}xx', [r.class / 100]), value: r.calls }))} />
-                </div>
-              </div>
-              <div className="card" style={{ gridColumn: 'span 2' }}>
-                <div className="card-head">
-                  <h3>{tr('Top endpoints')}</h3>
-                </div>
-                <div className="card-body">
-                  <BarList items={d.byPath.map((r) => ({ label: `${r.method} ${r.path}`, value: r.calls, sub: tr('{0} ms', [fmtNumber(r.avg_ms)]) }))} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Loader>
-      <div className="card">
+      <Loader state={state}>{(d) => <Dashboard d={d} fixed={fixed} loading={state.loading} />}</Loader>
+      <div className="card" id="recent-calls">
         <div className="card-head">
           <h3 className="grow">{tr('Recent calls')}</h3>
           <span className="faint small">
-            {calls.data?.retention && new Date(calls.data.retention.from).getTime() > Date.now() - ms ? tr('each call is kept {0} days · ', [calls.data.retention.callsDays]) : ''}
+            {calls.data?.retention && new Date(calls.data.retention.from).getTime() > new Date(tf.from).getTime()
+              ? tr('each call is kept {0} days · ', [calls.data.retention.callsDays])
+              : ''}
             {tr('reading request logs is traced in the audit trail')}
           </span>
         </div>
@@ -161,35 +435,37 @@ export function AnalyticsDashboard({ fixed = {} }) {
           {({ items: rows, total }) =>
             rows.length ? (
               <>
-              <div className="table-wrap">
-                <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  <thead>
-                    <tr>
-                      <th>{tr('Time')}</th>
-                      <th>{tr('Request')}</th>
-                      <th>{tr('Status')}</th>
-                      <th className="right">{tr('Duration')}</th>
-                      <th>{tr('Consumer')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r, i) => (
-                      <tr key={i} className="clickable" onClick={() => setOpen(r)}>
-                        <td className="nowrap muted">{fmtDate(r.at)}</td>
-                        <td className="mono">
-                          {r.method} {r.path}
-                        </td>
-                        <td>
-                          <StatusBadge status={r.status >= 500 ? 'error' : r.status >= 400 ? 'pending' : 'active'} label={String(r.status)} />
-                        </td>
-                        <td className="right"><Tr text={'{0} ms'} args={[r.duration_ms]} /></td>
-                        <td className="mono faint">{r.client_id || r.from_ip}</td>
+                <div className="table-wrap">
+                  <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <thead>
+                      <tr>
+                        <th>{tr('Time')}</th>
+                        <th>{tr('Request')}</th>
+                        <th>{tr('Status')}</th>
+                        <th className="right">{tr('Duration')}</th>
+                        <th>{tr('Consumer')}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pager paging={paging} total={total} />
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i} className="clickable" onClick={() => setOpen(r)}>
+                          <td className="nowrap muted">{fmtDate(r.at)}</td>
+                          <td className="mono">
+                            {r.method} {r.path}
+                          </td>
+                          <td>
+                            <StatusBadge status={r.status >= 500 ? 'error' : r.status >= 400 ? 'pending' : 'active'} label={String(r.status)} />
+                          </td>
+                          <td className="right">
+                            <Tr text={'{0} ms'} args={[r.duration_ms]} />
+                          </td>
+                          <td className="mono faint">{r.client_id || r.from_ip}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pager paging={paging} total={total} />
               </>
             ) : (
               <div className="card-body muted small">
@@ -202,7 +478,15 @@ export function AnalyticsDashboard({ fixed = {} }) {
       {open && (
         <Modal title={`${open.method} ${open.path} — ${open.status}`} size="wide" onClose={() => setOpen(null)}>
           <p className="muted small">
-            <Tr text={'{0} · {1} ms{2}{3}'} args={[fmtDate(open.at), open.duration_ms, nameOf(apis, open.api_id) ? ` · ${nameOf(apis, open.api_id).name} ${nameOf(apis, open.api_id).version}` : '', nameOf(apps, open.application_id) ? ` · ${nameOf(apps, open.application_id).name}` : '']} />
+            <Tr
+              text={'{0} · {1} ms{2}{3}'}
+              args={[
+                fmtDate(open.at),
+                open.duration_ms,
+                nameOf(apis, open.api_id) ? ` · ${nameOf(apis, open.api_id).name} ${nameOf(apis, open.api_id).version}` : '',
+                nameOf(apps, open.application_id) ? ` · ${nameOf(apps, open.application_id).name}` : '',
+              ]}
+            />
           </p>
           {open.req_id && (
             <p className="small">
@@ -225,31 +509,39 @@ const REFUSING = ['deny', 'ban', 'mask'];
 export function SecurityEvents({ fixed = {} }) {
   const { wapi, slug } = useWs();
   const [params, setParams] = useQuery();
-  const range = params.get('range') || '24h';
+  const tf = timeframe(params);
+  const range = tf.range;
   const apiFilter = fixed.api || params.get('api') || '';
   const category = params.get('category') || '';
   const action = params.get('action') || '';
-  const ms = RANGES.find((r) => r.value === range)?.ms || 86400e3;
   const paging = usePaging({ prefix: 'security', size: 25 });
   const qs = () => {
-    const q = new URLSearchParams({ from: new Date(Date.now() - ms).toISOString() });
+    const { from, to } = timeframe(params);
+    const q = new URLSearchParams({ from });
+    if (to) q.set('to', to);
     if (apiFilter) q.set('api', apiFilter);
     if (category) q.set('category', category);
     if (action) q.set('action', action);
     return q.toString();
   };
-  const state = useLoad(() => wapi.get(`/analytics/security?${qs()}&${paging.query}`), [slug, range, apiFilter, category, action, paging.key]);
+  const state = useLoad(() => wapi.get(`/analytics/security?${qs()}&${paging.query}`), [slug, range, tf.ms ? '' : `${tf.from}|${tf.to}`, apiFilter, category, action, paging.key]);
   const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
   const [open, setOpen] = useState(null);
   return (
     <div className="col gap-16">
       <div className="row wrap">
-        {!fixed.api && <Seg value={range} onChange={(v) => setParams({ range: v, security_page: null })} options={RANGES} />}
+        {!fixed.api && <TimeframePicker params={params} setParams={setParams} resetPage={{ security_page: null }} />}
         {!fixed.api && (
           <Select
             value={apiFilter}
             onChange={(v) => setParams({ api: v, security_page: null })}
-            options={[{ value: '', label: tr('All APIs') }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
+            options={[
+              { value: '', label: tr('All APIs') },
+              ...(apis.data || []).map((a) => ({
+                value: a.id,
+                label: `${a.name} ${a.version}`,
+              })),
+            ]}
             style={{ width: 220 }}
             aria-label={tr('filter by api')}
           />
@@ -278,7 +570,12 @@ export function SecurityEvents({ fixed = {} }) {
                     <h3>{tr('By category')}</h3>
                   </div>
                   <div className="card-body">
-                    <BarList items={d.byCategory.map((r) => ({ label: r.category, value: r.events }))} />
+                    <BarList
+                      items={d.byCategory.map((r) => ({
+                        label: r.category,
+                        value: r.events,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="card">
@@ -286,7 +583,12 @@ export function SecurityEvents({ fixed = {} }) {
                     <h3>{tr('By action')}</h3>
                   </div>
                   <div className="card-body">
-                    <BarList items={d.byAction.map((r) => ({ label: r.action, value: r.events }))} />
+                    <BarList
+                      items={d.byAction.map((r) => ({
+                        label: r.action,
+                        value: r.events,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="card">
@@ -294,7 +596,12 @@ export function SecurityEvents({ fixed = {} }) {
                     <h3>{tr('By plan')}</h3>
                   </div>
                   <div className="card-body">
-                    <BarList items={d.byPlan.map((r) => ({ label: `${fixed.api ? '' : `${r.api_name} · `}${r.plan_id ? r.plan_name : tr('(no plan: caller not identified)')}`, value: r.events }))} />
+                    <BarList
+                      items={d.byPlan.map((r) => ({
+                        label: `${fixed.api ? '' : `${r.api_name} · `}${r.plan_id ? r.plan_name : tr('(no plan: caller not identified)')}`,
+                        value: r.events,
+                      }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -322,7 +629,16 @@ export function SecurityEvents({ fixed = {} }) {
                             <tr key={r.id} className="clickable" onClick={() => setOpen(r)}>
                               <td className="nowrap muted">{fmtDate(r.at)}</td>
                               <td>
-                                <button className="btn ghost sm" onClick={(e) => (e.stopPropagation(), setParams({ category: r.category, security_page: null }))}>
+                                <button
+                                  className="btn ghost sm"
+                                  onClick={(e) => (
+                                    e.stopPropagation(),
+                                    setParams({
+                                      category: r.category,
+                                      security_page: null,
+                                    })
+                                  )}
+                                >
                                   {r.category}
                                 </button>
                               </td>
@@ -340,7 +656,11 @@ export function SecurityEvents({ fixed = {} }) {
                     <Pager paging={paging} total={d.total} />
                   </>
                 ) : (
-                  <div className="card-body muted small">{tr('No security event in this period: the Threat Protection Suite reports here once a plan carries it (plan › Threat protection) and the data exporter of the setup is installed.')}</div>
+                  <div className="card-body muted small">
+                    {tr(
+                      'No security event in this period: the Threat Protection Suite reports here once a plan carries it (plan › Threat protection) and the data exporter of the setup is installed.',
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -362,7 +682,10 @@ export function ObservabilityPage() {
   const view = params.get('view') === 'security' ? 'security' : 'usage';
   return (
     <div className="page">
-      <PageHead title={tr('Observability')} sub={tr("Usage of the catalogue, from the ingester's computed path — exhaustive, attributed to apis, plans and applications at ingestion.")} />
+      <PageHead
+        title={tr('Observability')}
+        sub={tr("Usage of the catalogue, from the ingester's computed path — exhaustive, attributed to apis, plans and applications at ingestion.")}
+      />
       <Tabs
         value={view}
         onChange={(v) => setParams({ view: v === 'usage' ? null : v })}

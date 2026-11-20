@@ -196,6 +196,43 @@ describe('the retention', () => {
   });
 });
 
+describe('the dashboards', () => {
+  test('latency, throughput, responses over time and the tops, filtered by status class', async () => {
+    const before = await ok('GET', `/workspaces/${WS}/analytics?api=${apiId}&from=${new Date(Date.now() - 3600e3).toISOString()}`);
+    await ingest([
+      event(`${RUN}-dash-1`, { status: 200, duration: 5, path: '/v1/dash/1' }),
+      event(`${RUN}-dash-2`, { status: 404, duration: 20, path: '/v1/dash/2' }),
+      event(`${RUN}-dash-3`, { status: 503, duration: 250, path: '/v1/dash/3' }),
+    ]);
+    const from = new Date(Date.now() - 3600e3).toISOString();
+    const d = await ok('GET', `/workspaces/${WS}/analytics?api=${apiId}&from=${from}`);
+    expect(d.source).toBe('calls');
+    expect(d.totals.calls).toBe(before.totals.calls + 3);
+    expect(d.totals.max_ms).toBeGreaterThanOrEqual(250);
+    expect(d.totals.server_errors).toBe(before.totals.server_errors + 1);
+    expect(d.totals.rps).toBeCloseTo(d.totals.calls / 3600, 4);
+    // an hour in minutes: every bucket, the empty ones too, their latency unknown rather than zero
+    expect(d.range.step).toBe(60e3);
+    expect(d.series.length).toBeGreaterThanOrEqual(60);
+    expect(d.series.some((b) => b.calls === 0 && b.avg_ms === null)).toBe(true);
+    const sum = (k) => d.series.reduce((n, b) => n + b[k], 0);
+    expect(sum('success') + sum('client_errors') + sum('server_errors')).toBe(d.totals.calls);
+    expect(d.byHost.find((h) => h.host === `ingest-${RUN}.oto.tools`).calls).toBeGreaterThanOrEqual(3);
+    expect(d.byRawPath.map((r) => r.path)).toContain('/v1/dash/3');
+    expect(d.byApi[0]).toMatchObject({ api_id: apiId, server_errors: d.totals.server_errors });
+    // the hits of an application over time: its buckets, the unattributed calls among them
+    expect(d.seriesByApi.ids).toEqual([apiId]);
+    expect(d.seriesByApi.points.reduce((n, b) => n + b[apiId], 0)).toBe(d.totals.calls);
+    // filtered on a status class: the 5xx only
+    const failed = await ok('GET', `/workspaces/${WS}/analytics?api=${apiId}&from=${from}&status=5xx`);
+    expect(failed.totals.calls).toBe(d.totals.server_errors);
+    expect(failed.statuses.map((r) => r.class)).toEqual([500]);
+    // three months: the buckets are days
+    const long = await ok('GET', `/workspaces/${WS}/analytics?api=${apiId}&from=${new Date(Date.now() - 90 * DAY).toISOString()}`);
+    expect([long.range.step, long.range.bucket]).toEqual([DAY, 'day']);
+  });
+});
+
 describe('the attribution', () => {
   test('a security event of the Threat Protection Suite is attributed from the key that called', async () => {
     const api = await ok('GET', `/workspaces/${WS}/apis/${apiId}`);
