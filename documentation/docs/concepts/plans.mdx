@@ -16,8 +16,11 @@ touches the infrastructure.
 |---|---|---|
 | `staging` | projected; its extractor is not installed | hidden |
 | `published` | projected and enforced | shown, subscribable |
-| `deprecated` | projected as deprecated; Otoroshi 18 only installs the extractors of published plans | shown, closed to new subscriptions |
+| `deprecated` | projected and enforced: its consumers keep calling | shown, closed to new subscriptions |
 | `closed` | Otoroshi deletes the keys of its subscriptions | hidden |
+
+An API without a published or deprecated plan is **closed**: the gateway refuses every call. An
+open API publishes a `keyless` plan. The draft says so (`no_served_plan`).
 
 ## Auth mechanism
 
@@ -55,16 +58,16 @@ own, and removes it when the plan stops listing it or when the API goes. The con
 certificate — subject, CA or not, validity — and shows the DN Otoroshi will compare.
 
 The gateway's TLS trust is global: it holds every certificate of the gateway plus the JDK CAs, so a
-certificate from any public authority completes the handshake. When the plan gives **no issuer
-pattern**, the projection derives one from the subjects of its CAs, an exact match in Otoroshi's
-form (`OU=Platform, O=Atlas Data, CN=Atlas Partner CA, C=FR`): the plan accepts what its CAs signed
-and nothing else. A subject Otoroshi's form cannot be predicted for (an e-mail attribute, an escaped
-character) gets a warning instead. Otoroshi accepts a certificate when its subject **or** its issuer
-matches (upstream gap G-16): a subject pattern alone is flagged.
+certificate from any public authority completes the handshake. The plan is tied to its own CAs: they
+are projected as its `trusted_ca_refs`, and the chain of a client certificate has to lead to one of
+them, whatever the handshake trusts. The subject and issuer DN patterns, when given, must **all**
+match (`dn_match: all`).
 
-Without trusted CAs nor issuer patterns, the plan accepts any certificate the gateway trusts —
-among them the [client certificates of the applications](./applications-and-subscriptions.mdx#client-certificates)
-that have an active subscription to an mtls plan, derived for that time. The plan reads the `CN` of
+Without trusted CAs, the plan accepts a certificate from any authority the gateway trusts — among
+them the [client certificates of the applications](./applications-and-subscriptions.mdx#client-certificates)
+that have an active subscription to an mtls plan, derived for that time — and an issuer pattern
+only compares text anyone can write in a certificate of their own: the draft warns
+(`no_trusted_ca`). The plan reads the `CN` of
 the certificate as the client id by default; without a client id field, the gateway names a
 consumer after its whole certificate and no application can be reconciled with it.
 
@@ -94,14 +97,18 @@ referencing a module that exists, the plan can describe the server — *Discover
 the userinfo url when the plan fetches the user profile, client id and secret when the server needs
 them. Same life as every derived object: marked, diffed, watched for drift, removed with the API.
 
-Otoroshi 18 checks the **signature and the dates** of the token, not its issuer nor its audience
-(upstream gap G-15): a token the same server issued for another client passes. The plan says so.
+The plan names the **issuer** its tokens carry (filled by *Discover*) and the **audiences** one of
+which they must carry: a token the same server issued for another client, or for another API, is
+refused. Without either, the plan accepts any token signed with the keys of the server, and the
+draft warns (`token_claims_not_checked`).
 
 ```yaml
 auth:
   kind: oauth2-remote
   config:
     clientIdPath: sub
+    issuer: https://idp.example.com
+    audiences: [books]
     derive: { enabled: true, discoveryUrl: https://idp.example.com/.well-known/openid-configuration, jwksUrl: https://idp.example.com/jwks }
 ```
 
@@ -129,8 +136,34 @@ not freely chosen, so the console shows it rather than hiding it:
 
 "If you present a valid key you are on your tier, otherwise you fall back on the open access."
 Two `apikey` plans are told apart by the key itself. Two `jwt`, `mtls`, `oauth2-remote` or `keyless`
-plans that can both match need a **selection rule** on all but one of them, or the draft does not
-publish.
+plans that can both match need a **selection** on all but one of them, or the draft does not
+publish. Between plans of the same kind, the order of the plans decides: the first one that
+identifies the caller wins, so the plan without a selection comes last (`selection_shadowed`
+otherwise).
+
+A selection is a list of JSON path conditions, all of which must hold, on the request, the claims
+of the token, the client certificate or the client id the plan read:
+
+```yaml
+- id: plan_gold
+  auth: { kind: jwt, config: { verifier: idp } }
+  selection:
+    - { path: $.token.tier, value: gold }
+- id: plan_free
+  auth: { kind: jwt, config: { verifier: idp } }
+```
+
+A value can be `Regex(…)`, `Contains(…)`, `Not(…)`… A plan whose selection fails identifies no
+one, and the next plan gets the call. Deprecated plans are served, and count.
+
+## Availability and isolation
+
+- **Counter failure strategy**: what happens when the distributed quota counter cannot be reached —
+  let the call pass, uncounted, or refuse it (`503`). Not the same answer for an open free tier and
+  for a contractual one. Projected as the plan's `counter_failure`.
+- **Circuit breaker granularity**: one circuit breaker for the API (each route, shared by every
+  caller), or one per subscription, so that one consumer making the backend fail does not open it
+  for everyone. Projected as the plan's `circuit_breaker_scope`.
 
 ## Limits
 
@@ -152,27 +185,26 @@ They are projected as the throttling strategy of the keys:
 
 (`10000000` is Otoroshi's "unlimited").
 
+On `apikey` plans, a **key validity** in days makes each key expire that long after it is first
+enabled — the subscription, or its acceptance — whatever the date of the subscription request.
+Projected as the `validity` of the plan's key template.
+
 ## Resource filtering
 
-A plan can give access to **all resources** or **only some**. On `apikey` plans it is projected as
-key restrictions — the allowed resources first, everything else forbidden:
+A plan can give access to **all resources** or **only some**. It is projected as the restrictions
+of its consumers — the allowed resources first, everything else forbidden. The paths are regexes
+Otoroshi matches against the whole request path: a resource and what is under it, or the resource
+alone when it is exact:
 
 ```json
 { "enabled": true, "allowLast": false,
-  "allowed": [{ "method": "GET", "path": "/v1/pets*" }],
-  "forbidden": [{ "method": "*", "path": "*" }] }
+  "allowed": [{ "method": "GET", "path": "/v1/pets(/.*)?" }],
+  "forbidden": [{ "method": "*", "path": "/.*" }] }
 ```
 
-A call outside the plan's resources gets `403`. Other plan kinds cannot carry restrictions on
-Otoroshi 18 ([G-5](../otoroshi-gaps.mdx)): the console says the filter is not enforced there.
-
-## Recorded, not yet enforced
-
-The **selection rule**, the **counter failure strategy** (let the call pass or refuse it when the
-distributed counter is unreachable) and the **circuit breaker granularity** (per API or per
-subscription) are attributes of the plan, projected as plan metadata (`apim_selection_rule`,
-`apim_counter_failure`, `apim_circuit_breaker`) and flagged as not enforced until Otoroshi reads
-them ([G-6](../otoroshi-gaps.mdx)).
+A call outside the plan's resources gets `403`, whatever the kind of the plan — but `oauth2-local`:
+the gateway gives the keys of these plans no restrictions, and the draft says the filter is not
+enforced there (`filter_not_enforced`).
 
 ## Plan plugins
 

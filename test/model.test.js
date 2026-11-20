@@ -1,7 +1,7 @@
 // Unit tests of the model and the projection — no database, no gateway.
 import { describe, expect, test } from 'bun:test';
 import { normalizeDraft, validateDraft, resolutionOrder, plansAreEquivalent, defaultPlan } from '../server/domain/model.js';
-import { buildOtoroshiApi, buildOtoroshiSubscription, restrictionsFor, rateLimitingFor, comparableApi } from '../server/otoroshi/projection.js';
+import { buildOtoroshiApi, buildOtoroshiSubscription, restrictionsFor, restrictionPath, rateLimitingFor, comparableApi } from '../server/otoroshi/projection.js';
 import { diff } from '../server/domain/diff.js';
 import { maskUrl } from '../server/domain/ingest.js';
 
@@ -19,20 +19,39 @@ function draft(plans = []) {
 }
 
 describe('validation', () => {
-  test('an api without a published plan is flagged as open', () => {
+  test('an api without a published or deprecated plan is closed, and says so', () => {
     const v = validateDraft(draft([defaultPlan({ status: 'staging' })]));
     expect(v.ok).toBe(true);
-    expect(v.warnings.map((w) => w.code)).toContain('open_routes');
+    expect(v.warnings.map((w) => w.code)).toContain('no_served_plan');
+    // a deprecated plan is still served
+    expect(validateDraft(draft([defaultPlan({ status: 'deprecated' })])).warnings.map((w) => w.code)).not.toContain('no_served_plan');
   });
 
-  test('two keyless or jwt plans that can both match need a selection rule', () => {
-    const jwt = (id) => defaultPlan({ id, status: 'published', auth: { kind: 'jwt', config: { verifier: 'v' } } });
+  test('two keyless or jwt plans that can both match need a selection, the plan without one last', () => {
+    const jwt = (id) => defaultPlan({ id, name: id, status: 'published', auth: { kind: 'jwt', config: { verifier: 'v' } } });
     expect(validateDraft(draft([jwt('a'), jwt('b')])).ok).toBe(false);
-    const withRule = { ...jwt('b'), selectionRule: "${token.aud} == 'x'" };
-    expect(validateDraft(draft([jwt('a'), withRule])).ok).toBe(true);
-    // two apikey plans are told apart by the key itself
+    const gold = { ...jwt('gold'), selection: [{ path: '$.token.tier', value: 'gold' }] };
+    const v = validateDraft(draft([gold, jwt('free')]));
+    expect(v.ok).toBe(true);
+    expect(v.warnings.map((w) => w.code)).not.toContain('selection_shadowed');
+    // the plan without selection first would take every caller
+    expect(validateDraft(draft([jwt('free'), gold])).warnings.map((w) => w.code)).toContain('selection_shadowed');
+    // a deprecated plan is served: it counts
+    expect(validateDraft(draft([jwt('a'), { ...jwt('b'), status: 'deprecated' }])).ok).toBe(false);
+    // two apikey plans are told apart by the key itself, and take no selection
     const key = (id) => defaultPlan({ id, status: 'published' });
     expect(validateDraft(draft([key('a'), key('b')])).ok).toBe(true);
+    expect(validateDraft(draft([{ ...key('a'), selection: [{ path: '$.request.ip', value: 'x' }] }])).ok).toBe(false);
+  });
+
+  test('the selection, the counter failure strategy and the circuit breaker are projected on the plan', () => {
+    const p = defaultPlan({ id: 'gold', status: 'published', auth: { kind: 'jwt', config: { verifier: 'v' } }, selection: [{ path: '$.token.tier', value: 'gold' }], counterFailure: 'deny', circuitBreaker: 'subscription' });
+    const plan = buildOtoroshiApi({ api: { id: 'api_1', name: 'x', version: '1' }, draft: draft([p]) }).plans[0];
+    expect(plan.selection).toEqual([{ path: '$.token.tier', value: 'gold' }]);
+    expect(plan.counter_failure).toEqual({ mode: 'deny' });
+    expect(plan.circuit_breaker_scope).toBe('consumer');
+    expect(plan.metadata).toEqual({ apim_unit: 'calls' });
+    expect(validateDraft(draft([p])).warnings.map((w) => w.code)).not.toContain('not_enforced');
   });
 
   test('a token or budget plan is refused without an llm backend', () => {
@@ -70,11 +89,19 @@ describe('projection', () => {
     expect(r.enabled).toBe(true);
     // with allowLast=true Otoroshi never reads the allowed list
     expect(r.allowLast).toBe(false);
+    // the paths are regexes Otoroshi matches against the whole request path
     expect(r.allowed).toEqual([
-      { method: 'GET', path: '/v1/pets*', authorized_entity: null },
+      { method: 'GET', path: '/v1/pets(/.*)?', authorized_entity: null },
       { method: '*', path: '/v1/store', authorized_entity: null },
     ]);
-    expect(r.forbidden).toEqual([{ method: '*', path: '*', authorized_entity: null }]);
+    expect(r.forbidden).toEqual([{ method: '*', path: '/.*', authorized_entity: null }]);
+    const matches = (re, path) => new RegExp(`^(?:${re})$`).test(path);
+    expect(matches(r.allowed[0].path, '/v1/pets/42')).toBe(true);
+    expect(matches(r.allowed[0].path, '/v1/pets')).toBe(true);
+    expect(matches(r.allowed[0].path, '/v1/petshop')).toBe(false);
+    expect(matches(restrictionPath('/v1/users/:id', true), '/v1/users/42')).toBe(true);
+    expect(matches(restrictionPath('/v1.2/a+b', true), '/v1x2/a+b')).toBe(false);
+    expect(matches(restrictionPath('', false), '/')).toBe(true);
     expect(restrictionsFor({ resourceFilter: { mode: 'all', resources: [] } }, d).enabled).toBe(false);
   });
 

@@ -22,20 +22,20 @@ since, reported upstream, not fixed yet.
 |---|---|---|---|---|---|
 | G-1 | [#2940](https://github.com/MAIF/otoroshi/issues/2940) | A `pending` ApiSubscription got an **enabled** apikey | high | ✅ | projects a subscription once it is effective, its key enabled while it is active |
 | G-2 | [#2941](https://github.com/MAIF/otoroshi/issues/2941) | Deleting an ApiSubscription **revoked nothing** | high | ✅ | deletes the subscription, Otoroshi revokes its keys |
-| G-3 | [#2942](https://github.com/MAIF/otoroshi/issues/2942) | An `Api` without a published plan has **open routes** | high | 🔜 | warns and asks for an explicit acknowledgement before deploying |
+| G-3 | [#2942](https://github.com/MAIF/otoroshi/issues/2942) | An `Api` without a published plan had **open routes** | high | ✅ | an api without a published or deprecated plan is closed; the draft says so (`no_served_plan`), the acknowledgement before deploying is gone |
 | G-4 | [#2943](https://github.com/MAIF/otoroshi/issues/2943) | On jwt / mtls / oauth2-remote plans, **any valid token passed**, subscribed or not | high | ✅ | projects these plans with `subscription_required`: only the client ids of enabled subscriptions are served (R-15) |
-| G-5 | [#2944](https://github.com/MAIF/otoroshi/issues/2944) | Resource filtering (restrictions) only exists on **apikey** plans | medium | 🔜 | flags it as not enforced on other kinds |
-| G-6 | [#2945](https://github.com/MAIF/otoroshi/issues/2945) | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | 🔜 | stored, projected as plan metadata, flagged as not enforced; R-14 waits for it |
+| G-5 | [#2944](https://github.com/MAIF/otoroshi/issues/2944) | Resource filtering (restrictions) only existed on **apikey** plans | medium | ✅ | the resource filter is projected on every kind but oauth2-local, which carries none (`filter_not_enforced`) |
+| G-6 | [#2945](https://github.com/MAIF/otoroshi/issues/2945) | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | ✅ | projected as `selection`, `counter_failure`, `circuit_breaker_scope` (R-14) |
 | G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records (R-33) |
 | G-8 | [#2947](https://github.com/MAIF/otoroshi/issues/2947) | The catalog-deploy path was borrowed by a control plane via a **naming convention** | medium | ✅ | the `Api` is managed as code, `created_by=external=otoroshi-api-management` |
 | G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` did not carry `apiRef` (plan, subscription) | low | ✅ | each call is attributed from the `apiRef` of its event |
 | G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on a missing entity was refused as **unauthorized**; the upsert said the opposite of what changed; certificates not enriched by the generic api | low | ✅ | the `Api` and every derived object are written with the upsert of the generic api |
 | G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | — | ➖ | tests poll; the console says "deployed" once the write is accepted |
 | G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session | medium | 🔜 | the console replays requests through the gateway without the trace; R-24 waits for it |
-| G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan loses its extractor: its consumers are no longer identified | high | 🔜 | validation warning on the plan; R-16 waits for it |
-| G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only has an **absolute** `validUntil` | low | 🔜 | not offered (the field was removed from the model) |
-| G-15 | [#2954](https://github.com/MAIF/otoroshi/issues/2954) | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | 🔜 | warns on the plan (`token_claims_not_checked`) |
-| G-16 | [#2955](https://github.com/MAIF/otoroshi/issues/2955) | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | 🔜 | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
+| G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan lost its extractor: its consumers were no longer identified | high | ✅ | a deprecated plan is served: in the resolution order and in the checks of the selection (R-16) |
+| G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only had an **absolute** `validUntil` | low | ✅ | an apikey plan offers a key validity in days, counted from the first enablement of the key |
+| G-15 | [#2954](https://github.com/MAIF/otoroshi/issues/2954) | **oauth2-remote** plans checked neither the **issuer** nor the **audience** of the token | high | ✅ | the plan names its `issuer` and `audiences`; without either, the draft warns |
+| G-16 | [#2955](https://github.com/MAIF/otoroshi/issues/2955) | On **mtls** plans the subject and issuer lists combined with **OR**, over a trust store shared by the whole gateway | medium | ✅ | the plan's CAs are its `trusted_ca_refs`, the DN lists combine with `all`; a plan without CA warns |
 | G-17 | [#2937](https://github.com/MAIF/otoroshi/issues/2937) | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carried **no consumer identity** | high | ✅ | the subscription carries the application's `client_id`; Otoroshi provisions its consumer, enabled while the subscription is |
 | G-18 | [#2938](https://github.com/MAIF/otoroshi/issues/2938) | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan were keyed by the **plan id alone**, and outlived their Api | high | ✅ | nothing to do: the consumers are named after the api and the plan, and leave with the `Api` |
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
@@ -65,19 +65,15 @@ kept, and the deletion answers a `500`.
 **The product.** Closing, rejecting or deleting deletes the `ApiSubscription`, and only it
 (`removeFromGateway`).
 
-## G-3 — an Api without a published plan has open routes — high
+## G-3 — an Api without a published plan had open routes — high — followed
 
-Upstream: [MAIF/otoroshi#2942](https://github.com/MAIF/otoroshi/issues/2942).
+Upstream: [MAIF/otoroshi#2942](https://github.com/MAIF/otoroshi/issues/2942), fixed in 18.1: the
+routes of every published or deprecated `Api` end with the `Api consumer enforcer`; without a
+published or deprecated plan it only lets through the callers a plugin of the flows identified, and
+refuses the others (`401`). An open api publishes a `keyless` plan.
 
-**Observed.** `applyPlansPolicies` only adds `NgApiConsumerEnforcer` when at least one plan is
-`published` (`next/models/Api.scala:1957`). Deprecating or closing the last plan opens the api to
-anyone.
-
-**Product meanwhile.** Validation warning `open_routes`; the deploy dialog requires an explicit
-"I understand: the routes will be open" acknowledgement.
-
-**Upstream fix.** An `Api` in `published` state with no published plan should deny by default
-(or require an explicit `open: true` / a keyless plan to be open).
+**The product.** The warning `open_routes` and the acknowledgement asked before deploying are gone;
+a draft without a published or deprecated plan gets `no_served_plan`: the api refuses every call.
 
 ## G-4 — any valid token passed on token and certificate plans — high — followed
 
@@ -91,33 +87,35 @@ the key an `enabled` subscription provisioned for the client id the caller is id
 subscription is always required (D-6). The warning `any_token_passes` is gone (R-15). A `keyless`
 plan stays open by nature: it is the anonymous tier.
 
-## G-5 — resource filtering only on apikey plans — medium
+## G-5 — resource filtering only on apikey plans — medium — followed
 
-Upstream: [MAIF/otoroshi#2944](https://github.com/MAIF/otoroshi/issues/2944).
+Upstream: [MAIF/otoroshi#2944](https://github.com/MAIF/otoroshi/issues/2944), fixed in 18.1: the
+access mode of a `keyless`, `jwt`, `mtls` or `oauth2-remote` plan has `restrictions`, given to the
+consumers it mints or provisions, and rewritten on the keys already minted when they change. An
+`oauth2-local` plan carries none.
 
-**Observed.** `ApiPlan.apikeyTemplate` (`next/models/Api.scala:789`) only carries a full template
-(with `restrictions`) for the `apikey` kind; the other kinds get a template with tags and metadata
-only, so a jwt / mtls / oauth2 / keyless plan cannot restrict the resources it gives access to.
+**The product.** The resource filter of a plan is projected as the `restrictions` of every kind; on
+an `oauth2-local` plan the draft says it is not enforced (`filter_not_enforced`). Found on the way,
+a bug of the product: the paths of the restrictions are regexes matched against the whole request
+path, and the product wrote `/v1/pets*` — only `/v1/pet` and `/v1/pets`, not `/v1/pets/42`. They
+are now `/v1/pets(/.*)?`, and `/v1/store` for an exact resource (`restrictionPath`).
 
-**Product meanwhile.** Restrictions are projected on apikey plans; on the other kinds the console
-says the filter is not enforced.
+## G-6 — no plan attribute for selection rule, counter failure, circuit breaker — medium — followed
 
-**Upstream fix.** Let every plan kind carry `restrictions` (and the rest of the key template)
-applied to the consumer it mints.
+Upstream: [MAIF/otoroshi#2945](https://github.com/MAIF/otoroshi/issues/2945), fixed in 18.1: a plan
+has a `selection` (JSON path conditions on the request, the token, the certificate or the client
+id; refused on apikey and oauth2-local plans), a `counter_failure` (`deny` or `allow`, and a
+timeout), a `circuit_breaker_scope` (`route` or `consumer`). Between plans of the same kind, the
+order of the plans decides.
 
-## G-6 — no plan attribute for selection rule, counter failure, circuit breaker — medium
-
-Upstream: [MAIF/otoroshi#2945](https://github.com/MAIF/otoroshi/issues/2945).
-
-**Observed.** `ApiPlan` has no field for: an expression that disambiguates two plans of the same
-kind whose extractors can both succeed; what to do when the distributed quota counter is
-unreachable (let pass / refuse); a circuit breaker per subscription instead of per api. All three are enforcement, hence projected.
-
-**Product meanwhile.** Stored in the plan, projected as `metadata.apim_selection_rule`,
-`apim_counter_failure`, `apim_circuit_breaker`, and flagged as not enforced.
-
-**Upstream fix.** Three plan attributes read by the extractors / `NgApiConsumerEnforcer` /
-backend client.
+**The product.** The selection rule of a plan is a list of conditions (`selection`: path, value),
+the form the gateway reads; a plan without selection placed before one of the same kind is flagged
+(`selection_shadowed`), and the resolution order follows the order of the plans. The counter
+failure strategy is projected as `counter_failure.mode`, the circuit breaker granularity as
+`circuit_breaker_scope` (`api` → `route`, `subscription` → `consumer`). The plan metadata
+`apim_selection_rule`, `apim_counter_failure`, `apim_circuit_breaker` and the warning
+`not_enforced` are gone (R-14). Checked end to end: a gold tier selected by a claim, before the
+partner tier of the same identity provider.
 
 ## G-7 — ApiDeployment could not carry the product snapshot — medium — followed
 
@@ -194,73 +192,47 @@ policy trace needs this upstream change.
 variant taking an `Api` id + route id), returning the response and the execution report — or let
 an admin apikey enable a report id for the next request.
 
-## G-13 — a deprecated plan loses its extractor — high
+## G-13 — a deprecated plan lost its extractor — high — followed
 
-Upstream: [MAIF/otoroshi#2952](https://github.com/MAIF/otoroshi/issues/2952).
+Upstream: [MAIF/otoroshi#2952](https://github.com/MAIF/otoroshi/issues/2952), fixed in 18.1: a plan
+is served — its extractor on the routes, its consumers enforced — when it is published or
+deprecated.
 
-**Observed.** `applyPlansPolicies` builds the extractors and the enforcer from the **published**
-plans only (`next/models/Api.scala:1949`). A plan moved to `deprecated` — meant as "still served,
-closed to new subscriptions" — gets no extractor any more: the consumers of a deprecated jwt, mtls,
-oauth2-remote or keyless plan are no longer identified, and those of a deprecated apikey plan only
-keep working while another published apikey or oauth2-local plan still installs `ApikeyCalls`.
-Found by reading the source while documenting; not reproduced on the gateway yet.
+**The product.** The warning `deprecated_without_extractor` is gone; deprecated plans are in the
+resolution order and in the checks of the selection (`SERVED_STATUSES`), and still take no new
+subscription (R-16). Checked end to end: the consumer of a deprecated jwt plan keeps calling.
 
-**Product meanwhile.** A validation warning on every deprecated plan whose extractor no published
-plan installs (`deprecated_without_extractor`).
+## G-14 — no key validity relative to the subscription — low — followed
 
-**Upstream fix.** Install the extractors of `published` **and** `deprecated` plans (deprecation
-closes subscriptions, not access); keep `closed` and `staging` out.
+Upstream: [MAIF/otoroshi#2953](https://github.com/MAIF/otoroshi/issues/2953), fixed in 18.1: the key
+template of an apikey plan has a `validity`, counted from the first time each key is enabled, and the
+`validUntil` of a key is its own from then on.
 
-## G-14 — no key validity relative to the subscription — low
+**The product.** An apikey plan offers a key validity in days (`validityDays`), projected as the
+`validity` of its key template.
 
-Upstream: [MAIF/otoroshi#2953](https://github.com/MAIF/otoroshi/issues/2953).
+## G-15 — oauth2-remote plans checked neither issuer nor audience — high — followed
 
-**Observed.** The key template of a plan (`ApikeyAccessModeConfiguration.validUntil`,
-`next/models/Api.scala:529`) is an absolute date, applied as is to every key the plan mints.
-"Keys of this plan are valid 90 days from the subscription" cannot be expressed; a `validUntil`
-written on a key afterwards is overwritten by the next plan update (`updateApikeyFromPlan`).
+Upstream: [MAIF/otoroshi#2954](https://github.com/MAIF/otoroshi/issues/2954), fixed in 18.1: an
+`oauth2-remote` plan has an `issuer` (compared exactly) and `audiences` (one of them in `aud`); a
+token refused for either is not identified by the plan.
 
-**Product meanwhile.** Not offered: the unused `validityDays` field was removed from the model.
+**The product.** The plan names the issuer (filled by *Discover* from the discovery document) and
+the audiences, projected as such; without either, the draft warns (`token_claims_not_checked`):
+the plan would accept any token signed with the keys of the server. Checked end to end: a token the
+same server issued for another audience is refused.
 
-**Upstream fix.** A relative validity (`validity: 90d`) in the plan's key template, turned into
-`validUntil` when the key is minted.
+## G-16 — mtls subject and issuer lists combined with OR — medium — followed
 
-## G-15 — oauth2-remote plans check neither issuer nor audience — high
+Upstream: [MAIF/otoroshi#2955](https://github.com/MAIF/otoroshi/issues/2955), fixed in 18.1: an
+`mtls` plan has `trusted_ca_refs` — certificates of the store the chain of a client certificate has
+to lead to, validated with PKIX whatever the trust of the handshake — and `dn_match` (`all` or
+`any`) for its two lists of patterns.
 
-Upstream: [MAIF/otoroshi#2954](https://github.com/MAIF/otoroshi/issues/2954).
-
-**Observed.** An `oauth2-remote` plan installs `NgOidcApikeyExtractor`, which validates the token
-with `LocalJwtVerifier().copy(enabled = true, algoSettings = oidcModule.jwtVerifier.get)`
-(`next/plugins/apimgmt.scala:681`). The default strategy of `LocalJwtVerifier` is
-`PassThrough(VerificationSettings(Map.empty))` (`models/JWTVerifier.scala:1921`): only the
-signature and the dates are checked. A token the same authorization server issued for another
-client or another audience is accepted by the plan. `OAuth2RemoteAccessModeConfiguration`
-(`next/models/Api.scala:461`) has no field to express the expected issuer or audience.
-
-**Product meanwhile.** A validation warning on every published oauth2-remote plan
-(`token_claims_not_checked`); the plan describes no issuer or audience it could not enforce.
-
-**Upstream fix.** `issuer` and `audience` in `OAuth2RemoteAccessModeConfiguration` (defaulting to
-the auth module's discovery document and client id), turned into the verification settings of the
-extractor's verifier.
-
-## G-16 — mtls subject and issuer lists combine with OR — medium
-
-Upstream: [MAIF/otoroshi#2955](https://github.com/MAIF/otoroshi/issues/2955).
-
-**Observed.** `NgClientCertApikeyExtractor.matches` accepts a certificate when its subject matches
-**one of the subject patterns or** its issuer matches one of the issuer patterns
-(`next/plugins/apimgmt.scala:486`). A plan cannot require both "issued by this CA" and "a subject
-of this shape". Meanwhile the server trust store holds every certificate of the gateway plus the
-JDK CAs (`ssl/ssl.scala:1428`, `includeJdkCa`): a client certificate from any trusted authority
-whose subject matches a subject pattern passes.
-
-**Product meanwhile.** When an mtls plan lists trusted CAs and no issuer pattern, the projection
-derives the issuer patterns from the subjects of those CAs (exact match). A plan with subject
-patterns and no issuer pattern gets a validation warning (`subject_without_issuer`).
-
-**Upstream fix.** Combine the two lists with AND when both are given (or a `match: all | any`
-switch), and an optional per-plan list of trusted CA certificate ids checked on the chain.
+**The product.** The CAs of a plan, derived as certificates of the gateway, are its
+`trusted_ca_refs`; the DN lists combine with `all`. The issuer patterns derived from the subjects
+of the CAs, and the warnings `issuer_not_derived` and `subject_without_issuer`, are gone; a served
+mtls plan without CA gets `no_trusted_ca`.
 
 ## G-17 — token and certificate subscriptions carried no consumer identity — high — followed
 

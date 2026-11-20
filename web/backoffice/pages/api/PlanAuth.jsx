@@ -1,14 +1,14 @@
 // The gateway objects a plan's auth mechanism needs, described in the plan and derived by the
 // product: the trusted CAs of an mtls plan, the authorization server of an oauth2-remote plan.
 import React, { useState } from 'react';
-import { Callout, Field, Icon, Input, Seg, Select, Setting, Switch, errorMessage } from '../../../shared/ui.jsx';
+import { Callout, Field, Icon, Input, Seg, Select, Setting, Switch, TagsInput, errorMessage } from '../../../shared/ui.jsx';
 import { CertificateList } from '../../../shared/certificates.jsx';
 import { api as rootApi } from '../../context.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
 const inspect = (pem) => rootApi.post('/certificates/inspect', { pem });
 
-export function TrustedCAs({ value = [], onChange, hasIssuerPatterns }) {
+export function TrustedCAs({ value = [], onChange }) {
   return (
     <CertificateList
       value={value}
@@ -16,11 +16,7 @@ export function TrustedCAs({ value = [], onChange, hasIssuerPatterns }) {
       inspect={inspect}
       mode="ca"
       label={tr('Trusted CAs')}
-      help={
-        hasIssuerPatterns
-          ? tr('derived as certificates of the gateway; the issuer patterns below decide which certificates the plan accepts')
-          : tr('derived as certificates of the gateway; with no issuer pattern, the plan accepts the certificates they signed and nothing else')
-      }
+      help={tr('derived as certificates of the gateway: the plan accepts the client certificates they signed, and nothing else')}
       addLabel={tr('Trust a CA')}
       addTitle={tr('Trust a certificate authority')}
       addHelp={tr("The CA certificate (PEM) that signs the client certificates of this plan's consumers. The product derives it as a certificate of the gateway, marked as its own, and removes it with the api. No private key: only the certificate.")}
@@ -42,6 +38,8 @@ export function AuthorizationServer({ config, setAuthConfig, authModules }) {
       const r = await rootApi.post('/oidc/discovery', { url: d.discoveryUrl });
       setFound(r);
       setD({ discoveryUrl: r.discoveryUrl, jwksUrl: r.jwksUrl || d.jwksUrl, userInfoUrl: r.userInfoUrl || d.userInfoUrl });
+      // the issuer the tokens of that server carry
+      if (r.issuer && !config.issuer) setAuthConfig({ issuer: r.issuer });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -115,7 +113,15 @@ export function AuthorizationServer({ config, setAuthConfig, authModules }) {
       <Setting label={tr('User profile')} help={tr("fetched from the userinfo url and kept in the consumer's metadata")}>
         <Switch checked={config.fetchUser} onChange={(v) => setAuthConfig({ fetchUser: v })} label={tr('Fetch the user profile')} />
       </Setting>
-      <Callout kind="warning">{tr('On Otoroshi 18 an oauth2-remote plan checks the signature and the dates of the token, not its issuer nor its audience (upstream gap G-15).')}</Callout>
+      <Setting label={tr('Issuer')} help={tr('the iss a token must carry, compared exactly: the issuer of the discovery document of the server')}>
+        <Input value={config.issuer || ''} onChange={(v) => setAuthConfig({ issuer: v })} mono placeholder={tr('https://idp.example.com')} />
+      </Setting>
+      <Setting label={tr('Audiences')} help={tr('the token must carry one of them in its aud claim: the audience of this api at the authorization server')}>
+        <TagsInput value={config.audiences || []} onChange={(v) => setAuthConfig({ audiences: v })} />
+      </Setting>
+      {!config.issuer && !(config.audiences || []).length && (
+        <Callout kind="warning">{tr('Without an issuer nor an audience, the plan accepts any token signed with the keys of the server — the ones it issued for other clients and other apis included.')}</Callout>
+      )}
     </>
   );
 }

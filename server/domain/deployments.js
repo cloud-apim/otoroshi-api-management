@@ -9,7 +9,7 @@ import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { getSnapshot, lastSnapshot } from './apis.js';
 import { enqueue, registerTaskHandler, PermanentError } from './tasks.js';
-import { normalizeDraft, validateDraft } from './model.js';
+import { normalizeDraft, SERVED_STATUSES, validateDraft } from './model.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiApi, comparableApi, comparableDerived, derivedEntities } from '../otoroshi/projection.js';
 import { DERIVED_PATHS, META } from '../otoroshi/client.js';
@@ -47,7 +47,7 @@ async function gatewayWarnings(content, derived) {
 }
 
 async function tlsWarnings(content, derived) {
-  const mtls = (normalizeDraft(content.draft).plans || []).filter((p) => p.status === 'published' && p.auth.kind === 'mtls');
+  const mtls = (normalizeDraft(content.draft).plans || []).filter((p) => SERVED_STATUSES.includes(p.status) && p.auth.kind === 'mtls');
   if (!mtls.length) return [];
   const tls = (await oto.globalConfig().catch(() => null))?.tlsSettings;
   if (!tls) return [];

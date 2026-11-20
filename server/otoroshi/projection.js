@@ -4,10 +4,11 @@
 // Documentation, plan visibility, terms, usage statements, pricing and metadata stay in the product.
 
 import { normalizeDraft } from '../domain/model.js';
-import { certificateKey, issuerPatterns, readCertificate } from '../domain/pki.js';
+import { certificateKey, readCertificate } from '../domain/pki.js';
 import { DERIVED_PATHS, META, OWNER_MARKER } from './client.js';
 
 const MAX = 10000000; // what Otoroshi uses as "no limit" in a quota
+const DAY = 86400000;
 
 function contextPath(cp) {
   if (!cp || cp === '/') return '';
@@ -108,7 +109,18 @@ function routeJson(r) {
   };
 }
 
-// resource filtering of a plan becomes apikey restrictions, on the full request path
+// the path of a resource as a restriction: a regex Otoroshi matches against the whole request path —
+// the path itself when exact, the path and what is under it otherwise; a named segment matches one
+// segment
+export function restrictionPath(base, exact) {
+  const re = base
+    .split('/')
+    .map((seg) => (/^(:\w+|\{\w+\})$/.test(seg) ? '[^/]+' : seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    .join('/');
+  return exact ? re || '/' : `${re}(/.*)?`;
+}
+
+// resource filtering of a plan becomes the restrictions of its consumers, on the full request path
 export function restrictionsFor(plan, draft) {
   if (plan.resourceFilter?.mode !== 'only') return { enabled: false, allowLast: true, allowed: [], forbidden: [], notFound: [] };
   const cp = contextPath(draft.entrypoint.contextPath);
@@ -116,14 +128,13 @@ export function restrictionsFor(plan, draft) {
   for (const rid of plan.resourceFilter.resources) {
     const r = draft.resources.find((x) => x.id === rid);
     if (!r) continue;
-    const base = `${cp}${r.path === '/' ? '' : r.path}`;
-    const path = r.exact ? base || '/' : `${base}*`;
+    const path = restrictionPath(`${cp}${r.path === '/' ? '' : r.path}`, r.exact);
     const methods = r.methods?.length ? r.methods : ['*'];
     methods.forEach((m) => allowed.push({ method: m, path, authorized_entity: null }));
   }
-  // allowLast=false: the allowed list is checked first, everything else falls on the forbidden
-  // wildcard (403). With allowLast=true Otoroshi never reads the allowed list.
-  return { enabled: true, allowLast: false, allowed, forbidden: [{ method: '*', path: '*', authorized_entity: null }], notFound: [] };
+  // allowLast=false: the allowed list is checked first, every other path falls on the forbidden
+  // one (403). With allowLast=true Otoroshi never reads the allowed list.
+  return { enabled: true, allowLast: false, allowed, forbidden: [{ method: '*', path: '/.*', authorized_entity: null }], notFound: [] };
 }
 
 export function rateLimitingFor(plan) {
@@ -161,6 +172,8 @@ function accessModeConfiguration(plan, draft) {
           nextSecret: null,
         },
         validUntil: null,
+        // each key valid that long from the first time it is enabled: the subscription, or its acceptance
+        ...(Number(c.validityDays) > 0 ? { validity: Math.round(Number(c.validityDays) * DAY) } : {}),
         tags: [],
         metadata: {},
       };
@@ -171,14 +184,18 @@ function accessModeConfiguration(plan, draft) {
         verifier: c.derive?.enabled ? derivedVerifierId(draft.__apiId, plan.id) : c.verifier || null,
         client_id_path: c.clientIdPath || 'client_id',
         subscription_required: true,
+        restrictions: restrictionsFor(plan, draft),
       };
     case 'mtls':
       return {
+        // the chain of a client certificate has to lead to one of the CAs of the plan
+        trusted_ca_refs: (c.trustedCAs || []).map((pem) => derivedCaId(draft.__apiId, plan.id, pem)),
         regex_subject_dns: c.regexSubjectDNs || [],
-        // without explicit issuer patterns, the plan accepts what its trusted CAs signed
-        regex_issuer_dns: c.regexIssuerDNs?.length ? c.regexIssuerDNs : issuerPatterns(c.trustedCAs) || [],
+        regex_issuer_dns: c.regexIssuerDNs || [],
+        dn_match: 'all',
         client_id_field: c.clientIdField || null,
         subscription_required: true,
+        restrictions: restrictionsFor(plan, draft),
       };
     case 'oauth2-local':
       return { default_key_pair: c.defaultKeyPair || 'otoroshi-jwt-signing', expiration: c.expiration || 3600 };
@@ -189,10 +206,13 @@ function accessModeConfiguration(plan, draft) {
         client_id_path: c.clientIdPath || 'client_id',
         fetch_user: !!c.fetchUser,
         user_metadata_key: 'user_profile',
+        ...(c.issuer ? { issuer: c.issuer } : {}),
+        audiences: c.audiences || [],
         subscription_required: true,
+        restrictions: restrictionsFor(plan, draft),
       };
     case 'keyless':
-      return { expr: c.expr || '${req.ip}', create_if_missing: c.createIfMissing === true };
+      return { expr: c.expr || '${req.ip}', create_if_missing: c.createIfMissing === true, restrictions: restrictionsFor(plan, draft) };
     default:
       return {};
   }
@@ -211,14 +231,13 @@ export function planJson(plan, draft) {
     validation: { kind: plan.validation === 'manual' ? 'manual' : 'auto', config: {} },
     visibility: { kind: 'public', config: {} },
     tags: [],
-    // enforcement attributes Otoroshi 18 does not read yet: projected so that they are visible
-    // on the gateway side, flagged as not enforced in the console (upstream work)
-    metadata: {
-      apim_unit: plan.unit,
-      apim_counter_failure: plan.counterFailure,
-      apim_circuit_breaker: plan.circuitBreaker,
-      ...(plan.selectionRule ? { apim_selection_rule: plan.selectionRule } : {}),
-    },
+    metadata: { apim_unit: plan.unit },
+    // the calls the plan applies to, between plans of the same kind
+    ...(plan.selection?.length ? { selection: plan.selection.map((c) => ({ path: c.path, value: c.value })) } : {}),
+    // when the counter of the quotas cannot be reached: availability (allow) or protection (deny)
+    counter_failure: { mode: plan.counterFailure === 'deny' ? 'deny' : 'allow' },
+    // one circuit breaker per route, shared by every caller, or one per consumer
+    circuit_breaker_scope: plan.circuitBreaker === 'subscription' ? 'consumer' : 'route',
     plugins: plan.flowRef ? { plugins: [], overrides: false, flow_ref: plan.flowRef } : null,
   };
 }
@@ -566,6 +585,14 @@ export function comparableApi(entity) {
       rate_limiting: p.rate_limiting?.strategy?.quota || null,
       window_ms: p.rate_limiting?.strategy?.windowDurationMs || null,
       subscription_required: IDENTITY_KINDS.includes(p.access_mode_configuration_type) ? !!p.access_mode_configuration?.subscription_required : undefined,
+      selection: (p.selection || []).map((c) => ({ path: c.path, value: c.value })),
+      counter_failure: p.counter_failure?.mode || 'deny',
+      circuit_breaker_scope: p.circuit_breaker_scope || 'route',
+      trusted_ca_refs: p.access_mode_configuration_type === 'mtls' ? p.access_mode_configuration?.trusted_ca_refs || [] : undefined,
+      dn_match: p.access_mode_configuration_type === 'mtls' ? p.access_mode_configuration?.dn_match || 'any' : undefined,
+      issuer: p.access_mode_configuration_type === 'oauth2-remote' ? p.access_mode_configuration?.issuer || null : undefined,
+      audiences: p.access_mode_configuration_type === 'oauth2-remote' ? p.access_mode_configuration?.audiences || [] : undefined,
+      validity: p.access_mode_configuration_type === 'apikey' ? p.access_mode_configuration?.validity || null : undefined,
       restrictions: p.access_mode_configuration?.restrictions?.enabled
         ? (({ allowLast, allowed, forbidden, notFound }) => ({ allowLast, allowed, forbidden, notFound }))(p.access_mode_configuration.restrictions)
         : null,

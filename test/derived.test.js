@@ -57,21 +57,22 @@ describe('mtls plans', () => {
     expect(derivedCaId('api_atlas', 'plan_bulk', `\n${CA}\n`)).toBe(cert.id);
   });
 
-  test('without issuer patterns, the plan accepts what its CAs signed and nothing else', () => {
+  test('the plan trusts its CAs: the chain of a client certificate has to lead to one of them', () => {
     const plan = (cfg) => buildOtoroshiApi(snapshot([mtlsPlan(cfg)])).plans[0].access_mode_configuration;
-    expect(plan({ trustedCAs: [CA] }).regex_issuer_dns).toEqual(['\\QOU=Platform, O=Atlas Data, CN=Atlas Partner CA, C=FR\\E']);
-    // explicit patterns win
+    expect(plan({ trustedCAs: [CA] }).trusted_ca_refs).toEqual([derivedCaId('api_atlas', 'plan_bulk', CA)]);
+    // the patterns are the plan's, and both lists must match
+    expect(plan({ trustedCAs: [CA] }).regex_issuer_dns).toEqual([]);
     expect(plan({ trustedCAs: [CA], regexIssuerDNs: ['.*Atlas.*'] }).regex_issuer_dns).toEqual(['.*Atlas.*']);
-    expect(plan({}).regex_issuer_dns).toEqual([]);
+    expect(plan({}).dn_match).toBe('all');
+    expect(plan({}).trusted_ca_refs).toEqual([]);
   });
 
-  test('validation: unreadable certificates block, unpredictable or missing issuers warn', () => {
+  test('validation: unreadable certificates block, a plan without CA warns', () => {
     const codes = (cfg) => validateDraft(snapshot([mtlsPlan(cfg)]).draft);
     expect(codes({ trustedCAs: ['not a certificate'] }).ok).toBe(false);
-    expect(codes({ trustedCAs: [ODD_CA] }).warnings.map((w) => w.code)).toContain('issuer_not_derived');
-    expect(codes({ trustedCAs: [ODD_CA], regexIssuerDNs: ['.*Odd.*'] }).warnings.map((w) => w.code)).not.toContain('issuer_not_derived');
-    expect(codes({ regexSubjectDNs: ['CN=.*'] }).warnings.map((w) => w.code)).toContain('subject_without_issuer');
-    expect(codes({ regexSubjectDNs: ['CN=.*'], trustedCAs: [CA] }).warnings.map((w) => w.code)).not.toContain('subject_without_issuer');
+    expect(codes({ trustedCAs: [ODD_CA] }).warnings.map((w) => w.code)).not.toContain('no_trusted_ca');
+    expect(codes({ regexSubjectDNs: ['CN=.*'] }).warnings.map((w) => w.code)).toContain('no_trusted_ca');
+    expect(codes({ regexSubjectDNs: ['CN=.*'], trustedCAs: [CA] }).warnings.map((w) => w.code)).not.toContain('no_trusted_ca');
   });
 
   test('the gateway’s own fields on a certificate are not drift', () => {

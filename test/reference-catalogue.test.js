@@ -318,6 +318,33 @@ describe('reference catalogue', () => {
     expect(r.status).toBe(200);
   });
 
+  test('a selection tells two jwt plans apart; a deprecated plan keeps its consumers; a filter holds on a jwt plan', async () => {
+    const { draft } = await call('GET', ws(`/apis/${state.apiId}`));
+    const partner = draft.plans.find((p) => p.id === 'plan_partner');
+    const gold = { ...JSON.parse(JSON.stringify(partner)), id: 'plan_gold', name: 'Gold', selection: [{ path: '$.token.tier', value: 'gold' }] };
+    gold.usageStatement.enabled = false;
+    gold.terms.enabled = false;
+    // the gold plan before the partner one: it takes the gold tokens, the partner plan the others
+    draft.plans = [...draft.plans.filter((p) => p.id !== 'plan_partner'), gold, { ...partner, status: 'deprecated', resourceFilter: { mode: 'only', resources: ['res_documents'] } }];
+    const saved = await call('PUT', ws(`/apis/${state.apiId}/draft`), { draft });
+    expect(saved.validation.errors).toEqual([]);
+    expect(saved.validation.warnings.map((w) => w.code)).not.toContain('selection_shadowed');
+    await call('POST', ws(`/apis/${state.apiId}/publish`), { comment: 'gold tier', deploy: true });
+    const app = await call('POST', ws('/applications'), { name: 'Gold agency', team_id: state.teamId, client_id: `gold-${RUN}` });
+    await call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_gold', application_id: app.id });
+    const bearer = (claims) => ({ Authorization: `Bearer ${jwt({ iss: 'https://id.atlas.example', ...claims })}` });
+    // a gold token of the gold consumer: the gold plan
+    const res = await gatewayCall('/documents/2026-0042', { headers: bearer({ client_id: `gold-${RUN}`, tier: 'gold' }), expect: (r) => r.status === 200 });
+    expect(res.status).toBe(200);
+    expect((await oto.getApikey(`jwt_${state.apiId}_plan_gold_gold-${RUN}`)).apiRef.plan).toBe('plan_gold');
+    // the consumer of the deprecated partner plan still calls, within its filter (once the gateway
+    // has the key the plan rewrote)
+    const agency = bearer({ client_id: `agency-north-${RUN}`, tier: 'silver' });
+    expect((await gatewayCall('/search?q=x', { headers: agency, expect: (r) => r.status !== 200 })).status).toBe(403);
+    expect((await gatewayCall('/documents/2026-0042', { headers: agency, expect: (r) => r.status === 200 })).status).toBe(200);
+    expect((await gatewayCall('/documents', { headers: agency, expect: (r) => r.status === 200 })).status).toBe(200);
+  });
+
   test('reconcile: drift on the gateway is detected, then repaired by redeploying the snapshot', async () => {
     let report = (await call('POST', ws('/drift'))) && (await call('GET', ws(`/apis/${state.apiId}/projection`))).drift;
     expect(report.status).toBe('in_sync');
@@ -394,7 +421,8 @@ describe('reference catalogue', () => {
     expect((await oto.getApi(state.apiId)).enabled).toBe(true);
     expect((await gatewayCall('/documents/2026-0042', { headers: partner, expect: (r) => r.status === 200 })).status).toBe(200);
     expect((await oto.getApikey(cred.client_id)).clientSecret).toBe(cred.client_secret);
-  });
+    // a disabled Api takes a few seconds to leave the proxy state, and more to come back (G-11)
+  }, 90000);
 
   test('deleting the api removes it from the gateway, with its subscriptions and the keys of its consumers', async () => {
     const keys = async () => ((await otoroshi('GET', '/api/apikeys')) || []).filter((k) => k.apiRef?.api === state.apiId);

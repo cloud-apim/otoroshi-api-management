@@ -6,10 +6,13 @@ import { MetadataForm } from '../../../shared/metadata.jsx';
 import { AuthorizationServer, TrustedCAs } from './PlanAuth.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
+// the kinds whose extractor can pass on a call with a selection: the others are told apart by the key
+const SELECTABLE = ['keyless', 'jwt', 'mtls', 'oauth2-remote'];
+
 const rid = () => `plan_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 
 const AUTH_DEFAULTS = {
-  apikey: { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } },
+  apikey: { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 }, validityDays: null },
   jwt: { verifier: '', clientIdPath: 'client_id' },
   mtls: { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: 'CN', trustedCAs: [] },
   'oauth2-local': { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 },
@@ -17,6 +20,8 @@ const AUTH_DEFAULTS = {
     verifier: '',
     clientIdPath: 'client_id',
     fetchUser: false,
+    issuer: '',
+    audiences: [],
     derive: { enabled: false, discoveryUrl: '', jwksUrl: '', userInfoUrl: '', clientId: '', clientSecret: '', scope: 'openid' },
   },
   keyless: { expr: '${req.ip}' },
@@ -38,7 +43,7 @@ export function newPlan(kind = 'apikey') {
     description: '',
     status: 'staging',
     auth: { kind, config: AUTH_DEFAULTS[kind] },
-    selectionRule: '',
+    selection: [],
     unit: 'calls',
     rateLimit: { enabled: true, calls: 10, windowMs: 1000 },
     quota: { daily: null, monthly: null },
@@ -62,7 +67,7 @@ function PlanSummary({ p, draft }) {
     <div className="col gap-6 small muted">
       <div>
         <Icon name="shield" size={13} /> {tr(AUTH_LABELS[p.auth.kind])}
-        {p.selectionRule ? tr(' · with a selection rule') : ''}
+        {p.selection?.length ? tr(' · with a selection') : ''}
       </div>
       <div>
         <Icon name="chart" size={13} /> {p.rateLimit.enabled ? tr('{0} calls / {1}', [fmtNumber(p.rateLimit.calls), fmtWindow(p.rateLimit.windowMs)]) : tr('no rate limit')}
@@ -103,7 +108,7 @@ export function PlansTab({ draft, setDraft, readOnly, order }) {
       {draft.plans.length === 0 ? (
         <div className="card">
           <Empty title={tr('No plan')} icon="layers" action={!readOnly && <button className="btn primary" onClick={() => setEditing(newPlan())}>{tr('Add a plan')}</button>}>
-            {tr('On Otoroshi 18 an API without a published plan has open routes.')}
+            {tr('Without a published plan, the gateway refuses every call to this api: publish a keyless plan for an open api.')}
           </Empty>
         </div>
       ) : (
@@ -149,8 +154,10 @@ function PlanEditor({ value, draft, onSave, onClose }) {
   const set = (patch) => setP((x) => ({ ...x, ...patch }));
   const setIn = (key, patch) => setP((x) => ({ ...x, [key]: { ...x[key], ...patch } }));
   const setAuthConfig = (patch) => setP((x) => ({ ...x, auth: { ...x.auth, config: { ...x.auth.config, ...patch } } }));
-  const kindChange = (kind) => setP((x) => ({ ...x, auth: { kind, config: AUTH_DEFAULTS[kind] } }));
-  const sameKind = draft.plans.filter((x) => x.id !== p.id && x.status === 'published' && x.auth.kind === p.auth.kind);
+  // an apikey or oauth2-local plan is told apart by its key: it takes no selection
+  const kindChange = (kind) => setP((x) => ({ ...x, auth: { kind, config: AUTH_DEFAULTS[kind] }, selection: SELECTABLE.includes(kind) ? x.selection || [] : [] }));
+  const sameKind = draft.plans.filter((x) => x.id !== p.id && ['published', 'deprecated'].includes(x.status) && x.auth.kind === p.auth.kind);
+  const setSelection = (i, patch) => set({ selection: p.selection.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const windows = [
     { value: 1000, label: tr('second') },
     { value: 60000, label: tr('minute') },
@@ -192,7 +199,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           <Setting label={tr('Description')} help={tr('shown to consumers on the portal')}>
             <TextArea value={p.description} onChange={(v) => set({ description: v })} rows={3} />
           </Setting>
-          <Setting label={tr('Status')} help={tr('staging: not enforced, not subscribable · published · deprecated: closed to new subscriptions — on Otoroshi 18 its consumers also lose access (G-13) · closed: Otoroshi deletes the keys of its subscriptions')}>
+          <Setting label={tr('Status')} help={tr('staging: not enforced, not subscribable · published · deprecated: closed to new subscriptions, its consumers keep calling · closed: Otoroshi deletes the keys of its subscriptions')}>
             <Select value={p.status} onChange={(v) => set({ status: v })} options={['staging', 'published', 'deprecated', 'closed']} />
           </Setting>
           <Setting label={tr('Plan plugins')} help={tr("a flow of this api added on top of the route's flow for the consumers of this plan (ApiPlanPlugins.flow_ref)")}>
@@ -214,6 +221,9 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             <>
               <Setting label={tr('Read only')} help={tr('the key only allows GET, HEAD and OPTIONS')}>
                 <Switch checked={p.auth.config.readOnly} onChange={(v) => setAuthConfig({ readOnly: v })} />
+              </Setting>
+              <Setting label={tr('Key validity (days)')} help={tr('each key expires that many days after it is first enabled: the subscription, or its acceptance. Empty: no expiry')}>
+                <NumberInput value={p.auth.config.validityDays} onChange={(v) => setAuthConfig({ validityDays: v })} placeholder={tr('no expiry')} />
               </Setting>
               <Setting label={tr('Secret rotation')} help={tr('Otoroshi rotates the secret itself, with a grace period where both work')}>
                 <Switch checked={p.auth.config.rotation?.enabled} onChange={(v) => setAuthConfig({ rotation: { ...p.auth.config.rotation, enabled: v } })} label={tr('Rotate automatically')} />
@@ -275,11 +285,14 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           )}
           {p.auth.kind === 'mtls' && (
             <>
-              <TrustedCAs value={p.auth.config.trustedCAs || []} onChange={(v) => setAuthConfig({ trustedCAs: v })} hasIssuerPatterns={(p.auth.config.regexIssuerDNs || []).length > 0} />
-              <Setting label={tr('Allowed issuer DNs')} help={tr("Java regexes on the issuer DN in Otoroshi's form (OU=…, O=…, CN=…, C=…); empty: derived from the trusted CAs")}>
+              <TrustedCAs value={p.auth.config.trustedCAs || []} onChange={(v) => setAuthConfig({ trustedCAs: v })} />
+              {!(p.auth.config.trustedCAs || []).length && (
+                <Callout kind="warning">{tr('Without a trusted CA, the plan accepts a client certificate from any authority the gateway trusts, JDK CAs included.')}</Callout>
+              )}
+              <Setting label={tr('Allowed issuer DNs')} help={tr("Java regexes on the issuer DN in Otoroshi's form (OU=…, O=…, CN=…, C=…). Both lists, when given, must match")}>
                 <TagsInput value={p.auth.config.regexIssuerDNs} onChange={(v) => setAuthConfig({ regexIssuerDNs: v })} />
               </Setting>
-              <Setting label={tr('Allowed subject DNs')} help={tr('Java regexes on the subject DN. Otoroshi accepts a certificate when its subject OR its issuer matches (upstream gap G-16)')}>
+              <Setting label={tr('Allowed subject DNs')} help={tr('Java regexes on the subject DN. Both lists, when given, must match')}>
                 <TagsInput value={p.auth.config.regexSubjectDNs} onChange={(v) => setAuthConfig({ regexSubjectDNs: v })} />
               </Setting>
               <Setting label={tr('Client id field')} help={tr('the certificate field used as client id')}>
@@ -302,13 +315,25 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               <Input value={p.auth.config.expr} onChange={(v) => setAuthConfig({ expr: v })} mono />
             </Setting>
           )}
-          <Setting
-            label={tr('Selection rule')}
-            help={tr('an expression that disambiguates two plans of the same kind whose extractors can both succeed on a request.{0}', [sameKind.length ? tr(' {0} other published {1} plan(s) exist on this api.', [sameKind.length, p.auth.kind]) : ''])}
-          >
-            <Input value={p.selectionRule} onChange={(v) => set({ selectionRule: v })} mono placeholder={tr("${token.aud} == 'partner'")} />
-            {p.selectionRule && <Callout kind="warning">{tr('Recorded and projected as plan metadata, not yet enforced by Otoroshi 18 (upstream work).')}</Callout>}
-          </Setting>
+          {SELECTABLE.includes(p.auth.kind) && (
+            <Setting
+              label={tr('Selection')}
+              help={tr('the calls this plan applies to, when another {0} plan of the api can identify the same callers: conditions on the request, the claims of the token, the client certificate or the client id ($.request.headers.x-tier, $.token.tier, $.certificate.subject_dn, $.client_id), all of which must hold. A value can be Regex(…), Contains(…), Not(…).{1}', [p.auth.kind, sameKind.length ? tr(' {0} other {1} plan(s) are served on this api: the first plan in the order of the plans that identifies a caller wins.', [sameKind.length, p.auth.kind]) : ''])}
+            >
+              {p.selection.map((c, i) => (
+                <div key={i} className="row">
+                  <Input value={c.path} onChange={(v) => setSelection(i, { path: v })} mono placeholder={tr('$.token.tier')} aria-label={tr('path')} />
+                  <Input value={c.value} onChange={(v) => setSelection(i, { value: v })} mono placeholder={tr('gold')} aria-label={tr('value')} />
+                  <button className="btn sm ghost icon" aria-label={tr('remove the condition')} onClick={() => set({ selection: p.selection.filter((_, j) => j !== i) })}>
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              ))}
+              <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => set({ selection: [...p.selection, { path: '', value: '' }] })}>
+                <Icon name="plus" /> {tr('Add a condition')}
+              </button>
+            </Setting>
+          )}
         </div>
       )}
       {section === 'limits' && (
@@ -336,7 +361,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               </Field>
             </div>
           </Setting>
-          <Setting label={tr('Resource filtering')} help={tr('the resources this plan gives access to. Projected as apikey restrictions — enforced on apikey plans.')}>
+          <Setting label={tr('Resource filtering')} help={tr('the resources this plan gives access to, projected as the restrictions of its consumers')}>
             <Select value={p.resourceFilter.mode} onChange={(v) => setIn('resourceFilter', { mode: v })} options={[{ value: 'all', label: tr('All resources') }, { value: 'only', label: tr('Only some resources') }]} />
             {p.resourceFilter.mode === 'only' && (
               <div className="col gap-6">
@@ -350,17 +375,16 @@ function PlanEditor({ value, draft, onSave, onClose }) {
                     {r.name} <span className="mono faint">{(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}</span>
                   </label>
                 ))}
-                {p.auth.kind !== 'apikey' && <Callout kind="warning"><Tr text={'Only apikey plans carry restrictions on Otoroshi 18: on a {0} plan this filter is not enforced.'} args={[p.auth.kind]} /></Callout>}
+                {p.auth.kind === 'oauth2-local' && <Callout kind="warning">{tr('The gateway gives the keys of an oauth2-local plan no restrictions: on this plan the filter is not enforced.')}</Callout>}
               </div>
             )}
           </Setting>
           <Setting label={tr('Counter failure strategy')} help={tr('when the distributed quota counter is unreachable: availability or protection? Not the same answer for an open free tier and a contractual one.')}>
             <Select value={p.counterFailure} onChange={(v) => set({ counterFailure: v })} options={[{ value: 'allow', label: tr('Let the call pass') }, { value: 'deny', label: tr('Refuse the call') }]} />
           </Setting>
-          <Setting label={tr('Circuit breaker granularity')} help={tr('per subscription keeps one abusive consumer from opening the circuit for everyone')}>
+          <Setting label={tr('Circuit breaker granularity')} help={tr('per subscription: each consumer gets its own circuit breaker, so that one consumer making the backend fail does not open it for everyone')}>
             <Select value={p.circuitBreaker} onChange={(v) => set({ circuitBreaker: v })} options={[{ value: 'api', label: tr('Per API') }, { value: 'subscription', label: tr('Per subscription') }]} />
           </Setting>
-          {(p.counterFailure !== 'allow' || p.circuitBreaker !== 'api') && <Callout kind="warning">{tr('Recorded and projected as plan metadata, not yet enforced by Otoroshi 18 (upstream work).')}</Callout>}
         </div>
       )}
       {section === 'catalogue' && (

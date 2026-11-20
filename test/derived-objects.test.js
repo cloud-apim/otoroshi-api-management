@@ -51,11 +51,12 @@ async function gatewayCall(path, { headers = {}, expect: wanted, timeoutMs = 300
   return last;
 }
 
-async function token(clientId) {
+// the development server gives a token the audience of the scope asked beside openid
+async function token(clientId, audience = 'documents') {
   const res = await fetch(`${IDP}/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=whatever&scope=openid`,
+    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=whatever&scope=openid%20${audience}`,
   });
   return (await res.json()).access_token;
 }
@@ -74,7 +75,7 @@ const plans = (trustedCAs) => [
     status: 'published',
     auth: {
       kind: 'oauth2-remote',
-      config: { clientIdPath: 'sub', fetchUser: false, derive: { enabled: true, discoveryUrl: `${IDP}/.well-known/openid-configuration`, jwksUrl: `${IDP}/jwks`, userInfoUrl: `${IDP}/userinfo`, scope: 'openid' } },
+      config: { clientIdPath: 'sub', fetchUser: false, issuer: IDP, audiences: ['documents'], derive: { enabled: true, discoveryUrl: `${IDP}/.well-known/openid-configuration`, jwksUrl: `${IDP}/jwks`, userInfoUrl: `${IDP}/userinfo`, scope: 'openid' } },
     },
     validation: 'auto',
   },
@@ -107,7 +108,8 @@ describe('derived objects', () => {
     draft.plans = plans([CA]);
     const saved = await call('PUT', ws(`/apis/${api.id}/draft`), { draft });
     expect(saved.validation.errors).toEqual([]);
-    expect(saved.validation.warnings.map((w) => w.code)).toContain('token_claims_not_checked');
+    // the plan says which issuer and which audience its tokens carry
+    expect(saved.validation.warnings.map((w) => w.code)).not.toContain('token_claims_not_checked');
   });
 
   test('the dry run lists the derived objects, and says what the gateway settings defeat', async () => {
@@ -124,8 +126,11 @@ describe('derived objects', () => {
     expect(res.deployment.status).toBe('deployed');
     const entity = await otoroshi('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`);
     const certified = entity.plans.find((p) => p.id === 'plan_certified').access_mode_configuration;
-    expect(certified.regex_issuer_dns).toEqual(['\\QOU=Platform, O=Atlas Data, CN=Atlas Partner CA, C=FR\\E']);
+    // the plan trusts its CA, by the id of the certificate derived from it; both lists of patterns must match
+    expect(certified.trusted_ca_refs.length).toBe(1);
+    expect(certified.dn_match).toBe('all');
     const sso = entity.plans.find((p) => p.id === 'plan_sso').access_mode_configuration;
+    expect(sso).toMatchObject({ issuer: IDP, audiences: ['documents'], subscription_required: true });
     state.authModuleId = sso.verifier;
 
     const mod = await otoroshi('GET', `/api/auths/${sso.verifier}`);
@@ -135,6 +140,7 @@ describe('derived objects', () => {
 
     const certs = ((await otoroshi('GET', '/api/certificates')) || []).filter((c) => c.metadata?.apim_api_id === state.apiId);
     expect(certs.length).toBe(1);
+    expect(certs[0].id).toBe(certified.trusted_ca_refs[0]);
     expect(certs[0].ca).toBe(true);
     expect(certs[0].privateKey || '').toBe('');
     // written with the upsert of the generic api, which reads the subject and the dates from the chain
@@ -154,6 +160,8 @@ describe('derived objects', () => {
     expect(ok.status).toBe(200);
     // another client of the same server, not subscribed
     expect((await gatewayCall('/documents', { headers: { Authorization: `Bearer ${await token(`stranger-${RUN}`)}` } })).status).toBe(401);
+    // the subscribed client, with a token the same server issued for another api: not its audience
+    expect((await gatewayCall('/documents', { headers: { Authorization: `Bearer ${await token(`partner-${RUN}`, 'payments')}` } })).status).toBe(401);
     const forged = `${good.split('.').slice(0, 2).join('.')}.${Buffer.from('not the signature').toString('base64url')}`;
     const ko = await gatewayCall('/documents', { headers: { Authorization: `Bearer ${forged}` } });
     expect([400, 401, 403]).toContain(ko.status);

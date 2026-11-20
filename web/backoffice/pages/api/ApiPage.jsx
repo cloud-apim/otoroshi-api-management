@@ -358,7 +358,6 @@ function DeployModal({ api, snapshot, onClose, onDone }) {
   const plan = useLoad(() => wapi.post(`/apis/${api.id}/deploy`, { snapshot, dry_run: true }), [api.id, snapshot]);
   const [busy, setBusy] = useState(false);
   const [showEntity, setShowEntity] = useState(false);
-  const [ack, setAck] = useState(false);
   const submit = async () => {
     setBusy(true);
     try {
@@ -384,7 +383,7 @@ function DeployModal({ api, snapshot, onClose, onDone }) {
           <button className="btn" onClick={onClose}>
             {tr('Cancel')}
           </button>
-          <button className="btn primary" disabled={busy || plan.loading || (plan.data?.warnings?.some((w) => w.code === 'open_routes') && !ack)} onClick={submit}>
+          <button className="btn primary" disabled={busy || plan.loading} onClick={submit}>
             <Icon name="rocket" /> <Tr text={'Deploy snapshot #{0}'} args={[plan.data?.snapshot?.number ?? '…']} />
           </button>
         </>
@@ -402,7 +401,6 @@ function DeployModal({ api, snapshot, onClose, onDone }) {
                 {w.message}
               </Callout>
             ))}
-            {p.warnings.some((w) => w.code === 'open_routes') && <Switch checked={ack} onChange={setAck} label={tr('I understand: the routes will be open to anyone')} />}
             <div className="grid-2">
               <div className="col">
                 <div className="label">

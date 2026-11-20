@@ -100,10 +100,12 @@ export function OverviewTab({ api, draft, validation, order }) {
                 {order.map((o, i) => (
                   <span key={o.id} className="order-chip" title={tr('extractor index {0}', [o.index])}>
                     <span className="bold">{i + 1}</span> {o.name} <span className="faint">{o.kind}</span>
+                    {o.selection?.length > 0 && <span className="faint"> · {tr('selection')}</span>}
+                    {o.status === 'deprecated' && <span className="faint"> · {tr('deprecated')}</span>}
                   </span>
                 ))}
               </div>
-              <p className="hint mt-8">{tr('It follows the extractor index of each auth kind in Otoroshi, it is not freely chosen — the console shows it rather than hiding it.')}</p>
+              <p className="hint mt-8">{tr('It follows the extractor index of each auth kind in Otoroshi, then the order of the plans between plans of the same kind; a plan with a selection lets the calls it does not select go to the next. It is not freely chosen — the console shows it rather than hiding it.')}</p>
             </div>
           )}
         </div>

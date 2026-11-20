@@ -4,7 +4,7 @@
 // are infrastructure; auth, rate limit, quota, resource filtering and visibility are the offer.
 
 import { newId } from '../db/index.js';
-import { issuerPatterns, readCertificate } from './pki.js';
+import { readCertificate } from './pki.js';
 
 export const AUTH_KINDS = ['keyless', 'apikey', 'jwt', 'mtls', 'oauth2-local', 'oauth2-remote'];
 
@@ -22,6 +22,14 @@ export const AUTH_KIND_ORDER = {
 // kinds whose subscription carries a credential minted by the product. On the other kinds the
 // gateway builds the consumer at call time from a token or a certificate.
 export const CREDENTIAL_KINDS = ['apikey', 'oauth2-local'];
+
+// the kinds whose extractor can pass on a call with a selection (JSON path conditions): the others
+// are told apart by the key presented
+export const SELECTABLE_KINDS = ['keyless', 'jwt', 'mtls', 'oauth2-remote'];
+
+// a plan is served — its extractor on the routes, its consumers identified and enforced — when it is
+// published or deprecated (deprecated: no new subscription, the consumers keep calling)
+export const SERVED_STATUSES = ['published', 'deprecated'];
 
 export const PLAN_STATUSES = ['staging', 'published', 'deprecated', 'closed'];
 export const VISIBILITIES = ['public', 'authenticated', 'restricted'];
@@ -70,7 +78,8 @@ export function defaultResource(backendId, flowId, overrides = {}) {
 export function defaultAuthConfig(kind) {
   switch (kind) {
     case 'apikey':
-      return { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 } };
+      // validityDays: each key expires that many days after it is first enabled (empty: never)
+      return { readOnly: false, rotation: { enabled: false, everyHours: 744, graceHours: 168 }, validityDays: null };
     case 'jwt':
       // either a reference to an existing Otoroshi verifier, or a description the product derives
       // the verifier from and keeps reconciled
@@ -80,18 +89,23 @@ export function defaultAuthConfig(kind) {
         derive: { enabled: false, kind: 'jwks', jwksUrl: '', secret: '', size: 256, issuer: '', audience: '', header: 'Authorization', prefix: 'Bearer ' },
       };
     case 'mtls':
-      // trustedCAs: the CA certificates the plan trusts, derived as certificates of the gateway;
-      // without issuer patterns, the plan accepts what they signed and nothing else
+      // trustedCAs: the CA certificates the plan trusts, derived as certificates of the gateway: the
+      // chain of a client certificate has to lead to one of them. The DN patterns, when given, must
+      // all match (each list by one of its patterns)
       return { regexSubjectDNs: [], regexIssuerDNs: [], clientIdField: 'CN', trustedCAs: [] };
     case 'oauth2-local':
       return { defaultKeyPair: 'otoroshi-jwt-signing', expiration: 3600 };
     case 'oauth2-remote':
       // verifier: an existing auth module of the gateway (Otoroshi names the field verifier), or
       // the description of the authorization server the product derives the module from
+      // issuer, audiences: what a token must carry (iss, one of aud) — the token of another client or
+      // another api of the same server is refused
       return {
         verifier: '',
         clientIdPath: 'client_id',
         fetchUser: false,
+        issuer: '',
+        audiences: [],
         derive: { enabled: false, discoveryUrl: '', jwksUrl: '', userInfoUrl: '', clientId: '', clientSecret: '', scope: 'openid' },
       };
     case 'keyless':
@@ -110,15 +124,16 @@ export function defaultPlan(overrides = {}) {
     description: '',
     status: 'staging',
     auth: { kind, config: defaultAuthConfig(kind) },
-    // EL expression that disambiguates two plans of the same kind
-    selectionRule: '',
+    // JSON path conditions a call has to meet for the plan to apply to it ([{ path, value }], all of
+    // them): disambiguates two plans of the same kind
+    selection: [],
     // calls | tokens | budget — tokens and budget need an LLM backend, out of the MVP
     unit: 'calls',
     rateLimit: { enabled: true, calls: 10, windowMs: 1000 },
     quota: { daily: null, monthly: null },
-    // what to do when the distributed counter is unreachable
+    // what to do when the distributed counter is unreachable: allow | deny
     counterFailure: 'allow',
-    // per api or per subscription
+    // one circuit breaker for the api (each route), or one per subscription (each consumer)
     circuitBreaker: 'api',
     resourceFilter: { mode: 'all', resources: [] },
     // plugins of the plan, by reference to a flow of the api (ApiPlanPlugins.flowRef)
@@ -207,6 +222,8 @@ export function normalizeDraft(input = {}) {
     plan.usageStatement = { ...defaultPlan().usageStatement, ...(p.usageStatement || {}) };
     plan.pricing = { ...defaultPlan().pricing, ...(p.pricing || {}) };
     plan.acl = asArray(p.acl);
+    plan.selection = asArray(p.selection).map((c) => ({ path: String(c?.path || ''), value: c?.value ?? '' }));
+    delete plan.selectionRule;
     plan.order = p.order ?? i;
     return plan;
   });
@@ -243,26 +260,13 @@ export function validateDraft(draft) {
       if (!p.group && !p.plugin) errors.push({ path: `flows[${f.name}]`, message: `flow "${f.name}" has a plugin without id` });
     })
   );
-  const active = d.plans.filter((p) => p.status === 'published');
-  if (!active.length) {
+  const served = d.plans.filter((p) => SERVED_STATUSES.includes(p.status));
+  if (!served.length)
     warnings.push({
       path: 'plans',
-      code: 'open_routes',
-      message:
-        'no published plan: Otoroshi 18 serves the routes of an api without published plan to anyone (open routes). Publish at least one plan, or a keyless plan if the api is meant to be open.',
+      code: 'no_served_plan',
+      message: 'no published plan: the gateway refuses every call to this api. Publish a plan — a keyless one if the api is meant to be open.',
     });
-  }
-  // Otoroshi 18 only installs the extractors of published plans (G-13)
-  const apikeyExtractor = active.some((p) => ['apikey', 'oauth2-local'].includes(p.auth.kind));
-  d.plans
-    .filter((p) => p.status === 'deprecated' && !(['apikey', 'oauth2-local'].includes(p.auth.kind) && apikeyExtractor))
-    .forEach((p) =>
-      warnings.push({
-        path: `plans[${p.name}]`,
-        code: 'deprecated_without_extractor',
-        message: `plan "${p.name}" is deprecated: Otoroshi 18 no longer installs its extractor, so its consumers are no longer identified (upstream gap G-13).`,
-      })
-    );
   d.plans.forEach((p, i) => {
     if (!AUTH_KINDS.includes(p.auth.kind)) errors.push({ path: `plans[${i}].auth.kind`, message: 'unknown auth kind' });
     if (p.unit !== 'calls')
@@ -292,56 +296,61 @@ export function validateDraft(draft) {
           errors.push({ path: `plans[${i}].auth.config.trustedCAs[${j}]`, message: `plan "${p.name}": trusted CA #${j + 1} is not a readable PEM certificate` });
         }
       });
-      const issuers = p.auth.config.regexIssuerDNs || [];
-      if (cas.length && !issuers.length && issuerPatterns(cas) === null)
-        warnings.push({
-          path: `plans[${i}].auth.config.regexIssuerDNs`,
-          code: 'issuer_not_derived',
-          message: `plan "${p.name}": the subject of a trusted CA cannot be predicted in Otoroshi's form — give the issuer patterns, or any certificate the gateway trusts passes`,
-        });
       if (!p.auth.config.clientIdField && p.status === 'published')
         warnings.push({
           path: `plans[${i}].auth.config.clientIdField`,
           code: 'no_client_id_field',
           message: `plan "${p.name}": without a client id field (CN, typically), the gateway names a consumer after its whole certificate — the expected client_id of an application can never match it`,
         });
-      if ((p.auth.config.regexSubjectDNs || []).length && !issuers.length && !cas.length && p.status === 'published')
+      if (!cas.length && SERVED_STATUSES.includes(p.status))
         warnings.push({
-          path: `plans[${i}].auth.config.regexSubjectDNs`,
-          code: 'subject_without_issuer',
-          message: `plan "${p.name}": a subject pattern alone accepts a certificate from any authority the gateway trusts (JDK CAs included) — add trusted CAs or issuer patterns (upstream gap G-16)`,
+          path: `plans[${i}].auth.config.trustedCAs`,
+          code: 'no_trusted_ca',
+          message: `plan "${p.name}": without a trusted CA, the plan accepts a client certificate from any authority the gateway trusts (JDK CAs included), and an issuer pattern only compares text anyone can write in a certificate of their own — give the CA that signs the certificates of its consumers`,
         });
     }
-    if (p.auth.kind === 'oauth2-remote' && p.status === 'published')
+    if (p.auth.kind === 'oauth2-remote' && SERVED_STATUSES.includes(p.status) && !p.auth.config.issuer && !(p.auth.config.audiences || []).length)
       warnings.push({
-        path: `plans[${i}]`,
+        path: `plans[${i}].auth.config.audiences`,
         code: 'token_claims_not_checked',
-        message: `plan "${p.name}" (oauth2-remote): Otoroshi 18 checks the signature and the dates of the token, not its issuer nor its audience — a token the same server issued for another client passes (upstream gap G-15)`,
+        message: `plan "${p.name}" (oauth2-remote): without an issuer nor an audience, the plan accepts any token signed with the keys of the authorization server — the tokens it issued for other clients and other apis included. Give at least the audience of this api.`,
       });
+    if (p.selection.length && !SELECTABLE_KINDS.includes(p.auth.kind))
+      errors.push({ path: `plans[${i}].selection`, message: `plan "${p.name}": a ${p.auth.kind} plan is told apart by the key presented, it takes no selection` });
+    p.selection.forEach((c, j) => {
+      if (!c.path.trim()) errors.push({ path: `plans[${i}].selection[${j}].path`, message: `plan "${p.name}": selection condition #${j + 1} has no path` });
+    });
+    const days = p.auth.kind === 'apikey' ? p.auth.config.validityDays : null;
+    if (days != null && days !== '' && !(Number(days) > 0))
+      errors.push({ path: `plans[${i}].auth.config.validityDays`, message: `plan "${p.name}": the validity of a key is a number of days, more than zero` });
     if (p.flowRef && !d.flows.find((f) => f.id === p.flowRef))
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)
       errors.push({ path: `plans[${i}].resourceFilter`, message: `plan "${p.name}" filters resources but allows none` });
-    if (p.selectionRule || p.counterFailure !== 'allow' || p.circuitBreaker !== 'api') {
-      warnings.push({
-        path: `plans[${i}]`,
-        code: 'not_enforced',
-        message: `plan "${p.name}": selection rule, counter failure strategy and circuit breaker granularity are recorded but not yet enforced by Otoroshi 18 (upstream work).`,
-      });
-    }
+    // the keys of an oauth2-local plan carry no restrictions on the gateway
+    if (p.resourceFilter.mode === 'only' && p.auth.kind === 'oauth2-local')
+      warnings.push({ path: `plans[${i}].resourceFilter`, code: 'filter_not_enforced', message: `plan "${p.name}" (oauth2-local): the gateway gives the keys of an oauth2-local plan no restrictions — this filter is not enforced` });
   });
-  // two plans of the same kind whose extractors can both succeed need a selection rule
+  // two served plans of the same kind whose extractors can both succeed need a selection: the first
+  // one in the order of the plans identifies the caller, a plan without selection takes every call
   const byKind = {};
-  active.forEach((p) => (byKind[p.auth.kind] = [...(byKind[p.auth.kind] || []), p]));
+  served.forEach((p) => (byKind[p.auth.kind] = [...(byKind[p.auth.kind] || []), p]));
   Object.entries(byKind).forEach(([kind, plans]) => {
-    if (plans.length > 1 && ['jwt', 'oauth2-remote', 'mtls', 'keyless'].includes(kind) && plans.filter((p) => !p.selectionRule).length > 1) {
+    if (plans.length < 2 || !SELECTABLE_KINDS.includes(kind)) return;
+    if (plans.filter((p) => !p.selection.length).length > 1)
       errors.push({
         path: 'plans',
-        message: `${plans.length} published ${kind} plans can match the same request: give at least all but one of them a selection rule`,
+        message: `${plans.length} ${kind} plans can match the same request: give at least all but one of them a selection`,
       });
-    }
+    const open = plans.findIndex((p) => !p.selection.length);
+    if (open >= 0 && open < plans.length - 1)
+      warnings.push({
+        path: 'plans',
+        code: 'selection_shadowed',
+        message: `plan "${plans[open].name}" has no selection and comes before ${plans.slice(open + 1).map((p) => `"${p.name}"`).join(', ')}: it identifies every ${kind} caller first, they are never reached — move it after them`,
+      });
   });
-  if (d.plans.filter((p) => p.status === 'published' && p.auth.kind === 'keyless').length && active.length > 1) {
+  if (served.filter((p) => p.auth.kind === 'keyless').length && served.length > 1) {
     warnings.push({
       path: 'plans',
       code: 'keyless_last',
@@ -351,12 +360,13 @@ export function validateDraft(draft) {
   return { errors, warnings, ok: errors.length === 0 };
 }
 
-// effective plan resolution order, as the gateway will evaluate it
+// effective plan resolution order, as the gateway will evaluate it: the extractor index of each
+// kind, then the order of the plans between plans of the same kind
 export function resolutionOrder(draft) {
   const d = normalizeDraft(draft);
   return d.plans
-    .filter((p) => p.status === 'published')
-    .map((p) => ({ id: p.id, name: p.name, kind: p.auth.kind, index: AUTH_KIND_ORDER[p.auth.kind] ?? 999, selectionRule: p.selectionRule }))
+    .filter((p) => SERVED_STATUSES.includes(p.status))
+    .map((p) => ({ id: p.id, name: p.name, kind: p.auth.kind, status: p.status, index: AUTH_KIND_ORDER[p.auth.kind] ?? 999, selection: p.selection }))
     .sort((a, b) => a.index - b.index);
 }
 
