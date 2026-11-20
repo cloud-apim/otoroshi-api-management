@@ -26,6 +26,41 @@ function pretty(body, headers) {
   return body;
 }
 
+const RESULT_KIND = { allowed: 'positive', successful: 'positive', denied: 'negative', failure: 'negative' };
+
+// the execution report of the call, as the gateway ran it: the consumer it identified, then each
+// step that ran plugins, each plugin with its outcome
+function TraceView({ trace }) {
+  return (
+    <div className="col gap-8">
+      <div className="label">{tr('Execution trace')}</div>
+      {trace.consumer ? (
+        <p className="small">
+          <Tr text={'Identified as {0}'} args={[<span className="mono">{trace.consumer.client_id}</span>]} />
+          {trace.consumer.plan_id && <span className="faint"> · <Tr text={'plan {0}'} args={[<span className="mono">{trace.consumer.plan_id}</span>]} /></span>}
+        </p>
+      ) : (
+        <p className="small muted">{tr('No consumer identified.')}</p>
+      )}
+      {trace.steps.map((s) => (
+        <div key={s.step} className="col gap-4">
+          <div className="tiny faint mono">{s.step}</div>
+          {s.plugins.map((p, i) => (
+            <div key={i} className="row small">
+              <span className="grow" title={p.plugin}>
+                {p.name}
+              </span>
+              {p.result && <Badge kind={RESULT_KIND[p.result] || ''}>{p.status ? `${p.result} ${p.status}` : p.result}</Badge>}
+              <span className="faint tiny"><Tr text={'{0} ms'} args={[p.durationMs]} /></span>
+            </div>
+          ))}
+        </div>
+      ))}
+      <p className="faint tiny"><Tr text={'{0} ms in the gateway, {1} of overhead — sent by the gateway itself, from 127.0.0.1'} args={[trace.durationMs, `${trace.overheadMs} ms`]} /></p>
+    </div>
+  );
+}
+
 export function RequestComposer({ send, credentials = [], paths = [], baseLabel = '', labels = {} }) {
   const L = {
     send: tr('Send'),
@@ -138,7 +173,7 @@ export function RequestComposer({ send, credentials = [], paths = [], baseLabel 
               </details>
               {res.body ? <CodeView value={pretty(res.body, res.headers)} language={bodyLanguage(res.headers)} maxHeight={480} ariaLabel={tr('response body')} /> : <p className="muted small">{tr('(empty body)')}</p>}
               {res.truncated && <p className="faint tiny">{tr('body truncated to 256 KB')}</p>}
-              {res.trace_unavailable && <Callout kind="info">{res.trace_unavailable}</Callout>}
+              {res.trace && <TraceView trace={res.trace} />}
             </>
           )}
         </div>

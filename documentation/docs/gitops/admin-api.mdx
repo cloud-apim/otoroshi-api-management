@@ -53,6 +53,19 @@ addressed by id or slug.
 | GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
 | observability | `GET …/analytics`, `GET …/analytics/calls`, `GET …/audit`, `GET POST …/drift`, `GET …/search`, `GET …/home` |
 
+## Trying a request
+
+`POST …/apis/<api>/test` sends a request through the API on the gateway — its real routing, plans,
+quotas and keys — with Otoroshi's request tester: `{"method": "GET", "path": "/search", "query":
+"q=x", "headers": {…}, "body": "…", "subscription_id": "sub_…"}`, the credentials of a
+subscription the caller can see when it names one. The answer holds the response (`status`,
+`headers`, `body`) and its **execution trace**: the consumer the plans identified (`client_id`,
+`plan_id`), then each step that ran plugins, each plugin `allowed`, `denied` (with its status),
+`successful` or `failure`, and its duration — which plan recognised the caller, and what refused
+it. The request is sent by the gateway itself, from `127.0.0.1`: a keyless plan identifies it by
+that address. The raw report of the gateway is never answered: it holds the headers of the request,
+credentials included.
+
 ## Paged lists
 
 The lists that grow — the audit trail (`GET …/audit`, `GET /audit`), the request log

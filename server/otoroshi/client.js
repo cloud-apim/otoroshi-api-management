@@ -109,6 +109,9 @@ export const oto = {
   // api: a POST on the id creates or replaces (a PUT refuses an entity that does not exist yet).
   upsertApi: (entity) => otoroshi('POST', `${API_BASE}/${entity.id}`, entity),
   deleteApi: (id) => otoroshi('DELETE', `${API_BASE}/${id}`),
+  // Otoroshi's request tester: the request sent through a route of the api, its response and the
+  // execution report of the call (null when the gateway does not serve the route)
+  tryRoute: (apiId, routeId, request) => otoroshi('POST', `${API_BASE}/${apiId}/routes/${routeId}/_tryit`, request, { timeoutMs: 35000 }),
   getSubscription: (id) => otoroshi('GET', `${SUB_BASE}/${id}`),
   listSubscriptions: () => otoroshi('GET', SUB_BASE),
   createSubscription: (entity) => otoroshi('POST', SUB_BASE, entity),

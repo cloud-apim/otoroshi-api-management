@@ -33,7 +33,6 @@ import * as notifications from '../domain/notifications.js';
 import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exposure.js';
 import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
-import { resolveLocal } from '../otoroshi/vault-refs.js';
 
 const r = new Router();
 
@@ -699,18 +698,51 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   };
 });
 
-// console side: replay a request through the api on the gateway — real routing, real plans,
-// real keys. The policy execution trace needs Otoroshi to expose its request tester (G-12).
+// the execution report of a trial, as the console shows it: the steps that ran plugins, each plugin
+// with its outcome, and the consumer the access validators identified. Never the raw report: it
+// holds the headers of the request, credentials included.
+function traceOf(report) {
+  if (!report?.steps) return null;
+  const outcome = (p) => p.execution_debug?.out?.result || {};
+  const steps = report.steps
+    .filter((s) => s.ctx?.plugins?.length)
+    .map((s) => ({
+      step: s.task,
+      durationMs: s.duration,
+      plugins: s.ctx.plugins.map((p) => ({ plugin: p.plugin, name: p.name || p.plugin.split('.').pop(), result: outcome(p).kind || null, status: outcome(p).status || null, durationMs: p.duration })),
+    }));
+  const validators = report.steps.find((s) => s.task === 'call-access-validator-plugins')?.ctx?.plugins || [];
+  const key = validators.map((p) => p.execution_debug?.out?.ctx?.apikey || p.execution_debug?.in?.ctx?.apikey).filter(Boolean).pop();
+  return {
+    durationMs: report.duration,
+    overheadMs: report.overhead,
+    steps,
+    consumer: key ? { client_id: key.clientId, plan_id: key.metadata?.plan_id || null, subscription_id: key.metadata?.apim_subscription_id || null } : null,
+    last_step: report.steps[report.steps.length - 1]?.task || null,
+  };
+}
+
+// the route a path goes to: the resource whose path is the longest prefix of it
+function routeFor(draft, path, method) {
+  const cp = draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
+  const rel = path.startsWith(cp) ? path.slice(cp.length) || '/' : path;
+  const fits = (r) => (r.exact ? rel === r.path : rel === r.path || rel.startsWith(r.path === '/' ? '/' : `${r.path}/`) || r.path === '/') && (!r.methods?.length || r.methods.includes(method));
+  return [...draft.resources].filter(fits).sort((a, b) => b.path.length - a.path.length)[0] || draft.resources[0];
+}
+
+// console side: replay a request through the api on the gateway — real routing, real plans, real
+// keys — with Otoroshi's request tester, which answers the execution report of the call: which
+// plan identified the caller, what refused it, which plugins ran
 r.post('/workspaces/:ws/apis/:api/test', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);
   const snap = await deployments.deployedSnapshot(api.id);
   if (!snap) throw badRequest('this api is not deployed');
   const draft = normalizeDraft(snap.content.draft);
-  const gw = await gatewaySettings();
   const cp = draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath.replace(/\/$/, '');
   const path = `${cp}${(body.path || '/').startsWith('/') ? body.path || '/' : `/${body.path}`}`;
-  const headers = { ...(body.headers || {}), host: await resolveLocal(draft.entrypoint.domain) };
+  const headers = { ...(body.headers || {}) };
+  for (const k of Object.keys(headers)) if (k.toLowerCase() === 'host') delete headers[k];
   let credential = null;
   if (body.subscription_id) {
     // only the credentials the caller can see: the subscriptions of its own applications
@@ -719,37 +751,39 @@ r.post('/workspaces/:ws/apis/:api/test', async ({ ctx, params, body }) => {
     await applications.requireSeeApplication(c, app);
     const cred = (await subscriptions.credentialsOf(sub.id)).find((x) => x.status === 'active');
     if (!cred) throw badRequest('this subscription has no active credential');
-    headers.authorization = 'Basic ' + Buffer.from(`${cred.client_id}:${cred.client_secret}`).toString('base64');
+    headers.Authorization = 'Basic ' + Buffer.from(`${cred.client_id}:${cred.client_secret}`).toString('base64');
     credential = { subscription_id: sub.id, client_id: cred.client_id, plan_id: sub.plan_id };
   }
   const method = (body.method || 'GET').toUpperCase();
+  const query = body.query ? `?${body.query.replace(/^\?/, '')}` : '';
+  const route = routeFor(draft, path, method);
   const started = performance.now();
-  let res;
+  let trial;
   try {
-    res = await fetch(`${gw.url}${path}${body.query ? `?${body.query.replace(/^\?/, '')}` : ''}`, {
+    trial = await oto.tryRoute(api.id, route.id, {
       method,
+      path: `${path}${query}`,
       headers,
-      body: ['GET', 'HEAD'].includes(method) ? undefined : body.body || undefined,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(30000),
+      ...(['GET', 'HEAD'].includes(method) || !body.body ? {} : { body: body.body }),
     });
   } catch (e) {
-    throw badRequest(`gateway unreachable: ${e.message}`);
+    throw badRequest(e.status === 0 ? `gateway unreachable: ${e.message}` : `the gateway could not try the request: ${e.message}`);
   }
-  const buf = await res.arrayBuffer();
+  if (!trial) throw badRequest('the gateway does not serve this api yet: a deployment takes a few seconds to reach it');
   const durationMs = Math.round(performance.now() - started);
-  const text = new TextDecoder().decode(buf.slice(0, 256 * 1024));
-  await audit(c, { action: 'api.test', entityKind: 'api', entityId: api.id, summary: `${method} ${path} replayed through the gateway: ${res.status}`, data: { credential } });
+  const buf = Buffer.from(trial.body_base_64 || '', 'base64');
+  const text = buf.subarray(0, 256 * 1024).toString('utf8');
+  const trace = traceOf(trial.report);
+  await audit(c, { action: 'api.test', entityKind: 'api', entityId: api.id, summary: `${method} ${path} tried on the gateway: ${trial.status}`, data: { credential, consumer: trace?.consumer || null } });
   return {
-    request: { method, url: `${draft.entrypoint.domain}${path}`, credential },
-    status: res.status,
+    request: { method, url: `${draft.entrypoint.domain}${path}${query}`, credential },
+    status: trial.status,
     durationMs,
-    headers: Object.fromEntries(res.headers),
+    headers: Object.fromEntries(Object.entries(trial.headers || {}).map(([k, v]) => [k.toLowerCase(), v])),
     body: text,
-    truncated: buf.byteLength > 256 * 1024,
-    size: buf.byteLength,
-    trace: null,
-    trace_unavailable: 'the policy execution trace needs Otoroshi to expose its request tester on the admin api (OTOROSHI-GAPS G-12)',
+    truncated: buf.length > 256 * 1024,
+    size: buf.length,
+    trace,
   };
 });
 

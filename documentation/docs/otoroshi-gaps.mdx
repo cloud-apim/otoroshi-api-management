@@ -29,7 +29,7 @@ follow, ➖ not fixed, ⬜ open.
 | G-9 | `GatewayEvent` did not carry the key's `apiRef` | low | ✅ | attributes each call from the `apiRef` of its event |
 | G-10 | A `PUT` on a missing entity was refused as unauthorized | low | ✅ | writes everything with the upsert of the generic api (`POST` on the id) |
 | G-11 | Nothing says when a new route or key becomes routable — not feasible in a distributed cluster without a shared store | — | ➖ | the console says *deployed* once the gateway accepted the write |
-| G-12 | Otoroshi's request tester with the policy execution trace is only reachable from its backoffice | medium | 🔜 | the console replays requests through the gateway without the trace |
+| G-12 | Otoroshi's request tester with the policy execution trace was only reachable from its backoffice | medium | ✅ | the console tries requests with it, and shows the trace |
 | G-13 | A **deprecated** plan lost its extractor: its consumers were no longer identified | high | ✅ | nothing: a deprecated plan keeps its consumers |
 | G-14 | No key validity relative to the subscription, only an absolute date | low | ✅ | an apikey plan offers a key validity in days |
 | G-15 | **oauth2-remote** plans checked neither the issuer nor the audience of the token | high | ✅ | the plan names its issuer and audiences |

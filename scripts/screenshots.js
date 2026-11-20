@@ -210,7 +210,7 @@ async function consoleTour(page) {
   await click(page, 'Edit');
   await shot(page, 'console-plan-general', 'Plan editor — general', { full: false });
   for (const [tab, name, title] of [
-    ['Access', 'console-plan-access', 'Plan editor — access: auth mechanism, selection rule'],
+    ['Access', 'console-plan-access', 'Plan editor — access: auth mechanism, selection'],
     ['Limits', 'console-plan-limits', 'Plan editor — limits: rate, quotas, resources, failure strategies'],
     ['Catalogue & approval', 'console-plan-catalogue', 'Plan editor — catalogue and approval: never projected'],
     ['Pricing', 'console-plan-pricing', 'Plan editor — pricing'],
@@ -275,7 +275,7 @@ async function consoleTour(page) {
   await click(page, 'Send');
   await sleep(800);
   await editors(page);
-  await shot(page, 'console-api-test', 'Test — replay a request through the gateway, with the credentials of a subscription');
+  await shot(page, 'console-api-test', 'Test — a request tried through the gateway, with the credentials of a subscription and the trace of the policies');
   await go(page, `${A}/analytics?range=24h`);
   await shot(page, 'console-api-analytics', 'API — analytics, in the catalogue vocabulary');
   await go(page, `${A}/settings`);

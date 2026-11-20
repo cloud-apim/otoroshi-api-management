@@ -241,6 +241,21 @@ describe('reference catalogue', () => {
     expect(res.status).toBe(200);
   });
 
+  test('the console replays a request through the gateway, with the trace of the policies', async () => {
+    // with the credentials of the Starter subscription: identified by the apikey of its plan
+    const withKey = await call('POST', ws(`/apis/${state.apiId}/test`), { method: 'GET', path: '/search', query: 'q=gdpr', subscription_id: state.starterSub });
+    expect(withKey.status).toBe(200);
+    expect(withKey.trace.consumer.client_id).toBe(state.cred.client_id);
+    const validators = withKey.trace.steps.find((s) => s.step === 'call-access-validator-plugins').plugins;
+    expect(validators.find((p) => p.plugin.endsWith('NgApiConsumerEnforcer')).result).toBe('allowed');
+    // the raw report never leaves the product: it holds the headers of the request
+    expect(JSON.stringify(withKey)).not.toContain(state.cred.client_secret);
+    // without credential: the open plan identifies the caller by its address, the gateway's own
+    const open = await call('POST', ws(`/apis/${state.apiId}/test`), { method: 'GET', path: '/search' });
+    expect(open.status).toBe(200);
+    expect(open.trace.consumer.client_id).toBe(`keyless_${state.apiId}_plan_open_127.0.0.1`);
+  });
+
   test('approval 2 — manual: Research waits for a producer, nothing is projected before', async () => {
     const app = await call('POST', ws('/applications'), { name: 'City university', team_id: state.teamId });
     const sub = await call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_research', application_id: app.id });
@@ -378,6 +393,18 @@ describe('reference catalogue', () => {
     expect(sub.drift.status).toBe('drifted');
     await call('POST', ws(`/subscriptions/${state.starterSub}/resync`));
     expect((await oto.getApikey(state.cred.client_id)).enabled).toBe(true);
+  });
+
+  test('a subscription gone from the gateway is made again, with a new key that replaces the old one', async () => {
+    await otoroshi('DELETE', `/apis/apis.otoroshi.io/v1/apisubscriptions/${state.starterSub}`);
+    expect(await oto.getApikey(state.cred.client_id)).toBeNull();
+    await call('POST', ws(`/subscriptions/${state.starterSub}/resync`));
+    const creds = (await call('GET', ws(`/subscriptions/${state.starterSub}`))).credentials;
+    const active = creds.filter((c) => c.status === 'active');
+    expect(active.length).toBe(1);
+    expect(active[0].client_id).not.toBe(state.cred.client_id);
+    expect(creds.find((c) => c.client_id === state.cred.client_id).status).toBe('revoked');
+    state.cred = active[0];
   });
 
   test('transfer: Starter -> Research keeps the key; apikey -> jwt is refused', async () => {

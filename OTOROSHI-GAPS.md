@@ -9,7 +9,7 @@ Found on Otoroshi `18.0.1`, source lines from the `18.1.0-dev` checkout in `../o
 
 ## Where we are
 
-Every gap was fixed upstream on 2026-11-19, in `18.1.0-dev`, but three that are not by decision of
+Every gap logged by then was fixed upstream on 2026-11-19, in `18.1.0-dev`, but three that are not by decision of
 the owner (G-11, G-19, G-21). The product requires Otoroshi 18.1 (the setup check says so) and
 drops its workarounds rather than keeping them for 18.0: nothing depends on the product with 18.0.
 
@@ -31,7 +31,7 @@ since, reported upstream, not fixed yet.
 | G-9 | [#2948](https://github.com/MAIF/otoroshi/issues/2948) | `GatewayEvent` did not carry `apiRef` (plan, subscription) | low | ✅ | each call is attributed from the `apiRef` of its event |
 | G-10 | [#2949](https://github.com/MAIF/otoroshi/issues/2949) | A `PUT` on a missing entity was refused as **unauthorized**; the upsert said the opposite of what changed; certificates not enriched by the generic api | low | ✅ | the `Api` and every derived object are written with the upsert of the generic api |
 | G-11 | [#2950](https://github.com/MAIF/otoroshi/issues/2950) | A new route / apikey becomes routable only after a few seconds, with no way to know when | — | ➖ | tests poll; the console says "deployed" once the write is accepted |
-| G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** is only reachable with a backoffice session | medium | 🔜 | the console replays requests through the gateway without the trace; R-24 waits for it |
+| G-12 | [#2951](https://github.com/MAIF/otoroshi/issues/2951) | Otoroshi's request tester with the **policy execution trace** was only reachable with a backoffice session | medium | ✅ | the console tries requests with it and shows the trace (R-24) |
 | G-13 | [#2952](https://github.com/MAIF/otoroshi/issues/2952) | A **deprecated** plan lost its extractor: its consumers were no longer identified | high | ✅ | a deprecated plan is served: in the resolution order and in the checks of the selection (R-16) |
 | G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only had an **absolute** `validUntil` | low | ✅ | an apikey plan offers a key validity in days, counted from the first enablement of the key |
 | G-15 | [#2954](https://github.com/MAIF/otoroshi/issues/2954) | **oauth2-remote** plans checked neither the **issuer** nor the **audience** of the token | high | ✅ | the plan names its `issuer` and `audiences`; without either, the draft warns |
@@ -173,24 +173,17 @@ change is live.
 **The product.** Tests poll the gateway; the console says "deployed" when the write is accepted —
 and stays so.
 
-## G-12 — the request tester with the execution trace is backoffice-only — medium
+## G-12 — the request tester with the execution trace was backoffice-only — medium — followed
 
-Upstream: [MAIF/otoroshi#2951](https://github.com/MAIF/otoroshi/issues/2951).
+Upstream: [MAIF/otoroshi#2951](https://github.com/MAIF/otoroshi/issues/2951), fixed in 18.1:
+`POST /apis/apis.otoroshi.io/v1/apis/<id>/routes/<route>/_tryit` sends a request through a route of
+a published or deprecated api, from the node itself (`127.0.0.1`), and answers the response and the
+execution report of the call.
 
-**Observed.** Otoroshi records an `NgExecutionReport` (every step and plugin, with timings) for a
-request carrying `Otoroshi-Try-It-Request-Id` only when that id was enabled by
-`TryItController.call` (`next/controllers/tryit.scala`), routed as `POST /bo/api/tryit`
-(`conf/routes:97`) behind `BackOfficeActionAuth`. An Admin API key cannot reach it, so a control
-plane cannot replay a request through an api "in diagnostic mode, with the trace of the policies"
-— the console half of testing.
-
-**Product meanwhile.** The console composer replays the request through the gateway (real
-routing, real plans, real keys) and shows status, headers, body and latency, and says that the
-policy trace needs this upstream change.
-
-**Upstream fix.** Expose the request tester on the Admin API (e.g. `POST /api/routes/_tryit`, and a
-variant taking an `Api` id + route id), returning the response and the execution report — or let
-an admin apikey enable a report id for the next request.
+**The product.** The console's *Test* tab tries requests with it (`oto.tryRoute`, `POST …/test`):
+the response, and the trace of the call — the consumer the plans identified, each plugin of each
+step with its outcome and its duration (R-24). The raw report is never answered: it holds the
+headers of the request, credentials included.
 
 ## G-13 — a deprecated plan lost its extractor — high — followed
 

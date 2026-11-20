@@ -1,5 +1,9 @@
 {
+  "Execution trace": "Trace d’exécution",
+  "Identified as {0}": "Identifié comme {0}",
   "just now": "à l’instant",
+  "No consumer identified.": "Aucun consommateur identifié.",
+  "plan {0}": "plan {0}",
   "{0} min ago": "il y a {0} min",
   "{0} h ago": "il y a {0} h",
   "{0} d ago": "il y a {0} j",
@@ -26,6 +30,7 @@
   "request body": "corps de la requête",
   "{0} ms": "{0} ms",
   "Send a request to see the response.": "Envoyez une requête pour voir la réponse.",
+  "{0} ms in the gateway, {1} of overhead — sent by the gateway itself, from 127.0.0.1": "{0} ms dans la gateway, dont {1} de surcoût — envoyée par la gateway elle-même, depuis 127.0.0.1",
   "{0} response headers": "{0} en-têtes de réponse",
   "response body": "corps de la réponse",
   "(empty body)": "(corps vide)",

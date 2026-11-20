@@ -20,6 +20,8 @@ Last update: 2026-11-20.
   - G-17, G-4, R-15: the subscription of a jwt, mtls or oauth2-remote plan carries the application's `client_id`, and Otoroshi provisions its consumer; these plans are projected with `subscription_required`: a valid token or certificate alone is not served. A client id changed by the application makes the subscription again on the gateway; two applications cannot subscribe to a plan with the same client id.
   - G-9: the ingester attributes each call from the `apiRef` of its event (api, plan, subscription, application), checked with real traffic; the parsing of minted consumer names is gone.
   - G-3, G-5, G-6, G-13, G-14, G-15, G-16, R-14, R-16: an api without a published or deprecated plan is closed (`no_served_plan`, no acknowledgement any more); deprecated plans are served; the resource filter is projected on every kind but oauth2-local; the selection is a list of JSON path conditions (`selection`), the counter failure strategy and the circuit breaker granularity are projected (`counter_failure`, `circuit_breaker_scope`); oauth2-remote plans name their `issuer` and `audiences`; mtls plans trust their CAs (`trusted_ca_refs`, `dn_match: all`); apikey plans offer a key validity in days. Checked end to end: a gold tier selected by a claim, a deprecated jwt plan with a filter, a token for another audience refused.
+  - G-12, R-24: the console's *Test* tab tries requests with Otoroshi's request tester, and shows the trace of the call — the consumer the plans identified, each plugin with its outcome.
+  - A bug of the product, found on the way: a subscription made again on the gateway (gone from it) kept its old credential active beside the new one; it is revoked now.
   - A bug of the product, found on the way: the restriction paths are regexes, and `/v1/pets*` did not allow `/v1/pets/42`; they are `/v1/pets(/.*)?` now.
   - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
 
@@ -68,7 +70,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-10 | L | Named compositions: resources and dictionaries |
 | R-19 | L | Custom portal templates |
 
-**Blocked on Otoroshi (1), fixed upstream, being followed:** R-24 (G-12, then S).
 
 **Owner decisions (4):** R-26 where the gateway health and the drift live in the console · R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
 
@@ -117,7 +118,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-24 | D-17, G-12 | The console replay **with the policy execution trace** | S once G-12 is fixed | G-12 |
 | R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
 
@@ -187,7 +187,7 @@ waits for the data plane rather than working around it.
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, and it reads the global configuration, super admin only by design (G-21) |
 | D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
-| D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ without the policy trace (G-12, R-24); one composer: R-23 |
+| D-17 testing | 🟡 | portal (Scalar + proxy) ✅; console ✅ with the trace of the policies (the request tester of the gateway); one composer: R-23 |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
 | D-19 workspace + teams, global users | ✅ | an admin only sees the members of its workspaces |
 | D-20 one portal per workspace, resolved from the url | ✅ | by root path, by hostname, or one workspace at the root (`APIM_TENANCY=single`: no prefix, no selector); the forms served before are recorded and their urls redirected (`301`/`308`) to the same page — `test/portal-exposure.test.js`, `test/portal-forms.test.js`; `portal_url` given by the admin api |

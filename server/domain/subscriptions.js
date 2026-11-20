@@ -411,6 +411,10 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
     }
     const tokenRefs = written?.token_refs || entity.token_refs || [];
     if (CREDENTIAL_KINDS.includes(sub.auth_kind)) {
+      // a subscription made again on the gateway (missing there) has new keys: the previous ones are gone
+      const live = tokenRefs.map((r) => r.apikey).filter(Boolean);
+      await db`update credentials set status = 'revoked', revoked_at = now()
+        where subscription_id = ${sub.id} and status = 'active' and not (client_id = any(${'{' + live.map((x) => `"${x}"`).join(',') + '}'}::text[]))`;
       for (const ref of tokenRefs) {
         if (!ref.apikey) continue;
         const key = await oto.getApikey(ref.apikey);
