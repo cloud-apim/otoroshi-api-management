@@ -1,8 +1,13 @@
 // One metadata mechanism, one screen: typed fields render the same way whatever their scope.
 import React from 'react';
 import { Field, Input, NumberInput, Select, Switch, TextArea } from './ui.jsx';
+import { language } from './i18n.jsx';
 
-export function MetadataForm({ fields = [], values = {}, onChange, disabled = false, emptyHint = null }) {
+// a field in the language of the reader: its translation, or the label and help it was defined with
+export const localizedField = (f, lang = language()) => ({ ...f, label: f.translations?.[lang]?.label || f.label, help: f.translations?.[lang]?.help || f.help });
+
+export function MetadataForm({ fields: all = [], values = {}, onChange, disabled = false, emptyHint = null, lang }) {
+  const fields = all.map((f) => localizedField(f, lang));
   if (!fields.length) return emptyHint;
   const set = (key, v) => {
     const next = { ...(values || {}) };
@@ -53,7 +58,8 @@ export function MetadataForm({ fields = [], values = {}, onChange, disabled = fa
   );
 }
 
-export function MetadataView({ fields = [], values = {} }) {
+export function MetadataView({ fields: all = [], values = {}, lang }) {
+  const fields = all.map((f) => localizedField(f, lang));
   const shown = fields.filter((f) => values?.[f.key] !== undefined);
   const extra = Object.keys(values || {}).filter((k) => !fields.some((f) => f.key === k));
   if (!shown.length && !extra.length) return null;

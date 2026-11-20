@@ -14,6 +14,20 @@ export async function listFields(workspaceId, scope = null) {
     and (${scope}::text is null or scope = ${scope}) order by scope, position, key`;
 }
 
+// the label and the help of a field in other languages, the ones given only
+function translationsOf(f) {
+  const t = f.translations && typeof f.translations === 'object' ? f.translations : {};
+  const out = {};
+  for (const [lang, v] of Object.entries(t)) {
+    if (!/^[a-z]{2}(-[a-z0-9]+)?$/i.test(lang) || !v || typeof v !== 'object') continue;
+    const entry = {};
+    if (typeof v.label === 'string' && v.label.trim()) entry.label = v.label.trim();
+    if (typeof v.help === 'string' && v.help.trim()) entry.help = v.help.trim();
+    if (Object.keys(entry).length) out[lang] = entry;
+  }
+  return out;
+}
+
 // the whole set is replaced at once: the field list is a document the admin edits
 export async function saveFields(ctx, workspaceId, fields) {
   if (!Array.isArray(fields)) throw badRequest('expected a list of fields');
@@ -29,9 +43,9 @@ export async function saveFields(ctx, workspaceId, fields) {
   await db.begin(async (tx) => {
     await tx`delete from metadata_fields where workspace_id = ${workspaceId}`;
     for (const [i, f] of fields.entries()) {
-      await tx`insert into metadata_fields (id, workspace_id, scope, key, label, type, options, required, portal, help, position)
+      await tx`insert into metadata_fields (id, workspace_id, scope, key, label, type, options, required, portal, help, position, translations)
         values (${f.id || newId('mf')}, ${workspaceId}, ${f.scope}, ${f.key}, ${f.label || f.key}, ${f.type || 'string'}, ${f.options || []},
-          ${!!f.required}, ${!!f.portal}, ${f.help || ''}, ${f.position ?? i})`;
+          ${!!f.required}, ${!!f.portal}, ${f.help || ''}, ${f.position ?? i}, ${translationsOf(f)})`;
     }
   });
   await audit(ctx, { action: 'metadata.fields.update', workspaceId, entityKind: 'workspace', entityId: workspaceId, summary: `${fields.length} metadata fields defined` });

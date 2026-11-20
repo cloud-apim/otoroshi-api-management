@@ -648,6 +648,21 @@ function MetadataSettings() {
                 <Field label={tr('Help')}>
                   <Input value={editing.help} onChange={(v) => setEditing({ ...editing, help: v })} />
                 </Field>
+                {/* the label and the help in the other languages of the portal and of the console */}
+                {[...new Set([...(ws.portal?.languages || []), 'en', 'fr'])].map((l) => {
+                  const t = editing.translations?.[l] || {};
+                  const setT = (patch) => setEditing({ ...editing, translations: { ...(editing.translations || {}), [l]: { ...t, ...patch } } });
+                  return (
+                    <div key={l} className="grid-2">
+                      <Field label={tr('Label ({0})', [l])}>
+                        <Input value={t.label || ''} onChange={(v) => setT({ label: v })} placeholder={editing.label} />
+                      </Field>
+                      <Field label={tr('Help ({0})', [l])}>
+                        <Input value={t.help || ''} onChange={(v) => setT({ help: v })} placeholder={editing.help} />
+                      </Field>
+                    </div>
+                  );
+                })}
                 <div className="row gap-24">
                   <Switch checked={editing.required} onChange={(v) => setEditing({ ...editing, required: v })} label={tr('Required')} />
                   {['subscription', 'application'].includes(editing.scope) && (

@@ -472,6 +472,13 @@ alter table payment_events add column processed_at timestamptz;
 alter table remote_catalogs add column options jsonb not null default '{}';
 `,
   },
+  {
+    version: '0014_metadata_translations',
+    sql: `
+-- the label and the help of a metadata field in other languages: { "fr": { "label": …, "help": … } }
+alter table metadata_fields add column translations jsonb not null default '{}';
+`,
+  },
 ];
 
 export const analyticsMigrations = [

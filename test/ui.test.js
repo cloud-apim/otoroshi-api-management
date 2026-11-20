@@ -116,6 +116,10 @@ beforeAll(async () => {
       ],
     },
   });
+  // a question of the request form, labelled in two languages
+  await call('PUT', ws('/metadata-fields'), {
+    fields: [{ scope: 'subscription', key: 'project', label: 'Your project', help: 'what you build', type: 'string', portal: true, translations: { fr: { label: 'Votre projet', help: 'ce que vous construisez' } } }],
+  });
   const consumer = await call('POST', '/users', CONSUMER);
   await call('POST', ws('/members'), { user_id: consumer.id, role: 'consumer' });
   state.consumerId = consumer.id;
@@ -262,6 +266,8 @@ describe.skipIf(!ready)('the portal', () => {
     await go(page, `/${WS}/apis/${state.apiId}/plans`);
     await click(page, 'Subscribe');
     await page.waitForSelector('.modal', { timeout: 10000 });
+    await page.waitForFunction(() => document.querySelector('.modal')?.innerText.includes('Your project'), { timeout: 10000 });
+    await fill(page, 'Your project', 'a reading list', '.modal');
     await fill(page, 'Application name', 'My reading list', '.modal');
     await page.evaluate(() => document.querySelector('.modal button[type=submit]').click());
     await page.waitForFunction(() => document.body.innerText.includes('You are subscribed!'), { timeout: 20000 });
@@ -271,6 +277,13 @@ describe.skipIf(!ready)('the portal', () => {
     expect(subs[0].status).toBe('active');
     const detail = await call('GET', ws(`/subscriptions/${subs[0].id}`));
     expect(await text(page)).toContain(detail.credentials[0].client_id);
+    expect(detail.metadata).toEqual({ project: 'a reading list' });
+    // in French, the question is asked in French
+    await page.evaluate(() => localStorage.setItem('apim.portal.lang', 'fr'));
+    await go(page, `/${WS}/apis/${state.apiId}/plans`);
+    await click(page, 'Souscrire');
+    await page.waitForFunction(() => document.querySelector('.modal')?.innerText.includes('Votre projet'), { timeout: 10000 });
+    expect(await page.evaluate(() => document.querySelector('.modal').innerText)).toContain('ce que vous construisez');
     expect(page.problems).toEqual([]);
     await context.close();
   });

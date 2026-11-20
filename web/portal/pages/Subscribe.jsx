@@ -20,7 +20,7 @@ async function credentialsFor(appId, subId, attempts = 4) {
 }
 
 export function SubscribeModal({ api: a, plan, onClose }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const apps = useLoad(() => api.get('/applications'), []);
   const [appId, setAppId] = useState('');
   const [newName, setNewName] = useState('');
@@ -190,7 +190,7 @@ export function SubscribeModal({ api: a, plan, onClose }) {
               <TextArea value={usage} onChange={setUsage} rows={4} aria-label={t('sub.usage')} required={usageRequired} />
             </Field>
           )}
-          {formFields.length > 0 && <MetadataForm fields={formFields} values={answers} onChange={setAnswers} />}
+          {formFields.length > 0 && <MetadataForm fields={formFields} values={answers} onChange={setAnswers} lang={lang} />}
           {plan.terms && (
             <label className="checkbox">
               <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} />

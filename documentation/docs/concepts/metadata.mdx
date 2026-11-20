@@ -22,6 +22,7 @@ An administrator declares the fields of the workspace in **Workspace settings �
 | required | a missing value is an error |
 | portal | subscription scope: asked in the request form · application scope: filled by the consumer |
 | help | shown under the field |
+| translations | the label and the help in other languages — `{"fr": {"label": …, "help": …}}`: the console and the portal show the ones of the reader's language, the label and the help otherwise |
 
 The type drives both the rendering and the validation. Values live on each object; keys that are
 not declared are kept untouched.
@@ -30,7 +31,8 @@ not declared are kept untouched.
 curl -X PUT http://localhost:9000/api/workspaces/default/metadata-fields \
   -H 'Authorization: Bearer apim-admin-token' -H 'Content-Type: application/json' \
   -d '{"fields": [
-        {"scope": "subscription", "key": "siret", "label": "SIRET number", "type": "string", "required": true, "portal": true},
+        {"scope": "subscription", "key": "siret", "label": "SIRET number", "type": "string", "required": true, "portal": true,
+         "translations": {"fr": {"label": "Numéro SIRET", "help": "les 14 chiffres de votre établissement"}}},
         {"scope": "plan", "key": "sla", "label": "SLA", "type": "enum", "options": ["none", "99.5", "99.9"], "required": true}
       ]}'
 ```
