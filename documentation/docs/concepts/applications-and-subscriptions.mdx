@@ -28,9 +28,10 @@ particular. Suspending or closing the subscription therefore removes the trust i
 certificate; a certificate signed by a CA the gateway trusts (the trusted CAs of the plan) is not
 affected.
 
-On these plans the subscription itself carries no identity of the consumer on Otoroshi 18
-([G-17](../otoroshi-gaps.mdx)): the gateway names the caller `mtls_<plan>_<CN>`, and the product
-attributes its calls to the subscription of the application that declared that `client_id`.
+On these plans the subscription carries the `client_id` the application declares: the gateway
+serves that client id, and no other, while the subscription is active. Two applications cannot
+subscribe to the same plan with the same `client_id`; changing it moves the subscriptions of the
+application to the new one.
 
 **Whoever can see an application can see its credentials** — the members of its team, and the
 workspace administrators. Reading credentials is recorded in the audit trail.

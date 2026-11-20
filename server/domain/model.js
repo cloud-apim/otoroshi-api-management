@@ -322,15 +322,6 @@ export function validateDraft(draft) {
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)
       errors.push({ path: `plans[${i}].resourceFilter`, message: `plan "${p.name}" filters resources but allows none` });
-    if (['jwt', 'mtls', 'oauth2-remote', 'keyless'].includes(p.auth.kind) && p.status === 'published') {
-      warnings.push({
-        path: `plans[${i}]`,
-        code: 'any_token_passes',
-        message: `plan "${p.name}" (${p.auth.kind}): Otoroshi 18 mints the consumer itself on first call, so any valid ${
-          p.auth.kind === 'keyless' ? 'caller' : 'token or certificate'
-        } passes, subscribed or not (upstream gap).`,
-      });
-    }
     if (p.selectionRule || p.counterFailure !== 'allow' || p.circuitBreaker !== 'api') {
       warnings.push({
         path: `plans[${i}]`,

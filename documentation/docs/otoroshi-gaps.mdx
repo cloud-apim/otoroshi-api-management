@@ -21,7 +21,7 @@ follow, ➖ not fixed.
 | G-1 | A `pending` ApiSubscription got an **enabled** apikey | high | ✅ | projects a subscription once it is effective |
 | G-2 | Deleting an ApiSubscription **revoked nothing** | high | ✅ | deletes the subscription, Otoroshi revokes its keys |
 | G-3 | An `Api` without a published plan has **open routes** | high | 🔜 | warns, and asks for an explicit acknowledgement before deploying |
-| G-4 | On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, **any valid token passes**, subscribed or not | high | 🔜 | flags it on the plan |
+| G-4 | On `jwt`, `mtls` and `oauth2-remote` plans, **any valid token passed**, subscribed or not | high | ✅ | these plans serve only the client ids of enabled subscriptions |
 | G-5 | Resource filtering only exists on **apikey** plans | medium | 🔜 | flags the filter as not enforced on the other kinds |
 | G-6 | No plan attribute for the **selection rule**, the **counter failure strategy**, the **circuit breaker granularity** | medium | 🔜 | stores them, projects them as plan metadata, flags them as not enforced |
 | G-7 | An `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the ref of each deployment Otoroshi records |
@@ -34,7 +34,7 @@ follow, ➖ not fixed.
 | G-14 | No key validity relative to the subscription, only an absolute date | low | 🔜 | not offered |
 | G-15 | **oauth2-remote** plans check neither the issuer nor the audience of the token | high | 🔜 | warns on the plan |
 | G-16 | On **mtls** plans the subject and issuer patterns combine with **OR**, over a trust store shared by the whole gateway | medium | 🔜 | derives the issuer pattern from the plan's CAs; warns on a subject pattern alone |
-| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carries no consumer identity | high | 🔜 | client id carried as metadata of the subscription; calls attributed at ingestion |
+| G-17 | The subscription of a **jwt, mtls or oauth2-remote** plan carried no consumer identity | high | ✅ | the subscription carries the client id of the application; the gateway provisions its consumer |
 | G-18 | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan were keyed by the plan id alone, and outlived their Api | high | ✅ | nothing to do: they are named after the api and the plan, and leave with it |
 | G-19 | A data exporter sends the url secrets and the **personal data** of an event in clear, and samples nothing — the job of whoever stores the events | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | An admin key narrowed by its access rights **read the secret of every admin key** of its teams | high | ✅ | nothing to change: the product's key is its own, super admin |

@@ -164,15 +164,21 @@ function accessModeConfiguration(plan, draft) {
         tags: [],
         metadata: {},
       };
+    // jwt, mtls and oauth2-remote plans serve only the consumers an enabled subscription provisioned,
+    // for the client id they call with: a valid token or certificate alone is not a subscription
     case 'jwt':
-      return { verifier: c.derive?.enabled ? derivedVerifierId(draft.__apiId, plan.id) : c.verifier || null, client_id_path: c.clientIdPath || 'client_id', create_if_missing: true };
+      return {
+        verifier: c.derive?.enabled ? derivedVerifierId(draft.__apiId, plan.id) : c.verifier || null,
+        client_id_path: c.clientIdPath || 'client_id',
+        subscription_required: true,
+      };
     case 'mtls':
       return {
         regex_subject_dns: c.regexSubjectDNs || [],
         // without explicit issuer patterns, the plan accepts what its trusted CAs signed
         regex_issuer_dns: c.regexIssuerDNs?.length ? c.regexIssuerDNs : issuerPatterns(c.trustedCAs) || [],
         client_id_field: c.clientIdField || null,
-        create_if_missing: true,
+        subscription_required: true,
       };
     case 'oauth2-local':
       return { default_key_pair: c.defaultKeyPair || 'otoroshi-jwt-signing', expiration: c.expiration || 3600 };
@@ -183,7 +189,7 @@ function accessModeConfiguration(plan, draft) {
         client_id_path: c.clientIdPath || 'client_id',
         fetch_user: !!c.fetchUser,
         user_metadata_key: 'user_profile',
-        create_if_missing: true,
+        subscription_required: true,
       };
     case 'keyless':
       return { expr: c.expr || '${req.ip}', create_if_missing: c.createIfMissing === true };
@@ -483,9 +489,10 @@ function ms(d) {
 export const IDENTITY_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
 
 // on apikey / oauth2-local plans Otoroshi mints the key from the ApiSubscription; the application is
-// projected as an id_ref metadata on the key. On jwt / mtls / oauth2-remote plans Otoroshi mints
-// nothing and the ApiSubscription has no field for who calls (G-17): the client id the application
-// declares is carried as metadata, so that it is there once Otoroshi reads one.
+// projected as an id_ref metadata on the key. On jwt / mtls / oauth2-remote plans the subscription
+// carries the client id the application declares: Otoroshi provisions the key the plan resolves for
+// that consumer, enabled while the subscription is. The client id of a subscription never changes on
+// the gateway: when the application declares another one, the subscription is made again.
 export function buildOtoroshiSubscription(sub, { application }) {
   const enabled = sub.status === 'active';
   const clientId = IDENTITY_KINDS.includes(sub.auth_kind) && application?.client_id ? application.client_id : null;
@@ -500,10 +507,10 @@ export function buildOtoroshiSubscription(sub, { application }) {
       [META.subscription]: sub.id,
       [META.workspace]: sub.workspace_id,
       [META.managedBy]: 'otoroshi-api-management',
-      ...(clientId ? { [META.clientId]: clientId } : {}),
     },
-    // never project a pending subscription as enabled: Otoroshi 18 enables the key of a pending one
+    // only an effective subscription is projected: active, or suspended (its key disabled)
     status: enabled ? 'enabled' : 'disabled',
+    ...(clientId ? { client_id: clientId } : {}),
     dates: {
       created_at: ms(sub.created_at),
       processed_at: ms(sub.dates?.processed_at),
@@ -558,6 +565,7 @@ export function comparableApi(entity) {
       kind: p.access_mode_configuration_type,
       rate_limiting: p.rate_limiting?.strategy?.quota || null,
       window_ms: p.rate_limiting?.strategy?.windowDurationMs || null,
+      subscription_required: IDENTITY_KINDS.includes(p.access_mode_configuration_type) ? !!p.access_mode_configuration?.subscription_required : undefined,
       restrictions: p.access_mode_configuration?.restrictions?.enabled
         ? (({ allowLast, allowed, forbidden, notFound }) => ({ allowLast, allowed, forbidden, notFound }))(p.access_mode_configuration.restrictions)
         : null,

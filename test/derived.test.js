@@ -150,11 +150,18 @@ describe('subscriptions of token and certificate plans', () => {
   const sub = (auth_kind) => ({ id: 'sub_1', workspace_id: 'ws_1', api_id: 'api_atlas', plan_id: 'plan_1', application_id: 'app_1', auth_kind, status: 'active', dates: {} });
   const app = { id: 'app_1', name: 'Partner app', client_id: 'partner-42' };
 
-  test('carry the client id the application declares, for when Otoroshi reads one', async () => {
+  test('carry the client id the application declares: the gateway provisions its consumer', async () => {
     const { buildOtoroshiSubscription } = await import('../server/otoroshi/projection.js');
-    for (const kind of ['jwt', 'mtls', 'oauth2-remote']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).metadata.apim_client_id).toBe('partner-42');
+    for (const kind of ['jwt', 'mtls', 'oauth2-remote']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).client_id).toBe('partner-42');
     // the key of an apikey plan is its identity; an application without a client id has nothing to carry
-    for (const kind of ['apikey', 'oauth2-local', 'keyless']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).metadata.apim_client_id).toBeUndefined();
-    expect(buildOtoroshiSubscription(sub('jwt'), { application: { ...app, client_id: null } }).metadata.apim_client_id).toBeUndefined();
+    for (const kind of ['apikey', 'oauth2-local', 'keyless']) expect(buildOtoroshiSubscription(sub(kind), { application: app }).client_id).toBeUndefined();
+    expect(buildOtoroshiSubscription(sub('jwt'), { application: { ...app, client_id: null } }).client_id).toBeUndefined();
+  });
+
+  test('token and certificate plans serve only the consumers of an enabled subscription', () => {
+    const snap = snapshot([mtlsPlan({ clientIdField: 'CN', trustedCAs: [CA] }), remotePlan({ verifier: 'm' })]);
+    const entity = buildOtoroshiApi(snap);
+    for (const p of entity.plans) expect(p.access_mode_configuration.subscription_required).toBe(true);
+    expect(validateDraft(snap.draft).warnings.map((w) => w.code)).not.toContain('any_token_passes');
   });
 });

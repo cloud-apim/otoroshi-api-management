@@ -25,9 +25,9 @@ const AUTH_DEFAULTS = {
 const AUTH_HELP = () => ({
   apikey: tr('The subscription mints an Otoroshi apikey (client id / secret). Throttling, quotas and path restrictions are enforced on the key.'),
   'oauth2-local': tr('The gateway is the token endpoint (client_credentials). The subscription mints the client id / secret used to get tokens.'),
-  jwt: tr('The consumer calls with a JWT validated by an Otoroshi JWT verifier; the consumer is identified by a claim, matched to the client_id declared on the application.'),
-  mtls: tr('The consumer is identified by its client certificate (subject / issuer DN).'),
-  'oauth2-remote': tr('Tokens issued by a remote IdP, validated through an Otoroshi auth module.'),
+  jwt: tr('The consumer calls with a JWT validated by an Otoroshi JWT verifier, identified by a claim: only the client_id of a subscribed application is served.'),
+  mtls: tr('The consumer is identified by its client certificate (subject / issuer DN): only the client_id of a subscribed application is served.'),
+  'oauth2-remote': tr('Tokens issued by a remote IdP, validated through an Otoroshi auth module: only the client_id of a subscribed application is served.'),
   keyless: tr('No credential: an identity is still derived (e.g. from the IP) so the quotas of the plan apply per caller.'),
 });
 
@@ -309,9 +309,6 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             <Input value={p.selectionRule} onChange={(v) => set({ selectionRule: v })} mono placeholder={tr("${token.aud} == 'partner'")} />
             {p.selectionRule && <Callout kind="warning">{tr('Recorded and projected as plan metadata, not yet enforced by Otoroshi 18 (upstream work).')}</Callout>}
           </Setting>
-          {['jwt', 'mtls', 'oauth2-remote', 'keyless'].includes(p.auth.kind) && (
-            <Callout kind="warning"><Tr text={'On Otoroshi 18 the gateway mints the consumer itself on the first call: any valid {0} passes, subscribed or not (upstream gap G-4).'} args={[p.auth.kind === 'keyless' ? tr('caller') : tr('token or certificate')]} /></Callout>
-          )}
         </div>
       )}
       {section === 'limits' && (

@@ -18,7 +18,6 @@ export const META = {
   application: 'id_ref', // the application is projected as an id_ref metadata on the apikey
   managedBy: 'apim_managed_by',
   setupPart: 'apim_setup_part', // the part of the setup that made an entity of the gateway
-  clientId: 'apim_client_id', // the client id an application declares, on the subscriptions that have no key
 };
 
 let cached = null;

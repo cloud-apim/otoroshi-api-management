@@ -52,7 +52,7 @@ function CreateAppModal({ onClose, onCreated }) {
       <Field label={tr('Owning team')}>
         <Select value={form.team_id || teams.data?.[0]?.id || ''} onChange={set('team_id')} options={(teams.data || []).map((t) => ({ value: t.id, label: t.personal ? tr('{0} (personal)', [t.name]) : t.name }))} />
       </Field>
-      <Field label={tr('Expected client_id')} hint={tr("for oauth2 and mtls plans: how the gateway's consumer is reconciled with this application")}>
+      <Field label={tr('Expected client_id')} hint={tr('for jwt, oauth2 and mtls plans: the gateway serves this client id once the application subscribes')}>
         <Input value={form.client_id} onChange={set('client_id')} mono />
       </Field>
     </Modal>
@@ -180,7 +180,7 @@ export function ApplicationPage({ id }) {
                     <Setting label={tr('Description')}>
                       <TextArea value={f.description} onChange={set('description')} rows={2} />
                     </Setting>
-                    <Setting label={tr('Expected client_id')} help={tr('On oauth2, jwt and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate. Declaring it here is what reconciles what the gateway sees with this application.')}>
+                    <Setting label={tr('Expected client_id')} help={tr('On jwt, oauth2 and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate, and serves only the client ids of subscribed applications. Changing it moves the subscriptions of the application to the new one.')}>
                       <Input value={f.client_id || ''} onChange={set('client_id')} mono />
                     </Setting>
                     {metaFields.length > 0 && (

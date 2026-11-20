@@ -143,10 +143,17 @@ describe('derived objects', () => {
     state.certIds = certs.map((c) => c.id);
   });
 
-  test('a token of the authorization server passes the oauth2-remote plan, a forged one does not', async () => {
+  test('a token of the authorization server passes the oauth2-remote plan once subscribed, a forged one does not', async () => {
+    const team = await call('POST', ws('/teams'), { name: 'SSO partners' });
+    const app = await call('POST', ws('/applications'), { name: 'SSO partner', team_id: team.id, client_id: `partner-${RUN}` });
     const good = await token(`partner-${RUN}`);
+    // not subscribed yet: a valid token is not a consumer of the plan
+    expect((await gatewayCall('/documents', { headers: { Authorization: `Bearer ${good}` }, expect: (r) => r.status !== 404 })).status).toBe(401);
+    await call('POST', ws('/subscriptions'), { api_id: state.apiId, plan_id: 'plan_sso', application_id: app.id });
     const ok = await gatewayCall('/documents', { headers: { Authorization: `Bearer ${good}` }, expect: (r) => r.status === 200 });
     expect(ok.status).toBe(200);
+    // another client of the same server, not subscribed
+    expect((await gatewayCall('/documents', { headers: { Authorization: `Bearer ${await token(`stranger-${RUN}`)}` } })).status).toBe(401);
     const forged = `${good.split('.').slice(0, 2).join('.')}.${Buffer.from('not the signature').toString('base64url')}`;
     const ko = await gatewayCall('/documents', { headers: { Authorization: `Bearer ${forged}` } });
     expect([400, 401, 403]).toContain(ko.status);
@@ -179,11 +186,18 @@ describe('derived objects', () => {
     const [cert] = await onGateway();
     expect(cert.chain.replace(/\s+/g, '')).toBe(CA.replace(/\s+/g, ''));
     expect(cert.metadata.apim_derived).toBe('true');
-    // the subscription carries the client id the application declares, and follows it
+    // the subscription carries the client id the application declares, and the gateway provisions
+    // its consumer; another client id is another subscription on the gateway, the previous key disabled
     const projected = () => otoroshi('GET', `/apis/apis.otoroshi.io/v1/apisubscriptions/${sub.id}`);
-    expect((await projected()).metadata.apim_client_id).toBe('Atlas Partner CA');
+    expect((await projected()).client_id).toBe('Atlas Partner CA');
+    const before = `mtls_${state.apiId}_plan_certified_Atlas Partner CA`;
+    expect((await projected()).token_refs).toEqual([{ apikey: before }]);
     await call('PUT', ws(`/applications/${app.id}`), { client_id: 'atlas-partner' });
-    expect((await projected()).metadata.apim_client_id).toBe('atlas-partner');
+    expect((await projected()).client_id).toBe('atlas-partner');
+    expect((await projected()).token_refs).toEqual([{ apikey: `mtls_${state.apiId}_plan_certified_atlas-partner` }]);
+    expect((await otoroshi('GET', `/api/apikeys/${encodeURIComponent(before)}`)).enabled).toBe(false);
+    await call('POST', '/gateway/drift', {});
+    expect((await call('GET', ws(`/subscriptions/${sub.id}`))).drift?.status).toBe('in_sync');
     // suspended: the gateway no longer trusts it; resumed: back
     await call('POST', ws(`/subscriptions/${sub.id}/suspend`), {});
     expect(await onGateway()).toEqual([]);

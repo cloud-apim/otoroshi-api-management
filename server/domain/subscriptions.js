@@ -67,6 +67,16 @@ function now() {
   return new Date().toISOString();
 }
 
+// the gateway serves one consumer per client id and plan: two applications cannot subscribe to a
+// token or certificate plan with the same client id
+export async function clientIdTaken(apiId, planId, clientId, applicationId) {
+  if (!clientId) return false;
+  const rows = await db`select s.id from subscriptions s join applications a on a.id = s.application_id
+    where s.api_id = ${apiId} and s.plan_id = ${planId} and a.client_id = ${clientId} and a.id <> ${applicationId}
+      and s.status = any(${'{' + OPEN_STATUSES.join(',') + '}'}::text[])`;
+  return rows.length > 0;
+}
+
 export async function requestSubscription(ctx, workspaceId, input) {
   const { api_id, plan_id, application_id } = input;
   const api = (await db`select * from apis where id = ${api_id} and workspace_id = ${workspaceId}`)[0];
@@ -87,6 +97,8 @@ export async function requestSubscription(ctx, workspaceId, input) {
   if (plan.terms?.enabled && !input.terms_accepted) throw badRequest('you must accept the terms of use of this plan');
   if (['oauth2-remote', 'jwt', 'mtls'].includes(plan.auth.kind) && !app.client_id)
     throw badRequest(`a ${plan.auth.kind} plan identifies the consumer by its client_id: declare the expected client_id on the application first`);
+  if (['oauth2-remote', 'jwt', 'mtls'].includes(plan.auth.kind) && (await clientIdTaken(api.id, plan.id, app.client_id, app.id)))
+    throw conflict(`another application subscribed to ${plan.name} with the client_id ${app.client_id}: the gateway serves one consumer per client id and plan`);
   const dup = await db`select id from subscriptions where application_id = ${app.id} and api_id = ${api.id} and plan_id = ${plan.id}
     and status = any(${'{' + OPEN_STATUSES.join(',') + '}'}::text[])`;
   if (dup.length) throw conflict('this application already has an open subscription to this plan');
@@ -386,7 +398,12 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
     const entity = buildOtoroshiSubscription(sub, { application: app });
     let written;
     if (!existing) {
-      written = await oto.createSubscription(entity);
+      written = await oto.createSubscription({ ...entity, token_refs: [] });
+    } else if ((existing.client_id || null) !== (entity.client_id || null)) {
+      // the client id of a subscription never changes on the gateway: it is made again, the key of
+      // the previous client id left disabled
+      await oto.deleteSubscription(sub.id);
+      written = await oto.createSubscription({ ...entity, token_refs: [], dates: { ...entity.dates, created_at: existing.dates?.created_at || entity.dates.created_at } });
     } else {
       entity.token_refs = existing.token_refs || [];
       entity.dates.created_at = existing.dates?.created_at || entity.dates.created_at;

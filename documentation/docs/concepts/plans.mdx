@@ -105,14 +105,10 @@ auth:
     derive: { enabled: true, discoveryUrl: https://idp.example.com/.well-known/openid-configuration, jwksUrl: https://idp.example.com/jwks }
 ```
 
-On `jwt`, `mtls` and `oauth2-remote` plans the application must declare its expected `client_id`:
-it is how the consumer seen by the gateway is reconciled with the catalogue.
-
-:::warning Any valid token passes
-On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans, Otoroshi 18 mints the consumer itself on
-the first call, so any valid token or certificate is served, subscribed or not. The console flags
-it on the plan. See [G-4](../otoroshi-gaps.mdx).
-:::
+On `jwt`, `mtls` and `oauth2-remote` plans the application must declare its expected `client_id`,
+and the gateway serves **only the client ids of enabled subscriptions**: a valid token or
+certificate alone is not a subscription. A caller the plan does not serve falls to the next plan
+of the API — a `keyless` plan serves it as any anonymous caller — or is refused (`401`).
 
 The gateway names the consumers of these plans after the API and the plan
 (`jwt_<api>_<plan>_<client id>`): two APIs may have plans of the same id, their consumers are

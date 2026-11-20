@@ -17,6 +17,7 @@ Last update: 2026-11-20.
   - G-10: the derived certificates are written with the upsert of the generic api, which computes their subject and dates from the chain.
   - Otoroshi 18.1 required by the setup check. G-8: the `Api` is managed as code, `created_by=external=otoroshi-api-management`. G-7, R-33: the snapshot id is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records; the console lists the gateway's deployments by snapshot.
   - G-1, G-2, G-18, G-20: closing a subscription deletes it, Otoroshi revokes its keys; deleting an api deletes its `Api`, Otoroshi its subscriptions and keys; the warning `plan_id_shared` and the cleanup of minted keys in the tests are gone. Undeploying now disables the `Api` rather than deleting it, so that the consumers keep their keys at the next deployment.
+  - G-17, G-4, R-15: the subscription of a jwt, mtls or oauth2-remote plan carries the application's `client_id`, and Otoroshi provisions its consumer; these plans are projected with `subscription_required`: a valid token or certificate alone is not served. A client id changed by the application makes the subscription again on the gateway; two applications cannot subscribe to a plan with the same client id.
 
 ## Next, in the proposed order
 
@@ -63,7 +64,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-10 | L | Named compositions: resources and dictionaries |
 | R-19 | L | Custom portal templates |
 
-**Blocked on Otoroshi (4), fixed upstream, being followed:** R-14 (G-6), R-15 (G-4), R-16 (G-13), R-24 (G-12, then S).
+**Blocked on Otoroshi (3), fixed upstream, being followed:** R-14 (G-6), R-16 (G-13), R-24 (G-12, then S).
 
 **Owner decisions (4):** R-26 where the gateway health and the drift live in the console · R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
 
@@ -95,7 +96,6 @@ waits for the data plane rather than working around it.
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
 | R-14 | §4, G-6 | Enforce the **selection rule**, **counter failure strategy** and **circuit breaker granularity** of a plan — stored and projected as metadata today | — | G-6 |
-| R-15 | D-6, G-4 | Require a **subscription on jwt / mtls / oauth2-remote / keyless plans** — today any valid token passes | — | G-4 |
 | R-16 | G-13 | Keep the consumers of a **deprecated plan** served (only published plans get an extractor) | — | G-13 |
 | R-17 | §5 | **Adopt mode**, second half: take over the existing subscriptions and apikeys of an adopted Api, not only its description | M | |
 | R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
@@ -172,7 +172,7 @@ waits for the data plane rather than working around it.
 | D-3 the api created end to end, routes included | ✅ | resources → routes, backends, flows: plugins named and configured from the gateway's catalog (default configuration, order, regex paths), plan flows; configuration as a form generated from the catalog's form description (`config_schema` / `config_flow`) or as JSON; JSON, YAML and Markdown (documentation pages, portal home) in a code editor (Monaco, bundled, loaded on first use) |
 | D-4 never in the request path | ✅ | replayable task queue `server/domain/tasks.js`; `test/product-down.test.js`: with the product and its databases stopped, keys, tokens and quotas are enforced by the gateway alone; with the gateway unreachable, the portal serves its catalogue and a subscription waits, then is projected |
 | D-5 the policy lives in the plan | ✅ | plan editor; limits and filtering projected on the plan |
-| D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway — limits: G-1, G-4, G-17; the consumers minted for a plan are keyed by its id alone (G-18): warning `plan_id_shared` on the draft and the deployment (`test/shared-plan-ids.test.js`) |
+| D-6 a subscription is an apikey | ✅ | `apiRef` + `id_ref` verified on the gateway, on every kind: the subscription of a jwt, mtls or oauth2-remote plan carries the client id of the application, and the gateway serves only the consumers of enabled subscriptions (`test/reference-catalogue.test.js`, `test/derived-objects.test.js`) |
 | D-8 PostgreSQL ×2 | ✅ | `server/db/migrations.js` |
 | D-9 n°1 everything the UI does goes through the API | ✅ | the same router on `/api` and `/backoffice/api` |
 | D-9 n°2 escape hatch to the projected entity | ✅ | "Technical details", link to the Otoroshi backoffice |

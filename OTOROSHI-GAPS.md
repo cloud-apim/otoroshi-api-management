@@ -22,7 +22,7 @@ upstream, the product still does what the last column says; ➖ **not fixed**, b
 | G-1 | [#2940](https://github.com/MAIF/otoroshi/issues/2940) | A `pending` ApiSubscription got an **enabled** apikey | high | ✅ | projects a subscription once it is effective, its key enabled while it is active |
 | G-2 | [#2941](https://github.com/MAIF/otoroshi/issues/2941) | Deleting an ApiSubscription **revoked nothing** | high | ✅ | deletes the subscription, Otoroshi revokes its keys |
 | G-3 | [#2942](https://github.com/MAIF/otoroshi/issues/2942) | An `Api` without a published plan has **open routes** | high | 🔜 | warns and asks for an explicit acknowledgement before deploying |
-| G-4 | [#2943](https://github.com/MAIF/otoroshi/issues/2943) | On jwt / mtls / oauth2-remote / keyless plans, **any valid token passes**, subscribed or not | high | 🔜 | flags it on the plan (warning `any_token_passes`); R-15 waits for it |
+| G-4 | [#2943](https://github.com/MAIF/otoroshi/issues/2943) | On jwt / mtls / oauth2-remote plans, **any valid token passed**, subscribed or not | high | ✅ | projects these plans with `subscription_required`: only the client ids of enabled subscriptions are served (R-15) |
 | G-5 | [#2944](https://github.com/MAIF/otoroshi/issues/2944) | Resource filtering (restrictions) only exists on **apikey** plans | medium | 🔜 | flags it as not enforced on other kinds |
 | G-6 | [#2945](https://github.com/MAIF/otoroshi/issues/2945) | No plan attribute for **selection rule**, **counter failure strategy**, **circuit breaker granularity** | medium | 🔜 | stored, projected as plan metadata, flagged as not enforced; R-14 waits for it |
 | G-7 | [#2946](https://github.com/MAIF/otoroshi/issues/2946) | `ApiDeployment` could not carry the **external snapshot id** | medium | ✅ | the snapshot is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records (R-33) |
@@ -35,7 +35,7 @@ upstream, the product still does what the last column says; ➖ **not fixed**, b
 | G-14 | [#2953](https://github.com/MAIF/otoroshi/issues/2953) | A plan's key template only has an **absolute** `validUntil` | low | 🔜 | not offered (the field was removed from the model) |
 | G-15 | [#2954](https://github.com/MAIF/otoroshi/issues/2954) | **oauth2-remote** plans check neither the **issuer** nor the **audience** of the token | high | 🔜 | warns on the plan (`token_claims_not_checked`) |
 | G-16 | [#2955](https://github.com/MAIF/otoroshi/issues/2955) | On **mtls** plans the subject and issuer lists combine with **OR**, over a trust store shared by the whole gateway | medium | 🔜 | derives the issuer list from the plan's CAs when none is given; warns when a subject list stands alone |
-| G-17 | [#2937](https://github.com/MAIF/otoroshi/issues/2937) | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carries **no consumer identity** | high | 🔜 | the client id is carried as metadata of the ApiSubscription; calls are attributed at ingestion |
+| G-17 | [#2937](https://github.com/MAIF/otoroshi/issues/2937) | The `ApiSubscription` of a **jwt, mtls or oauth2-remote** plan carried **no consumer identity** | high | ✅ | the subscription carries the application's `client_id`; Otoroshi provisions its consumer, enabled while the subscription is |
 | G-18 | [#2938](https://github.com/MAIF/otoroshi/issues/2938) | The consumers minted for a **jwt, mtls, oauth2-remote or keyless** plan were keyed by the **plan id alone**, and outlived their Api | high | ✅ | nothing to do: the consumers are named after the api and the plan, and leave with the `Api` |
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
@@ -77,23 +77,17 @@ anyone.
 **Upstream fix.** An `Api` in `published` state with no published plan should deny by default
 (or require an explicit `open: true` / a keyless plan to be open).
 
-## G-4 — any valid token passes on non-apikey plans — high
+## G-4 — any valid token passed on token and certificate plans — high — followed
 
-Upstream: [MAIF/otoroshi#2943](https://github.com/MAIF/otoroshi/issues/2943).
+Upstream: [MAIF/otoroshi#2943](https://github.com/MAIF/otoroshi/issues/2943), fixed in 18.1: a
+`jwt`, `mtls` or `oauth2-remote` plan with `subscription_required` mints nothing, and serves only
+the key an `enabled` subscription provisioned for the client id the caller is identified with
+(G-17). Another caller is not identified by the plan: another plan of the api may identify it (a
+`keyless` one), otherwise it gets `401`.
 
-**Observed.** On `jwt`, `mtls`, `oauth2-remote` and `keyless` plans the extractor mints the
-consumer itself on the first call (`createIfMissing`, e.g. `next/models/Api.scala:1870`). Any
-token signed by the verifier — or any certificate matching the DN regexes — is served and counted,
-whether a subscription exists or not. Verified in the reference catalogue test: a JWT with an arbitrary
-`client_id` passes on its jwt plan.
-
-**Product meanwhile.** Warning `any_token_passes` on the plan; the application declares its
-expected `client_id` so that what the gateway sees can be reconciled, but nothing stops an
-unsubscribed caller.
-
-**Upstream fix.** A plan option "subscription required": the extractor resolves the minted
-consumer against the existing `ApiSubscription`s of the plan (by client id) and refuses when there
-is none — instead of `createIfMissing`.
+**The product.** Its plans of these kinds are projected with `subscription_required: true`: a
+subscription is always required (D-6). The warning `any_token_passes` is gone (R-15). A `keyless`
+plan stays open by nature: it is the anonymous tier.
 
 ## G-5 — resource filtering only on apikey plans — medium
 
@@ -269,51 +263,21 @@ patterns and no issuer pattern gets a validation warning (`subject_without_issue
 **Upstream fix.** Combine the two lists with AND when both are given (or a `match: all | any`
 switch), and an optional per-plan list of trusted CA certificate ids checked on the chain.
 
-## G-17 — token and certificate subscriptions carry no consumer identity — high
+## G-17 — token and certificate subscriptions carried no consumer identity — high — followed
 
-Upstream: [MAIF/otoroshi#2937](https://github.com/MAIF/otoroshi/issues/2937).
+Upstream: [MAIF/otoroshi#2937](https://github.com/MAIF/otoroshi/issues/2937), fixed in 18.1: an
+`ApiSubscription` to a `jwt`, `mtls` or `oauth2-remote` plan has a `client_id`; Otoroshi provisions
+the key `<kind>_<api id>_<plan id>_<client id>` the plan resolves for that consumer (taking over one
+minted on the fly), references it in `token_refs`, enables it only while the subscription is
+`enabled`, and disables it when the subscription is deleted. The `client_id` is unique per plan and
+never changes (`400`).
 
-**Observed.** On `jwt`, `mtls` and `oauth2-remote` plans, an `ApiSubscription` creates nothing
-and carries no identity of its consumer — `owner_ref` is the application, `token_refs` stays
-empty. `ApiSubscription.handleSubscriptionChanged` (`next/models/Api.scala:1188`) only creates
-(`createNewApikeyFromPlan`) and updates (`updateApikeyFromPlan`) keys for `apikey` and
-`oauth2-local` subscriptions. The extractor builds the consumer at call time as
-`<kind>_<planId>_<clientId>` — the prefix is set by `pluginsForPlan`
-(`next/models/Api.scala:1868`, `:1894`, `:1917`) — without looking at any subscription. So
-suspending or closing such a subscription changes nothing at the gateway, and a call cannot be tied
-to the subscription it was made under — even once G-4 refuses unsubscribed callers, there is
-nothing to resolve them against.
-
-**What makes the fix small.** `ApikeyFromPlan.resolveOrCreate` (`next/plugins/apimgmt.scala:200`)
-never mints over an existing key, and refuses a disabled one (401 and `RevokedApiKeyUsageAlert`).
-A key `<kind>_<planId>_<clientId>` saved ahead of the first call, enabled or not, therefore decides
-for that consumer.
-
-**Why the product does not save that key itself.** It would rely on the extractor's naming
-convention, not on a contract; it would copy what `generateNewApikeyFromPlan` builds from a plan
-(quotas, throttling, restrictions, rotation) and keep it in step with every plan change, which
-Otoroshi only does for `apikey` and `oauth2-local` subscriptions; and a closed subscription would
-have to leave its key disabled forever, since a deleted one is minted again at the next call. It
-is the data plane's job.
-
-**Product meanwhile.** The application declares its expected client id and its client
-certificates. The ApiSubscription of a jwt, mtls or oauth2-remote plan carries that client id as
-the metadata `apim_client_id`, re-projected when the application changes it and checked for
-drift: ignored by Otoroshi today, in place once it reads one. The ingester attributes
-`<kind>_<planId>_<clientId>` consumers to the subscription of the application that declared that
-client id. The certificates of an application are derived as certificates of the gateway only
-while it has an active subscription to an mtls plan: suspending or closing removes the trust in a
-self-signed certificate (one signed by a CA the gateway trusts is not affected).
-
-**Upstream fix** (detailed in the issue). A `client_id` field on `ApiSubscription`, as the plan
-reads it, immutable, unique per plan. On create, Otoroshi saves the key `<plan prefix><client_id>`
-with `generateNewApikeyFromPlan` — or takes over the one minted on the fly — and references it in
-`token_refs`; on update and on plan changes the key follows the plan and the status (enabled only
-when the subscription is); deleting the subscription leaves its key disabled. Every key minted for
-these plans, on the fly or by a subscription, carries the metadata `api_id`, `plan_id`,
-`access_mode` (`jwt`, `mtls`, `oauth2-remote`) and `plan_consumer: "true"`, written after the
-template's. G-4's "subscription required" then only turns `create_if_missing` off: an unknown
-client id has no key and is refused.
+**The product.** The subscription carries the `client_id` the application declares
+(`buildOtoroshiSubscription`); when the application declares another one, the subscription is made
+again on the gateway (`sync_subscription`), the key of the previous one left disabled. Two
+applications cannot subscribe to a plan with the same client id, nor take the client id of another
+application subscribed to the same plan. Drift detection compares the client id and the state of the
+provisioned key. The metadata `apim_client_id` is gone.
 
 ## G-18 — consumers minted for a plan were keyed by the plan id alone — high — followed
 

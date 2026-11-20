@@ -7,7 +7,7 @@ import { db, newId } from '../db/index.js';
 import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
-import { buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
+import { IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
   await db`insert into drift_reports (id, workspace_id, entity_kind, entity_id, otoroshi_kind, otoroshi_id, status, diff, checked_at)
@@ -56,9 +56,17 @@ export async function checkSubscription(sub) {
     if (actual.plan_ref !== sub.plan_id) changes.push({ op: 'change', path: 'plan_ref', before: sub.plan_id, after: actual.plan_ref });
     if (actual.api_ref !== sub.api_id) changes.push({ op: 'change', path: 'api_ref', before: sub.api_id, after: actual.api_ref });
     const app = (await db`select id, name, client_id from applications where id = ${sub.application_id}`)[0];
-    const wantedClientId = buildOtoroshiSubscription(sub, { application: app }).metadata[META.clientId] ?? null;
-    const actualClientId = actual.metadata?.[META.clientId] ?? null;
-    if (actualClientId !== wantedClientId) changes.push({ op: 'change', path: `metadata.${META.clientId}`, before: wantedClientId, after: actualClientId });
+    const wantedClientId = buildOtoroshiSubscription(sub, { application: app }).client_id ?? null;
+    const actualClientId = actual.client_id ?? null;
+    if (actualClientId !== wantedClientId) changes.push({ op: 'change', path: 'client_id', before: wantedClientId, after: actualClientId });
+    // the key Otoroshi provisioned for the client id of a token or certificate subscription
+    if (IDENTITY_KINDS.includes(sub.auth_kind))
+      for (const ref of actual.token_refs || []) {
+        const key = ref.apikey ? await oto.getApikey(ref.apikey) : null;
+        if (!key) changes.push({ op: 'remove', path: `apikey[${ref.apikey}]`, before: 'present' });
+        else if (key.enabled !== (sub.status === 'active'))
+          changes.push({ op: 'change', path: `apikey[${ref.apikey}].enabled`, before: sub.status === 'active', after: key.enabled });
+      }
     const creds = await db`select * from credentials where subscription_id = ${sub.id} and status = 'active'`;
     for (const c of creds) {
       const key = await oto.getApikey(c.client_id);

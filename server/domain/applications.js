@@ -98,6 +98,19 @@ export function requireUnmanaged(ctx, obj, what) {
 
 export async function updateApplication(ctx, app, patch) {
   requireUnmanaged(ctx, app, 'application');
+  // the gateway serves one consumer per client id and plan: not the client id another application
+  // already subscribed with to a plan this one subscribes to
+  const nextClientId = patch.client_id !== undefined ? patch.client_id || null : app.client_id;
+  if (nextClientId && nextClientId !== app.client_id) {
+    const taken = await db`select p.name from subscriptions s join subscriptions o on o.api_id = s.api_id and o.plan_id = s.plan_id
+        join applications other on other.id = o.application_id
+        cross join lateral (select coalesce(s.request->>'plan_name', s.plan_id) as name) p
+      where s.application_id = ${app.id} and other.id <> ${app.id} and other.client_id = ${nextClientId}
+        and s.auth_kind = any(${'{' + IDENTITY_KINDS.join(',') + '}'}::text[])
+        and s.status in ('pending', 'pending_payment', 'active', 'suspended') and o.status in ('pending', 'pending_payment', 'active', 'suspended')
+      limit 1`;
+    if (taken.length) throw conflict(`another application subscribed to ${taken[0].name} with the client_id ${nextClientId}: the gateway serves one consumer per client id and plan`);
+  }
   if (patch.metadata !== undefined)
     patch = { ...patch, metadata: await checkValues(app.workspace_id, 'application', { ...app.metadata, ...patch.metadata }, { only: ctx.via === 'portal' ? (f) => f.portal : null }) };
   const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
@@ -106,7 +119,7 @@ export async function updateApplication(ctx, app, patch) {
     where id = ${app.id} returning *`;
   await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated` });
   if (patch.certificates !== undefined || patch.name !== undefined) await syncCertificates(rows[0]);
-  // the subscriptions without a key carry the client id the application declares
+  // the subscriptions to token and certificate plans carry the client id the application declares
   if ((rows[0].client_id || null) !== (app.client_id || null)) {
     const subs = await db`select id from subscriptions where application_id = ${app.id} and status in ('active', 'suspended')
       and auth_kind = any(${'{' + IDENTITY_KINDS.join(',') + '}'}::text[])`;

@@ -178,8 +178,6 @@ describe('reference catalogue', () => {
     const kinds = new Set(saved.draft.plans.map((p) => p.auth.kind));
     expect(saved.draft.plans.length).toBe(6);
     expect(kinds.size).toBe(5);
-    // the abstraction does not lie: the gaps of the data plane are surfaced, not hidden
-    expect(saved.validation.warnings.some((w) => w.code === 'any_token_passes')).toBe(true);
     // effective resolution order: credential based kinds first, keyless last
     const order = saved.resolution_order.map((o) => o.kind);
     expect(order[order.length - 1]).toBe('keyless');
@@ -272,6 +270,19 @@ describe('reference catalogue', () => {
     // the jwt consumer calls with its own token, identified by the client_id of the application
     const res = await gatewayCall('/documents/2026-0042', { headers: { Authorization: `Bearer ${jwt({ client_id: `agency-north-${RUN}`, iss: 'https://id.atlas.example' })}` }, expect: (r) => r.status === 200 });
     expect(res.status).toBe(200);
+    // the subscription provisioned the consumer of that client id, tied to it
+    const key = await oto.getApikey(`jwt_${state.apiId}_plan_partner_agency-north-${RUN}`);
+    expect(key.apiRef).toEqual({ api: state.apiId, plan: 'plan_partner', sub: sub.id });
+    expect(key.metadata.id_ref).toBe(app.id);
+    // a valid token without a subscription is not a consumer of the plan: the open plan serves it, under its quota
+    const stranger = await fetch(`${GATEWAY}/documents/2026-0042`, { headers: { Host: DOMAIN, Authorization: `Bearer ${jwt({ client_id: `stranger-${RUN}`, iss: 'https://id.atlas.example' })}` } });
+    expect(stranger.status).toBe(200);
+    expect(await oto.getApikey(`jwt_${state.apiId}_plan_partner_stranger-${RUN}`)).toBeNull();
+    // suspended, the consumer is turned away; resumed, served again
+    await call('POST', ws(`/subscriptions/${sub.id}/suspend`), {});
+    expect((await oto.getApikey(key.clientId)).enabled).toBe(false);
+    await call('POST', ws(`/subscriptions/${sub.id}/resume`), {});
+    expect((await oto.getApikey(key.clientId)).enabled).toBe(true);
   });
 
   test('approval 4 — contract: Bulk is out of self-service, a producer puts the consumer on it', async () => {

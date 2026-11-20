@@ -94,14 +94,18 @@ On `apikey` and `oauth2-local` plans Otoroshi mints the key from the plan's temp
 subscription's metadata — among which **`id_ref`, the application**. That is what answers
 "which APIs does this application consume" and "which keys to revoke if it is compromised".
 
-On `jwt`, `mtls` and `oauth2-remote` plans Otoroshi mints no key: the gateway builds the consumer
-at each call from the token or the certificate. The `ApiSubscription` then carries the client id
-the application declares, as the metadata `apim_client_id`. Otoroshi does not read it yet
-([gap G-17](../otoroshi-gaps.mdx)); it is re-projected when the application changes its client id,
-and a value changed on the gateway is reported as drift.
+On `jwt`, `mtls` and `oauth2-remote` plans the consumer calls with its own token or certificate.
+The `ApiSubscription` carries the `client_id` the application declares, and Otoroshi provisions the
+key the plan resolves for that consumer — `jwt_<api>_<plan>_<client id>`, with the same `apiRef`
+and metadata — enabled while the subscription is. These plans are projected with
+`subscription_required`: a valid token or certificate whose client id no enabled subscription
+declares is not a consumer of the plan. The client id of a subscription never changes on the
+gateway: when the application declares another one, the subscription is made again, the key of the
+previous client id left disabled. A client id changed on the gateway, or a provisioned key enabled
+or disabled by hand, is reported as drift.
 
 A suspended subscription is projected `disabled`; a pending or rejected one is not projected at all;
-closing deletes the keys first, then the subscription.
+closing deletes the subscription, and Otoroshi revokes its keys.
 
 ## Asynchronous and replayable
 
