@@ -15,9 +15,9 @@ dropped its workarounds rather than keeping them for 18.0: nothing depends on th
 
 On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
 they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
-contract on the gateway. Found on the way: G-22 and G-23, reported upstream; G-24 to G-28 in the
-Threat Protection Suite, checked on a gateway running its release 1.0.0, not reported yet (G-25 is
-not a gap). Status: ✅ **followed** — the
+contract on the gateway. Found on the way: G-22 and G-23, reported upstream; G-24, G-26, G-27 and
+G-28 in the Threat Protection Suite, checked on a gateway running its release 1.0.0 and reported to
+it (G-25 is not a gap). Status: ✅ **followed** — the
 product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
 yet.
 
@@ -46,11 +46,11 @@ yet.
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
 | G-23 | [#2963](https://github.com/MAIF/otoroshi/issues/2963) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
-| G-24 | — | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
+| G-24 | [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60) | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
 | G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
-| G-26 | — | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
-| G-27 | — | Threat Protection Suite: with the core rule set, **every call scores a firewall match** — its initialization rules count as matches | medium | ⬜ | nothing: a policy that refuses starts at 90 (the weight of a block), and the events of every call are kept |
-| G-28 | — | Threat Protection Suite: a firewall that **blocks on its own** sends no `CloudApimSecurityEvent`, only its trail event | medium | ⬜ | the docs advise the fabric of the extension — the firewall reports, the threat response decides — whose refusals are security events |
+| G-26 | [waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61) | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
+| G-27 | [waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62) | Threat Protection Suite: with the core rule set, **every call scores a firewall match** — its initialization rules count as matches | medium | ⬜ | nothing: a policy that refuses starts at 90 (the weight of a block), and the events of every call are kept |
+| G-28 | [waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63) | Threat Protection Suite: a firewall that **blocks on its own** sends no `CloudApimSecurityEvent`, only its trail event | medium | ⬜ | the docs advise the fabric of the extension — the firewall reports, the threat response decides — whose refusals are security events |
 
 ---
 
@@ -372,9 +372,9 @@ last of them; a foreign key without the flag is refused, or dropped from the `to
 
 ## G-24 — the global table of Threat Studio does not see the plan plugins — high — open
 
-Not reported upstream yet. In the Threat Protection Suite (`../otoroshi-waf-extension`), found while
-implementing R-25 (threat protection per plan, D-10), and checked on a gateway running the release
-1.0.0.
+Reported upstream: [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60). In the Threat Protection Suite (`../otoroshi-waf-extension`),
+found while implementing R-25 (threat protection per plan, D-10), and checked on a gateway running
+the release 1.0.0.
 
 **Observed.** The global preset (`CloudApimSecuritySuiteGlobalPreset`, the table of Threat Studio)
 protects every route a rule of its table claims, and stands down on a route that carries its own
@@ -397,9 +397,20 @@ would be banned.
 **The product.** It places the preset of the extension on the plan — it never adds a firewall of its
 own. Nothing more: the docs ask an operator to keep the global table off the apis protected per plan.
 
-**Fix to propose.** `carriesOwnProtection` also looks at the plans of the Api the route belongs to
-(`route.apiRef` → its plans' `plugins.plugins`, and the flow they reference), or the global preset
-stands down at call time when a preset of the plan of the call is in the chain.
+**Why it cannot see it.** The order of a call on an Api (`next/proxy/engine.scala:2119-2173` in
+Otoroshi): the chain of the route — its global plugins and its own — is built first, and the global
+preset expands there, deciding whether it stands down; its plugins run, the extractors of the plans
+among them, which identify the key, hence its `apiRef`, hence the plan; only then is the chain of
+the plan composed, its own phases run, and merged with the one of the route for the rest of the call,
+the global plugins kept as they were expanded. When the table decides, the plan of the call is not
+known yet — it cannot be.
+
+**Fix to propose.** Either a static decision — `carriesOwnProtection` also looks at the plans of the
+Api of the route (`route.apiRef` → its plans' `plugins.plugins`, and the flows they reference), and
+stands down when every plan carries a preset (when only some do, it cannot tell without the plan of
+the call) — or a decision at call time: once in place, the modules of the table check whether the
+merged chain of the call (`ContextualPluginsKey` in the attrs) already holds a preset, and do nothing
+then; more exact, more intrusive.
 
 ## G-25 — a challenge answers a page with status 200 — not a gap
 
@@ -409,8 +420,8 @@ challenge.
 
 ## G-26 — a security event names the api, not the plan — low — open
 
-Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25, and checked
-on a gateway running the release 1.0.0.
+Reported upstream: [waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61). In the Threat Protection Suite, found while implementing R-25,
+and checked on a gateway running the release 1.0.0.
 
 **Observed.** `CloudApimSecurityEvent` carries the route and the api of the route (`otoroshi.api_id`,
 from `route.apiRef`, `security/events.scala:137`) and the client id of the key that called
@@ -429,8 +440,8 @@ selected none.
 
 ## G-27 — with the core rule set, every call scores a firewall match — medium — open
 
-Not reported upstream yet. In the Threat Protection Suite, found on a gateway running the release
-1.0.0, with the firewall configuration of its getting started (`@import_preset crs`,
+Reported upstream: [waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62). In the Threat Protection Suite, found on a gateway running the
+release 1.0.0, with the firewall configuration of its getting started (`@import_preset crs`,
 `SecRuleEngine On`).
 
 **Observed.** Every call, a legitimate `GET /books?page=1` with a browser user agent included, gives a
@@ -451,8 +462,8 @@ a match only for the rules that detected something.
 
 ## G-28 — a firewall that blocks on its own sends no security event — medium — open
 
-Not reported upstream yet. In the Threat Protection Suite, found on a gateway running the release
-1.0.0.
+Reported upstream: [waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63). In the Threat Protection Suite, found on a gateway running the
+release 1.0.0.
 
 **Observed.** With a firewall configuration in blocking mode (`block: true`), an injection is refused
 by the firewall itself (`400`), and the only event is its own `CloudApimWafTrailEvent`
