@@ -178,9 +178,30 @@ describe('derived objects', () => {
     const drifted = await report();
     expect(drifted.status).toBe('drifted');
     expect(JSON.stringify(drifted.diff)).toContain("AuthModule");
+    // the deployment of the api says it, from the drift detection
+    expect((await call('GET', ws(`/apis/${state.apiId}`))).deployment.gateway).toMatchObject({ status: 'drifted' });
     // redeploying repairs it
     await call('POST', ws(`/apis/${state.apiId}/deploy`), {});
     expect((await otoroshi('GET', `/api/auths/${mod.id}`)).jwtVerifier.url).toBe(`${IDP}/jwks`);
+  });
+
+  test('an api the gateway lost: its deployment says so, from the drift detection, until it is deployed again', async () => {
+    const api = async () => (await call('GET', ws(`/apis/${state.apiId}`))).deployment;
+    await call('POST', '/gateway/drift', {});
+    expect((await api()).gateway?.status).not.toBe('missing');
+    // the gateway loses it: a restart without storage, a hand in its console
+    await otoroshi('DELETE', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`);
+    await call('POST', '/gateway/drift', {});
+    const lost = await api();
+    // the product put it there; the gateway no longer holds it
+    expect(lost.on_gateway).toBe(true);
+    expect(lost.gateway).toMatchObject({ status: 'missing' });
+    // deployed again: the drift seen before this deployment no longer speaks for it
+    await call('POST', ws(`/apis/${state.apiId}/deploy`), { snapshot: lost.current.snapshot_number });
+    expect((await api()).gateway).toBeNull();
+    expect((await otoroshi('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`)).id).toBe(state.apiId);
+    await call('POST', '/gateway/drift', {});
+    expect((await api()).gateway?.status).toBe('in_sync');
   });
 
   test('the certificate of an application is on the gateway while its mtls subscription is active', async () => {

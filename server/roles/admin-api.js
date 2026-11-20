@@ -161,8 +161,21 @@ r.get('/gateway/status', async ({ ctx }) => {
     queueStats({ workspaceIds: await visibleWorkspaces(ctx) }),
     db`select value from settings where key = 'drift.last_run'`.then((x) => x[0]?.value || null),
   ]);
-  const ingest = await analytics.ingestStats().catch(() => null);
-  return { health, queue, drift: lastDrift, ingest };
+  if (ctx.user.is_admin) {
+    const ingest = await analytics.ingestStats().catch(() => null);
+    return { health, queue, drift: lastDrift, ingest };
+  }
+  // anyone else sees the state of the gateway for its own workspaces: whether it answers, its
+  // projections, its drift — not the settings of the gateway (its url, its errors) nor the volumes of
+  // the installation
+  const mine = (await identity.listWorkspacesFor(ctx.user)).map((w) => w.id);
+  const reports = lastDrift ? (await driftReports(null)).filter((r) => r.workspace_id && mine.includes(r.workspace_id)) : [];
+  const count = (status) => reports.filter((r) => r.status === status).length;
+  return {
+    health: { ok: health.ok, latencyMs: health.latencyMs },
+    queue,
+    drift: lastDrift && { at: lastDrift.at, drifted: count('drifted'), missing: count('missing') },
+  };
 });
 
 r.get('/gateway/tasks', async ({ ctx, query }) => {

@@ -51,6 +51,8 @@ Last update: 2026-11-20.
   - R-10, second half: **shared resources** (D-16) — an authorization server described once for the workspace (issuer, keys, discovery, user info, the client of the gateway), published by immutable versions; a jwt or oauth2-remote plan pins a version instead of describing its server, the snapshot freezes it, and the projection derives from it the very JWT verifier or auth module a description derives; a new version changes nothing until an api is upgraded, the apis behind listed; a resource still pinned is not deleted; checked with a real token of the identity provider of the stack (`test/shared-resources.test.js`, `test/model.test.js`).
   - The screens tour taken again (109 captures, `docs/screens.mdx`): the AsyncAPI tab and the events of the portal, the catalogue placement and the reviews, the threat protection of a plan, shared resources and dictionaries, the observability tops, the request log and a call, the security events, the analytics and the request log of the portal.
   - The demo feeds every dashboard (`scripts/demo-activity.js`, run by `mise run demo`): what the drift detection finds missing on the gateway is deployed again (the snapshot that ran) and provisioned again — the development gateway keeps nothing across a restart; an event-driven api with its AsyncAPI specification, a dictionary, a shared authorization server pinned behind its latest version, the categories and a review of the portal; calls through the gateway now, under the rate limits of the plans, and fourteen days of calls and security events fed to the ingester once.
+  - R-26 settled by the owner: the gateway pill at the bottom of the sidebar and the Gateway page stay as they are, on one condition met — the settings of the gateway are the installation administrators' only: the connection, ingestion and setup tabs are hidden from anyone else (refused by the admin api already), and the status a non-admin reads drops the url of the gateway, its errors and the volumes of the installation, its drift counted on their own workspaces (`test/permissions.test.js`).
+  - The banner of an api says what the drift detection saw since its deployment: "no longer on the gateway" (a restart without storage, a hand in its console) or "changed on the gateway", with a redeploy of the snapshot that ran; `on_gateway` still means "the product put it there" (`deployment.gateway`, `test/derived-objects.test.js`).
   - Every list is searchable and paged, in the console and the portal — top-level pages, the lists of a detail page, a card, a modal or a drawer (`web/shared/lists.jsx`: `useLocalPaging`, `usePaging`, `local` for a modal, the page brought back when the list shrinks; the reference is the applications list). Searched and paged on the server where they grow: the people (`GET /users`, formerly cut at 200), the deployment history of an api (formerly cut at 50), the usage billed for a subscription (its sums now over every batch, not the last 200), the security events (`q`), the notifications of the portal. Editable ordered compositions (the plugins of a flow, the pages and categories of the portal settings, key/value editors) stay as they are.
   - G-22 extended: a call refused in the end is exported twice as well (the `400 no apikey` of an extractor, then the `401` the client gets), captured again on the data exporter.
 
@@ -80,13 +82,13 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions).
 
-**Owner decisions (4):** R-26 where the gateway health and the drift live in the console · R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
+**Owner decisions (3):** R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
 
 **Waiting for a go:** building the real image (downloads).
 
 **Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
 
-**Total doable:** 12 S + 10 M + 2 L ≈ 18 M. Without R-18, R-37, R-21 and R-19 (out of the MVP, or not a priority): ≈ 13 M.
+**Total doable:** 1 S + 3 M + 2 L ≈ 8 M. Without R-18, R-37, R-21 and R-19 (out of the MVP, or not a priority): ≈ 3 M (R-54, R-48).
 
 ## Known issues
 
@@ -114,12 +116,6 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
-
-### Console
-
-| # | Spec | What is missing | Size | Upstream |
-|---|---|---|---|---|
-| R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
 
 ### Industrialisation (GitOps, environments, operations)
 
@@ -187,7 +183,7 @@ waits for the data plane rather than working around it.
 | D-24 `default` location + ownership marking | ✅ | |
 | D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; "via Otoroshi" verified end to end: a person signed in on a basic auth module of the gateway, in front of the console route the setup makes, is the user of the console (`test/setup.test.js`) |
 | D-26 application, expected `client_id`, `id_ref` | ✅ | client certificates read and checked (console and portal), derived as certificates of the gateway while an mtls subscription is active (`test/derived-objects.test.js`); a subscription of a token or certificate plan carries no consumer identity on Otoroshi (G-17, MAIF/otoroshi#2937): its ApiSubscription carries the application's client id as metadata meanwhile |
-| D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37: R-26): failed projections, waiting ones and drift counted apart, leading to the first of them; a failed task says what it works on, is retried or dismissed, and dismissed by itself when its object is gone |
+| D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37, settled by the owner on 2026-11-20, R-26: the pill and a Gateway page as they are, the state of the gateway for everyone, scoped to their workspaces, its settings — connection, ingestion, setup — for the installation administrators only): failed projections, waiting ones and drift counted apart, leading to the first of them; a failed task says what it works on, is retried or dismissed, and dismissed by itself when its object is gone |
 | D-28 administrable by program | ✅ | admin API ✅, CLI ✅, remote catalogs http/git/s3 ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests and the Helm chart (linted, rendered) validated by a k3s api server — `test/kubernetes.test.js` |
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |

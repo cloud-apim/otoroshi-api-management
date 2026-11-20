@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from '../../../shared/router.jsx';
+import { fmtRelative } from '../../../shared/lib.js';
 import { Badge, Callout, DiffView, Dropdown, Field, Icon, Input, Loader, MenuItem, Modal, StatusBadge, Switch, Tabs, errorMessage, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { PageHead } from '../../layout.jsx';
@@ -182,7 +183,14 @@ function ApiEditor({ api, tab, reload }) {
           )
         }
       />
-      <DeploymentBanner api={api} onDeploy={() => setDeploying({ snapshot: dep.latest_snapshot?.id })} onPublish={() => setPublishing(true)} readOnly={!operable} dirty={dirty} />
+      <DeploymentBanner
+        api={api}
+        onDeploy={() => setDeploying({ snapshot: dep.latest_snapshot?.id })}
+        onRedeploy={() => setDeploying({ snapshot: dep.current?.snapshot_id })}
+        onPublish={() => setPublishing(true)}
+        readOnly={!operable}
+        dirty={dirty}
+      />
       {api.managed_by ? (
         <Callout kind="info" title={tr('Managed by {0}', [api.managed_by.startsWith('catalog:') ? tr('a remote catalog') : api.managed_by])}>
           {tr('Its source of truth is elsewhere: change it there, the next sync brings the change here. Deployment and subscriptions stay operable from the console.')}
@@ -266,7 +274,7 @@ function ApiEditor({ api, tab, reload }) {
 }
 
 // the described state is not the deployed state, and the gap is always shown
-function DeploymentBanner({ api, onDeploy, onPublish, readOnly, dirty }) {
+function DeploymentBanner({ api, onDeploy, onRedeploy, onPublish, readOnly, dirty }) {
   const dep = api.deployment;
   const pc = api.pending_changes;
   if (!dep.latest_snapshot) {
@@ -285,12 +293,21 @@ function DeploymentBanner({ api, onDeploy, onPublish, readOnly, dirty }) {
       </div>
     );
   }
-  const runs = dep.current ? tr('snapshot #{0} runs on the gateway', [dep.current.snapshot_number]) : tr('not deployed on the gateway');
+  // the drift detection, not the product, says whether the gateway still holds what was deployed
+  const lost = dep.current && dep.gateway?.status === 'missing';
+  const changed = dep.current && dep.gateway?.status === 'drifted';
+  const runs = lost
+    ? tr('snapshot #{0} is no longer on the gateway', [dep.current.snapshot_number])
+    : dep.current
+      ? tr('snapshot #{0} runs on the gateway', [dep.current.snapshot_number])
+      : tr('not deployed on the gateway');
   return (
-    <div className={`api-banner ${dep.out_of_sync ? 'out' : ''}`}>
-      <span className={`gw-dot ${dep.current ? 'ok' : ''}`} />
+    <div className={`api-banner ${dep.out_of_sync || lost || changed ? 'out' : ''}`}>
+      <span className={`gw-dot ${lost ? 'ko' : dep.current ? 'ok' : ''}`} />
       <div className="grow small">
-        <span className="bold">{runs}</span>
+        <span className={`bold ${lost ? 'negative-text' : ''}`}>{runs}</span>
+        {lost && <span> <Tr text={'· the drift detection found it missing {0}: deploy it again'} args={[fmtRelative(dep.gateway.checked_at)]} /></span>}
+        {changed && <span> <Tr text={'· changed on the gateway since its deployment (drift detection, {0})'} args={[fmtRelative(dep.gateway.checked_at)]} /></span>}
         {dep.out_of_sync && <span> <Tr text={'· latest snapshot #{0} is not deployed'} args={[dep.latest_snapshot.number]} /></span>}
         {pc.hasChanges && <span> <Tr text={'· the draft has {0} unpublished change{1}'} args={[pc.count ?? '', pc.count === 1 ? '' : tr('s')]} /></span>}
         {dep.last?.status === 'failed' && <span className="negative-text"> <Tr text={'· last deployment failed: {0}'} args={[dep.last.error]} /></span>}
@@ -299,6 +316,11 @@ function DeploymentBanner({ api, onDeploy, onPublish, readOnly, dirty }) {
       {!readOnly && dep.out_of_sync && (
         <button className="btn sm" onClick={onDeploy} disabled={dirty}>
           <Icon name="rocket" /> <Tr text={'Deploy #{0}'} args={[dep.latest_snapshot.number]} />
+        </button>
+      )}
+      {!readOnly && !dep.out_of_sync && (lost || changed) && (
+        <button className="btn sm" onClick={onRedeploy} disabled={dirty}>
+          <Icon name="rocket" /> <Tr text={'Deploy #{0} again'} args={[dep.current.snapshot_number]} />
         </button>
       )}
     </div>

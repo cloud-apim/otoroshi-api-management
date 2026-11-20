@@ -22,11 +22,15 @@ function Status() {
     <Loader state={st}>
       {(s) => (
         <div className="col gap-16">
-          <div className="grid-4">
-            <StatTile label={tr('Gateway')} value={s.health.ok ? 'Reachable' : 'Unreachable'} hint={s.health.ok ? tr('{0} · {1} ms', [s.health.url, s.health.latencyMs]) : s.health.error} />
+          <div className={s.ingest ? 'grid-4' : 'grid-3'}>
+            <StatTile
+              label={tr('Gateway')}
+              value={s.health.ok ? tr('Reachable') : tr('Unreachable')}
+              hint={s.health.ok ? (s.health.url ? tr('{0} · {1} ms', [s.health.url, s.health.latencyMs]) : tr('{0} ms', [s.health.latencyMs])) : s.health.error}
+            />
             <StatTile label={tr('Projections waiting')} value={(s.queue.pending || 0) + (s.queue.running || 0)} hint={tr('{0} failed · {1} done', [s.queue.failed || 0, s.queue.done || 0])} />
             <StatTile label={tr('Drift')} value={(s.drift?.drifted || 0) + (s.drift?.missing || 0)} hint={s.drift ? tr('checked {0}', [fmtRelative(s.drift.at)]) : tr('not checked yet')} />
-            <StatTile label={tr('Ingested calls')} value={fmtNumber(s.ingest?.calls)} hint={s.ingest?.last_at ? tr('last {0}', [fmtRelative(s.ingest.last_at)]) : tr('nothing received yet')} />
+            {s.ingest && <StatTile label={tr('Ingested calls')} value={fmtNumber(s.ingest.calls)} hint={s.ingest.last_at ? tr('last {0}', [fmtRelative(s.ingest.last_at)]) : tr('nothing received yet')} />}
           </div>
           <Callout kind="info">
             {tr('The product is never in the request path: if it is down, traffic still flows. Its operations are asynchronous and replayable — a projection that cannot reach the gateway waits in this queue and runs when the gateway is back.')}
@@ -681,8 +685,14 @@ function Setup() {
   );
 }
 
+// the state of the gateway is everyone's; its settings — connection, ingestion, setup — are the
+// installation administrators' only
+const SETTINGS_TABS = ['connection', 'ingestion', 'setup'];
+
 export function GatewayPage({ tab }) {
   const { navigate } = useRouter();
+  const { user } = useSession();
+  const settings = SETTINGS_TABS.includes(tab);
   return (
     <div className="page">
       <PageHead title={tr('Gateway')} sub={tr("The Otoroshi cluster this installation drives. One installation per environment; geography is carried by Otoroshi's own leader/worker cluster.")} />
@@ -693,17 +703,20 @@ export function GatewayPage({ tab }) {
           ['connection', tr('Connection & events')],
           ['ingestion', tr('Ingestion')],
           ['setup', tr('Setup')],
-        ].map(([id, label]) => (
-          <button key={id} className={tab === id ? 'on' : ''} onClick={() => navigate(`/gateway/${id}`)}>
-            {label}
-          </button>
-        ))}
+        ]
+          .filter(([id]) => user.is_admin || !SETTINGS_TABS.includes(id))
+          .map(([id, label]) => (
+            <button key={id} className={tab === id ? 'on' : ''} onClick={() => navigate(`/gateway/${id}`)}>
+              {label}
+            </button>
+          ))}
       </div>
       {tab === 'status' && <Status />}
       {tab === 'drift' && <Drift />}
-      {tab === 'connection' && <Connection />}
-      {tab === 'ingestion' && <Ingestion />}
-      {tab === 'setup' && <Setup />}
+      {settings && !user.is_admin && <Callout kind="info">{tr('Installation administrators only.')}</Callout>}
+      {user.is_admin && tab === 'connection' && <Connection />}
+      {user.is_admin && tab === 'ingestion' && <Ingestion />}
+      {user.is_admin && tab === 'setup' && <Setup />}
     </div>
   );
 }

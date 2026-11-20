@@ -249,10 +249,18 @@ export async function deploymentStatus(api) {
   const last = (await db`select d.*, s.number as snapshot_number from api_deployments d left join api_snapshots s on s.id = d.snapshot_id
     where d.api_id = ${api.id} order by d.requested_at desc limit 1`)[0];
   const lastSnap = await lastSnapshot(api.id);
+  // what the drift detection saw of the api on the gateway since its deployment reached it: the product
+  // put it there, the gateway may have lost it since (a restart without storage, a hand in its console)
+  const [seen] = current?.finished_at
+    ? await db`select status, checked_at from drift_reports where entity_kind = 'api' and entity_id = ${api.id} and checked_at > ${current.finished_at}
+        order by case status when 'missing' then 0 when 'drifted' then 1 else 2 end, checked_at desc limit 1`
+    : [];
   return {
     deployed: !!current,
-    // an undeployed api stays on the gateway, disabled: removing it from the product purges it there
+    // the product put it there — an undeployed api stays on the gateway, disabled: removing it from the
+    // product purges it there. Whether the gateway still holds it is `gateway`
     on_gateway: !!last,
+    gateway: seen ? { status: seen.status, checked_at: seen.checked_at } : null,
     current: current ? { id: current.id, snapshot_id: current.snapshot_id, snapshot_number: current.snapshot_number, at: current.finished_at } : null,
     last: last || null,
     latest_snapshot: lastSnap ? { id: lastSnap.id, number: lastSnap.number } : null,

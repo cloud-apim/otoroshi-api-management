@@ -142,9 +142,17 @@ describe('a producer', () => {
   });
 
   test('has no installation rights', async () => {
-    expect((await as('bob', 'GET', '/gateway/status')).status).toBe(200);
+    // the state of the gateway, not its settings: no url of the gateway, no volumes of the installation
+    const status = await ok('bob', 'GET', '/gateway/status');
+    expect(Object.keys(status.health).sort()).toEqual(['latencyMs', 'ok']);
+    expect(status.ingest).toBeUndefined();
+    expect((await ok('admin', 'GET', '/gateway/status')).health.url).toBeTruthy();
     for (const [method, path] of [
       ['GET', '/settings'],
+      ['PUT', '/settings/gateway'],
+      ['PUT', '/settings/ingest'],
+      ['GET', '/gateway/setup'],
+      ['POST', '/gateway/setup'],
       ['POST', '/users'],
       ['POST', '/workspaces'],
       ['GET', '/audit'],
