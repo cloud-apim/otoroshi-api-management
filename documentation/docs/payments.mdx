@@ -65,8 +65,14 @@ The subscription follows what Stripe says of its Stripe subscription:
 | `canceled` | closed | deleted |
 
 The other way round, **closing** a paid subscription in the product cancels it at Stripe, and a
-**move** between two paid plans changes its price at Stripe, prorated. A move from a free plan to a
-paid one goes through a payment: the consumer subscribes to the paid plan.
+**move** between two paid plans changes its price at Stripe, prorated.
+
+A **move from a free plan to a paid one** goes through a payment. Once agreed — the consumer asks and
+the producer applies, or the producer proposes and the consumer agrees — it waits for the
+consumer's payment: the subscription stays on its free plan, its key working, and the portal offers
+to **pay** the move, through a Checkout of the paid plan, or to drop it. When Stripe says it is
+paid, the subscription moves to the paid plan with the same key, and its payment is followed as
+any other. Either side can drop a move that waits for its payment.
 
 ## Lost webhooks, replayed ones
 

@@ -131,18 +131,20 @@ async function customerOf(p, ws, account, team, email) {
 export async function checkout(ctx, ws, sub, { email } = {}) {
   const p = paymentProvider();
   if (!p) throw forbidden(availability().reason);
-  if (sub.status !== 'pending_payment') throw badRequest('this subscription is not waiting for a payment');
+  // a new paid subscription, or the move of a free one to a paid plan
+  const moving = sub.pending_transfer?.status === 'awaiting_payment';
+  if (sub.status !== 'pending_payment' && !moving) throw badRequest('this subscription is not waiting for a payment');
   const account = accountOf(ws);
   if (!account) throw forbidden('this portal does not sell its plans yet: its administrators link a Stripe account first');
-  const api = (await db`select * from apis where id = ${sub.api_id}`)[0];
-  const { plan } = await subscriptions.findPlan(api, sub.plan_id);
+  const api = (await db`select * from apis where id = ${moving ? sub.pending_transfer.to.api_id : sub.api_id}`)[0];
+  const { plan } = await subscriptions.findPlan(api, moving ? sub.pending_transfer.to.plan_id : sub.plan_id);
   if (plan.pricing?.kind !== 'paid') throw badRequest(`the plan ${plan.name} is free`);
   const app = (await db`select * from applications where id = ${sub.application_id}`)[0];
   const team = (await db`select * from teams where id = ${app.team_id}`)[0];
   const customer = await customerOf(p, ws, account, team, email || ctx.user?.email);
   const attempt = (sub.payment?.checkouts || 0) + 1;
   const back = `${portalUrl(ws.slug).replace(/\/$/, '')}/apps/${app.id}`;
-  const metadata = { apim_subscription_id: sub.id, apim_workspace: ws.slug, apim_api: api.id, apim_plan: plan.id };
+  const metadata = { apim_subscription_id: sub.id, apim_workspace: ws.slug, apim_api: api.id, apim_plan: plan.id, ...(moving ? { apim_transfer: 'true' } : {}) };
   const session = await p.checkout(account, {
     lineItem: lineItemOf(plan, `${api.name} ${api.version} · ${plan.name}`),
     customer,
@@ -152,7 +154,8 @@ export async function checkout(ctx, ws, sub, { email } = {}) {
     cancelUrl: `${back}?checkout=canceled`,
     idempotencyKey: `apim-checkout-${sub.id}-${attempt}`,
   });
-  await db`update subscriptions set payment = ${{ ...(sub.payment || {}), provider: p.name, account, customer, checkout_session: session.id, checkouts: attempt, grace_days: Number(plan.pricing.graceDays ?? 7), status: 'awaiting_payment' }}, updated_at = now() where id = ${sub.id}`;
+  // a subscription that moves keeps working on its plan: its payment is not awaited, the move is
+  await db`update subscriptions set payment = ${{ ...(sub.payment || {}), provider: p.name, account, customer, checkout_session: session.id, checkouts: attempt, grace_days: Number(plan.pricing.graceDays ?? 7), ...(moving ? {} : { status: 'awaiting_payment' }) }}, updated_at = now() where id = ${sub.id}`;
   await audit(ctx, { action: 'subscription.checkout', workspaceId: ws.id, entityKind: 'subscription', entityId: sub.id, summary: `checkout of ${plan.name} opened for ${app.name}` });
   return { url: session.url };
 }
@@ -238,6 +241,13 @@ export async function handleEvent(event) {
       if (!ws) return 'no workspace for this account';
       const sub = (await db`select * from subscriptions where id = ${m.apim_subscription_id} and workspace_id = ${ws.id}`)[0];
       if (!sub) return 'no such subscription';
+      // the payment of a move to a paid plan: the move is applied, then the payment followed
+      if (m.apim_transfer) {
+        if (sub.pending_transfer?.status !== 'awaiting_payment' || sub.pending_transfer.to.plan_id !== m.apim_plan) return 'no move waits for this payment';
+        await db`update subscriptions set payment = ${{ ...(sub.payment || {}), provider_subscription: o.subscription, customer: o.customer || sub.payment?.customer }} where id = ${sub.id}`;
+        await subscriptions.completePaidTransfer(system(ws, sub), (await db`select * from subscriptions where id = ${sub.id}`)[0]);
+        return follow(ws, (await db`select * from subscriptions where id = ${sub.id}`)[0], await p.subscription(event.account, o.subscription));
+      }
       if (sub.payment?.provider_subscription === o.subscription && sub.status !== 'pending_payment') return 'already';
       await db`update subscriptions set payment = ${{ ...(sub.payment || {}), provider_subscription: o.subscription, customer: o.customer || sub.payment?.customer }} where id = ${sub.id}`;
       const fresh = (await db`select * from subscriptions where id = ${sub.id}`)[0];

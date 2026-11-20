@@ -75,6 +75,7 @@ beforeAll(async () => {
   draft.plans = [
     { id: PLAN, name: 'Premium', status: 'published', auth: { kind: 'apikey' }, validation: 'auto', pricing: { kind: 'paid', amount: 49, currency: 'EUR', interval: 'month', graceDays: 7 } },
     { id: `plan_gold_${RUN}`, name: 'Gold', status: 'published', auth: { kind: 'apikey' }, validation: 'auto', pricing: { kind: 'paid', amount: 99, currency: 'EUR', interval: 'month', graceDays: 7 } },
+    { id: `plan_basic_${RUN}`, name: 'Basic', status: 'published', auth: { kind: 'apikey' }, validation: 'auto' },
   ];
   await ok('PUT', `/workspaces/${WS}/apis/${api.id}/draft`, { draft });
   await ok('POST', `/workspaces/${WS}/apis/${api.id}/publish`, { comment: 'paid', deploy: true });
@@ -190,6 +191,49 @@ describe('selling the paid plans of a workspace', () => {
     const { url } = await (await portal(`/subscriptions/${state.subId}/billing`, { method: 'POST', body: '{}' })).json();
     expect(url).toContain(`/apps/${state.appId}`);
     expect(url).toContain('stripe-portal=fake');
+  });
+
+  test('from a free plan to a paid one: agreed, paid through a Checkout, then moved with the same key', async () => {
+    const free = await (await portal('/subscriptions', { method: 'POST', body: JSON.stringify({ api_id: state.apiId, plan_id: `plan_basic_${RUN}`, application_id: state.appId }) })).json();
+    expect(free.status).toBe('active');
+    const key = (await ok('GET', `/workspaces/${WS}/subscriptions/${free.id}`)).credentials[0];
+    // the consumer asks, the producer agrees: the move waits for its payment, on the free plan
+    expect((await portal(`/subscriptions/${free.id}/transfer`, { method: 'POST', body: JSON.stringify({ plan_id: PLAN }) })).status).toBe(200);
+    const agreed = await ok('POST', `/workspaces/${WS}/subscriptions/${free.id}/transfer/decision`, { accept: true });
+    expect(agreed.plan_id).toBe(`plan_basic_${RUN}`);
+    expect(agreed.pending_transfer).toMatchObject({ status: 'awaiting_payment', to: { plan_id: PLAN } });
+    expect(agreed.status).toBe('active');
+    // agreed is not paid: accepting it again is refused
+    expect((await call('POST', `/workspaces/${WS}/subscriptions/${free.id}/transfer/decision`, { accept: true })).status).toBe(400);
+    const { url } = await (await portal(`/subscriptions/${free.id}/checkout`, { method: 'POST', body: '{}' })).json();
+    const session = billing.paymentProvider().sessions.get(url.split('/').pop());
+    expect(session.metadata).toMatchObject({ apim_subscription_id: free.id, apim_plan: PLAN, apim_transfer: 'true' });
+    expect(session.lineItem.price_data.unit_amount).toBe(4900);
+    await fetch(`${url}/pay`, { method: 'POST', redirect: 'manual' });
+    const moved = (await db`select * from subscriptions where id = ${free.id}`)[0];
+    expect(moved.plan_id).toBe(PLAN);
+    expect(moved.pending_transfer).toBeNull();
+    expect(moved.payment).toMatchObject({ status: 'paid', stripe_status: 'active' });
+    expect(moved.history.at(-1)).toMatchObject({ from: { plan_id: `plan_basic_${RUN}` }, to: { plan_id: PLAN } });
+    // the key did not change, and follows its new plan on the gateway
+    const after = (await ok('GET', `/workspaces/${WS}/subscriptions/${free.id}`)).credentials.find((c) => c.status === 'active');
+    expect(after.client_id).toBe(key.client_id);
+    const gw = await otoroshi('GET', `/api/apikeys/${key.client_id}`);
+    expect(gw.apiRef.plan).toBe(PLAN);
+    await portal(`/subscriptions/${free.id}/close`, { method: 'POST', body: '{}' });
+  });
+
+  test('a move waiting for its payment can be dropped: the subscription stays where it was', async () => {
+    const free = await (await portal('/subscriptions', { method: 'POST', body: JSON.stringify({ api_id: state.apiId, plan_id: `plan_basic_${RUN}`, application_id: state.appId }) })).json();
+    await portal(`/subscriptions/${free.id}/transfer`, { method: 'POST', body: JSON.stringify({ plan_id: PLAN }) });
+    await ok('POST', `/workspaces/${WS}/subscriptions/${free.id}/transfer/decision`, { accept: true });
+    expect((await portal(`/subscriptions/${free.id}/transfer/consent`, { method: 'POST', body: JSON.stringify({ accept: false }) })).status).toBe(200);
+    const kept = (await db`select * from subscriptions where id = ${free.id}`)[0];
+    expect(kept.pending_transfer).toBeNull();
+    expect(kept.plan_id).toBe(`plan_basic_${RUN}`);
+    // a Checkout for a move nobody waits for is refused
+    expect((await portal(`/subscriptions/${free.id}/checkout`, { method: 'POST', body: '{}' })).status).toBe(400);
+    await portal(`/subscriptions/${free.id}/close`, { method: 'POST', body: '{}' });
   });
 
   test('a lost webhook is caught up by the reconciliation: cancelled at Stripe, closed here', async () => {

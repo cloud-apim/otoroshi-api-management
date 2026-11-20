@@ -405,6 +405,38 @@ function PendingTransfer({ sub, onChange }) {
   const pt = sub.pending_transfer;
   if (!pt) return null;
   if (pt.status === 'requested') return <Callout kind="info">{t('transfer.requested', { plan: pt.to.plan_name })}</Callout>;
+  // a move to a paid plan, agreed: paid through a Checkout, on a page of its own
+  if (pt.status === 'awaiting_payment') {
+    const pay = async () => {
+      try {
+        window.location.href = (await api.post(`/subscriptions/${sub.id}/checkout`)).url;
+      } catch (e) {
+        toast(errorMessage(e), 'error');
+      }
+    };
+    const drop = async () => {
+      try {
+        await api.post(`/subscriptions/${sub.id}/transfer/consent`, { accept: false });
+        toast(t('transfer.dropped'));
+        onChange();
+      } catch (e) {
+        toast(errorMessage(e), 'error');
+      }
+    };
+    return (
+      <Callout kind="info" title={t('transfer.payment.title', { plan: pt.to.plan_name })}>
+        <div>{t('transfer.payment.body')}</div>
+        <div className="row mt-8">
+          <button className="btn primary sm" onClick={pay}>
+            {t('sub.pay')}
+          </button>
+          <button className="btn sm" onClick={drop}>
+            {t('transfer.payment.drop')}
+          </button>
+        </div>
+      </Callout>
+    );
+  }
   const answer = async (accept) => {
     try {
       await api.post(`/subscriptions/${sub.id}/transfer/consent`, { accept });

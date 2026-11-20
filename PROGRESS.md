@@ -29,13 +29,13 @@ Last update: 2026-11-20.
   - R-36: the secrets the product keeps — credentials, the key of the gateway, the secrets of the identity providers and of the info token, the headers of the catalogs and of the audit exporters, the key of the pseudonyms — are sealed with AES-256-GCM and the key of the installation (`APIM_SECRETS_KEY`); a rotation lists the previous keys (`APIM_SECRETS_PREVIOUS_KEYS`), and every instance seals again at start what another key, or none, sealed. The setup check says when there is no key; a plan secret in clear is flagged (`secret_in_clear`): a vault reference keeps it out of the snapshots. Workspace exports leave the secret of the portal's identity provider out (`test/secrets.test.js`).
   - R-13: a producer gives a subscription an end date (console, admin api, cli); from that day it expires — on the gateway, its keys disabled — and a later date, or none, renews it with the same keys; the workers expire what is due every minute; a paid subscription takes none (`test/expiry.test.js`).
   - R-38: the interface tested in a headless Chromium (`test/ui.test.js`): every page of the console opens without an error or a 5xx, a producer makes an api and a plan from the console and saves the draft, the console speaks French, a consumer subscribes from the portal and sees its credentials. `mise run test` builds the interfaces first.
+  - R-47: a move from a free plan to a paid one, once agreed, waits for the consumer's payment — the subscription on its free plan, its key working — and is applied when the Checkout of the paid plan is paid, with the same key; either side can drop it (`test/payments.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-47** — the free → paid plan move through a Checkout.
-2. **R-27** — remote catalogs from S3.
-3. **R-42** — free pages of the portal.
+1. **R-27** — remote catalogs from S3.
+2. **R-42** — free pages of the portal.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -45,11 +45,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (19)**
+**Doable (18)**
 
 | # | Effort | What |
 |---|---|---|
-| R-47 | S | Free → paid plan move through a Checkout |
 | R-27 | S | Remote catalogs from S3 |
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-32 | S | Correlation id carried to the backends |
@@ -138,7 +137,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-47 | D-36, D-30 | A move from a **free plan to a paid one** through a Checkout, the subscription staying on its plan until it is paid — refused today: the consumer subscribes to the paid plan | S | |
 | R-48 | D-33 | A daily **compaction** of the hourly rollups past a few months, should their volume call for it | S | |
 | R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
@@ -197,7 +195,7 @@ waits for the data plane rather than working around it.
 | D-32 MVP scope, captured events | 🟡 | GatewayEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
 | D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
-| D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move: R-47; usage billing: R-34 |
+| D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move through a Checkout ✅; usage billing: R-34 |
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
 | D-38 projection marked as the product's | ✅ | the `Api` is managed as code (`created_by=external=otoroshi-api-management`): Otoroshi records each deployment, with the snapshot as its ref |
 | D-39 hand-written CSS | ✅ | chart palette validated |

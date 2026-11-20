@@ -342,8 +342,21 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             </div>
 
             {s.pending_transfer && (
-              <Callout kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'} title={tr('Move to {0} — {1}', [s.pending_transfer.to.plan_name, s.pending_transfer.status === 'requested' ? tr('asked by the consumer') : tr("waiting for the consumer's consent")])}>
+              <Callout
+                kind={s.pending_transfer.status === 'requested' ? 'info' : 'warning'}
+                title={tr('Move to {0} — {1}', [
+                  s.pending_transfer.to.plan_name,
+                  s.pending_transfer.status === 'requested' ? tr('asked by the consumer') : s.pending_transfer.status === 'awaiting_payment' ? tr("waiting for the consumer's payment") : tr("waiting for the consumer's consent"),
+                ])}
+              >
                 {s.pending_transfer.reasons?.length > 0 && <div><Tr text={"The target plan brings {0} (a change of contract needs the consumer's agreement)."} args={[s.pending_transfer.reasons.join(', ')]} /></div>}
+                {s.pending_transfer.status === 'awaiting_payment' && s.can_manage && (
+                  <div className="row mt-8">
+                    <button className="btn sm" disabled={busy} onClick={() => act('transfer/decision', { accept: false }, tr('Move dropped'))}>
+                      {tr('Drop the move')}
+                    </button>
+                  </div>
+                )}
                 {s.pending_transfer.status === 'requested' && s.can_manage && (
                   <div className="row mt-8">
                     <button className="btn sm primary" disabled={busy} onClick={() => act('transfer/decision', { accept: true }, tr('Subscription transferred — the key does not change'))}>

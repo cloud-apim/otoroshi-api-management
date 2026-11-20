@@ -321,12 +321,33 @@ async function resolveTransfer(sub, { plan_id, api_id }) {
   if (!plansAreEquivalent(fromPlan, toPlan))
     throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer`);
   if (toPlan.status !== 'published') throw badRequest(`target plan is ${toPlan.status}`);
-  if (isPaid(toPlan) && !isPaid(fromPlan))
-    throw badRequest(`${toPlan.name} is a paid plan: moving to it goes through a payment — subscribe to it, then close this subscription`);
-  return { fromApi, toApi, fromPlan, toPlan, reasons: degradations(fromPlan, toPlan), reason_codes: degradationCodes(fromPlan, toPlan) };
+  // from a free plan to a paid one: the move waits for its payment, through a Checkout, on the plan it leaves
+  const needsPayment = isPaid(toPlan) && !isPaid(fromPlan);
+  if (needsPayment && (config.payments.provider === 'off' || !(await db`select payments from workspaces where id = ${sub.workspace_id}`)[0]?.payments?.account?.id))
+    throw badRequest(`${toPlan.name} is a paid plan, and this portal does not sell its plans yet: its administrators link a Stripe account first`);
+  return { fromApi, toApi, fromPlan, toPlan, needsPayment, reasons: degradations(fromPlan, toPlan), reason_codes: degradationCodes(fromPlan, toPlan) };
 }
 
-async function applyTransfer(ctx, sub, t) {
+// what is agreed is applied — but a move to a paid plan waits for the consumer to pay it: the
+// subscription stays on its plan meanwhile, its key working
+async function proceed(ctx, sub, t, consent = null) {
+  if (!t.needsPayment) return applyTransfer(ctx, sub, t);
+  const pt = { ...pending(ctx, t, 'awaiting_payment'), consent: consent || sub.pending_transfer?.consent || null };
+  await db`update subscriptions set pending_transfer = ${pt}, updated_at = now() where id = ${sub.id}`;
+  await audit(ctx, { action: 'subscription.transfer.payment', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `move to ${t.toPlan.name} agreed, waiting for its payment` });
+  await notifyConsumer(sub, { kind: 'subscription.transfer.payment', title: `move to ${t.toPlan.name}: pay to complete it`, body: 'Your subscription stays on its plan until the payment is done.' });
+  return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+}
+
+// the payment of a move to a paid plan is done: the move is applied, the provider already charging the new price
+export async function completePaidTransfer(ctx, sub) {
+  const pt = sub.pending_transfer;
+  if (pt?.status !== 'awaiting_payment') throw badRequest('no move waits for a payment');
+  const t = await resolveTransfer(sub, { plan_id: pt.to.plan_id, api_id: pt.to.api_id });
+  return applyTransfer(ctx, sub, t, { followPayment: false });
+}
+
+async function applyTransfer(ctx, sub, t, { followPayment = true } = {}) {
   const { fromApi, toApi, fromPlan, toPlan } = t;
   const history = [
     ...(sub.history || []),
@@ -343,7 +364,7 @@ async function applyTransfer(ctx, sub, t) {
   });
   await enqueue('sync_subscription', { subscription_id: sub.id }, { dedupeKey: `sub:${sub.id}` });
   // the provider follows: the price of a paid plan changes, prorated; a free plan ends the payment
-  if (sub.payment?.provider_subscription && sub.payment.status !== 'canceled') {
+  if (followPayment && sub.payment?.provider_subscription && sub.payment.status !== 'canceled') {
     if (isPaid(toPlan)) await enqueue('payment_change_price', { subscription_id: sub.id, price_ref: toPlan.pricing.priceRef }, { dedupeKey: `payment:${sub.id}` });
     else await enqueue('payment_cancel', { subscription_id: sub.id }, { dedupeKey: `payment:${sub.id}` });
   }
@@ -383,15 +404,17 @@ export async function transferSubscription(ctx, sub, { plan_id, api_id }, { init
     await notifyConsumer(sub, { kind: 'subscription.transfer.consent', title: `move to ${t.toPlan.name} needs your agreement`, body: `The new plan brings ${t.reasons.join(', ')}.`, data: { reasons: t.reasons } });
     return (await db`select * from subscriptions where id = ${sub.id}`)[0];
   }
-  return applyTransfer(ctx, sub, t);
+  return proceed(ctx, sub, t);
 }
 
 // the consumer answers a proposal, or the producer answers a request
 export async function answerTransfer(ctx, sub, { accept }, { side }) {
   const pt = sub.pending_transfer;
   if (!pt) throw badRequest('no transfer is waiting');
-  if (side === 'consumer' && pt.status !== 'awaiting_consent') throw badRequest('this transfer waits for the producer, not for you');
-  if (side === 'producer' && pt.status !== 'requested') throw badRequest('this transfer waits for the consumer');
+  // a move waiting for its payment is paid through a Checkout; either side can drop it
+  if (pt.status === 'awaiting_payment' && accept) throw badRequest('this move waits for its payment: pay it, or drop it');
+  if (side === 'consumer' && !['awaiting_consent', 'awaiting_payment'].includes(pt.status)) throw badRequest('this transfer waits for the producer, not for you');
+  if (side === 'producer' && !['requested', 'awaiting_payment'].includes(pt.status)) throw badRequest('this transfer waits for the consumer');
   if (!accept) {
     await db`update subscriptions set pending_transfer = null, updated_at = now() where id = ${sub.id}`;
     await audit(ctx, { action: 'subscription.transfer.decline', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `move to ${pt.to.plan_name} declined by the ${side}` });
@@ -401,7 +424,7 @@ export async function answerTransfer(ctx, sub, { accept }, { side }) {
   }
   const t = await resolveTransfer(sub, { plan_id: pt.to.plan_id, api_id: pt.to.api_id });
   const consent = side === 'consumer' ? { by: ctx.user?.email, at: now(), reasons: t.reasons } : pt.consent;
-  return applyTransfer(ctx, { ...sub, pending_transfer: { ...pt, consent } }, t);
+  return proceed(ctx, { ...sub, pending_transfer: { ...pt, consent } }, t, consent);
 }
 
 export async function rotateCredential(ctx, sub, credentialId) {
