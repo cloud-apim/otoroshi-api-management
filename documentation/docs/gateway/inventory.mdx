@@ -1,0 +1,61 @@
+---
+sidebar_position: 5
+title: Inventory of the Otoroshi entities
+description: Every kind of entity of the gateway, and what the product does with it — projected, derived, made by the setup, minted by Otoroshi, consumed as infrastructure, or not used.
+---
+
+# Inventory of the Otoroshi entities
+
+What is not API management is either **derived** from the description of the APIs, or **consumed**
+as the infrastructure it is: the product never recreates the rest of the gateway "to have everything
+in one place" — it would become a second administration console. The criterion: does the entity
+follow from the description of an API? Then the product derives it, marks it as its own
+(`created_by`, `apim_derived`), shows it in the deployment diff, watches it for drift, and removes
+it with the API. Otherwise it is infrastructure: referenced, read, never owned.
+
+| Treatment | What it means |
+|---|---|
+| Projected | written from a snapshot or a subscription, the product's own |
+| Derived | follows from the description of an API, the product's own, reconciled with it |
+| Made by the setup | made once by the [setup of the gateway](./setup.mdx), marked as the product's |
+| Minted by Otoroshi | made by Otoroshi from what the product projects: read, never written |
+| Consumed | infrastructure the product references or reads |
+| Not used | the product neither reads nor writes it |
+
+The list follows the kinds the gateway declares (`GET /apis/entities`): a kind the inventory does
+not know fails the tests of the product.
+
+| Kind | Group | Treatment | How |
+|---|---|---|---|
+| `Api` | `apis.otoroshi.io` | Projected | one per deployed api: the snapshot projected, managed as code (`created_by=external=otoroshi-api-management`, `deployment_ref`); an Api the product does not manage can be adopted |
+| `ApiSubscription` | `apis.otoroshi.io` | Projected | one per effective subscription (active, suspended, expired), its id the product's, the client id of the application on token and certificate plans |
+| `JwtVerifier` | `security.otoroshi.io` | Derived | from a jwt plan that describes how its tokens are validated (`apim_jwt_<api>_<plan>`); a plan may reference an existing verifier instead: consumed |
+| `AuthModule` | `security.otoroshi.io` | Derived | from an oauth2-remote plan that describes its authorization server (`apim_auth_<api>_<plan>`); a plan may reference an existing module instead, and the console route of the setup may sit behind one: consumed |
+| `Certificate` | `pki.otoroshi.io` | Derived | the trusted CAs of the mtls plans (`apim_ca_…`), the client certificates of the applications while they hold an mtls subscription (`apim_appcert_…`); the key pairs that sign the tokens of oauth2-local plans and the certificates of the hosts served over https are consumed |
+| `Route` | `proxy.otoroshi.io` | Made by the setup | the routes of the console and of the portals (`apim_setup_console`, `apim_setup_portals`); the routes of an api are inside its Api, not Route entities |
+| `DataExporter` | `events.otoroshi.io` | Made by the setup | the exporter of the events to the ingester, `apim_ingester_exporter`; the other exporters are the operator's |
+| `Apikey` | `apim.otoroshi.io` | Minted by Otoroshi | minted by Otoroshi for the subscriptions and the consumers of the plans: the product reads them (credentials, drift, quotas), rotates a secret on demand; the key of the product itself, `apim_product_admin`, is made by the setup |
+| `GlobalConfig` | `config.otoroshi.io` | Consumed | read: the TLS settings (client authentication of mtls plans, trusted CAs) and the env of the local vault; the setup sets the TLS client authentication when asked |
+| `Script` | `plugins.otoroshi.io` | Consumed | the plugins of the flows of an api, chosen in the catalog of the gateway, by their id |
+| `WasmPlugin` | `plugins.otoroshi.io` | Consumed | a wasm plugin a flow of an api uses, referenced in its configuration |
+| `Workflow` | `plugins.otoroshi.io` | Consumed | a workflow a flow of an api calls, referenced in its configuration |
+| `CorazaConfig` | `coraza-waf.extensions.otoroshi.io` | Consumed | a firewall configuration a flow of an api references (threat protection) |
+| `Organization` | `organize.otoroshi.io` | Consumed | everything the product writes is in the `default` location: a workspace is never a tenant of the gateway |
+| `Tenant` | `organize.otoroshi.io` | Consumed | the same, under its other name: the `default` tenant |
+| `Team` | `organize.otoroshi.io` | Consumed | the `default` team; the teams of the product are its own |
+| `Backend` | `proxy.otoroshi.io` | Not used | the backends of an api are inside its Api |
+| `RouteComposition` | `proxy.otoroshi.io` | Not used | — |
+| `RouteTemplate` | `proxy.otoroshi.io` | Not used | — |
+| `Draft` | `proxy.otoroshi.io` | Not used | the drafts of an api are the product's: they never reach the gateway |
+| `TcpService` | `proxy.otoroshi.io` | Not used | — |
+| `ErrorTemplate` | `proxy.otoroshi.io` | Not used | — |
+| `HttpListener` | `http-listeners.proxy.otoroshi.io` | Not used | the routes of an api answer on the standard listeners |
+| `ServiceGroup` | `organize.otoroshi.io` | Not used | — |
+| `AdminSession` | `security.otoroshi.io` | Not used | the product calls the gateway with its key, not a session |
+| `SimpleAdminUser` | `security.otoroshi.io` | Not used | — |
+| `AuthModuleUser` | `security.otoroshi.io` | Not used | the people of the console and of the portals are the product's |
+| `UserRightsPolicy` | `security.otoroshi.io` | Not used | — |
+| `UserDashboard` | `analytics.otoroshi.io` | Not used | the dashboards are the product's, from its ingester |
+| `UserAlert` | `analytics.otoroshi.io` | Not used | — |
+| `RemoteCatalog` | `catalogs.otoroshi.io` | Not used | the remote catalogs of the product are its own: they write drafts, not Apis |
+| `GreenScore` | `green-score.extensions.otoroshi.io` | Not used | — |

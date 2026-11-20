@@ -35,11 +35,12 @@ Last update: 2026-11-20.
   - R-22: the label and the help of a metadata field in other languages (`translations`), shown in the reader's language on the console and the portal — a request form asks its questions in French on a French portal (`test/ui.test.js`).
   - R-23: an api without an OpenAPI specification has a *Try it* tab on the portal — the request composer of the console, through the gateway, with the credentials of the consumer's own subscriptions (`test/ui.test.js`).
   - R-32: one request id from the caller to the backends — the `Otoroshi-Request-Id` the caller gets back is sent to the backends (`Otoroshi headers in` added to the flows, an api setting) and kept by the request log, where it is searched (`test/reference-catalogue.test.js`, `test/ingestion.test.js`).
+  - R-9: the inventory of the Otoroshi entities (D-15, Q-6) — every kind the gateway declares, with what the product does with it — a table in the product (`server/otoroshi/inventory.js`) and in the documentation, checked against `GET /apis/entities` of the gateway (`test/inventory.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-9** — the written inventory of the Otoroshi entities.
+1. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension).
 2. **R-48** — compaction of old rollups (only if the volume calls for it).
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
@@ -50,12 +51,11 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (13)**
+**Doable (12)**
 
 | # | Effort | What |
 |---|---|---|
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
-| R-9 | S | Written inventory of the Otoroshi entities (derived or infrastructure) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-12 | M | One credential for several subscriptions |
@@ -94,7 +94,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-9 | D-15, Q-6 | The **object-by-object inventory** of Otoroshi entities: derived from the api description, or infrastructure consumed as is — a written table checked against the Otoroshi source | S | |
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
 | R-17 | §5 | **Adopt mode**, second half: take over the existing subscriptions and apikeys of an adopted Api, not only its description | M | |
@@ -172,7 +171,7 @@ waits for the data plane rather than working around it.
 | D-11 i18n | ✅ | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages stay in English (owner), the pages of the portal per language ✅, the labels and help of the metadata fields per language ✅ |
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, and it reads the global configuration, super admin only by design (G-21) |
-| D-15 derived objects | 🟡 | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (issuer pattern derived from them when none is given), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; inventory: R-9 |
+| D-15 derived objects | ✅ | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (the trusted CAs of their plan, `trusted_ca_refs`), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; the inventory of every kind of the gateway ✅ |
 | D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
 | D-17 testing | ✅ | portal: Scalar + proxy for an api with its specification, the composer shared with the console otherwise ✅; console ✅ with the trace of the policies (the request tester of the gateway) |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
@@ -223,7 +222,7 @@ waits for the data plane rather than working around it.
 
 | Question | Status |
 |---|---|
-| Q-6 inventory of D-15 | ⬜ R-9 |
+| Q-6 inventory of D-15 | ✅ [Inventory of the Otoroshi entities](./documentation/docs/gateway/inventory.mdx): every kind the gateway declares, projected, derived, made by the setup, minted, consumed or not used — checked against the gateway (`test/inventory.test.js`) |
 | Q-8 computed path content, raw path lightening | ✅ hourly rollups by catalogue dimension, method, templated path and status class, durations as a histogram; calls 30 days, rollups 400, AI usage 90, raw 7 — set in the console; the cleaning at ingestion, its upstream counterpart logged as G-19 |
 | Q-11 declarative format | 🟡 implemented, to validate: R-28 |
 | Q-12 monetisation | ⬜ owner decision: R-35; connector: R-7 |
