@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtRelative } from '../../shared/lib.js';
-import { Callout, CopyButton, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Seg, Setting, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Callout, CopyButton, Empty, Field, FileButton, Icon, Input, Loader, Modal, NumberInput, Seg, Setting, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import YAML from 'yaml';
 import { CodeEditor } from '../../shared/code-editor.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
@@ -13,6 +14,19 @@ function GatewayState({ state }) {
   const map = { in_sync: ['active', tr('on the gateway')], drifted: ['pending', tr('changed on the gateway')], missing: ['error', tr('not on the gateway')], unknown: ['created', tr('gateway unknown')] };
   const [status, label] = map[state] || map.unknown;
   return <StatusBadge status={status} label={label} />;
+}
+
+// the values of a local file, JSON or YAML: an object, or an error said
+const VALUE_FILES = '.json,.yaml,.yml,application/json,application/yaml,text/yaml';
+function valuesOf(text, file) {
+  let v;
+  try {
+    v = YAML.parse(text);
+  } catch (e) {
+    throw new Error(tr('{0} cannot be read: {1}', [file.name, e.message]));
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(tr('{0} holds no object of values', [file.name]));
+  return v;
 }
 
 // the keys of the values, as paths of dots: what an expression reads
@@ -101,7 +115,7 @@ export function DictionariesPage() {
                   const d = await wapi.post('/dictionaries', {
                     name: creating.name,
                     description: creating.description,
-                    ...(creating.kind === 'url' ? { source: { kind: 'url', url: creating.url, everySeconds: 300 } } : { entries: {} }),
+                    ...(creating.kind === 'url' ? { source: { kind: 'url', url: creating.url, everySeconds: 300 } } : { entries: creating.entries || {} }),
                   });
                   navigate(`/ws/${slug}/dictionaries/${d.id}`);
                 } catch (e) {
@@ -132,6 +146,25 @@ export function DictionariesPage() {
           {creating.kind === 'url' && (
             <Field label={tr('Source url')} hint={tr('answers a JSON object')}>
               <Input value={creating.url} onChange={(v) => setCreating({ ...creating, url: v })} mono placeholder="https://…/values.json" />
+            </Field>
+          )}
+          {creating.kind === 'static' && (
+            <Field label={tr('Initial values')} hint={tr('a JSON or YAML file holding an object; or none, and the values are written on the next page')}>
+              <div className="row">
+                <FileButton
+                  accept={VALUE_FILES}
+                  onFile={(text, file) => {
+                    try {
+                      setCreating({ ...creating, entries: valuesOf(text, file), file: file.name });
+                    } catch (e) {
+                      toast(e.message, 'error');
+                    }
+                  }}
+                >
+                  {tr('From a local file…')}
+                </FileButton>
+                {creating.file && <span className="muted small">{tr('{0} values from {1}', [Object.keys(creating.entries || {}).length, creating.file])}</span>}
+              </div>
             </Field>
           )}
         </Modal>
@@ -272,6 +305,22 @@ function DictionaryEditor({ d, reload }) {
               </>
             ) : (
               <>
+                <div className="row">
+                  <FileButton
+                    className="btn sm"
+                    accept={VALUE_FILES}
+                    onFile={(t, file) => {
+                      try {
+                        setText(JSON.stringify(valuesOf(t, file), null, 2));
+                        toast(tr('{0} imported: save to apply it', [file.name]));
+                      } catch (e) {
+                        toast(e.message, 'error');
+                      }
+                    }}
+                  >
+                    {tr('Replace with a local file…')}
+                  </FileButton>
+                </div>
                 <CodeEditor value={text} onChange={setText} language="json" minHeight={260} maxHeight={560} ariaLabel={tr('values of the dictionary')} />
                 {parseError && <Callout kind="negative">{parseError}</Callout>}
               </>

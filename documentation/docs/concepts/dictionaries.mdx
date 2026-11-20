@@ -17,8 +17,9 @@ what is composed by hand, gives it a lifecycle and a scope.
 
 ## Its values
 
-- **Given here**: a JSON object, its values strings, numbers, booleans, or objects of the same. A key
-  holds no dot: the expression language reads a path of dots.
+- **Given here**: a JSON object, its values strings, numbers, booleans, or objects of the same — written
+  on the page, or imported from a local JSON or YAML file, at its creation or later. A key holds no
+  dot: the expression language reads a path of dots.
 - **From a source**: an `http(s)` URL answering a JSON object, read again every few minutes (30 seconds
   to 24 hours), the object at a JSON pointer of the answer (`/data`), with headers — a token — kept
   sealed and never shown back. **Refresh now** reads it at once. A source that fails keeps the last

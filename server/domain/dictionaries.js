@@ -199,7 +199,9 @@ registerTaskHandler('project_dictionary', async ({ dictionary_id }) => {
 registerTaskHandler('unproject_dictionary', async ({ workspace, name }) => {
   const { all } = await gatewayDictionaries();
   if (!all?.[workspace] || !(name in all[workspace])) return { skipped: 'not on the gateway' };
-  await oto.patchGlobalConfig([{ op: 'remove', path: `/env/${ROOT.map(esc).join('/')}/${esc(workspace)}/${esc(name)}` }]);
+  // the last dictionary of a workspace takes its entry with it
+  const last = Object.keys(all[workspace]).length === 1;
+  await oto.patchGlobalConfig([{ op: 'remove', path: `/env/${ROOT.map(esc).join('/')}/${esc(workspace)}${last ? '' : `/${esc(name)}`}` }]);
   return { removed: name };
 });
 

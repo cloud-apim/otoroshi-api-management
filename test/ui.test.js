@@ -7,7 +7,9 @@
 // (CHROMIUM, /usr/bin/chromium by default): skipped without them.
 
 import { describe, test, expect, beforeAll, afterAll, setDefaultTimeout } from 'bun:test';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 setDefaultTimeout(120000);
 
@@ -210,6 +212,33 @@ describe.skipIf(!ready)('the console', () => {
     await settle(800);
     const saved = await call('GET', ws(`/apis/${state.createdApiId}`));
     expect(saved.draft.plans.map((p) => p.name)).toContain('Gold');
+    expect(page.problems).toEqual([]);
+    await context.close();
+  });
+
+  test('a dictionary created from a local file, its values on the page and on the gateway', async () => {
+    const context = await browser.createBrowserContext();
+    const page = await watchedPage(context);
+    await go(page, '/backoffice/');
+    await page.type('input[type=email]', 'admin@otoroshi.io');
+    await page.type('input[type=password]', 'password');
+    await click(page, 'Sign in');
+    await page.waitForFunction(() => location.pathname.startsWith('/backoffice/ws/'), { timeout: 15000 });
+    const file = join(mkdtempSync(join(tmpdir(), 'apim-ui-')), 'regions.yaml');
+    writeFileSync(file, 'eu: https://eu.backend.internal\nus: https://us.backend.internal\nlimits:\n  eu: 1000\n');
+    await go(page, `/backoffice/ws/${WS}/dictionaries`);
+    await click(page, 'New dictionary');
+    await fill(page, 'Name', 'regions', '.modal');
+    const input = await page.$('.modal input[type=file]');
+    await input.uploadFile(file);
+    await input.evaluate((el) => el.dispatchEvent(new Event('change', { bubbles: true })));
+    await page.waitForFunction(() => document.querySelector('.modal')?.innerText.includes('3 values from regions.yaml'), { timeout: 10000 });
+    await click(page, 'Create', '.modal button');
+    await page.waitForFunction(() => /\/dictionaries\/dict_/.test(location.pathname), { timeout: 15000 });
+    await page.waitForFunction(() => document.body.innerText.includes('limits.eu') && document.body.innerText.includes('on the gateway'), { timeout: 15000 });
+    const d = (await call('GET', ws('/dictionaries'))).find((x) => x.name === 'regions');
+    expect(d.entries).toEqual({ eu: 'https://eu.backend.internal', us: 'https://us.backend.internal', limits: { eu: 1000 } });
+    await call('DELETE', ws(`/dictionaries/${d.id}`));
     expect(page.problems).toEqual([]);
     await context.close();
   });
