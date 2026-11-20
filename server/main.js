@@ -12,6 +12,7 @@ import { migrateAll } from './db/index.js';
 import { errorResponse, json, parseCookies, readJson, HttpError } from './http/router.js';
 import * as identity from './domain/identity.js';
 import { adminRouter } from './roles/admin-api.js';
+import * as portalDesign from './domain/portal-design.js';
 import { portalRouter, testProxy } from './roles/portal-api.js';
 import { ingest, parseEvents } from './domain/ingest.js';
 import { workOnce } from './domain/tasks.js';
@@ -219,6 +220,9 @@ async function handlePortal(req, url, server) {
   const role = user ? (user.is_admin ? 'admin' : await identity.membership(ws.id, user.id)) : null;
   const ctx = { user, workspace: ws, role, via: 'portal', ip: clientIp(req, server) };
 
+  // the files of the design: its assets by digest, its script — served only where the portal allows
+  // scripts, the published one (or the draft, through a preview link)
+  if (rest.startsWith('/_design/')) return serveDesign(req, ws, rest.slice('/_design/'.length));
   if (rest.startsWith('/front/api/')) {
     const path = rest.slice('/front/api'.length);
     if (path === '/test' || path.startsWith('/test?')) {
@@ -281,6 +285,31 @@ async function handlePortal(req, url, server) {
     return dispatch(portalRouter, req, path, ctx);
   }
   return spaIndex('portal', { workspace: ws.slug, base, exposure: currentForm().kind });
+}
+
+// assets are never scripts: an svg is a document of its own, sandboxed; nothing is sniffed
+async function serveDesign(req, ws, rel) {
+  const m = /^assets\/([0-9a-f]{64})$/.exec(rel);
+  if (m) {
+    const a = await portalDesign.getAsset(ws.id, m[1]).catch(() => null);
+    if (!a) return json({ error: 'not found' }, 404);
+    return new Response(a.data, {
+      headers: {
+        'content-type': a.content_type,
+        'cache-control': 'public, max-age=31536000, immutable',
+        'x-content-type-options': 'nosniff',
+        ...(a.content_type === 'image/svg+xml' ? { 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" } : {}),
+      },
+    });
+  }
+  if (rel === 'script.js') {
+    if (!portalDesign.scriptsOf(ws).enabled) return json({ error: 'scripts are not allowed on this portal' }, 404);
+    const preview = new URL(req.url).searchParams.get('preview');
+    const shown = preview && portalDesign.readPreviewToken(preview, ws) ? { design: await portalDesign.draftOf(ws) } : await portalDesign.publishedDesign(ws);
+    if (!shown.design.script) return json({ error: 'not found' }, 404);
+    return new Response(shown.design.script, { headers: { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' } });
+  }
+  return json({ error: 'not found' }, 404);
 }
 
 async function fetchHandler(req, server) {

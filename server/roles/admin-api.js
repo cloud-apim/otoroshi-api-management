@@ -6,6 +6,7 @@ import { Router, badRequest, notFound, forbidden } from '../http/router.js';
 import { db } from '../db/index.js';
 import { config } from '../config.js';
 import * as identity from '../domain/identity.js';
+import * as portalDesign from '../domain/portal-design.js';
 import * as apis from '../domain/apis.js';
 import * as deployments from '../domain/deployments.js';
 import * as applications from '../domain/applications.js';
@@ -395,6 +396,69 @@ r.put('/workspaces/:ws', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   if (body.metadata !== undefined) body.metadata = await metadata.checkValues(c.workspace.id, 'workspace', body.metadata);
   return withPortal(await identity.updateWorkspace(c, c.workspace, body));
+});
+
+// ---------------------------------------------------------------- the design of the portal
+
+// the draft, the published version and what differs; the producers read it, the administrators edit
+r.get('/workspaces/:ws/portal/design', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return portalDesign.designState(c.workspace);
+});
+r.put('/workspaces/:ws/portal/design', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.saveDraft(c, c.workspace, body);
+});
+r.post('/workspaces/:ws/portal/publish', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.publishDesign(c, c.workspace, body);
+});
+r.get('/workspaces/:ws/portal/versions', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return portalDesign.listVersions(c.workspace.id, pageParams(query, { defaultLimit: 50 }));
+});
+r.get('/workspaces/:ws/portal/versions/:n', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return portalDesign.getVersion(c.workspace.id, params.n);
+});
+r.post('/workspaces/:ws/portal/versions/:n/restore', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.restoreVersion(c, c.workspace, params.n);
+});
+// the files of the design: uploaded as base64, read back by their digest
+r.post('/workspaces/:ws/portal/assets', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.storeAsset(c, c.workspace, body);
+});
+r.get('/workspaces/:ws/portal/assets/:hash', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  const a = await portalDesign.getAsset(c.workspace.id, params.hash);
+  return { hash: params.hash, contentType: a.content_type, size: a.size, data: Buffer.from(a.data).toString('base64') };
+});
+// the declarative document of the design (the draft), and its apply — the cli and the catalogs
+r.get('/workspaces/:ws/portal/document', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return portalDesign.portalDocument(c.workspace);
+});
+r.post('/workspaces/:ws/portal/apply', async ({ ctx, params, body, query }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.applyPortalDocument(c, c.workspace, body, { managedBy: query.get('managed_by') || null, publish: query.get('publish') === 'true', comment: query.get('comment') || '' });
+});
+// scripts on the portal: off by default; allowing them acknowledges what they can do
+r.get('/workspaces/:ws/portal/scripts', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return { ...portalDesign.scriptsOf(c.workspace), warning: portalDesign.SCRIPTS_WARNING };
+});
+r.put('/workspaces/:ws/portal/scripts', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return portalDesign.setScripts(c, c.workspace, body);
+});
+// a link to the portal showing the draft, for an hour
+r.post('/workspaces/:ws/portal/preview', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  const token = portalDesign.previewToken(c.workspace);
+  const base = withPortal(c.workspace).portal_url;
+  return { token, url: `${String(base).replace(/\/$/, '')}/?preview=${encodeURIComponent(token)}`, expires_in: 3600 };
 });
 
 r.delete('/workspaces/:ws', async ({ ctx, params }) => {

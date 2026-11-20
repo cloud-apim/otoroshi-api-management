@@ -2,6 +2,7 @@
 // from the URL by the server, never from a session. The catalogue is served from the snapshots that
 // run on the gateway, so it stays readable during a gateway incident.
 
+import * as portalDesign from '../domain/portal-design.js';
 import { readCertificate } from '../domain/pki.js';
 import { Router, badRequest, forbidden, notFound, unauthorized } from '../http/router.js';
 import { pageParams } from '../http/paging.js';
@@ -164,11 +165,17 @@ function publicPortal(portal = {}) {
   return { ...rest, sso: oidc?.enabled ? { label: oidc.label || 'single sign-on' } : null };
 }
 
-r.get('/portal', async ({ ctx }) => ({
-  workspace: { slug: ctx.workspace.slug, name: ctx.workspace.name, description: ctx.workspace.description },
-  portal: publicPortal(ctx.workspace.portal),
-  user: ctx.user ? { ...identity.publicUser(ctx.user), role: ctx.role } : null,
-}));
+r.get('/portal', async ({ ctx, query }) => {
+  // the published design, or the draft through a preview link of the console
+  const preview = query.get('preview') && portalDesign.readPreviewToken(query.get('preview'), ctx.workspace);
+  const shown = preview ? { number: null, design: await portalDesign.draftOf(ctx.workspace) } : await portalDesign.publishedDesign(ctx.workspace);
+  return {
+    workspace: { slug: ctx.workspace.slug, name: ctx.workspace.name, description: ctx.workspace.description },
+    portal: publicPortal(ctx.workspace.portal),
+    design: { ...portalDesign.publicDesign(shown.design, ctx.workspace, shown.number), preview: !!preview },
+    user: ctx.user ? { ...identity.publicUser(ctx.user), role: ctx.role } : null,
+  };
+});
 
 r.get('/me', async ({ ctx }) => {
   requireUser(ctx);

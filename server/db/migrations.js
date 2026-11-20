@@ -577,6 +577,38 @@ create table resource_versions (
 );
 `,
   },
+  {
+    version: '0019_portal_design',
+    sql: `
+-- the design of a portal: what it looks like and says — its mode (the default template, a theme, or
+-- templates), its texts, theme, navigation, home, pages, templates, styles, script and assets —,
+-- edited as a draft and published by immutable versions. Its settings (languages, signup, identity
+-- provider, categories, the permission of scripts) stay in workspaces.portal, live
+alter table workspaces add column portal_design jsonb;
+
+create table portal_versions (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  number int not null,
+  design jsonb not null,
+  comment text not null default '',
+  published_by text,
+  published_at timestamptz not null default now(),
+  unique (workspace_id, number)
+);
+
+-- the files of the designs — images, fonts, style sheets —, kept by their digest
+create table portal_assets (
+  workspace_id text not null references workspaces(id) on delete cascade,
+  hash text not null,
+  content_type text not null,
+  size int not null,
+  data bytea not null,
+  created_at timestamptz not null default now(),
+  primary key (workspace_id, hash)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [
