@@ -232,12 +232,19 @@ A gateway without the extension ignores a plugin it does not know, and the calls
 says it before you start. The events of the suite are in **Observability → Security**, attributed to
 the API and the plan.
 
+The extension works best as a fabric: the firewall **reports** (a configuration that does not block)
+and the **threat response decides**, from the score of the call — a policy that refuses at 90, the
+weight of a block of the firewall, with `waf_block_decisive`. Its refusals are then security events.
+A threat policy can also **challenge** a caller: a challenge is a page, for a person in a browser.
+
 :::caution What the extension does not do yet
-A threat policy that **challenges** a caller answers a page with status `200`, which an API client
-takes for a success ([G-25](../otoroshi-gaps.mdx)): for an API, prefer a policy that refuses — the
-tab warns of a policy that can challenge. The global table of Threat Studio does not see the plugins
-of a plan and can add a second firewall on top ([G-24](../otoroshi-gaps.mdx)): keep it off the APIs
-the product protects per plan.
+- The global table of Threat Studio does not see the preset of a plan: a second firewall runs on the
+  calls of that plan, the scores add up and the policy of the table decides
+  ([G-24](../otoroshi-gaps.mdx)). Keep the global table off the APIs the product protects per plan.
+- With the core rule set, every call scores a firewall match (45): its initialization rules count as
+  matches ([G-27](../otoroshi-gaps.mdx)). A policy that refuses below 90 refuses legitimate calls.
+- A firewall that blocks on its own sends no security event, only its trail
+  ([G-28](../otoroshi-gaps.mdx)): its blocks do not reach **Observability → Security**.
 :::
 
 ## Catalogue and approval — never projected

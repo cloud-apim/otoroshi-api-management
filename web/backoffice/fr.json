@@ -1265,7 +1265,7 @@
   "they carry the address of the caller: reading them is traced in the audit trail": "ils portent l’adresse de l’appelant : leur lecture est tracée dans le journal d’audit",
   "This installation serves the single workspace {0} at {1}: no prefix, no workspace selector.": "Cette installation sert l’unique workspace {0} à {1} : pas de préfixe, pas de sélecteur de workspace.",
   "this plugin takes no configuration": "ce plugin ne prend pas de configuration",
-  "This policy can challenge a caller: the extension answers with a page, status 200, which an api client takes for a success (gap G-25). Prefer a policy that refuses for an api.": "Cette politique peut soumettre un appelant à un défi : l’extension répond par une page, en statut 200, qu’un client d’API prend pour un succès (écart G-25). Préférez une politique qui refuse pour une API.",
+  "This policy can challenge a caller: a challenge is a page, for a person in a browser.": "Cette politique peut soumettre un appelant à un défi : un défi est une page, pour une personne dans un navigateur.",
   "This policy records what it would do and refuses nothing.": "Cette politique enregistre ce qu’elle ferait et ne refuse rien.",
   "This sync deploys: every change below reaches the gateway.": "Cette synchronisation déploie : chaque changement ci-dessous atteint la gateway.",
   "This version was created from {0}. Subscriptions do not follow a new version: transfer them.": "Cette version a été créée à partir de {0}. Les souscriptions ne suivent pas une nouvelle version : transférez-les.",

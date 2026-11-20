@@ -306,6 +306,18 @@ describe('the attribution', () => {
     expect((trail.items || trail).length).toBeGreaterThan(0);
   });
 
+  test('the first calls of an api made since the attribution cache was read are attributed too', async () => {
+    await ingest([event(`${RUN}-warm`)]);
+    const team = (await ok('GET', `/workspaces/${WS}/teams`))[0];
+    const fresh = (await ok('POST', `/workspaces/${WS}/apis`, { name: 'Fresh', version: '1.0.0', team_id: team.id, domain: `fresh-${RUN}.oto.tools`, contextPath: '/' })).id;
+    await Bun.sleep(1100);
+    await ingest([{ ...event(`${RUN}-fresh`), route: { id: `route_fresh_${RUN}`, name: 'r', metadata: { 'Otoroshi-Api-Ref': fresh } } }]);
+    const [row] = await adb`select api_id, workspace_id from calls where req_id = ${`${RUN}-fresh`}`;
+    expect(row.api_id).toBe(fresh);
+    await adb`delete from calls where api_id = ${fresh}`;
+    await ok('DELETE', `/workspaces/${WS}/apis/${fresh}`);
+  });
+
   test('a call is attributed from the apiRef the gateway gives its event', async () => {
     const api = await ok('GET', `/workspaces/${WS}/apis/${apiId}`);
     const planId = api.draft.plans[0].id;

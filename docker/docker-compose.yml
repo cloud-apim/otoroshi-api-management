@@ -25,7 +25,16 @@ services:
 
   otoroshi:
     image: eclipse-temurin:21-jre
-    command: ["java", "-Xmx1g", "-jar", "/otoroshi/otoroshi.jar"]
+    # the extensions of the gateway on its classpath — the Threat Protection Suite, the LLM extension:
+    # the jars of OTOROSHI_EXTENSIONS (a directory, docker/extensions by default, empty), enabled here
+    command:
+      - java
+      - -Xmx2g
+      - -Dotoroshi.admin-extensions.configurations.cloud-apim_extensions_waf.enabled=true
+      - -Dotoroshi.admin-extensions.configurations.cloud-apim_extensions_llmextension.enabled=true
+      - -cp
+      - /otoroshi/otoroshi.jar:/otoroshi/extensions/*
+      - play.core.server.ProdServerStart
     environment:
       APP_STORAGE: file
       APP_DB_PATH: /data/otoroshi.json
@@ -38,6 +47,7 @@ services:
       - "8080:8080"
     volumes:
       - ${OTOROSHI_JAR:-../../otoroshi.jar}:/otoroshi/otoroshi.jar:ro
+      - ${OTOROSHI_EXTENSIONS:-./extensions}:/otoroshi/extensions:ro
       - otodata:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"

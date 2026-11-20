@@ -37,20 +37,20 @@ Last update: 2026-11-20.
   - R-32: one request id from the caller to the backends — the `Otoroshi-Request-Id` the caller gets back is sent to the backends (`Otoroshi headers in` added to the flows, an api setting) and kept by the request log, where it is searched (`test/reference-catalogue.test.js`, `test/ingestion.test.js`).
   - R-9: the inventory of the Otoroshi entities (D-15, Q-6) — every kind the gateway declares, with what the product does with it — a table in the product (`server/otoroshi/inventory.js`) and in the documentation, checked against `GET /apis/entities` of the gateway (`test/inventory.test.js`).
   - R-17: adopt mode takes over the subscriptions of an Api and their keys too — an application per owner, the same subscription ids, the same client ids and secrets — and the first deployment updates them in place: the consumer keeps calling with its key (`test/adopt.test.js`). The plans of an adopted Api keep the new attributes of the contract (selection, counter failure, circuit breaker, issuer and audiences, trusted CAs, validity).
-  - R-12 found a gap, logged as **G-23** (open, not reported upstream): a key cannot serve several subscriptions — each one rebuilds the keys it references on its own api and plan — so one credential for the subscriptions of a consumer to several apis waits for Otoroshi.
+  - R-12 found a gap, **G-23**, reproduced on the gateway and reported upstream ([#2963](https://github.com/MAIF/otoroshi/issues/2963)): a key is its subscription's own — a second subscription that names it gets a key of its own — so one credential for the subscriptions of a consumer to several apis waits for Otoroshi.
   - R-20: the catalogue as a discovery system, on three axes — editorial (the categories of the portal, where each api stands across its versions, the featured ones, applied at once without a snapshot), the reviews of the consumers who subscribed (one per person and api, hidden by a producer, kept in the console), and the real usage (subscribed applications, calls of the last thirty days); the portal filters by category and sorts on them; a workspace keeps reviews or usage off its portal (`test/discovery.test.js`, `test/ui.test.js`).
   - R-25: the Threat Protection Suite per plan (D-10) — a tab of the plan configures the preset of the extension (firewall, bots, IP reputation, fail2ban, sensitive data, error leakage, uploads, login guard, api contract) and references its policies, projected in the plugins of the plan and watched by the drift detection; a gateway without the extension, which would let the calls through unprotected, gets the draft and the deployment warned; the `CloudApimSecurityEvent` of the suite are exported, ingested and attributed to the api and, through the key that called, the plan, the subscription and the application — Observability › Security, and the analytics of an api (`test/threat-protection.test.js`, `test/ingestion.test.js`, `test/model.test.js`). Three gaps of the extension logged: **G-24** (the global table of Threat Studio ignores the plan plugins), **G-25** (a challenge answers a page with status 200), **G-26** (a security event does not name the plan).
   - R-34: usage-based billing (D-36) — a paid plan can bill the usage of its subscriptions with a metered price of Stripe, with its recurring price or alone; the calls counted from the computed path (success or served), pushed to the meter of the linked account in batches after the rollups, taken by id — exactly once, each report sent once with its id as identifier and replayed until it is; the calls kept until billed; the usage shown on the subscription (console, admin api, cli) and on the portal; a usage price refused on a provider that cannot meter (`test/payments.test.js`, `test/stripe.test.js`, `test/model.test.js`).
   - R-51: the analytics of the console to the level of the API management consoles of the market — one row of filters in the url (timeframes from 5 minutes to a year and a custom range, api, plan, application, status class; refresh and auto-refresh), requests per second, minimum, maximum and p95 latency, the responses over time split into successes, client and server errors (stacked columns), the latency over time, the hits of the first applications and apis (the others folded into "other"), the tops by calls, server errors and latency, the hosts (kept at ingestion) and the paths as called; buckets that follow the range (`date_bin`), empty ones shown; charts per the dataviz method, legend and table view everywhere (`test/ingestion.test.js`, `test/ui.test.js`).
   - R-52: the request log as a view of its own (Observability › Logs) — the filters of the dashboards and its own (method, path, client id, a free search that reaches the host), the detail of a call (where its time went), a CSV export of the filtered calls (formulas quoted, 50,000 at most), both traced in the audit trail; every dashboard opens it with its filters (`test/ingestion.test.js`, `test/ui.test.js`).
   - R-53: the analytics and the logs of the consumer's applications on the portal — the same filters (timeframes, application, api, status class), the figures, the responses and the latency over time, the hits by api and application, the tops; the request log of its applications, filtered by method and path, with the detail of a call and a CSV export traced in the audit trail; each application links to both (`test/payments.test.js`, `test/ui.test.js`).
+  - R-25 checked on a gateway running the Threat Protection Suite 1.0.0 and the LLM extension 0.0.90 (their latest releases, on the classpath of the development gateway: `OTOROSHI_EXTENSIONS`): a legitimate call served, an injection refused by the threat response, its security event attributed to the api, the plan, the subscription and the application (`test/threat-protection.test.js`, which runs either case). On the way: **G-24** confirmed (the global table of Threat Studio runs a second firewall on a plan already protected, the scores add up), **G-26** confirmed, **G-27** (every call scores a firewall match with the core rule set) and **G-28** (a firewall that blocks on its own sends no security event) found; **G-25** withdrawn — a challenge is for a person in a browser. None reported yet. Also found on the way, in the product: the ingester read its attribution cache every 15 seconds, so the first calls of an api or a key made meanwhile were unattributed — an unknown api, subscription or key now reads it again, once a second at most (`test/ingestion.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
-2. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
-3. **R-48** — compaction of old rollups (only if the volume calls for it).
+1. **R-31** — the LLM and MCP ingestion checked with real events (the LLM extension runs on the development gateway).
+2. **R-48** — compaction of old rollups (only if the volume calls for it).
 
 Then the large ones: R-10, R-19.
 
@@ -60,15 +60,14 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (8)**
+**Doable (7)**
 
 | # | Effort | What |
 |---|---|---|
-| R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
+| R-31 | S | LLM/MCP ingestion checked with real events (the LLM extension now runs on the development gateway) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
-| R-25 | S | Threat protection checked against a gateway with the extension running (needs it built: to download on the owner's go) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
 | R-10 | L | Named compositions: resources and dictionaries |
 | R-19 | L | Custom portal templates |
@@ -116,7 +115,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-25 | D-10 | **Threat protection**: configured per plan from a dedicated screen and rendered in observability — done; what remains is the check against a gateway that runs the extension | S | needs the extension built (downloads) |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
 
 ### Industrialisation (GitOps, environments, operations)
@@ -190,7 +188,7 @@ waits for the data plane rather than working around it.
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | one credential for several apis: R-12, waiting for G-23 |
-| D-32 MVP scope, captured events | 🟡 | GatewayEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
+| D-32 MVP scope, captured events | 🟡 | GatewayEvent and CloudApimSecurityEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
 | D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
 | D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move through a Checkout ✅; usage billing: R-34 |

@@ -209,6 +209,22 @@ One installation drives one Otoroshi cluster, with an administration key.
 | `OTOROSHI_PUBLIC_SCHEME` / `OTOROSHI_PUBLIC_PORT` | `http` / `8080` | how consumers reach the APIs: `<scheme>://<api domain>:<port>` |
 | `OTOROSHI_BACKOFFICE_URL` | `http://otoroshi.oto.tools:8080` | used to link a projected entity in the Otoroshi backoffice |
 
+The extensions of the gateway are the gateway's: the product needs none, and uses the ones it finds —
+the **Threat Protection Suite** for the threat protection of the plans, the **LLM extension** for the
+AI and MCP audits it ingests. In the development stack, the gateway starts with the jars of a
+directory on its classpath, both extensions enabled:
+
+```sh
+# the latest releases, in a directory of their own
+mkdir -p ~/otoroshi-extensions && cd ~/otoroshi-extensions
+gh release download -R cloud-apim/otoroshi-waf-extension -p 'otoroshi-waf-extension_3-*.jar*'
+gh release download -R cloud-apim/otoroshi-llm-extension -p 'otoroshi-llm-extension_3-*.jar*'
+sha256sum -c *.sha256
+# the gateway restarted with them (docker/extensions, empty, by default)
+OTOROSHI_EXTENSIONS=~/otoroshi-extensions mise exec -- docker compose up -d otoroshi
+mise run demo   # the development gateway keeps nothing across a restart
+```
+
 ### Ingestion
 
 | Variable | Default | Meaning |

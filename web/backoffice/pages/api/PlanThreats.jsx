@@ -150,7 +150,7 @@ function ThreatPolicyNotes({ policy }) {
       <div className="row gap-6">{policy.dry_run && <Badge kind="warning">{tr('dry run')}</Badge>}</div>
       {policy.dry_run && <span className="faint small">{tr('This policy records what it would do and refuses nothing.')}</span>}
       {policy.challenge && (
-        <Callout kind="warning">{tr('This policy can challenge a caller: the extension answers with a page, status 200, which an api client takes for a success (gap G-25). Prefer a policy that refuses for an api.')}</Callout>
+        <Callout kind="info">{tr('This policy can challenge a caller: a challenge is a page, for a person in a browser.')}</Callout>
       )}
     </>
   );

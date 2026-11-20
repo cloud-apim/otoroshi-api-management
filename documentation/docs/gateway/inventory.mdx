@@ -24,7 +24,8 @@ it with the API. Otherwise it is infrastructure: referenced, read, never owned.
 
 The list follows the kinds the gateway declares (`GET /apis/entities`): a kind the inventory does
 not know fails the tests of the product. The kinds of the Threat Protection Suite
-(`waf.extensions.cloud-apim.com`) are there when the gateway has the extension.
+(`waf.extensions.cloud-apim.com`) and of the LLM extension (`ai-gateway.extensions.cloud-apim.com`)
+are there when the gateway has the extension.
 
 | Kind | Group | Treatment | How |
 |---|---|---|---|
@@ -41,6 +42,10 @@ not know fails the tests of the product. The kinds of the Threat Protection Suit
 | `WasmPlugin` | `plugins.otoroshi.io` | Consumed | a wasm plugin a flow of an api uses, referenced in its configuration |
 | `Workflow` | `plugins.otoroshi.io` | Consumed | a workflow a flow of an api calls, referenced in its configuration |
 | `CorazaConfig` | `coraza-waf.extensions.otoroshi.io` | Consumed | a firewall configuration a flow of an api references (threat protection) |
+| `AiProvider` | `ai-gateway.extensions.cloud-apim.com` | Consumed | referenced in the configuration of a plugin of a flow of an api (an AI or MCP api), never written |
+| `McpConnector` | `ai-gateway.extensions.cloud-apim.com` | Consumed | referenced in the configuration of a plugin of a flow of an api (an AI or MCP api), never written |
+| `McpVirtualServer` | `ai-gateway.extensions.cloud-apim.com` | Consumed | referenced in the configuration of a plugin of a flow of an api (an AI or MCP api), never written |
+| `A2AServer` | `ai-gateway.extensions.cloud-apim.com` | Consumed | referenced in the configuration of a plugin of a flow of an api (an AI or MCP api), never written |
 | `ThreatPolicy` | `waf.extensions.cloud-apim.com` | Consumed | a threat policy a plan with threat protection references: how a score turns into an action; read to say when it records only, or can challenge a caller |
 | `BotPolicy` | `waf.extensions.cloud-apim.com` | Consumed | a bot policy a plan with threat protection references |
 | `WafConfig` | `waf.extensions.cloud-apim.com` | Consumed | a firewall configuration a plan with threat protection references |
@@ -64,6 +69,22 @@ not know fails the tests of the product. The kinds of the Threat Protection Suit
 | `UserAlert` | `analytics.otoroshi.io` | Not used | — |
 | `RemoteCatalog` | `catalogs.otoroshi.io` | Not used | the remote catalogs of the product are its own: they write drafts, not Apis |
 | `GreenScore` | `green-score.extensions.otoroshi.io` | Not used | — |
+| `PromptContext` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `Prompt` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `PromptTemplate` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `ToolFunction` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `EmbeddingModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `EmbeddingStore` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `ModerationModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `DecisionModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `AudioModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `OcrModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `SearchEngine` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `ImageModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `VideoModel` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `PersistentMemory` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
+| `AiBudget` | `ai-gateway.extensions.cloud-apim.com` | Not used | the token and AI budget plans are out of the MVP for now |
+| `A2AConnector` | `ai-gateway.extensions.cloud-apim.com` | Not used | — |
 | `WafRuleset` | `waf.extensions.cloud-apim.com` | Not used | the rules of a firewall configuration: the operator's, in Threat Studio |
 | `ChallengeProvider` | `waf.extensions.cloud-apim.com` | Not used | the challenges of a threat policy |
 | `HoneypotPolicy` | `waf.extensions.cloud-apim.com` | Not used | — |

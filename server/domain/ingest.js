@@ -16,8 +16,8 @@ export { maskUrl } from './ingest-policy.js';
 
 const cache = { at: 0, byClientId: new Map(), apis: new Map(), subs: new Map() };
 
-async function refreshCache() {
-  if (Date.now() - cache.at < 15000) return;
+async function refreshCache({ maxAgeMs = 15000 } = {}) {
+  if (Date.now() - cache.at < maxAgeMs) return;
   const creds = await db`select c.client_id, s.id as subscription_id, s.application_id, s.plan_id, s.api_id, s.workspace_id
     from credentials c join subscriptions s on s.id = c.subscription_id`;
   const apis = await db`select id, workspace_id from apis`;
@@ -30,6 +30,25 @@ async function refreshCache() {
 
 export function invalidateAttributionCache() {
   cache.at = 0;
+}
+
+// the api, the subscription and the client id an event names, whatever its type
+function refsOf(e) {
+  const type = e?.['@type'];
+  if (type === 'GatewayEvent')
+    return { api: e.identity?.apiRef?.api || e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref, sub: e.identity?.apiRef?.sub, client: e.identity?.identityType === 'APIKEY' ? e.identity.identity : null };
+  if (type === 'CloudApimSecurityEvent') return { api: e.otoroshi?.api_id, client: e.source?.apikey };
+  return { api: e?.route?.metadata?.['Otoroshi-Api-Ref'], client: e?.apikey?.clientId || e?.consumer?.apikey || e?.user?.apikey };
+}
+
+// an event of an api, a subscription or a key made since the cache was read: read it again, once a
+// second at most — the first calls of a new api are attributed like the others
+async function knowEvery(events) {
+  const missing = events.some((e) => {
+    const r = refsOf(e);
+    return (r.api && !cache.apis.has(r.api)) || (r.sub && !cache.subs.has(r.sub)) || (r.client && r.api && cache.apis.has(r.api) && !cache.byClientId.has(r.client) && !r.sub);
+  });
+  if (missing) await refreshCache({ maxAgeMs: 1000 });
 }
 
 // the event names the api, the plan and the subscription of the key that called (`apiRef`, as the
@@ -80,6 +99,7 @@ function lighten(p, event, { headers = 'keep' } = {}) {
 
 export async function ingest(events) {
   await refreshCache();
+  await knowEvery(events);
   const p = await policy();
   const calls = [];
   const ai = [];

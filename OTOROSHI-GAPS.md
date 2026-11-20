@@ -15,8 +15,9 @@ dropped its workarounds rather than keeping them for 18.0: nothing depends on th
 
 On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
 they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
-contract on the gateway. Found on the way: G-22, reported upstream; G-23 in Otoroshi and G-24 to
-G-26 in the Threat Protection Suite, not reported yet. Status: ✅ **followed** — the
+contract on the gateway. Found on the way: G-22 and G-23, reported upstream; G-24 to G-28 in the
+Threat Protection Suite, checked on a gateway running its release 1.0.0, not reported yet (G-25 is
+not a gap). Status: ✅ **followed** — the
 product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
 yet.
 
@@ -44,10 +45,12 @@ yet.
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
-| G-23 | — | A key cannot serve **several subscriptions**: each one rebuilds the keys it references on its own api and plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
-| G-24 | — | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins** and can add a second WAF on a plan protected by the product | medium | ⬜ | nothing: an operator keeps the global table off the apis the product protects per plan |
-| G-25 | — | Threat Protection Suite: a **challenge answers a page, status 200**, which an api client takes for a success | high | ⬜ | the plan screen says it of a threat policy that can challenge, and advises one that refuses |
+| G-23 | [#2963](https://github.com/MAIF/otoroshi/issues/2963) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
+| G-24 | — | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
+| G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
 | G-26 | — | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
+| G-27 | — | Threat Protection Suite: with the core rule set, **every call scores a firewall match** — its initialization rules count as matches | medium | ⬜ | nothing: a policy that refuses starts at 90 (the weight of a block), and the events of every call are kept |
+| G-28 | — | Threat Protection Suite: a firewall that **blocks on its own** sends no `CloudApimSecurityEvent`, only its trail event | medium | ⬜ | the docs advise the fabric of the extension — the firewall reports, the threat response decides — whose refusals are security events |
 
 ---
 
@@ -344,81 +347,124 @@ call then has one event, its own, which already carries the reason of a refusal
 
 ## G-23 — a key cannot serve several subscriptions — medium — open
 
-Not reported upstream yet. Found on 18.1.0-dev while implementing R-12 (one credential for several
-subscriptions of a consumer, D-31: the identity grouped, the quotas never pooled).
+Reported upstream: [#2963](https://github.com/MAIF/otoroshi/issues/2963). Found on 18.1.0-dev
+while implementing R-12 (one credential for several subscriptions of a consumer, D-31: the identity
+grouped, the quotas never pooled), and reproduced on the development gateway.
 
-**Observed.** A key minted for an `ApiSubscription` is built from its api and its plan only:
-`authorizedEntities = Seq(ApiIdentifier(api.id))`, `apiRef = {api, plan, sub}`, the throttling of
-the plan (`ApiSubscription.generateNewApikeyFromPlan`, `next/models/Api.scala:1323`). Every write of
-the subscription, and every change of its plan, rebuilds each key of its `token_refs` the same way
-(`updateApikeyFromPlan`, `:1458`, through `rebuildApikey`, `:1418`). A second subscription that
-references the key of the first in its `token_refs` therefore rewrites it on its own api and plan:
-the last write wins, and the api of the other subscription refuses the key (`ApikeyCalls` checks
-`authorizedEntities`). Deleting either subscription deletes the key both rely on (`deleteKeys`,
-`:1254`, only spares a key whose `apiRef` names another subscription). So one key cannot carry the
-subscriptions of a consumer to several apis — what `authorizedEntities` allows for a classic apikey.
+**Observed.** A key minted for an `ApiSubscription` is its subscription's own: authorized on its api
+(`authorizedEntities = Seq(ApiIdentifier(api.id))`), one `apiRef` `{api, plan, sub}`
+(`generateNewApikeyFromPlan`, `next/models/Api.scala:1323`). A second subscription, to another api,
+of the same owner, that names that key in its `token_refs`: the key is left alone — `onOwnKeys`
+(`:1244`) skips a key whose `apiRef` is another subscription's, with a warning — and the second
+subscription gets a new key of its own (`createNewApikeyFromPlan`, `:1384`), the first key still
+listed in its `token_refs` although it serves nothing on its api: a call to the second api with it
+is refused (`401`). Writing the first subscription again, or deleting the second, leaves the key
+as it was. So one key cannot carry the subscriptions of a consumer to several apis — what
+`authorizedEntities` allows for a classic apikey.
 
 **The product.** One key per subscription. R-12 waits for this.
 
-**Fix to propose.** A subscription that joins the key of another subscription of the same owner
-(e.g. `token_refs: [{"apikey": "<client id>", "shared": true}]`, or a `credential_ref`): the key is
-authorized on the union of the apis of the subscriptions that reference it, each call is enforced
-with the plan of the subscription of the api called (its rate, quotas and restrictions, counted per
-key and plan — no pooled quota), the `apiRef` of the event is the one of that subscription, and the
-key goes with the last subscription that references it.
+**Fix proposed upstream.** An opt-in sharing (`{"apikey": "<client id>", "shared": true}` in the
+`token_refs` of a subscription of the same owner): the key knows the subscriptions it serves, each
+call is enforced with the plan of the subscription of the api called — counters per key and plan,
+no pooled quota —, the `apiRef` of the event is that subscription's, and the key goes with the
+last of them; a foreign key without the flag is refused, or dropped from the `token_refs`.
 
-## G-24 — the global table of Threat Studio does not see the plan plugins — medium — open
+## G-24 — the global table of Threat Studio does not see the plan plugins — high — open
 
 Not reported upstream yet. In the Threat Protection Suite (`../otoroshi-waf-extension`), found while
-implementing R-25 (threat protection per plan, D-10).
+implementing R-25 (threat protection per plan, D-10), and checked on a gateway running the release
+1.0.0.
 
-**Observed.** The global preset (`CloudApimSecuritySuiteGlobalPreset`) protects every route a rule of
-its table claims, and stands down on a route that carries its own protection when
-`skip_protected_routes` is on. It decides that from the plugins of the route only:
+**Observed.** The global preset (`CloudApimSecuritySuiteGlobalPreset`, the table of Threat Studio)
+protects every route a rule of its table claims, and stands down on a route that carries its own
+protection when `skip_protected_routes` is on. It decides that from the plugins of the route only:
 `carriesOwnProtection(route) = route.plugins.slots.exists(...)` (`plugins/globalpreset.scala:202`).
 The plugins of a plan (`ApiPlanPlugins`) are composed into the chain at call time, after the plan is
-selected (`next/models/plugins.scala:366` in Otoroshi): the route of an Api whose plans carry the
-preset looks unprotected to the table, which can add a second WAF on top of the plan's — the calls
-judged twice, by two configurations.
+selected (`next/models/plugins.scala:366` in Otoroshi), so the route of an Api whose plan carries the
+preset looks unprotected to the table. On the development gateway, a table with one rule for every
+route (`skip_protected_routes: true`) and three apis, three calls each:
 
-**The product.** Nothing: the docs ask an operator to keep the global table off the apis the product
-protects per plan.
+| the api | the decisions of the threat response |
+|---|---|
+| the preset in the flow of the route, its own policy | 3 × `score 45 reached tier 1 (log)` — the table stands down |
+| no protection | 3 × `score 45 reached tier 40 (log)` — the table protects it |
+| the preset on its plan, its own policy | 3 × `score 90 reached tier 90 (ban)` — both firewalls ran, their scores added up, and the policy of the table decided |
+
+With the default tiers of a policy that is not in dry run, every call of a plan protected that way
+would be banned.
+
+**The product.** It places the preset of the extension on the plan — it never adds a firewall of its
+own. Nothing more: the docs ask an operator to keep the global table off the apis protected per plan.
 
 **Fix to propose.** `carriesOwnProtection` also looks at the plans of the Api the route belongs to
 (`route.apiRef` → its plans' `plugins.plugins`, and the flow they reference), or the global preset
-runs after the plan chain and stands down when a preset of the plan already ran for the call.
+stands down at call time when a preset of the plan of the call is in the chain.
 
-## G-25 — a challenge answers a page with status 200 — high — open
+## G-25 — a challenge answers a page with status 200 — not a gap
 
-Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25.
-
-**Observed.** A threat policy whose tier action is `challenge` answers the call with the interstitial
-page: `Results.Ok(Interstitial.render(provider, issued)).as("text/html; charset=utf-8")`
-(`plugins/threat.scala:461`). It suits a browser route; an api client — a program, not a person —
-reads a `200` and takes the html for the answer of the api. Nothing in the response says that the
-call was not served.
-
-**The product.** The plan screen says it of a threat policy that has a challenge tier, and advises a
-policy that refuses for an api.
-
-**Fix to propose.** Answer a challenge to a caller that does not accept html (no `text/html` in
-`Accept`, or an api route) with a refusal — `429` or `403`, a json body naming the challenge and the
-url where a person answers it — and keep the page for the browsers.
+Withdrawn, by decision of the owner: a challenge is for a person in a browser, its page answered with
+`200` as it should be (`plugins/threat.scala:461`). The plan screen only says that a policy can
+challenge.
 
 ## G-26 — a security event names the api, not the plan — low — open
 
-Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25.
+Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25, and checked
+on a gateway running the release 1.0.0.
 
-**Observed.** `CloudApimSecurityEvent` carries the route and the api of the route
-(`otoroshi.api_id`, from `route.apiRef`, `security/events.scala:137`), and the client id of the key
-that called (`source.apikey`), but not the plan the engine selected for the call, nor its
-subscription. For a keyless plan, or a caller refused before it was identified, the plan is lost.
+**Observed.** `CloudApimSecurityEvent` carries the route and the api of the route (`otoroshi.api_id`,
+from `route.apiRef`, `security/events.scala:137`) and the client id of the key that called
+(`source.apikey`), but not the plan the engine selected for the call, nor its subscription. On the
+development gateway, the event of a refused attack: `otoroshi: {route_id, route_name, api_id,
+tenant, teams, groups, node}`, `source: {ip, apikey, user}`, no plan. For a keyless plan, or a
+caller refused before it was identified, the plan is lost.
 
 **The product.** The ingester takes the plan, the subscription and the application from the key that
-called when there is one (the key of a subscription of the product); otherwise the event is the api's
-only, shown as "no plan: caller not identified".
+called when there is one (checked end to end: `test/threat-protection.test.js`); otherwise the event
+is the api's only, shown as "no plan: caller not identified".
 
 **Fix to propose.** Add the `apiRef` of the call to the event (`api`, `plan`, `sub`), as the
 `GatewayEvent` of Otoroshi does in `identity.apiRef`: the plan the engine selected, empty when it
 selected none.
+
+## G-27 — with the core rule set, every call scores a firewall match — medium — open
+
+Not reported upstream yet. In the Threat Protection Suite, found on a gateway running the release
+1.0.0, with the firewall configuration of its getting started (`@import_preset crs`,
+`SecRuleEngine On`).
+
+**Observed.** Every call, a legitimate `GET /books?page=1` with a browser user agent included, gives a
+`waf:match` signal, "rules matched without blocking (rules 900990, 901100, 901110, 901111, 901115)",
+scored 45 (`waf_match_weight`). These are the setup and initialization rules of the core rule set
+(`crs-setup.conf`, `REQUEST-901-INITIALIZATION`): `SecAction`s that run on every request to set
+variables, not detections. The signal is published as soon as the engine reports events
+(`CloudApimWafFabric.signalFor`, `plugins/waf.scala`: `result.events.isEmpty`). So every call starts at
+45: the default tiers log it as a threat (tier 40), a security event per call, and leave 25 points to
+the tarpit (tier 70) — one more signal, a bot score, and a legitimate client is slowed down.
+
+**The product.** Nothing: the events of every call are kept as they come. The test policy refuses at
+90 only (`test/threat-protection.test.js`).
+
+**Fix to propose.** Leave out of the signal the rules that only set state — the `SecAction`s, the
+rules with `nolog` or without a `msg`, the 9000xx and 9011xx ranges of the core rule set — and count
+a match only for the rules that detected something.
+
+## G-28 — a firewall that blocks on its own sends no security event — medium — open
+
+Not reported upstream yet. In the Threat Protection Suite, found on a gateway running the release
+1.0.0.
+
+**Observed.** With a firewall configuration in blocking mode (`block: true`), an injection is refused
+by the firewall itself (`400`), and the only event is its own `CloudApimWafTrailEvent`
+(`plugins/waf.scala:365`): no `CloudApimSecurityEvent`, although the event says that "every module
+emits this shape rather than its own" (`security/events.scala`). A consumer of the normalised events
+(a SIEM, the product) does not see the blocks of the firewall. With the firewall reporting and the
+threat response deciding (`block: false`, a policy that refuses at 90 with `waf_block_decisive`), the
+refusal is a `CloudApimSecurityEvent` (`category: threat`, `action: deny`) — checked end to end.
+
+**The product.** The docs advise that fabric; the exporter of the setup exports the normalised events
+only.
+
+**Fix to propose.** The firewall sends a `CloudApimSecurityEvent` (`category: waf`, `action: block`,
+the rules in `signals`) when it blocks, beside its trail event.
 

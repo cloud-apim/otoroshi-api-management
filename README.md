@@ -30,7 +30,8 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 ## Quick start
 
 Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar, 18.1
-or later (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`).
+or later (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`); its extensions,
+optional, from a directory (`OTOROSHI_EXTENSIONS`, see the install documentation).
 
 ```sh
 mise trust && mise install
