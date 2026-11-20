@@ -151,7 +151,9 @@ description = "Syntax-check every server, cli, script and test file; every text 
 run = ["bun scripts/check.js", "bun scripts/i18n.js check"]
 
 [tasks.test]
-description = "Run every test: unit tests, and the reference catalogue test against the real gateway (needs the stack)"
+description = "Run every test: unit tests, the end-to-end tests against the real gateway, the interface in a headless Chromium (needs the stack)"
+# the interface tests drive what dist/ holds: built first
+depends = ["build"]
 run = "bun test"
 
 [tasks."test:unit"]

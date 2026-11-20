@@ -13,7 +13,7 @@ mise install && mise run install
 mise run up                   # build the uis, start the docker stack (postgres :5442, otoroshi :8080, the product :9000), wait
 mise run demo                 # idempotent demo data
 mise run watch                # rebuild the uis on change (the server serves dist/)
-mise run test                 # unit tests + the reference catalogue test (needs the stack; its own server on :9117)
+mise run test                 # builds the uis, then unit, end-to-end and interface tests (needs the stack, and Chromium for the interface; its own server on :9117)
 mise run test:unit            # no infrastructure
 mise run ci                   # check + build + test + docs:build
 mise run cli apis list default

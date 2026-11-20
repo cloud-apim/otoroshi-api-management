@@ -104,9 +104,14 @@ API, the plan, the subscription and the application.
 
 ```bash
 bun test test/model.test.js      # unit tests, no infrastructure
-bun test                         # everything, including the reference catalogue test against the real gateway
+mise run test                    # everything: the interfaces built, then every test against the real gateway
 ```
 
 The reference catalogue test (`test/reference-catalogue.test.js`) describes a catalogue — 6 plans,
 5 auth mechanisms, 4 approval modes on one API and one set of routes — and checks that it is
 projected, reconciled, and that its drift is detected and repaired.
+
+The interface test (`test/ui.test.js`) drives the console and the portal in a headless Chromium
+(`CHROMIUM`, `/usr/bin/chromium` by default; skipped without one): every page of the console opens
+without an error, a producer makes an API and a plan, the console speaks French, a consumer
+subscribes from the portal and gets its credentials.
