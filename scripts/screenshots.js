@@ -212,6 +212,7 @@ async function consoleTour(page) {
   for (const [tab, name, title] of [
     ['Access', 'console-plan-access', 'Plan editor — access: auth mechanism, selection'],
     ['Limits', 'console-plan-limits', 'Plan editor — limits: rate, quotas, resources, failure strategies'],
+    ['Threat protection', 'console-plan-threats', 'Plan editor — threat protection: the Threat Protection Suite on the calls of the plan, its policies referenced'],
     ['Catalogue & approval', 'console-plan-catalogue', 'Plan editor — catalogue and approval: never projected'],
     ['Pricing', 'console-plan-pricing', 'Plan editor — pricing'],
   ]) {
@@ -247,6 +248,14 @@ async function consoleTour(page) {
   await go(page, `${A}/openapi`);
   await editors(page);
   await shot(page, 'console-api-openapi', 'API — OpenAPI specification, in a code editor', { full: false });
+  const orders = await api(page, `/backoffice/api/workspaces/${WS}/apis/orders-events`);
+  if (orders?.id) {
+    await go(page, `${W}/apis/${orders.id}/asyncapi`);
+    await editors(page);
+    await shot(page, 'console-api-asyncapi', 'API — AsyncAPI specification of an event-driven api, and its channels', { full: false });
+  }
+  await go(page, `${A}/catalogue`);
+  await shot(page, 'console-api-catalogue', 'API — its place in the catalogue of the portal (categories, featured), and the reviews of its consumers');
   await go(page, `${A}/subscriptions`);
   await shot(page, 'console-api-subscriptions', 'API — its subscriptions');
   if (bookSub) {
@@ -276,8 +285,10 @@ async function consoleTour(page) {
   await sleep(800);
   await editors(page);
   await shot(page, 'console-api-test', 'Test — a request tried through the gateway, with the credentials of a subscription and the trace of the policies');
-  await go(page, `${A}/analytics?range=24h`);
-  await shot(page, 'console-api-analytics', 'API — analytics, in the catalogue vocabulary');
+  await go(page, `${A}/analytics?range=7d`);
+  await page.setViewport({ width: 1440, height: 1500 });
+  await shot(page, 'console-api-analytics', 'API — analytics, in the catalogue vocabulary', { full: false });
+  await page.setViewport({ width: 1440, height: 900 });
   await go(page, `${A}/settings`);
   await click(page, 'Technical details', { selector: 'summary' });
   await shot(page, 'console-api-settings', 'API — settings, versions, technical details (the escape hatch), danger zone');
@@ -287,6 +298,21 @@ async function consoleTour(page) {
   if (groups[0]) {
     await go(page, `${W}/policy-groups/${groups[0].id}`);
     await shot(page, 'console-policy-group', 'A policy group — draft, versions, the apis that use it and lag behind');
+  }
+  await go(page, `${W}/shared-resources`);
+  await shot(page, 'console-shared-resources', 'Shared resources — an authorization server described once, pinned by the plans');
+  const resources = await api(page, `/backoffice/api/workspaces/${WS}/shared-resources`);
+  if (resources[0]) {
+    await go(page, `${W}/shared-resources/${resources[0].id}`);
+    await shot(page, 'console-shared-resource', 'A shared resource — its draft, its versions, the plans that pin it');
+  }
+  await go(page, `${W}/dictionaries`);
+  await shot(page, 'console-dictionaries', 'Dictionaries — named values given to the expression language of the gateway');
+  const dicts = await api(page, `/backoffice/api/workspaces/${WS}/dictionaries`);
+  if (dicts[0]) {
+    await go(page, `${W}/dictionaries/${dicts[0].id}`);
+    await editors(page);
+    await shot(page, 'console-dictionary', 'A dictionary — its values, and the expression that reads each of them');
   }
 
   await go(page, `${W}/applications`);
@@ -303,10 +329,20 @@ async function consoleTour(page) {
     await go(page, `${W}/subscriptions?status=pending&open=${pendingSub.id}`);
     await shot(page, 'console-review', 'Reviewing a request: usage statement, request form, terms', { full: false });
   }
-  await go(page, `${W}/observability?range=24h`);
+  await go(page, `${W}/observability?range=7d`);
   await page.setViewport({ width: 1440, height: 1500 });
-  await shot(page, 'console-observability', 'Observability — traffic by api, plan, application, status, endpoint', { full: false });
+  await shot(page, 'console-observability', 'Observability — the figures, responses and latency over time, hits by application and api', { full: false });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight * 0.45));
+  await settle(page, 400);
+  await shot(page, 'console-observability-tops', 'Observability — the tops: failed and slow apis, applications, plans, hosts, paths', { full: false });
   await page.setViewport({ width: 1440, height: 900 });
+  await go(page, `${W}/observability?view=logs&range=24h`);
+  await shot(page, 'console-logs', 'Observability — the request log, filtered like the dashboards, exported as CSV', { full: false });
+  await click(page, '', { selector: 'tr.clickable' });
+  await shot(page, 'console-log-call', 'A call of the request log — where its time went', { full: false });
+  await page.keyboard.press('Escape');
+  await go(page, `${W}/observability?view=security&range=14d`);
+  await shot(page, 'console-security', 'Observability — the security events of the Threat Protection Suite, by category, action and plan', { full: false });
   await go(page, `${W}/audit`);
   await shot(page, 'console-audit', 'Audit — writes, and reads of credentials and request logs', { full: false });
   await click(page, '', { selector: 'tr.clickable' });
@@ -393,7 +429,7 @@ async function portalTour(page) {
   await go(page, `${P}/`);
   await shot(page, 'portal-home', 'Portal — home of a workspace portal (anonymous visitor)');
   await go(page, `${P}/apis`);
-  await shot(page, 'portal-catalogue', 'Portal — catalogue');
+  await shot(page, 'portal-catalogue', 'Portal — catalogue: categories, featured apis, ratings, usage');
   await go(page, `${P}/apis/books`);
   await shot(page, 'portal-api', 'Portal — an api: base url, quickstart, resources');
   await go(page, `${P}/apis/books/docs`);
@@ -403,6 +439,10 @@ async function portalTour(page) {
   await shot(page, 'portal-reference', 'Portal — API reference, and testing from it (Scalar)');
   await go(page, `${P}/apis/books/plans`);
   await shot(page, 'portal-plans', 'Portal — plans: what really applies, per credential');
+  await go(page, `${P}/apis/books/reviews`);
+  await shot(page, 'portal-reviews', 'Portal — the reviews of the consumers who subscribed');
+  await go(page, `${P}/apis/orders-events/events`);
+  await shot(page, 'portal-events', 'Portal — the events of an event-driven api, from its AsyncAPI specification');
   await go(page, `${P}/signin`);
   await shot(page, 'portal-signin', 'Portal — sign in, with the IdP of the workspace', { full: false });
   await go(page, `${P}/signup`);
@@ -426,8 +466,12 @@ async function portalTour(page) {
     await click(page, 'Change plan');
     await shot(page, 'portal-change-plan', 'Portal — asking to move to an equivalent plan', { full: false });
   }
-  await go(page, `${P}/usage`);
-  await shot(page, 'portal-usage', 'Portal — my consumption');
+  await go(page, `${P}/usage?range=7d`);
+  await page.setViewport({ width: 1440, height: 1400 });
+  await shot(page, 'portal-usage', 'Portal — the analytics of my applications', { full: false });
+  await page.setViewport({ width: 1440, height: 900 });
+  await go(page, `${P}/usage?view=logs&range=24h`);
+  await shot(page, 'portal-logs', 'Portal — the request log of my applications, exported as CSV', { full: false });
   await go(page, `${P}/teams`);
   await shot(page, 'portal-teams', 'Portal — my teams');
   await go(page, `${P}/apps`);

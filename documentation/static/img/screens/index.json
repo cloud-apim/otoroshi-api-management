@@ -100,6 +100,10 @@
     "title": "Plan editor — limits: rate, quotas, resources, failure strategies"
   },
   {
+    "file": "console-plan-threats.png",
+    "title": "Plan editor — threat protection: the Threat Protection Suite on the calls of the plan, its policies referenced"
+  },
+  {
     "file": "console-plan-catalogue.png",
     "title": "Plan editor — catalogue and approval: never projected"
   },
@@ -126,6 +130,14 @@
   {
     "file": "console-api-openapi.png",
     "title": "API — OpenAPI specification, in a code editor"
+  },
+  {
+    "file": "console-api-asyncapi.png",
+    "title": "API — AsyncAPI specification of an event-driven api, and its channels"
+  },
+  {
+    "file": "console-api-catalogue.png",
+    "title": "API — its place in the catalogue of the portal (categories, featured), and the reviews of its consumers"
   },
   {
     "file": "console-api-subscriptions.png",
@@ -176,6 +188,22 @@
     "title": "A policy group — draft, versions, the apis that use it and lag behind"
   },
   {
+    "file": "console-shared-resources.png",
+    "title": "Shared resources — an authorization server described once, pinned by the plans"
+  },
+  {
+    "file": "console-shared-resource.png",
+    "title": "A shared resource — its draft, its versions, the plans that pin it"
+  },
+  {
+    "file": "console-dictionaries.png",
+    "title": "Dictionaries — named values given to the expression language of the gateway"
+  },
+  {
+    "file": "console-dictionary.png",
+    "title": "A dictionary — its values, and the expression that reads each of them"
+  },
+  {
     "file": "console-applications.png",
     "title": "Applications"
   },
@@ -197,7 +225,23 @@
   },
   {
     "file": "console-observability.png",
-    "title": "Observability — traffic by api, plan, application, status, endpoint"
+    "title": "Observability — the figures, responses and latency over time, hits by application and api"
+  },
+  {
+    "file": "console-observability-tops.png",
+    "title": "Observability — the tops: failed and slow apis, applications, plans, hosts, paths"
+  },
+  {
+    "file": "console-logs.png",
+    "title": "Observability — the request log, filtered like the dashboards, exported as CSV"
+  },
+  {
+    "file": "console-log-call.png",
+    "title": "A call of the request log — where its time went"
+  },
+  {
+    "file": "console-security.png",
+    "title": "Observability — the security events of the Threat Protection Suite, by category, action and plan"
   },
   {
     "file": "console-audit.png",
@@ -313,7 +357,7 @@
   },
   {
     "file": "portal-catalogue.png",
-    "title": "Portal — catalogue"
+    "title": "Portal — catalogue: categories, featured apis, ratings, usage"
   },
   {
     "file": "portal-api.png",
@@ -330,6 +374,14 @@
   {
     "file": "portal-plans.png",
     "title": "Portal — plans: what really applies, per credential"
+  },
+  {
+    "file": "portal-reviews.png",
+    "title": "Portal — the reviews of the consumers who subscribed"
+  },
+  {
+    "file": "portal-events.png",
+    "title": "Portal — the events of an event-driven api, from its AsyncAPI specification"
   },
   {
     "file": "portal-signin.png",
@@ -357,7 +409,11 @@
   },
   {
     "file": "portal-usage.png",
-    "title": "Portal — my consumption"
+    "title": "Portal — the analytics of my applications"
+  },
+  {
+    "file": "portal-logs.png",
+    "title": "Portal — the request log of my applications, exported as CSV"
   },
   {
     "file": "portal-teams.png",

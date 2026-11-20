@@ -44,7 +44,7 @@ yet.
 | G-19 | [#2956](https://github.com/MAIF/otoroshi/issues/2956) | A data exporter sends the **url secrets** and the **personal data** of an event in clear, and **samples** nothing | — | ➖ | the ingester masks, pseudonymises and samples before it stores |
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
-| G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
+| G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds, or is refused: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
 | G-23 | [#2963](https://github.com/MAIF/otoroshi/issues/2963) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
 | G-24 | [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60) | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
 | G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
@@ -336,8 +336,15 @@ its own `reqId`), then the call itself (`200`, the key). A jwt call produces the
 tuple` of `ApikeyCalls`, then itself. Seen on the development stack: about one call in ten of the
 end-to-end tests was such an event.
 
+A call **refused** in the end is counted twice as well: a call without a key, on an api whose plans
+are apikey plans, gives the `400 no apikey` event of `ApikeyCalls` ("no apikey detected in the http
+request"), then the `401` the client gets, from the consumer enforcer ("no consumer identified on the
+call", `next/plugins/apimgmt.scala:1301`) — two `reqId`, the same url and time, a status the client
+never saw. Captured again on the data exporter of 18.1.0-dev.
+
 **The product.** Nothing: an error event is an event. The dashboards count these as calls and as
-errors — the error rate of an api with several plans is overstated.
+errors — the error rate of an api with several plans is overstated, and every refused call counts
+twice.
 
 **Fix to propose.** An extractor that only tries to identify the caller does not send the event of
 the error it lets go: `sendEvent = false` on the verification of `NgJwtApikeyExtractor` and

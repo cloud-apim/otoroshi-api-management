@@ -6,6 +6,8 @@
 //  - the texts of the default portal, in English and French
 //  - the Otoroshi data exporter that feeds the ingester
 //  - a (fake) Stripe account linked to the default workspace, for its paid plans
+//  - then scripts/demo-activity.js: the gateway caught up, an event-driven api, a dictionary, a shared
+//    resource, the catalogue of the portal, and activity for every dashboard
 import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 
@@ -85,3 +87,8 @@ if (payments.available && !payments.account) {
   await fetch(authorize.headers.get('location'), { redirect: 'manual' });
   console.log(`default   payments through a ${payments.provider} Stripe account`);
 }
+
+// what the screens show beyond the apis: an event-driven api, a dictionary, a shared resource, the
+// catalogue of the portal, and activity for every dashboard
+await import('./demo-activity.js');
+

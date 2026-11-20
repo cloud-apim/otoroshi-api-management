@@ -21,7 +21,9 @@ export function SharedResourcesPage() {
     <div className="page">
       <PageHead
         title={tr('Shared resources')}
-        sub={tr('A dependency the plans consume, described once — an authorization server: its issuer, its keys, its endpoints. A plan pins a published version instead of describing it again; publishing a new version changes nothing until each API is upgraded.')}
+        sub={tr(
+          'A dependency the plans consume, described once — an authorization server: its issuer, its keys, its endpoints. A plan pins a published version instead of describing it again; publishing a new version changes nothing until each API is upgraded.'
+        )}
         actions={
           <button className="btn primary" onClick={() => setCreating({ name: '', description: '' })}>
             <Icon name="plus" /> {tr('New authorization server')}
@@ -49,7 +51,15 @@ export function SharedResourcesPage() {
                         <div className="bold">{r.name}</div>
                         <div className="faint tiny">{r.draft?.issuer || r.description}</div>
                       </td>
-                      <td>{r.last_version ? <Badge kind="accent"><Tr text={'v{0}'} args={[r.last_version]} /></Badge> : <StatusBadge status="created" label={tr('draft only')} />}</td>
+                      <td>
+                        {r.last_version ? (
+                          <Badge kind="accent">
+                            <Tr text={'v{0}'} args={[r.last_version]} />
+                          </Badge>
+                        ) : (
+                          <StatusBadge status="created" label={tr('draft only')} />
+                        )}
+                      </td>
                       <td className="small">
                         <Tr
                           text={'{0} API(s){1}'}
@@ -214,7 +224,9 @@ function ResourceEditor({ r, reload }) {
               <Field label={tr('Scope')}>
                 <Input value={c.scope} onChange={(v) => set({ scope: v })} mono />
               </Field>
-              {c.clientSecret && !c.clientSecret.startsWith('${vault://') && <Callout kind="warning">{tr('The client secret is kept in clear in the versions and the snapshots: prefer a vault reference.')}</Callout>}
+              {c.clientSecret && !c.clientSecret.startsWith('${vault://') && (
+                <Callout kind="warning">{tr('The client secret is kept in clear in the versions and the snapshots: prefer a vault reference.')}</Callout>
+              )}
             </div>
           </div>
           <div className="card">
