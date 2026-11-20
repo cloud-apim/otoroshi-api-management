@@ -29,8 +29,8 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 
 ## Quick start
 
-Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi 18
-jar (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`).
+Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar, 18.1
+or later (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`).
 
 ```sh
 mise trust && mise install
@@ -82,7 +82,7 @@ console (/backoffice) ─┐                     ┌─ portal (/<workspace>/, /
                        │                      subscriptions · applications · audit
                        │  task queue (async, replayable)
                        ▼
-            Otoroshi Admin API  — Api entity (catalog-marked write), ApiSubscription → apikey
+            Otoroshi Admin API  — Api entity (written as code), ApiSubscription → apikey
                        │
          Otoroshi (data plane) ── data exporter ──▶ ingester (/ingest) ──▶ analytics db
 ```
@@ -103,7 +103,7 @@ Two PostgreSQL databases: application data, and events + analytics.
 | Concern | Where |
 |---|---|
 | Draft → immutable snapshot → deployment | `server/domain/apis.js`, `deployments.js` |
-| Projection: catalog-marked `Api` write | `server/otoroshi/projection.js`, `client.js` |
+| Projection: `Api` written as code | `server/otoroshi/projection.js`, `client.js` |
 | A subscription is an apikey with `apiRef`, the application an `id_ref` | `server/domain/subscriptions.js` |
 | Selective sync: docs, terms, usage statements, pricing never projected | `projection.js` |
 | Async and replayable operations | `server/domain/tasks.js` |

@@ -394,7 +394,7 @@ function DeployModal({ api, snapshot, onClose, onDone }) {
         {(p) => (
           <>
             <p className="small muted">
-              <Tr text={"Writes the {0} entity on the installation's Otoroshi cluster, marked as a catalog deployment ({1}), so Otoroshi records it in its own deployment history."} args={[<code>Api</code>, <code>created_by=remote_catalog=otoroshi-apim-deployment</code>]} />
+              <Tr text={"Writes the {0} entity on the installation's Otoroshi cluster, as an api managed as code ({1}): Otoroshi records the deployment in its own history, with the snapshot as its ref."} args={[<code>Api</code>, <code>created_by=external=otoroshi-api-management</code>]} />
             </p>
             {p.gatewayError && <Callout kind="negative" title={tr('Gateway unreachable')}><Tr text={'{0} — the deployment will wait in the queue and run when the gateway is back.'} args={[p.gatewayError]} /></Callout>}
             {p.warnings.map((w, i) => (

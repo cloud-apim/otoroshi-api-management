@@ -685,8 +685,12 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
     const got = await oto.getEntity(d.path, d.id).catch(() => null);
     derived.push({ kind: d.kind, id: d.id, name: d.entity.name, present: !!got });
   }
+  // the deployment history of the gateway, each deployment tied to the snapshot it put live (its ref)
+  const numbers = new Map((await db`select id, number from api_snapshots where api_id = ${api.id}`).map((s) => [s.id, s.number]));
+  const gatewayDeployments = (actual?.deployments || []).map((d) => ({ id: d.id, at: d.at, owner: d.owner, ref: d.ref || null, snapshot_number: numbers.get(d.ref) ?? null }));
   return {
     derived,
+    gateway_deployments: gatewayDeployments,
     otoroshi: { kind: 'apis.otoroshi.io/Api', id: api.id, backoffice_url: `${gw.backofficeUrl}/bo/dashboard/apis/${api.id}` },
     expected,
     actual,

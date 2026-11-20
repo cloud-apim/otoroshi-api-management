@@ -4,11 +4,14 @@
 import { config } from '../config.js';
 import { db } from '../db/index.js';
 
-export const OWNER_MARKER = 'remote_catalog=otoroshi-apim-deployment';
+// an outside tool that manages its apis as code: each write of an Api so marked is a deploy, recorded
+// in the deployment history of the Api, owned by this marker
+export const TOOL_ID = 'otoroshi-api-management';
+export const OWNER_MARKER = `external=${TOOL_ID}`;
 export const META = {
   createdBy: 'created_by',
   api: 'apim_api_id',
-  snapshot: 'apim_snapshot_id',
+  snapshot: 'deployment_ref', // the snapshot deployed: Otoroshi gives it to the deployment as its ref
   snapshotNumber: 'apim_snapshot_number',
   workspace: 'apim_workspace',
   subscription: 'apim_subscription_id',
@@ -101,8 +104,9 @@ export const oto = {
   },
   getApi: (id) => otoroshi('GET', `${API_BASE}/${id}`),
   listApis: () => otoroshi('GET', API_BASE),
-  // a catalog-marked write is a deploy: production_readonly is lifted, the api may be created
-  // already published, and the write is recorded as an ApiDeployment. The upsert of the generic
+  // the write of an Api managed as code is a deploy: the api may be created already published, the
+  // fields locked in production take the body, and a change is recorded as an ApiDeployment whose
+  // ref is the snapshot. The upsert of the generic
   // api: a POST on the id creates or replaces (a PUT refuses an entity that does not exist yet).
   upsertApi: (entity) => otoroshi('POST', `${API_BASE}/${entity.id}`, entity),
   deleteApi: (id) => otoroshi('DELETE', `${API_BASE}/${id}`),

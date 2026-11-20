@@ -44,10 +44,10 @@ alone, through its admin API or its backoffice:
 - **change the offer**: edit a plan of the `Api`, and Otoroshi carries its quotas to the keys of
   its subscriptions.
 
-While an `Api` carries the marker of the product (`created_by: remote_catalog=otoroshi-apim-deployment`),
-Otoroshi takes each write that changes what is live for a catalog deploy, and records it in the
-deployment history of the API ([G-8](../otoroshi-gaps.mdx)). Remove `created_by` from its metadata to
-manage it through Otoroshi's own draft and deploy.
+While an `Api` carries the marker of the product (`created_by: external=otoroshi-api-management`),
+Otoroshi takes it for an api managed as code: each write that changes what is live is a deploy,
+recorded in the deployment history of the API. Remove `created_by` from its metadata to manage it
+through Otoroshi's own draft and deploy.
 
 Back, the product reports what was changed by hand as [drift](./drift-and-adopt.mdx), and puts its
 description back on demand, by redeploying the snapshot. What was created by hand — a subscription,
@@ -60,7 +60,7 @@ else. What stays on the gateway:
 
 | Left on the gateway | Marked with | After uninstalling |
 |---|---|---|
-| the `Api` entities | `created_by`, `apim_api_id`, `apim_snapshot_id` | served; remove `created_by` to manage them as any Otoroshi API |
+| the `Api` entities | `created_by`, `apim_api_id`, `deployment_ref` | served; remove `created_by` to manage them as any Otoroshi API |
 | the `ApiSubscription`s and their keys | `id_ref` (the application), `apim_subscription_id` | served, managed by hand |
 | the derived JWT verifiers, CA certificates, auth modules, application certificates | `created_by`, `apim_derived` | referenced by the plans: keep them |
 | the keys the gateway minted for the consumers of jwt, mtls, oauth2-remote and keyless plans | `created_by: apikey-extractor` | Otoroshi's own |

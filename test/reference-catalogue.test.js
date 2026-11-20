@@ -192,26 +192,29 @@ describe('reference catalogue', () => {
     expect(order.indexOf('apikey')).toBeLessThan(order.indexOf('jwt'));
   });
 
-  test('project: publish a snapshot and deploy it as a catalog-marked Api entity', async () => {
+  test('project: publish a snapshot and deploy it as an Api entity managed as code', async () => {
     const res = await call('POST', ws(`/apis/${state.apiId}/publish`), { comment: 'reference catalogue', deploy: true });
     expect(res.snapshot.number).toBe(1);
     expect(res.deployment.deployment.status).toBe('deployed');
     const entity = await oto.getApi(state.apiId);
     expect(entity).toBeTruthy();
     expect(entity.state).toBe('published');
-    expect(entity.metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
-    expect(entity.metadata.apim_snapshot_id).toBe(res.snapshot.id);
+    expect(entity.metadata.created_by).toBe('external=otoroshi-api-management');
+    expect(entity.metadata.deployment_ref).toBe(res.snapshot.id);
+    // the gateway records the deployment, tied to the snapshot
+    expect(entity.deployments[0]).toMatchObject({ owner: 'external=otoroshi-api-management', ref: res.snapshot.id });
     expect(entity.routes.length).toBe(3); // one set of routes for every plan
     expect(entity.plans.map((p) => p.access_mode_configuration_type).sort()).toEqual(['apikey', 'apikey', 'jwt', 'keyless', 'mtls', 'oauth2-local']);
     const starter = entity.plans.find((p) => p.id === 'plan_starter');
     expect(starter.rate_limiting.strategy.quota.window).toBe(600);
     expect(starter.rate_limiting.strategy.windowDurationMs).toBe(60000);
-    // otoroshi records the catalog write in its own deployment history
-    expect(entity.deployments.length).toBeGreaterThanOrEqual(1);
+    // the console reads the gateway's history by snapshot
+    const projection = await call('GET', ws(`/apis/${state.apiId}/projection`));
+    expect(projection.gateway_deployments[0]).toMatchObject({ ref: res.snapshot.id, snapshot_number: 1 });
     // the verifier of the Partner plan is derived, marked as the product's
     const verifierId = entity.plans.find((p) => p.id === 'plan_partner').access_mode_configuration.verifier;
     const verifier = await otoroshi('GET', `/api/verifiers/${verifierId}`);
-    expect(verifier.metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
+    expect(verifier.metadata.created_by).toBe('external=otoroshi-api-management');
     expect(verifier.metadata.apim_api_id).toBe(state.apiId);
     expect(verifier.strategy.verificationSettings.fields.iss).toBe('https://id.atlas.example');
     state.verifierId = verifierId;

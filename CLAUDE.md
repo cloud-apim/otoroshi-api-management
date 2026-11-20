@@ -37,7 +37,7 @@ ingester when the product runs inside the compose stack (`http://apim:9000/inges
   append-only; the deployment references a snapshot. Never write a draft to the gateway.
 - **Selective sync**: documentation, plan visibility, terms, usage statements, pricing and
   metadata never reach Otoroshi. `test/model.test.js` checks it.
-- **Projection**: `Api` written with `metadata.created_by=remote_catalog=otoroshi-apim-deployment`;
+- **Projection**: `Api` written as code, `metadata.created_by=external=otoroshi-api-management`, the snapshot id as `metadata.deployment_ref`;
   ApiSubscription → apikey with `apiRef`; application → `id_ref` metadata on the key.
 - **Every UI action is an admin api call**: `server/roles/admin-api.js` is served on
   both `/api` (bearer) and `/backoffice/api` (session). Add features there, then the console, then

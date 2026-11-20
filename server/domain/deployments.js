@@ -1,6 +1,7 @@
 // Deployment: the described state is not the deployed state. A deployment pushes a
-// frozen snapshot to the installation's single Otoroshi cluster with a catalog-marked write
-//, and shows its diff before acting. Rollback is the redeployment of an earlier snapshot.
+// frozen snapshot to the installation's single Otoroshi cluster, as an Api managed as code (each
+// write is a deploy, recorded by Otoroshi with the snapshot as its ref), and shows its diff before
+// acting. Rollback is the redeployment of an earlier snapshot.
 
 import { db, newId } from '../db/index.js';
 import { badRequest, notFound } from '../http/router.js';

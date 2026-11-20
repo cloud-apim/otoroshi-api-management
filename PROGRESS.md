@@ -15,6 +15,7 @@ Last update: 2026-11-20.
 
 - **Following the upstream fixes** (Otoroshi `18.1.0-dev`, step 3 of the [roadmap](./OTOROSHI-GAPS.md#roadmap)), on the stack run with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up`. The suite passed on it unchanged (152/152): the new behaviours are opt-in. Done so far:
   - G-10: the derived certificates are written with the upsert of the generic api, which computes their subject and dates from the chain.
+  - Otoroshi 18.1 required by the setup check. G-8: the `Api` is managed as code, `created_by=external=otoroshi-api-management`. G-7, R-33: the snapshot id is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records; the console lists the gateway's deployments by snapshot.
 
 ## Next, in the proposed order
 
@@ -61,7 +62,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-10 | L | Named compositions: resources and dictionaries |
 | R-19 | L | Custom portal templates |
 
-**Blocked on Otoroshi (5):** R-14 (G-6), R-15 (G-4), R-16 (G-13), R-24 (G-12, then S), R-33 (G-7) — nothing to do on this side until fixed upstream.
+**Blocked on Otoroshi (4), fixed upstream, being followed:** R-14 (G-6), R-15 (G-4), R-16 (G-13), R-24 (G-12, then S).
 
 **Owner decisions (4):** R-26 where the gateway health and the drift live in the console · R-28 the declarative format · R-29 two answers already implemented · R-35 who pays, and whether monetisation is in the MVP.
 
@@ -132,7 +133,6 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
 | R-32 | §8 | A **correlation id** carried beyond the gateway, to follow a request through the backends | S | |
-| R-33 | §8, G-7 | Tie Otoroshi's deployment history to the product snapshot from the gateway side | — | G-7 |
 
 ### Monetisation
 
@@ -202,7 +202,7 @@ waits for the data plane rather than working around it.
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
 | D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move: R-47; usage billing: R-34 |
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
-| D-38 catalog-marked projection | ✅ | Otoroshi records each deployment |
+| D-38 projection marked as the product's | ✅ | the `Api` is managed as code (`created_by=external=otoroshi-api-management`): Otoroshi records each deployment, with the snapshot as its ref |
 | D-39 hand-written CSS | ✅ | chart palette validated |
 | D-41 unit of measure of a plan | ✅ | tokens / budget refused without an LLM backend; projection: R-18 |
 | D-42 Scalar bundled behind a proxy | ✅ | |
@@ -227,7 +227,7 @@ waits for the data plane rather than working around it.
 | Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
 | The catalogue as a discovery system | 🟡 search and tags: R-20 |
 | IdP integration beyond validation | ⬜ R-21, not a priority (owner) |
-| Deployment history tied to the snapshot | 🟡 through the `Api` metadata: R-33 |
+| Deployment history tied to the snapshot | ✅ each deployment Otoroshi records carries the snapshot as its ref (`deployment_ref`); the console lists them by snapshot |
 
 ## Open questions of the spec
 

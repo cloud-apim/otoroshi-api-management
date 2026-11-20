@@ -294,10 +294,10 @@ describe('the product is down', () => {
     expect((await gatewayCall('/forecast', { headers: withKey(state.standard), expect: (r) => r.status === 200 })).status).toBe(200);
 
     // make the Api an ordinary Otoroshi one: without the marker of the product, Otoroshi no longer
-    // takes its writes for catalog deploys, and manages it through its own draft and deploy
+    // takes its writes for deploys of an api managed as code, and manages it through its own draft and deploy
     const marked = await otoroshiAdmin('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`);
     const { created_by, ...metadata } = marked.metadata;
-    expect(created_by).toBe('remote_catalog=otoroshi-apim-deployment');
+    expect(created_by).toBe('external=otoroshi-api-management');
     await otoroshiAdmin('PUT', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`, { ...marked, metadata });
     const released = await otoroshiAdmin('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`);
     expect(released.metadata.created_by).toBeUndefined();
@@ -317,7 +317,7 @@ describe('the product is down', () => {
     await call('POST', ws(`/apis/${state.apiId}/deploy`), {});
     await call('POST', ws('/drift'));
     expect((await call('GET', ws(`/apis/${state.apiId}/projection`))).drift.status).toBe('in_sync');
-    expect((await otoroshiAdmin('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`)).metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
+    expect((await otoroshiAdmin('GET', `/apis/apis.otoroshi.io/v1/apis/${state.apiId}`)).metadata.created_by).toBe('external=otoroshi-api-management');
     // what was created by hand is not the product's: it is left alone
     expect(await otoroshiAdmin('GET', `/apis/apis.otoroshi.io/v1/apisubscriptions/${state.handSub}`)).toBeTruthy();
     expect((await otoroshiAdmin('GET', `/api/apikeys/${state.handKey}`)).enabled).toBe(true);

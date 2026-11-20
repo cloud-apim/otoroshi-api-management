@@ -27,10 +27,10 @@ Deploying a snapshot writes one Otoroshi `Api` entity, whose id is the product's
   "contextPath": "/v1",
   "state": "published",
   "metadata": {
-    "created_by": "remote_catalog=otoroshi-apim-deployment",
+    "created_by": "external=otoroshi-api-management",
     "apim_api_id": "api_01a1eb8054c5…",
     "apim_workspace": "ws_01a1eb8016…",
-    "apim_snapshot_id": "snap_01a1eb806b…",
+    "deployment_ref": "snap_01a1eb806b…",
     "apim_snapshot_number": "2"
   },
   "routes": [ … ],      // one per resource
@@ -41,11 +41,16 @@ Deploying a snapshot writes one Otoroshi `Api` entity, whose id is the product's
 }
 ```
 
-- **The catalog marker**. Otoroshi treats any `Api` write whose `created_by` starts with
-  `remote_catalog=` as the deployment of a catalog: the API may be created already published,
-  `production_readonly` is lifted, state transitions are still checked, and the write is recorded in
-  Otoroshi's own deployment history (`deployments`, the last five). The product uses the id
-  `otoroshi-apim-deployment` — no real remote catalog may use it.
+- **Managed as code**. An `Api` whose `created_by` is `external=<tool id>` is managed as code by an
+  outside tool: each write is a deploy — the API may be created already published, the fields
+  locked in production take the body, state transitions are still checked — and a write that
+  changes what is live is recorded in Otoroshi's own deployment history (`deployments`), owned by
+  the marker. The product's tool id is `otoroshi-api-management`.
+- **The snapshot, on the gateway side**. `deployment_ref` names the snapshot deployed: Otoroshi
+  gives it to the deployment it records as its `ref`, so `deployments[0].ref` says which snapshot is
+  live, and the console lists the gateway's deployments by snapshot (**Deployment › Technical
+  details**). Otoroshi keeps the last five (`OTOROSHI_APIS_DEPLOYMENTS_HISTORY_SIZE`); the product
+  keeps its whole history.
 - **Ownership**. The marker and `apim_api_id` are how the product recognises its own
   entities on a gateway that also serves other things — for drift detection, adopt mode and cleanup.
 - **No tenancy**. Everything lands in the default location: a workspace is never an

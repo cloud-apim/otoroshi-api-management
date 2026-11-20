@@ -25,6 +25,7 @@ import { diff } from './diff.js';
 export const PARTS = ['key', 'exporter', 'console', 'portals', 'tls'];
 export const SETUP_MARKER = 'otoroshi-apim-setup';
 export const KEY_ID = 'apim_product_admin';
+export const MIN_OTOROSHI = { major: 18, minor: 1 };
 export const EXPORTER_ID = 'apim_ingester_exporter';
 export const CONSOLE_ROUTE = 'apim_setup_console';
 export const PORTALS_ROUTE = 'apim_setup_portals';
@@ -341,8 +342,11 @@ async function checks(run) {
   const infos = await run.call('GET', '/api/infos').catch((e) => ({ error: e.message }));
   if (!infos || infos.error) add('error', 'gateway_unreachable', `the gateway does not answer: ${infos?.error || 'no infos'}`);
   else {
-    const major = infos.otoroshi_version_sem?.major;
-    add(major >= 18 ? 'ok' : 'error', 'gateway_version', `Otoroshi ${infos.otoroshi_version}, cluster ${infos.otoroshi_cluster_id}, ${infos.datastore} datastore${major >= 18 ? '' : ': the product needs Otoroshi 18'}`);
+    const v = infos.otoroshi_version_sem || {};
+    // the release that carries the contract the product projects to (subscriptions with a client id,
+    // plans that require one, apis managed as code...)
+    const supported = v.major > MIN_OTOROSHI.major || (v.major === MIN_OTOROSHI.major && v.minor >= MIN_OTOROSHI.minor);
+    add(supported ? 'ok' : 'error', 'gateway_version', `Otoroshi ${infos.otoroshi_version}, cluster ${infos.otoroshi_cluster_id}, ${infos.datastore} datastore${supported ? '' : `: the product needs Otoroshi ${MIN_OTOROSHI.major}.${MIN_OTOROSHI.minor} or later`}`);
   }
   const s = await gatewaySettings();
   add(s.clientId === KEY_ID ? 'ok' : 'warning', 'product_key', s.clientId === KEY_ID ? `the product calls the gateway with its own key, ${KEY_ID}` : `the product calls the gateway with ${s.clientId}, a key it did not make (part key)`);

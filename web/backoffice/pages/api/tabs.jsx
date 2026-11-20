@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useRouter } from '../../../shared/router.jsx';
-import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
+import { AUTH_LABELS, fmtDate, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import {
   Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea,
   errorMessage, useConfirm, useLoad, useToast,
@@ -959,7 +959,18 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   <dt>{tr('Ownership marker')}</dt>
                   <dd className="mono small">{p.actual?.metadata?.created_by || '—'}</dd>
                   <dt>{tr('Otoroshi deployments')}</dt>
-                  <dd><Tr text={'{0} recorded (Otoroshi keeps the last five)'} args={[p.actual?.deployments?.length ?? 0]} /></dd>
+                  <dd className="col gap-4">
+                    {p.gateway_deployments?.length ? (
+                      p.gateway_deployments.map((d) => (
+                        <span key={d.id} className="small">
+                          {fmtDate(d.at)} — {d.snapshot_number != null ? tr('snapshot #{0}', [d.snapshot_number]) : <span className="mono">{d.ref || tr('no ref')}</span>}{' '}
+                          <span className="faint mono">{d.owner}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="faint small">{tr('none recorded')}</span>
+                    )}
+                  </dd>
                   {p.derived?.length > 0 && (
                     <>
                       <dt>{tr('Derived objects')}</dt>

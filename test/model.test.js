@@ -83,12 +83,12 @@ describe('projection', () => {
     expect(s).toEqual({ id: 'FixedWindowStrategyConfig', windowDurationMs: 60000, quota: { window: 500, daily: 1000, monthly: 10000000 } });
   });
 
-  test('the api entity is catalog-marked and never carries portal-only data', () => {
+  test('the api entity is managed as code and never carries portal-only data', () => {
     const plan = defaultPlan({ id: 'p', status: 'published', usageStatement: { enabled: true, required: true, prompt: 'SECRET-PROMPT' }, pricing: { kind: 'paid', amount: 42 } });
     const d = draft([plan]);
     const e = buildOtoroshiApi({ api: { id: 'api_1', name: 'Pets', version: '1.0.0', workspace_id: 'ws', tags: [] }, draft: d }, { snapshotId: 'snap_1', snapshotNumber: 3 });
-    expect(e.metadata.created_by).toBe('remote_catalog=otoroshi-apim-deployment');
-    expect(e.metadata.apim_snapshot_id).toBe('snap_1');
+    expect(e.metadata.created_by).toBe('external=otoroshi-api-management');
+    expect(e.metadata.deployment_ref).toBe('snap_1');
     expect(e.contextPath).toBe('/v1');
     expect(e.state).toBe('published');
     expect(e.documentation).toBeNull();

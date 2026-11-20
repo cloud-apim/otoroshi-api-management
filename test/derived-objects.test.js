@@ -135,7 +135,7 @@ describe('derived objects', () => {
     const mod = await otoroshi('GET', `/api/auths/${sso.verifier}`);
     expect(mod.type).toBe('oauth2');
     expect(mod.jwtVerifier.url).toBe(`${IDP}/jwks`);
-    expect(mod.metadata).toMatchObject({ created_by: 'remote_catalog=otoroshi-apim-deployment', apim_api_id: state.apiId, apim_derived: 'true' });
+    expect(mod.metadata).toMatchObject({ created_by: 'external=otoroshi-api-management', apim_api_id: state.apiId, apim_derived: 'true' });
 
     const certs = ((await otoroshi('GET', '/api/certificates')) || []).filter((c) => c.metadata?.apim_api_id === state.apiId);
     expect(certs.length).toBe(1);
