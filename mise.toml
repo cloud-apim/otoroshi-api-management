@@ -21,6 +21,9 @@ node = "24"
 # ─── Environment ─────────────────────────────────────────────────────
 
 [env]
+# the product started from the repository takes the values of the development stack for what is not
+# given (server/config.js); without it, it starts for production and refuses an incomplete configuration
+DEV = "true"
 # the cli and the smoke tasks talk to the local product with the bootstrap admin token
 APIM_URL = "http://localhost:9000"
 APIM_TOKEN = "apim-admin-token"
@@ -158,7 +161,7 @@ run = "bun test"
 
 [tasks."test:unit"]
 description = "Run the unit tests only (no infrastructure)"
-run = "bun test test/model.test.js test/derived.test.js test/auth.test.js test/catalogs.test.js test/portal-exposure.test.js test/kubernetes-manifests.test.js test/stripe.test.js test/ingest-policy.test.js"
+run = "bun test test/config.test.js test/model.test.js test/derived.test.js test/auth.test.js test/catalogs.test.js test/portal-exposure.test.js test/kubernetes-manifests.test.js test/stripe.test.js test/ingest-policy.test.js"
 
 [tasks."test:e2e"]
 description = "Run the reference catalogue test against the real gateway (needs the stack)"

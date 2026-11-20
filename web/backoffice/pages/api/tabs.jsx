@@ -1044,7 +1044,7 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   <dt>{tr('On the gateway')}</dt>
                   <dd>
                     {p.actual ? <StatusBadge status="deployed" label={tr('present')} /> : <StatusBadge status="none" label={tr('absent')} />}{' '}
-                    {p.actual && (
+                    {p.actual && p.otoroshi.backoffice_url && (
                       <a className="link small" href={p.otoroshi.backoffice_url} target="_blank" rel="noreferrer">
                         {tr('open in the Otoroshi backoffice')} <Icon name="external" size={12} />
                       </a>

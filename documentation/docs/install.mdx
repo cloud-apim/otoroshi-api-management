@@ -40,10 +40,10 @@ installations of their own, a snapshot [promoted](./gitops/promotion.mdx) from o
 
 | | Required | |
 |---|---|---|
-| **Otoroshi 18.1** or later | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
+| **Otoroshi 18.1** or later — until it is released, built from the `master` branch of Otoroshi | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
 | **PostgreSQL 14** or later | yes | **two databases**, created beforehand: the application data, and the events and analytics — two connection URLs, one server is enough; a user that owns them (the product creates its tables, the migrations run at startup) |
 | **The product** | yes | the executable (linux and macOS, x64 and arm64) or the image `ghcr.io/cloud-apim/otoroshi-api-management`; one instance or several, listening on one port (`9000`) |
-| A key for the secrets | in production | `APIM_SECRETS_KEY`: the secrets it keeps — of the credentials, of its key to the gateway, of the identity providers — are sealed with it ([secrets at rest](#secrets-at-rest)) |
+| A key for the secrets | yes | `APIM_SECRETS_KEY`: the secrets it keeps — of the credentials, of its key to the gateway, of the identity providers — are sealed with it ([secrets at rest](#secrets-at-rest)) |
 | An OpenID Connect provider | no | to sign in to the console, to a portal ([authentication](./authentication.mdx)); local accounts otherwise |
 | A Stripe account | no | to sell paid plans ([payments](./payments.mdx)) |
 | The extensions of the gateway | no | the **Threat Protection Suite** for the threat protection of the plans, the **LLM extension** for the AI and MCP audits |
@@ -92,6 +92,14 @@ OTOROSHI_CLIENT_SECRET=…
 OTOROSHI_PUBLIC_SCHEME=https             # how consumers call the apis: https://<api domain>:443
 OTOROSHI_PUBLIC_PORT=443
 ```
+
+**An instance missing one of them does not start**: it names every variable missing, then exits.
+A secret left at the value of the development stack (`apim-admin-token`, `password`…) is refused the
+same way. `APIM_ADMIN_TOKEN` is needed by the instances with the `api`, `backoffice` or `portal`
+role, `APIM_INGEST_TOKEN` by those with the `ingester`, `api` or `backoffice` role, the others by
+every instance; `APIM_PORTAL_DOMAIN` too, when the portals are exposed by hostname. Only `DEV=true`
+fills what is missing, with the values of the development stack of the repository: never set it
+elsewhere.
 
 On PostgreSQL, the two databases made once:
 
@@ -165,13 +173,11 @@ The image is the executable on a slim Debian: no Bun, no `node_modules`, `git` f
 unprivileged user. Its entry point is the executable, `serve` by default:
 
 ```bash
-docker run -p 9000:9000 \
-  -e APIM_DATABASE_URL=postgres://… -e APIM_ANALYTICS_DATABASE_URL=postgres://… \
-  -e OTOROSHI_URL=http://otoroshi:8080 -e OTOROSHI_CLIENT_ID=… -e OTOROSHI_CLIENT_SECRET=… \
-  ghcr.io/cloud-apim/otoroshi-api-management
+# apim.env: the minimal configuration above, one variable per line
+docker run -p 9000:9000 --env-file apim.env ghcr.io/cloud-apim/otoroshi-api-management
 
 # the same image, for the setup of the gateway or a command of the cli
-docker run --rm -e APIM_DATABASE_URL=… -e APIM_ANALYTICS_DATABASE_URL=… -e OTOROSHI_URL=… \
+docker run --rm --env-file apim.env \
   ghcr.io/cloud-apim/otoroshi-api-management setup --admin-client-id … --admin-client-secret … --dry-run
 ```
 
@@ -264,36 +270,40 @@ console (*Gateway* and *Global settings*); stored values take precedence.
 
 ### Server
 
+**Required** means required to start: an instance without it names it and exits — unless `DEV=true`,
+which fills it with the value of the development stack, given in parentheses.
+
 | Variable | Default | Meaning |
 |---|---|---|
+| `DEV` | `false` | `true`: the values of the development stack for what is not given, its secrets accepted — the repository's stack only |
 | `APIM_PORT` (or `PORT`) | `9000` | listening port |
 | `APIM_ROLES` | `ingester,api,backoffice,portal` | roles of this instance |
-| `APIM_PUBLIC_URL` | `http://localhost:<port>` | public base url of the product |
+| `APIM_PUBLIC_URL` | required (`http://localhost:<port>`) | public base url of the product |
 | `APIM_INSTALLATION_NAME` | the host of `APIM_PUBLIC_URL` | the name of this installation — an environment: `recette`, `production`. A [promoted](./gitops/promotion.mdx) snapshot says where it comes from |
-| `APIM_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim` | application database |
-| `APIM_ANALYTICS_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim_analytics` | events and analytics database |
+| `APIM_DATABASE_URL` | required (`postgres://apim:apim@localhost:5442/apim`) | application database |
+| `APIM_ANALYTICS_DATABASE_URL` | required (`postgres://apim:apim@localhost:5442/apim_analytics`) | events and analytics database |
 | `APIM_DATABASE_POOL` | `20` | connections an instance may open to the application database |
 | `APIM_ANALYTICS_DATABASE_POOL` | `10` | connections an instance may open to the analytics database |
 | `APIM_DATABASE_IDLE_TIMEOUT_S` | `30` | an idle connection is closed after that many seconds |
-| `APIM_SECRETS_KEY` | — | the key the secrets kept by the product are sealed with ([secrets at rest](#secrets-at-rest)); without it they are stored in clear |
+| `APIM_SECRETS_KEY` | required (none: in clear) | the key the secrets kept by the product are sealed with ([secrets at rest](#secrets-at-rest)) |
 | `APIM_SECRETS_PREVIOUS_KEYS` | — | previous keys, comma-separated: still read, their secrets sealed again with the current key at start |
 | `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |
 | `APIM_PROJECTION_INTERVAL_MS` | `2000` | how often the projection queue is polled |
 | `APIM_DRIFT_INTERVAL_MS` | `60000` | how often drift is detected |
-| `APIM_COOKIE_SECURE` | `false` | mark session cookies `Secure` |
+| `APIM_COOKIE_SECURE` | `true` when `APIM_PUBLIC_URL` is `https` | mark session cookies `Secure` |
 
 ### Bootstrap
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `APIM_BOOTSTRAP_ADMINS` | `admin@otoroshi.io` | comma-separated emails of the installation administrators |
-| `APIM_BOOTSTRAP_PASSWORD` | `password` | their local password, set when they are created |
+| `APIM_BOOTSTRAP_ADMINS` | required (`admin@otoroshi.io`) | comma-separated emails of the installation administrators |
+| `APIM_BOOTSTRAP_PASSWORD` | required (`password`) | their local password, set when they are created |
 | `APIM_BOOTSTRAP_WORKSPACE` | `default` | slug of the workspace created on first start, and the target of `/` |
-| `APIM_ADMIN_TOKEN` | `apim-admin-token` | a static admin API token acting as the first bootstrap administrator |
+| `APIM_ADMIN_TOKEN` | required with the `api`, `backoffice` or `portal` role (`apim-admin-token`) | a static admin API token acting as the first bootstrap administrator |
 
 :::warning
-Change `APIM_BOOTSTRAP_PASSWORD`, `APIM_ADMIN_TOKEN` and `APIM_INGEST_TOKEN` on anything that is not
-your laptop.
+The secrets of the development stack — `password`, `apim-admin-token`, `ingest-secret`, its Otoroshi
+key and its secrets key — are refused outside `DEV=true`: the instance does not start with them.
 :::
 
 ### The Otoroshi cluster
@@ -302,11 +312,11 @@ One installation drives one Otoroshi cluster, with an administration key.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `OTOROSHI_URL` | `http://localhost:8080` | where the product reaches the Otoroshi admin API |
-| `OTOROSHI_HOST` | `otoroshi-api.oto.tools` | the `Host` of the admin API |
-| `OTOROSHI_CLIENT_ID` / `OTOROSHI_CLIENT_SECRET` | `apim-admin-client` / `apim-admin-secret` | an Otoroshi admin apikey |
-| `OTOROSHI_PUBLIC_SCHEME` / `OTOROSHI_PUBLIC_PORT` | `http` / `8080` | how consumers reach the APIs: `<scheme>://<api domain>:<port>` |
-| `OTOROSHI_BACKOFFICE_URL` | `http://otoroshi.oto.tools:8080` | used to link a projected entity in the Otoroshi backoffice |
+| `OTOROSHI_URL` | required (`http://localhost:8080`) | where the product reaches the Otoroshi admin API |
+| `OTOROSHI_HOST` | required (`otoroshi-api.oto.tools`) | the `Host` of the admin API |
+| `OTOROSHI_CLIENT_ID` / `OTOROSHI_CLIENT_SECRET` | required (`apim-admin-client` / `apim-admin-secret`) | an Otoroshi admin apikey |
+| `OTOROSHI_PUBLIC_SCHEME` / `OTOROSHI_PUBLIC_PORT` | required (`http` / `8080`) | how consumers reach the APIs: `<scheme>://<api domain>:<port>` |
+| `OTOROSHI_BACKOFFICE_URL` | — (`http://otoroshi.oto.tools:8080`) | used to link a projected entity in the Otoroshi backoffice; none, no link |
 
 The extensions of the gateway are the gateway's: the product needs none, and uses the ones it finds —
 the **Threat Protection Suite** for the threat protection of the plans, the **LLM extension** for the
@@ -328,7 +338,7 @@ mise run demo   # the development gateway keeps nothing across a restart
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `APIM_INGEST_TOKEN` | `ingest-secret` | the token the data exporter presents to `/ingest` |
+| `APIM_INGEST_TOKEN` | required with the `ingester`, `api` or `backoffice` role (`ingest-secret`) | the token the data exporter presents to `/ingest` |
 | `APIM_INGEST_URL` | — | `/ingest` as the gateway reaches it, used by the exporter helper |
 | `APIM_INGEST_STORE_RAW` | `true` | keep the raw path (see [analytics](./gateway/analytics-and-ingester.mdx)); its sampling, the pseudonymisation and the retention are set in the console |
 | `APIM_INGEST_RETENTION_MS` | `300000` | how often the ingester rolls the calls up and applies the retention |
@@ -339,7 +349,7 @@ mise run demo   # the development gateway keeps nothing across a restart
 |---|---|---|
 | `APIM_TENANCY` | `multi` | `multi`: one portal per workspace · `single`: one workspace, its portal at the root, no workspace selector |
 | `APIM_PORTAL_EXPOSURE` | `path` | with several workspaces — `path`: `<portal url>/<workspace>/` · `hostname`: `<workspace>.<domain>/` |
-| `APIM_PORTAL_DOMAIN` | `portal.oto.tools` | the domain of the hostname mode |
+| `APIM_PORTAL_DOMAIN` | required in the hostname mode (`portal.oto.tools`) | the domain of the hostname mode |
 | `APIM_PORTAL_URL` | `APIM_PUBLIC_URL` | the public base of the portals; its scheme and port make the hostname URLs |
 
 ### Payments

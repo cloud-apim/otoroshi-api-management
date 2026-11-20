@@ -17,7 +17,7 @@ if (!cmd || cmd === 'serve') {
   try {
     stopOnSignals(await start());
   } catch (e) {
-    console.error('[apim] failed to start', e);
+    console.error('[apim] failed to start:', e.config ? e.message : e);
     process.exit(1);
   }
 } else if (cmd === 'setup') {

@@ -86,6 +86,8 @@ services:
     working_dir: /app
     command: ["bun", "--watch", "server/main.js"]
     environment:
+      # the values of the development stack for what is not given here (server/config.js)
+      DEV: "true"
       APIM_DATABASE_URL: postgres://apim:apim@postgres:5432/apim
       APIM_ANALYTICS_DATABASE_URL: postgres://apim:apim@postgres:5432/apim_analytics
       OTOROSHI_URL: http://otoroshi:8080

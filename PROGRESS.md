@@ -13,6 +13,7 @@ Last update: 2026-11-20.
 
 ## Now
 
+- **Towards 0.1.0, a beta** (2026-11-20, the owner's request): the suite on it, 255 pass, 4 skip (the extensions), none failing. The values of the development stack are given only with `DEV=true` — mise, the compose stack and the tests set it. Without it the product starts for production and refuses an incomplete configuration: every variable missing for the roles of the instance named at once, and the secrets of the development stack (`apim-admin-token`, `password`, `ingest-secret`…) refused; `serve` and `setup` alike, a message and exit 1 (`test/config.test.js`, `test/binary.test.js`). The session cookies are `Secure` by default when the public url is https; without `OTOROSHI_BACKOFFICE_URL`, no link to the Otoroshi backoffice. The beta runs against Otoroshi built from its `master` branch until 18.1 is released (install, quickstart).
 - **The gateway of 2026-11-20, 17:56** (`18.1.0-dev`): G-22 fixed upstream (#2962) and followed — a call is one event, served or refused; checked on the ingester (6.4 % of ghost `400` events before, none after). A subscription no longer rebuilds, disables or deletes a key it did not mint: nothing to change, the product lets the subscription mint its keys. The suite on it: 247 pass, 4 skip (the extensions, not loaded: they have to be recompiled against this Otoroshi), 1 failure of the controller under the load of the whole suite, passing alone. The demo catches the showcase up too after a restart of the gateway.
 - **The upstream fixes are followed** (2026-11-20, Otoroshi `18.1.0-dev`, [where we are](./OTOROSHI-GAPS.md#where-we-are)): the product requires Otoroshi 18.1, its workarounds and warnings are gone, R-14, R-15, R-16, R-24 and R-33 are done. Run the stack with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up` until a release carries the fixes. The suite passed on that jar unchanged first (152/152: the new behaviours are opt-in), then followed the fixes one by one:
   - G-10: the derived certificates are written with the upsert of the generic api, which computes their subject and dates from the chain.
@@ -70,6 +71,11 @@ Last update: 2026-11-20.
   - G-22 extended: a call refused in the end is exported twice as well (the `400 no apikey` of an extractor, then the `401` the client gets), captured again on the data exporter.
 
 ## Next, in the proposed order
+
+**Release 0.1.0** (a beta, before the types of api): the notes of the release, written by hand
+(what it does, what it needs — Otoroshi `master` —, its known limitations); from 0.1.0 on, a
+migration that shipped is never edited, a change is a new migration; the release workflow tried
+once by hand (it builds, publishes nothing); the tag, by the owner.
 
 The types of api (D-44, the owner's direction on 2026-11-20): an api has a type, which says how its
 route is set up — REST today; MCP and AI with the LLM extension; event-driven with the event

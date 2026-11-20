@@ -74,4 +74,24 @@ describe.skipIf(!built)('the executable', () => {
     expect(unknown.code).toBe(1);
     expect(unknown.err).toContain('unknown command frobnicate');
   });
+
+  test('without DEV=true, a start for production: an incomplete configuration is refused, every gap named', async () => {
+    // nothing of the development: no DEV, no variable of the product
+    const bare = { PATH: process.env.PATH, HOME: process.env.HOME, APIM_PORT: '9119' };
+    const start = async (env, ...args) => {
+      const proc = Bun.spawn([BIN, ...args], { cwd, env, stdout: 'pipe', stderr: 'pipe' });
+      const [err, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+      return { err, code };
+    };
+    const refused = await start(bare, 'serve');
+    expect(refused.code).toBe(1);
+    expect(refused.err).toContain('the configuration is incomplete for a production start');
+    for (const name of ['APIM_PUBLIC_URL', 'APIM_DATABASE_URL', 'APIM_SECRETS_KEY', 'APIM_ADMIN_TOKEN', 'APIM_INGEST_TOKEN', 'OTOROSHI_CLIENT_SECRET'])
+      expect(refused.err).toContain(`${name} is missing`);
+    expect(refused.err).not.toContain('    at '); // a message, not a stack
+    // a secret of the development stack is refused too; the setup checks the same
+    const setup = await start({ ...bare, APIM_ADMIN_TOKEN: 'apim-admin-token' }, 'setup', '--dry-run');
+    expect(setup.code).toBe(1);
+    expect(setup.err).toContain('APIM_ADMIN_TOKEN has the value of the development stack');
+  });
 });

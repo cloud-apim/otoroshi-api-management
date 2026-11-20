@@ -30,7 +30,7 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 ## Quick start
 
 Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar, 18.1
-or later (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`); its extensions,
+or later — until it is released, built from the `master` branch of Otoroshi — (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`); its extensions,
 optional, from a directory (`OTOROSHI_EXTENSIONS`, see the install documentation).
 
 ```sh
@@ -50,7 +50,7 @@ mise run open                      # the urls and credentials
 - admin api: `curl -H 'Authorization: Bearer apim-admin-token' localhost:9000/api/me`
 - otoroshi: <http://otoroshi.oto.tools:8080> — `admin@otoroshi.io` / `password`
 
-Running the product on the host (`bun --watch server/main.js`) works too, but the Otoroshi data
+Running the product on the host (`DEV=true bun --watch server/main.js`, or `mise run dev`) works too, but the Otoroshi data
 exporter then has to reach the host; inside the compose stack it reaches `http://apim:9000/ingest`.
 Install the exporter from the console (Gateway → Connection & events) or
 `POST /api/gateway/exporter`.

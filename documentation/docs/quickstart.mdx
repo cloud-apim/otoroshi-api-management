@@ -13,7 +13,9 @@ the product, all in Docker.
 
 - [Bun](https://bun.sh) 1.3 and Docker
 - an Otoroshi jar, 18.1 or later: `../otoroshi.jar` relative to the repository by default, or
-  `OTOROSHI_JAR=/path/to/otoroshi.jar`
+  `OTOROSHI_JAR=/path/to/otoroshi.jar`. Until 18.1 is released, build it from the `master` branch of
+  Otoroshi — its interface first (`npm install && npm run build` in `otoroshi/javascript`), then
+  `sbt assembly` in `otoroshi/`: the jar is `otoroshi/target/scala-*/otoroshi.jar`
 
 ## Start the stack
 
@@ -50,7 +52,7 @@ UI changes need `bun run build`.
 
 :::tip Why the product runs inside Docker
 The Otoroshi data exporter must reach the ingester. Inside the compose network it reaches
-`http://apim:9000/ingest`. Running the product on the host works too (`bun --watch server/main.js`),
+`http://apim:9000/ingest`. Running the product on the host works too (`DEV=true bun --watch server/main.js`),
 but the gateway container then has to reach your host.
 :::
 

@@ -26,6 +26,14 @@ export async function setupCommand(argv) {
     console.log(`otoroshi-apim setup — what the product needs on the gateway, created or repaired\n\n${SETUP_HELP}\n  [-o json]`);
     return 0;
   }
+  const { checkProductionConfig } = await import('./config.js');
+  try {
+    checkProductionConfig();
+  } catch (e) {
+    if (!e.config) throw e;
+    console.error(e.message);
+    return 1;
+  }
   const { migrateAll } = await import('./db/index.js');
   const { runSetup } = await import('./domain/setup.js');
   await migrateAll();

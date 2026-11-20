@@ -797,7 +797,7 @@ r.get('/workspaces/:ws/apis/:api/projection', async ({ ctx, params }) => {
   return {
     derived,
     gateway_deployments: gatewayDeployments,
-    otoroshi: { kind: 'apis.otoroshi.io/Api', id: api.id, backoffice_url: `${gw.backofficeUrl}/bo/dashboard/apis/${api.id}` },
+    otoroshi: { kind: 'apis.otoroshi.io/Api', id: api.id, backoffice_url: gw.backofficeUrl ? `${gw.backofficeUrl.replace(/\/$/, '')}/bo/dashboard/apis/${api.id}` : null },
     expected,
     actual,
     error,

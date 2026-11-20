@@ -8,7 +8,7 @@
 import { randomBytes } from 'node:crypto';
 import { normalize } from 'node:path';
 import { uiFile } from './ui-files.js';
-import { config, hasRole } from './config.js';
+import { checkProductionConfig, config, hasRole } from './config.js';
 import { migrateAll } from './db/index.js';
 import { errorResponse, json, parseCookies, readJson, HttpError } from './http/router.js';
 import * as identity from './domain/identity.js';
@@ -368,6 +368,7 @@ async function fetchHandler(req, server) {
 }
 
 async function start() {
+  checkProductionConfig();
   checkConfig();
   (await import('./payments/billing.js')).checkPaymentsConfig();
   await migrateAll();
@@ -436,7 +437,7 @@ if (import.meta.main && !globalThis.__APIM_BIN__) {
   start()
     .then(stopOnSignals)
     .catch((e) => {
-      console.error('[apim] failed to start', e);
+      console.error('[apim] failed to start:', e.config ? e.message : e);
       process.exit(1);
     });
 }
