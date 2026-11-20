@@ -36,6 +36,7 @@ Last update: 2026-11-20.
   - R-23: an api without an OpenAPI specification has a *Try it* tab on the portal — the request composer of the console, through the gateway, with the credentials of the consumer's own subscriptions (`test/ui.test.js`).
   - R-32: one request id from the caller to the backends — the `Otoroshi-Request-Id` the caller gets back is sent to the backends (`Otoroshi headers in` added to the flows, an api setting) and kept by the request log, where it is searched (`test/reference-catalogue.test.js`, `test/ingestion.test.js`).
   - R-9: the inventory of the Otoroshi entities (D-15, Q-6) — every kind the gateway declares, with what the product does with it — a table in the product (`server/otoroshi/inventory.js`) and in the documentation, checked against `GET /apis/entities` of the gateway (`test/inventory.test.js`).
+  - R-17: adopt mode takes over the subscriptions of an Api and their keys too — an application per owner, the same subscription ids, the same client ids and secrets — and the first deployment updates them in place: the consumer keeps calling with its key (`test/adopt.test.js`). The plans of an adopted Api keep the new attributes of the contract (selection, counter failure, circuit breaker, issuer and audiences, trusted CAs, validity).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
@@ -51,7 +52,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (12)**
+**Doable (11)**
 
 | # | Effort | What |
 |---|---|---|
@@ -59,7 +60,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-12 | M | One credential for several subscriptions |
-| R-17 | M | Adopt: take over the existing subscriptions and keys too |
 | R-20 | M | Catalogue as a discovery tool (categories, featured, reviews) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-25 | M | Threat protection per plan, and its events in observability |
@@ -96,7 +96,6 @@ waits for the data plane rather than working around it.
 |---|---|---|---|---|
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
-| R-17 | §5 | **Adopt mode**, second half: take over the existing subscriptions and apikeys of an adopted Api, not only its description | M | |
 | R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
 
 ### Developer portal
@@ -204,7 +203,7 @@ waits for the data plane rather than working around it.
 | Idempotent, replayable projection | ✅ |
 | Explicit ownership (marker, `managed_by`) | ✅ |
 | Drift detection (apis, keys, derived objects), readable | ✅ |
-| Adopt mode | 🟡 the api is taken over without being overwritten; its subscriptions are not: R-17 |
+| Adopt mode | ✅ the api taken over without being overwritten, with its subscriptions and their keys as they are (`test/adopt.test.js`) |
 | Dry-run before a mass projection | ✅ deployments and catalog syncs |
 
 ## Spec §8, not yet drafted in the spec

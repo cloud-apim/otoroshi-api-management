@@ -20,7 +20,7 @@ import { pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
 import { searchTasks, queueStats, enqueue, dismissTask } from '../domain/tasks.js';
 import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
-import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi } from '../otoroshi/drift.js';
+import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi, adoptSubscriptions, trustedChains } from '../otoroshi/drift.js';
 import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
@@ -808,11 +808,27 @@ r.post('/workspaces/:ws/adopt', async ({ ctx, params, body }) => {
     description: entity.description || '',
     team_id: body.team_id || null,
     tags: entity.tags || [],
-    draft: draftFromOtoroshi(entity),
+    draft: draftFromOtoroshi(entity, await trustedChains(entity)),
     metadata: { adopted_from: { otoroshi_api_id: entity.id, at: new Date().toISOString(), created_by: entity.metadata?.created_by || null } },
   });
-  await audit(c, { action: 'api.adopt', entityKind: 'api', entityId: created.id, summary: `otoroshi api ${entity.id} adopted as a draft (nothing written to the gateway)` });
-  return created;
+  // its subscriptions and their keys too, unless asked otherwise: the consumers keep calling with them
+  let adopted = null;
+  if (body.subscriptions !== false) {
+    // the applications of the consumers belong to a team: the one asked, the team of the api, or one made for them
+    const teamId =
+      body.application_team_id ||
+      created.team_id ||
+      (await db`select id from teams where workspace_id = ${c.workspace.id} and personal = false order by created_at limit 1`)[0]?.id ||
+      (await identity.createTeam(c, c.workspace.id, { name: 'Consumers adopted from the gateway' })).id;
+    adopted = await adoptSubscriptions(c, c.workspace.id, entity, { teamId });
+  }
+  await audit(c, {
+    action: 'api.adopt',
+    entityKind: 'api',
+    entityId: created.id,
+    summary: `otoroshi api ${entity.id} adopted as a draft${adopted ? `, with ${adopted.subscriptions} subscription(s) and ${adopted.credentials} key(s)` : ''} (nothing written to the gateway)`,
+  });
+  return { ...created, adopted };
 });
 
 // ---------------------------------------------------------------- applications

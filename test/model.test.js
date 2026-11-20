@@ -136,7 +136,7 @@ describe('projection', () => {
     d.flows[0].plugins = [{ plugin: 'cp:a', config: {} }, { group: 'pg_1', version: 2 }];
     const groups = { 'pg_1@2': { name: 'company', plugins: [{ plugin: 'cp:headers', config: { v: 2 } }, { plugin: 'cp:cors', config: {} }] } };
     const e = buildOtoroshiApi({ api: { id: 'a', name: 'x', version: '1', workspace_id: 'ws' }, draft: d, policyGroups: groups });
-    expect(e.flows[0].plugins.map((p) => p.plugin)).toEqual(['cp:a', 'cp:headers', 'cp:cors']);
+    expect(e.flows[0].plugins.map((p) => p.plugin)).toEqual(['cp:a', 'cp:headers', 'cp:cors', 'cp:otoroshi.next.plugins.OtoroshiHeadersIn']);
     // a snapshot that does not carry the pinned version cannot be projected
     expect(() => buildOtoroshiApi({ api: { id: 'a', name: 'x', version: '1', workspace_id: 'ws' }, draft: d, policyGroups: {} })).toThrow(/pg_1 v2/);
     // a floating reference is refused at validation

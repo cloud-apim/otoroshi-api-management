@@ -88,7 +88,7 @@ function AdoptModal({ onClose, onAdopted }) {
   return (
     <Modal title={tr('Adopt an API from the gateway')} onClose={onClose} size="wide">
       <Callout kind="info">
-        <Tr text={'Adopt mode takes over an existing Otoroshi {0} without overwriting it: it becomes a draft in the product, and nothing is written to the gateway until you publish and deploy. The ids are kept, so the first deployment updates the entity in place.'} args={[<code>Api</code>]} />
+        <Tr text={'Adopt mode takes over an existing Otoroshi {0} without overwriting it: it becomes a draft in the product, its subscriptions and their keys become the product\'s, and nothing is written to the gateway until you publish and deploy. The ids and the keys are kept, so the first deployment updates them in place: the consumers keep calling with the keys they have.'} args={[<code>Api</code>]} />
       </Callout>
       <Loader state={state}>
         {(list) =>
@@ -100,6 +100,7 @@ function AdoptModal({ onClose, onAdopted }) {
                     <th>{tr('Otoroshi API')}</th>
                     <th>{tr('Entrypoint')}</th>
                     <th>{tr('Plans')}</th>
+                    <th>{tr('Subscriptions')}</th>
                     <th />
                   </tr>
                 </thead>
@@ -115,13 +116,14 @@ function AdoptModal({ onClose, onAdopted }) {
                         {a.contextPath}
                       </td>
                       <td className="small">{a.plans.map((p) => `${p.name} (${p.kind})`).join(', ') || '—'}</td>
+                      <td className="small">{a.subscriptions || '—'}</td>
                       <td className="actions">
                         <button
                           className="btn sm"
                           onClick={async () => {
                             try {
                               const created = await wapi.post('/adopt', { otoroshi_api_id: a.id });
-                              toast(tr('API adopted as a draft'));
+                              toast(created.adopted?.subscriptions ? tr('API adopted as a draft, with {0} subscription(s) and their keys', [created.adopted.subscriptions]) : tr('API adopted as a draft'));
                               onAdopted(created);
                             } catch (e) {
                               toast(errorMessage(e), 'error');

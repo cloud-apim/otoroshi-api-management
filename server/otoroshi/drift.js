@@ -7,8 +7,8 @@ import { db, newId } from '../db/index.js';
 import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
-import { open } from '../domain/secrets.js';
-import { IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
+import { open, seal } from '../domain/secrets.js';
+import { CORRELATION_PLUGIN, IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
   await db`insert into drift_reports (id, workspace_id, entity_kind, entity_id, otoroshi_kind, otoroshi_id, status, diff, checked_at)
@@ -160,6 +160,8 @@ export async function driftReports(workspaceId) {
 
 export async function unmanagedApis() {
   const all = (await oto.listApis()) || [];
+  const subsByApi = new Map();
+  for (const s of (await oto.listSubscriptions().catch(() => null)) || []) subsByApi.set(s.api_ref, (subsByApi.get(s.api_ref) || 0) + 1);
   return all
     .filter((a) => a.metadata?.[META.createdBy] !== OWNER_MARKER)
     .map((a) => ({
@@ -171,19 +173,26 @@ export async function unmanagedApis() {
       version: a.version,
       plans: (a.plans || []).map((p) => ({ id: p.id, name: p.name, kind: p.access_mode_configuration_type, status: p.status })),
       routes: (a.routes || []).length,
+      subscriptions: subsByApi.get(a.id) || 0,
       created_by: a.metadata?.created_by || null,
     }));
 }
 
-function planFromOtoroshi(p) {
+// the plan as the product describes it; `cas` the chains of the certificates an mtls plan trusts
+function planFromOtoroshi(p, cas = {}) {
   const kind = p.access_mode_configuration_type || 'keyless';
   const amc = p.access_mode_configuration || {};
   const config = {
-    apikey: { readOnly: !!amc.readOnly },
+    apikey: { readOnly: !!amc.readOnly, validityDays: amc.validity ? Math.round(amc.validity / 86400000) : null },
     jwt: { verifier: amc.verifier || '', clientIdPath: amc.client_id_path || 'client_id' },
-    mtls: { regexSubjectDNs: amc.regex_subject_dns || [], regexIssuerDNs: amc.regex_issuer_dns || [], clientIdField: amc.client_id_field || '' },
+    mtls: {
+      regexSubjectDNs: amc.regex_subject_dns || [],
+      regexIssuerDNs: amc.regex_issuer_dns || [],
+      clientIdField: amc.client_id_field || '',
+      trustedCAs: (amc.trusted_ca_refs || []).map((id) => cas[id]).filter(Boolean),
+    },
     'oauth2-local': { defaultKeyPair: amc.default_key_pair || 'otoroshi-jwt-signing', expiration: amc.expiration || 3600 },
-    'oauth2-remote': { verifier: amc.verifier || '', clientIdPath: amc.client_id_path || 'client_id', fetchUser: !!amc.fetch_user },
+    'oauth2-remote': { verifier: amc.verifier || '', clientIdPath: amc.client_id_path || 'client_id', fetchUser: !!amc.fetch_user, issuer: amc.issuer || '', audiences: amc.audiences || [] },
     keyless: { expr: amc.expr || '${req.ip}' },
   }[kind];
   const q = p.rate_limiting?.strategy?.quota || {};
@@ -198,12 +207,26 @@ function planFromOtoroshi(p) {
     rateLimit: { enabled: !!q.window && q.window < MAX, calls: q.window && q.window < MAX ? q.window : 10, windowMs: p.rate_limiting?.strategy?.windowDurationMs || 1000 },
     quota: { daily: q.daily && q.daily < MAX ? q.daily : null, monthly: q.monthly && q.monthly < MAX ? q.monthly : null },
     flowRef: p.plugins?.flow_ref || null,
+    selection: (p.selection || []).map((c) => ({ path: c.path, value: c.value })),
+    counterFailure: p.counter_failure?.mode === 'allow' ? 'allow' : 'deny',
+    circuitBreaker: p.circuit_breaker_scope === 'consumer' ? 'subscription' : 'api',
   });
+}
+
+// the chains of the certificates the mtls plans of an Api trust, by id
+export async function trustedChains(a) {
+  const ids = [...new Set((a.plans || []).flatMap((p) => p.access_mode_configuration?.trusted_ca_refs || []))];
+  const out = {};
+  for (const id of ids) {
+    const c = await oto.getEntity('/apis/pki.otoroshi.io/v1/certificates', id).catch(() => null);
+    if (c?.chain) out[id] = c.chain;
+  }
+  return out;
 }
 
 // Converts an Otoroshi Api into a product draft without writing anything to the gateway. The ids
 // are kept, so that the first deployment updates the entity in place instead of duplicating it.
-export function draftFromOtoroshi(a) {
+export function draftFromOtoroshi(a, cas = {}) {
   return normalizeDraft({
     entrypoint: { domain: a.domain, contextPath: a.contextPath || '/' },
     backends: (a.backends || []).map((b) => ({
@@ -226,7 +249,65 @@ export function draftFromOtoroshi(a) {
       flowId: r.flow_ref || r.plugin_chain || null,
       enabled: r.enabled !== false,
     })),
-    plans: (a.plans || []).map(planFromOtoroshi),
-    settings: { capture: !!a.capture, debugFlow: !!a.debug_flow, exportReporting: !!a.export_reporting },
+    plans: (a.plans || []).map((p) => planFromOtoroshi(p, cas)),
+    // adopted without being changed: the request id goes to the backends if the flows already send it
+    settings: {
+      capture: !!a.capture,
+      debugFlow: !!a.debug_flow,
+      exportReporting: !!a.export_reporting,
+      correlationId: (a.flows || []).some((f) => (f.plugins || []).some((p) => p.plugin === CORRELATION_PLUGIN)),
+    },
   });
 }
+
+// Adopt mode, second half: the subscriptions of an adopted Api and their keys become the product's,
+// as they are — same ids, same keys, same secrets. Each owner of the gateway (owner_ref, and the
+// client id on token and certificate plans) becomes an application of the product, or the one its
+// keys already name (id_ref). Nothing is written to the gateway: the first deployment of the api
+// updates the subscriptions in place, their keys with them.
+export async function adoptSubscriptions(ctx, workspaceId, entity, { teamId }) {
+  const subs = ((await oto.listSubscriptions()) || []).filter((s) => s.api_ref === entity.id);
+  const plans = new Map((entity.plans || []).map((p) => [p.id, p]));
+  const apps = new Map();
+  const out = { subscriptions: 0, applications: 0, credentials: 0, skipped: [] };
+  const ms = (v) => (v ? new Date(v).toISOString() : null);
+  for (const s of subs) {
+    if ((await db`select 1 from subscriptions where id = ${s.id}`).length) {
+      out.skipped.push({ id: s.id, reason: 'already a subscription of the product' });
+      continue;
+    }
+    const keys = [];
+    for (const ref of s.token_refs || []) if (ref.apikey) keys.push(await oto.getApikey(ref.apikey));
+    const clientId = IDENTITY_KINDS.includes(s.subscription_kind) ? s.client_id || null : null;
+    // the application: the one the keys name, or one per owner and client id
+    const named = keys.map((k) => k?.metadata?.[META.application]).find(Boolean);
+    let appId = named && (await db`select id from applications where id = ${named} and workspace_id = ${workspaceId}`)[0]?.id;
+    const ownerKey = `${s.owner_ref || s.name || s.id}|${clientId || ''}`;
+    if (!appId && apps.has(ownerKey)) appId = apps.get(ownerKey);
+    if (!appId) {
+      appId = newId('app');
+      await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by)
+        values (${appId}, ${workspaceId}, ${teamId}, ${s.owner_ref || s.name || s.id}, ${'adopted from the gateway'}, ${clientId}, ${[]}, ${{}}, ${ctx.user?.id || null})`;
+      out.applications++;
+    }
+    apps.set(ownerKey, appId);
+    const status = s.status === 'enabled' ? 'active' : 'suspended';
+    const dates = { created_at: ms(s.dates?.created_at), processed_at: ms(s.dates?.processed_at), started_at: ms(s.dates?.started_at), adopted_at: new Date().toISOString() };
+    const tokenRefs = s.token_refs || [];
+    await db`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, dates, payment, projection, requested_by, metadata)
+      values (${s.id}, ${workspaceId}, ${entity.id}, ${s.plan_ref}, ${appId}, ${s.subscription_kind}, ${status},
+        ${{ plan_name: plans.get(s.plan_ref)?.name || s.plan_ref, adopted: true }}, ${dates}, ${{}},
+        ${{ status: 'synced', otoroshi_subscription_id: s.id, token_refs: tokenRefs, synced_at: new Date().toISOString() }}, ${ctx.user?.id || null}, ${{}})`;
+    out.subscriptions++;
+    // the keys a consumer holds: the client id and the secret it calls with, unchanged
+    if (['apikey', 'oauth2-local'].includes(s.subscription_kind))
+      for (const k of keys.filter(Boolean)) {
+        await db`insert into credentials (id, subscription_id, application_id, kind, client_id, client_secret, otoroshi)
+          values (${newId('cred')}, ${s.id}, ${appId}, ${s.subscription_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'}, ${k.clientId}, ${seal(k.clientSecret)},
+            ${{ enabled: k.enabled, apiRef: k.apiRef, authorizations: k.authorizations }})`;
+        out.credentials++;
+      }
+  }
+  return out;
+}
+

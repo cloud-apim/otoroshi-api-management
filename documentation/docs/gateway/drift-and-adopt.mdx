@@ -64,7 +64,12 @@ curl -X POST http://localhost:9000/api/workspaces/default/adopt \
   -d '{"otoroshi_api_id": "api_4b28c494-…"}'
 ```
 
-:::note
-Adopt mode takes over the API description only. The subscriptions and apikeys that already exist on
-the adopted API are not imported in this version.
-:::
+Its **subscriptions and their keys** are taken over too, as they are. Each owner on the gateway — its
+`owner_ref`, and the client id on token and certificate plans — becomes an application of the
+product (or the one its keys already name with `id_ref`), in the team of the API or the one given
+(`application_team_id`); each `ApiSubscription` becomes a subscription of the product with the same
+id, active or suspended; each key a credential with the same client id and secret. The first
+deployment updates them in place: the consumers keep calling with the keys they have. Adopt the API
+alone with `"subscriptions": false`. The trusted CAs of an mtls plan are read from the certificates
+it names; the selection, the counter failure strategy, the circuit breaker, the issuer and the
+audiences of the plans come with them.
