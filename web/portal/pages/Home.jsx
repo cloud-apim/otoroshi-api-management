@@ -12,7 +12,9 @@ export function Home() {
   const { navigate } = useRouter();
   const [q, setQ] = useState('');
   const apis = useLoad(() => api.get('/apis'), []);
-  const featured = (apis.data || []).slice(0, 6);
+  // the apis the producers feature, the most used otherwise (the catalogue comes featured first)
+  const latest = Object.values((apis.data || []).reduce((acc, a) => ({ ...acc, [a.slug]: a }), {}));
+  const featured = (latest.some((a) => a.featured) ? latest.filter((a) => a.featured) : latest).slice(0, 6);
   return (
     <>
       <section className="pt-hero">

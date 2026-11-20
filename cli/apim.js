@@ -34,6 +34,8 @@ ${SETUP_HELP}
   apis publish <ws> <api> [--comment c] [--deploy]
   apis deploy <ws> <api> [--snapshot n] [--dry-run]
   apis undeploy <ws> <api>
+  apis placement <ws> <api> [--categories a,b] [--featured true|false]   where it stands in the catalogue
+  apis reviews <ws> <api>              the reviews of its consumers, the hidden ones too
   apis snapshots <ws> <api>
   apis export-snapshot <ws> <api> [--snapshot n]   a snapshot as a promotion document (default: the deployed one)
   promote <ws> -f <file> [--dry-run] [--deploy] [--replace-draft]
@@ -217,6 +219,18 @@ async function main() {
         }
         case 'undeploy':
           return print(await call('POST', `${ws(w)}/apis/${need(api, '<api>')}/undeploy`));
+        case 'placement': {
+          const body = {};
+          if (flags.categories !== undefined) body.categories = String(flags.categories === true ? '' : flags.categories).split(',').map((c) => c.trim()).filter(Boolean);
+          if (flags.featured !== undefined) body.featured = flags.featured !== 'false';
+          return print(await call('PUT', `${ws(w)}/apis/${need(api, '<api>')}/placement`, body));
+        }
+        case 'reviews': {
+          const r = await call('GET', `${ws(w)}/apis/${need(api, '<api>')}/reviews`);
+          if (OUTPUT !== 'table') return print(r);
+          console.log(r.rating ? `${r.rating.average}/5 from ${r.rating.count} review(s)` : 'no review shown');
+          return print(r.reviews, [['rating', 'rating'], ['author', 'author'], ['hidden', (x) => (x.hidden ? 'hidden' : '')], ['comment', 'comment'], ['id', 'id']]);
+        }
         case 'export-snapshot':
           return console.log(JSON.stringify(await call('GET', `${ws(w)}/apis/${need(api, '<api>')}/snapshots/${flags.snapshot || 'deployed'}/promotion`), null, 2));
         case 'snapshots':

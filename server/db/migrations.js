@@ -479,6 +479,29 @@ alter table remote_catalogs add column options jsonb not null default '{}';
 alter table metadata_fields add column translations jsonb not null default '{}';
 `,
   },
+  {
+    version: '0015_discovery',
+    sql: `
+-- the catalogue as a discovery system: the editorial placement of an api (its categories, chosen
+-- among the ones of its workspace, and whether it is featured), and the reviews of its consumers
+alter table apis add column categories jsonb not null default '[]';
+alter table apis add column featured boolean not null default false;
+create table api_reviews (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  -- an api across its versions
+  api_slug text not null,
+  user_id text not null references users(id) on delete cascade,
+  rating int not null check (rating between 1 and 5),
+  comment text not null default '',
+  hidden boolean not null default false,
+  hidden_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, api_slug, user_id)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

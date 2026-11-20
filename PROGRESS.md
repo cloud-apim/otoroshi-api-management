@@ -38,14 +38,17 @@ Last update: 2026-11-20.
   - R-9: the inventory of the Otoroshi entities (D-15, Q-6) — every kind the gateway declares, with what the product does with it — a table in the product (`server/otoroshi/inventory.js`) and in the documentation, checked against `GET /apis/entities` of the gateway (`test/inventory.test.js`).
   - R-17: adopt mode takes over the subscriptions of an Api and their keys too — an application per owner, the same subscription ids, the same client ids and secrets — and the first deployment updates them in place: the consumer keeps calling with its key (`test/adopt.test.js`). The plans of an adopted Api keep the new attributes of the contract (selection, counter failure, circuit breaker, issuer and audiences, trusted CAs, validity).
   - R-12 found a gap, logged as **G-23** (open, not reported upstream): a key cannot serve several subscriptions — each one rebuilds the keys it references on its own api and plan — so one credential for the subscriptions of a consumer to several apis waits for Otoroshi.
+  - R-20: the catalogue as a discovery system, on three axes — editorial (the categories of the portal, where each api stands across its versions, the featured ones, applied at once without a snapshot), the reviews of the consumers who subscribed (one per person and api, hidden by a producer, kept in the console), and the real usage (subscribed applications, calls of the last thirty days); the portal filters by category and sorts on them; a workspace keeps reviews or usage off its portal (`test/discovery.test.js`, `test/ui.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension).
-2. **R-48** — compaction of old rollups (only if the volume calls for it).
+1. **R-25** — threat protection per plan, and its events in observability.
+2. **R-34** — usage-based billing.
+3. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
+4. **R-48** — compaction of old rollups (only if the volume calls for it).
 
-Then the items that touch the projection: R-25, R-10.
+Then the large ones: R-10, R-19.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -53,14 +56,13 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (10)**
+**Doable (9)**
 
 | # | Effort | What |
 |---|---|---|
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
-| R-20 | M | Catalogue as a discovery tool (categories, featured, reviews) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-25 | M | Threat protection per plan, and its events in observability |
 | R-34 | M | Usage-based billing (Stripe Billing Meters) |
@@ -105,7 +107,6 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
-| R-20 | §8 | **Catalogue as a discovery system**: editorial categories and featured apis, consumer reviews, real usage — today search and tags only | M | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 
 ### Console
@@ -215,7 +216,7 @@ waits for the data plane rather than working around it.
 | Default portal template | ✅; customer templates: R-19 |
 | Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; one request id from the caller to the backends, found in the request log |
 | Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
-| The catalogue as a discovery system | 🟡 search and tags: R-20 |
+| The catalogue as a discovery system | ✅ editorial categories and featured apis, consumer reviews, real usage; filtered and sorted on them (`test/discovery.test.js`) |
 | IdP integration beyond validation | ⬜ R-21, not a priority (owner) |
 | Deployment history tied to the snapshot | ✅ each deployment Otoroshi records carries the snapshot as its ref (`deployment_ref`); the console lists them by snapshot |
 

@@ -34,6 +34,7 @@ import * as notifications from '../domain/notifications.js';
 import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exposure.js';
 import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
+import * as discovery from '../domain/discovery.js';
 
 const r = new Router();
 
@@ -546,6 +547,30 @@ r.post('/workspaces/:ws/apis/:api/lifecycle', async ({ ctx, params, body }) => {
   if (current && ['published', 'deprecated'].includes(updated.lifecycle)) await deployments.deploy(c, updated, { snapshot: current.snapshot_id });
   if (updated.lifecycle === 'archived' && current) await deployments.undeploy(c, updated);
   return updated;
+});
+
+// the catalogue as a discovery system: where an api stands (categories, featured), its reviews
+r.put('/workspaces/:ws/apis/:api/placement', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params, { manage: true });
+  return discovery.setPlacement(c, api, body);
+});
+
+r.get('/workspaces/:ws/apis/:api/reviews', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params);
+  const list = await discovery.listReviews(c.workspace.id, api.slug, { includeHidden: true });
+  const shown = list.filter((r) => !r.hidden);
+  return {
+    rating: shown.length ? { average: Math.round((shown.reduce((s, r) => s + r.rating, 0) / shown.length) * 10) / 10, count: shown.length } : null,
+    reviews: list,
+  };
+});
+
+r.post('/workspaces/:ws/apis/:api/reviews/:review/hide', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  await apiOf(c, params, { manage: true });
+  return discovery.hideReview(c, c.workspace.id, params.review, body?.hidden !== false);
 });
 
 r.post('/workspaces/:ws/apis/:api/versions', async ({ ctx, params, body }) => {

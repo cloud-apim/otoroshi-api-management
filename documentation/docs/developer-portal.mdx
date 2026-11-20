@@ -40,6 +40,27 @@ the product's own snapshots, it stays readable during a gateway incident.
 
 Search covers names, descriptions and tags.
 
+### Discovery
+
+Beyond a few dozen APIs a flat list is not enough. The catalogue is a discovery tool on three axes,
+each correcting the blind spots of the others:
+
+- **Editorial** — the portal declares its **categories** (**Settings → Portal**, a slug and a name per
+  language), and each API is placed in its own and possibly **featured** from its page, tab
+  **Catalogue**. The placement covers all the versions of the API and applies at once: it is not part
+  of the description, so it needs no snapshot and holds on an API a remote catalog manages. Featured
+  APIs open the catalogue in a section of their own, and fill the home page.
+- **Reviews** — a consumer whose applications subscribed to an API (now or before) rates it from 1 to
+  5 with an optional comment, on its tab **Reviews**; one review per person and API, which they can
+  update or withdraw. A producer hides a review from the API's tab **Catalogue**: it leaves the
+  portal and the rating, and stays visible in the console.
+- **Real usage** — the applications subscribed to the API and its calls of the last thirty days,
+  across its versions, from the ingester.
+
+The catalogue filters by category and tag, and sorts by featured first (the default), most used,
+best rated, name or most recently published. A workspace keeps its reviews or its usage off the
+portal in **Settings → Portal → Discovery**.
+
 ## An API page
 
 - **Overview**: the description, the base URL on the gateway, and how to call it — `curl`,
@@ -51,6 +72,7 @@ Search covers names, descriptions and tags.
   [Scalar](https://github.com/scalar/scalar), bundled in the portal. Its servers point at the
   gateway.
 - **Plans**: auth mechanism, rate limit and quotas *as they apply* — per credential, nothing pooled — the resources a plan gives access to, terms, approval mode and price.
+- **Reviews**: the ratings and comments of the consumers, and the visitor's own when they subscribed.
 - A version switcher when several versions of the API are in the catalogue.
 
 ### Testing

@@ -149,6 +149,19 @@ export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {
   return { items, total, limit, offset, retention: { callsDays: p.retention.callsDays, from: await horizon() } };
 }
 
+// the calls of each api over the last days, exact: the rollups, and the calls not rolled up yet
+export async function callsByApi(workspaceId, days = 30) {
+  const start = new Date(Date.now() - days * 86400000);
+  const [state] = await adb`select last_id from rollup_state where name = 'calls'`;
+  const rolled = Number(state?.last_id || 0);
+  const rows = await adb`select api_id, sum(n)::int as calls from (
+      select api_id, sum(calls) as n from call_rollups where workspace_id = ${workspaceId} and hour >= date_trunc('hour', ${start}::timestamptz) group by api_id
+      union all
+      select api_id, count(*) as n from calls where workspace_id = ${workspaceId} and id > ${rolled} and at >= ${start} group by api_id
+    ) t where api_id is not null and api_id <> '' group by api_id`;
+  return new Map(rows.map((r) => [r.api_id, r.calls]));
+}
+
 export async function ingestStats() {
   const [c] = await adb`select count(*)::int as calls, max(at) as last_at, min(at) as oldest_at from calls`;
   const [r] = await adb`select count(*)::int as raw, min(at) as raw_oldest_at from raw_events`;

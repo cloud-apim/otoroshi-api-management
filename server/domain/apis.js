@@ -21,7 +21,7 @@ export function apiSummary(row) {
 export async function listApis(workspaceId, { q, teamId, lifecycle } = {}) {
   const like = q ? `%${q.toLowerCase()}%` : null;
   return db`select a.id, a.workspace_id, a.team_id, a.slug, a.name, a.version, a.description, a.tags, a.visibility, a.acl,
-      a.lifecycle, a.previous_version_id, a.managed_by, a.created_at, a.updated_at, a.draft_updated_at,
+      a.lifecycle, a.previous_version_id, a.managed_by, a.categories, a.featured, a.created_at, a.updated_at, a.draft_updated_at,
       t.name as team_name,
       (select max(number) from api_snapshots s where s.api_id = a.id) as last_snapshot,
       (select jsonb_build_object('status', d.status, 'snapshot_id', d.snapshot_id, 'action', d.action, 'at', d.finished_at)

@@ -17,6 +17,7 @@ import { listFields } from '../domain/metadata.js';
 import * as notifications from '../domain/notifications.js';
 import { resolveLocal } from '../otoroshi/vault-refs.js';
 import * as billing from '../payments/billing.js';
+import * as discovery from '../domain/discovery.js';
 import { portalUrl } from '../portal-exposure.js';
 
 const r = new Router();
@@ -33,7 +34,7 @@ export async function gatewayBaseUrl(draft) {
 
 // the catalogue: what is deployed, filtered by the visibility ACL (visibility is never projected)
 async function catalogue(ctx) {
-  const rows = await db`select a.id, a.slug, a.team_id, a.lifecycle, a.previous_version_id, s.content, s.number, s.published_at
+  const rows = await db`select a.id, a.slug, a.team_id, a.lifecycle, a.previous_version_id, a.categories, a.featured, s.content, s.number, s.published_at
     from apis a
     join lateral (select d.snapshot_id, d.action from api_deployments d where d.api_id = a.id and d.status = 'deployed' order by d.finished_at desc limit 1) dep on true
     join api_snapshots s on s.id = dep.snapshot_id
@@ -66,7 +67,37 @@ function publicPlan(p, draft) {
   };
 }
 
-async function apiView(entry, { full = false } = {}) {
+// what the portal shows of the discovery axes: the workspace may keep its reviews or its usage off
+function discoveryOf(portal = {}) {
+  return { reviews: portal.discovery?.reviews !== false, usage: portal.discovery?.usage !== false, categories: portal.categories || [] };
+}
+
+// the signals of the catalogue, once per listing: the rating of each api, its subscribed
+// applications and its calls of the last thirty days, across its versions
+async function signals(ctx) {
+  const d = discoveryOf(ctx.workspace.portal);
+  const [rated, subscribed, calls, ids] = await Promise.all([
+    d.reviews ? discovery.ratings(ctx.workspace.id) : new Map(),
+    d.usage ? discovery.subscribers(ctx.workspace.id) : new Map(),
+    d.usage ? analytics.callsByApi(ctx.workspace.id, 30).catch(() => new Map()) : new Map(),
+    db`select id, slug from apis where workspace_id = ${ctx.workspace.id}`,
+  ]);
+  const callsBySlug = new Map();
+  for (const { id, slug } of ids) if (calls.has(id)) callsBySlug.set(slug, (callsBySlug.get(slug) || 0) + calls.get(id));
+  return { d, rated, subscribed, callsBySlug };
+}
+
+function placementOf(row, sig) {
+  const known = new Set(sig.d.categories.map((c) => c.slug));
+  return {
+    categories: (row.categories || []).filter((c) => known.has(c)),
+    featured: !!row.featured,
+    rating: sig.d.reviews ? sig.rated.get(row.slug) || null : undefined,
+    usage: sig.d.usage ? { applications: sig.subscribed.get(row.slug) || 0, calls_30d: sig.callsBySlug.get(row.slug) || 0 } : undefined,
+  };
+}
+
+async function apiView(entry, { full = false, sig = null } = {}) {
   const { row, tags, privileged } = entry;
   const c = row.content;
   const draft = normalizeDraft(c.draft);
@@ -82,6 +113,7 @@ async function apiView(entry, { full = false } = {}) {
     published_at: row.published_at,
     plans_count: draft.plans.filter((p) => p.status === 'published').length,
     has_openapi: !!draft.openapi.content?.trim(),
+    ...(sig ? placementOf(row, sig) : {}),
   };
   if (!full) return base;
   return {
@@ -141,23 +173,66 @@ r.get('/metadata-fields', async ({ ctx }) => {
 
 // ---------------------------------------------------------------- catalogue
 
+// the order of the catalogue: the featured apis first, then by name, unless asked otherwise
+const SORTS = {
+  featured: (a, b) => Number(b.featured) - Number(a.featured) || a.name.localeCompare(b.name),
+  name: (a, b) => a.name.localeCompare(b.name),
+  popular: (a, b) => (b.usage?.applications || 0) - (a.usage?.applications || 0) || (b.usage?.calls_30d || 0) - (a.usage?.calls_30d || 0) || a.name.localeCompare(b.name),
+  rating: (a, b) => (b.rating?.average || 0) - (a.rating?.average || 0) || (b.rating?.count || 0) - (a.rating?.count || 0) || a.name.localeCompare(b.name),
+  recent: (a, b) => String(b.published_at).localeCompare(String(a.published_at)),
+};
+
 r.get('/apis', async ({ ctx, query }) => {
   const list = await catalogue(ctx);
   const q = (query.get('q') || '').toLowerCase();
   const tag = query.get('tag');
-  const views = await Promise.all(list.map((e) => apiView(e)));
-  return views.filter(
-    (a) =>
-      (!q || a.name.toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q) || (a.tags || []).some((t) => t.toLowerCase().includes(q))) &&
-      (!tag || (a.tags || []).includes(tag))
-  );
+  const category = query.get('category');
+  const sig = await signals(ctx);
+  const views = await Promise.all(list.map((e) => apiView(e, { sig })));
+  const sort = SORTS[query.get('sort')] || SORTS.featured;
+  return views
+    .filter(
+      (a) =>
+        (!q || a.name.toLowerCase().includes(q) || (a.description || '').toLowerCase().includes(q) || (a.tags || []).some((t) => t.toLowerCase().includes(q))) &&
+        (!tag || (a.tags || []).includes(tag)) &&
+        (!category || a.categories.includes(category)) &&
+        (query.get('featured') !== 'true' || a.featured)
+    )
+    .sort(sort);
 });
 
 r.get('/apis/:api', async ({ ctx, params }) => {
   const entry = await findEntry(ctx, params.api);
-  const view = await apiView(entry, { full: true });
+  const view = await apiView(entry, { full: true, sig: await signals(ctx) });
   const versions = (await catalogue(ctx)).filter((e) => e.row.slug === entry.row.slug).map((e) => ({ id: e.row.id, version: e.row.content.api.version, lifecycle: e.row.lifecycle }));
   return { ...view, versions };
+});
+
+// the reviews of an api, across its versions: from the consumers who subscribed to it
+r.get('/apis/:api/reviews', async ({ ctx, params }) => {
+  const entry = await findEntry(ctx, params.api);
+  if (!discoveryOf(ctx.workspace.portal).reviews) throw notFound('this portal has no reviews');
+  const list = await discovery.listReviews(ctx.workspace.id, entry.row.slug);
+  return {
+    rating: list.length ? { average: Math.round((list.reduce((s, r) => s + r.rating, 0) / list.length) * 10) / 10, count: list.length } : null,
+    reviews: list.map(({ user_id, hidden, hidden_by, ...r }) => ({ ...r, mine: user_id === ctx.user?.id })),
+    can_review: await discovery.canReview(ctx.user, ctx.workspace.id, entry.row.slug),
+  };
+});
+
+r.put('/apis/:api/reviews/mine', async ({ ctx, params, body }) => {
+  requireUser(ctx);
+  const entry = await findEntry(ctx, params.api);
+  if (!discoveryOf(ctx.workspace.portal).reviews) throw notFound('this portal has no reviews');
+  const saved = await discovery.saveReview(ctx, ctx.workspace.id, entry.row.slug, body || {});
+  return { id: saved.id, rating: saved.rating, comment: saved.comment, updated_at: saved.updated_at };
+});
+
+r.delete('/apis/:api/reviews/mine', async ({ ctx, params }) => {
+  requireUser(ctx);
+  const entry = await findEntry(ctx, params.api);
+  await discovery.deleteReview(ctx, ctx.workspace.id, entry.row.slug);
+  return { deleted: true };
 });
 
 r.get('/apis/:api/pages/:page', async ({ ctx, params }) => {

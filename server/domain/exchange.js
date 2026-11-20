@@ -31,6 +31,8 @@ export async function exportWorkspace(ws) {
       lifecycle: a.lifecycle,
       previous_version_id: a.previous_version_id,
       metadata: a.metadata,
+      categories: a.categories || [],
+      featured: !!a.featured,
       draft: normalizeDraft(a.draft),
       pages,
       snapshots,
@@ -64,11 +66,11 @@ export async function importWorkspace(ctx, ws, doc) {
       stats.teams++;
     }
     for (const a of doc.apis || []) {
-      await tx`insert into apis (id, workspace_id, team_id, slug, name, version, description, tags, visibility, acl, lifecycle, previous_version_id, draft, metadata)
+      await tx`insert into apis (id, workspace_id, team_id, slug, name, version, description, tags, visibility, acl, lifecycle, previous_version_id, draft, metadata, categories, featured)
         values (${a.id}, ${ws.id}, ${a.team_id || null}, ${a.slug}, ${a.name}, ${a.version}, ${a.description || ''}, ${a.tags || []}, ${a.visibility || 'public'},
-          ${a.acl || []}, ${a.lifecycle || 'created'}, ${a.previous_version_id || null}, ${normalizeDraft(a.draft)}, ${a.metadata || {}})
+          ${a.acl || []}, ${a.lifecycle || 'created'}, ${a.previous_version_id || null}, ${normalizeDraft(a.draft)}, ${a.metadata || {}}, ${a.categories || []}, ${!!a.featured})
         on conflict (id) do update set name = excluded.name, description = excluded.description, tags = excluded.tags, visibility = excluded.visibility,
-          acl = excluded.acl, draft = excluded.draft, team_id = excluded.team_id, draft_updated_at = now()`;
+          acl = excluded.acl, draft = excluded.draft, team_id = excluded.team_id, categories = excluded.categories, featured = excluded.featured, draft_updated_at = now()`;
       stats.apis++;
       for (const p of a.pages || []) {
         await tx`insert into api_doc_pages (id, api_id, parent_id, slug, position, title, content)

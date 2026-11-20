@@ -144,6 +144,44 @@ function PortalPages({ pages, onChange, lang, def, ro }) {
   );
 }
 
+// the categories of the catalogue: the editorial axis of the discovery, a slug and a name per language
+function PortalCategories({ categories, onChange, lang, def, ro }) {
+  const update = (i, patch) => onChange(categories.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  const localized = (v) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h3 className="grow">{tr('Catalogue categories')}</h3>
+        {!ro && (
+          <button className="btn sm" onClick={() => onChange([...categories, { slug: `category-${categories.length + 1}`, name: { [def]: tr('New category') } }])}>
+            <Icon name="plus" /> {tr('Add a category')}
+          </button>
+        )}
+      </div>
+      <fieldset disabled={ro} className="ro-fieldset card-body col gap-8">
+        <p className="muted small">{tr('The categories the consumers browse the catalogue by; each api is placed in its own from its page, tab Catalogue.')}</p>
+        {!categories.length && <span className="faint small">{tr('No category yet: the catalogue is a single list.')}</span>}
+        {categories.map((c, i) => (
+          <div key={i} className="row">
+            <Input value={c.slug} onChange={(v) => update(i, { slug: v })} mono aria-label={tr('slug of category {0}', [i + 1])} />
+            <Input
+              value={localized(c.name)[lang] || ''}
+              onChange={(v) => update(i, { name: { ...localized(c.name), [lang]: v } })}
+              placeholder={lang !== def ? localized(c.name)[def] : ''}
+              aria-label={tr('name of category {0} ({1})', [i + 1, lang])}
+            />
+            {!ro && (
+              <button className="btn ghost sm icon" aria-label={tr('delete the category')} onClick={() => onChange(categories.filter((_, j) => j !== i))}>
+                <Icon name="trash" />
+              </button>
+            )}
+          </div>
+        ))}
+      </fieldset>
+    </div>
+  );
+}
+
 function Portal() {
   const { wapi, ws, session, isAdmin } = useWs();
   const ro = !isAdmin;
@@ -217,6 +255,7 @@ function Portal() {
         </div>
       </div>
       <PortalPages pages={p.pages || []} onChange={set('pages')} lang={current} def={def} ro={ro} />
+      <PortalCategories categories={p.categories || []} onChange={set('categories')} lang={current} def={def} ro={ro} />
       <div className="card">
         <div className="card-head">
           <h3>{tr('Settings')}</h3>
@@ -234,6 +273,10 @@ function Portal() {
           </Setting>
           <Setting label={tr('Logo url')}>
             <Input value={p.logoUrl} onChange={set('logoUrl')} />
+          </Setting>
+          <Setting label={tr('Discovery')} help={tr('what the catalogue shows beside the categories: the reviews of the consumers who subscribed, and the real usage of each api (its subscribed applications, its calls of the last thirty days)')}>
+            <Switch checked={p.discovery?.reviews !== false} onChange={(v) => set('discovery')({ ...p.discovery, reviews: v })} label={tr('Consumer reviews')} />
+            <Switch checked={p.discovery?.usage !== false} onChange={(v) => set('discovery')({ ...p.discovery, usage: v })} label={tr('Real usage')} />
           </Setting>
           <Setting label={tr('Self signup')} help={tr('anyone can create an account and get a key on public plans')}>
             <Switch checked={p.selfSignup} onChange={set('selfSignup')} />

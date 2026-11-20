@@ -256,6 +256,7 @@ function Shell() {
             ['/apis/:api/reference', (p) => <ApiPage id={p.api} tab="reference" />],
             ['/apis/:api/try', (p) => <ApiPage id={p.api} tab="try" />],
             ['/apis/:api/plans', (p) => <ApiPage id={p.api} tab="plans" />],
+            ['/apis/:api/reviews', (p) => <ApiPage id={p.api} tab="reviews" />],
             ['/signin', () => <SignIn />],
             ['/signup', () => <SignUp />],
             ['/apps', () => <Apps />],

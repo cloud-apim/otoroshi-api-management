@@ -153,7 +153,7 @@ describe.skipIf(!ready)('the console', () => {
     const routes = [
       W,
       `${W}/apis`,
-      ...['overview', 'resources', 'backends', 'flows', 'plans', 'documentation', 'openapi', 'subscriptions', 'deployment', 'test', 'analytics', 'settings'].map((t) => `${W}/apis/${state.apiId}/${t}`),
+      ...['overview', 'resources', 'backends', 'flows', 'plans', 'documentation', 'openapi', 'catalogue', 'subscriptions', 'deployment', 'test', 'analytics', 'settings'].map((t) => `${W}/apis/${state.apiId}/${t}`),
       `${W}/policy-groups`,
       `${W}/applications`,
       `${W}/applications/${state.appId}`,
@@ -289,6 +289,15 @@ describe.skipIf(!ready)('the portal', () => {
       await click(page, 'Send');
     }
     expect(await page.evaluate(() => [...document.querySelectorAll('.badge')].map((b) => b.innerText))).toContain('200');
+    // subscribed, the consumer reviews the api: four stars and a word, on its card in the catalogue
+    await go(page, `/${WS}/apis/${state.apiId}/reviews`);
+    await page.waitForSelector('.stars-input', { timeout: 10000 });
+    await click(page, '4 out of 5', '.stars-input button');
+    await fill(page, 'Comment (optional)', 'clear and quick');
+    await click(page, 'Publish my review');
+    await page.waitForFunction(() => document.body.innerText.includes('clear and quick') && document.body.innerText.includes('1 review'), { timeout: 10000 });
+    await go(page, `/${WS}/apis`);
+    expect(await page.evaluate(() => document.querySelector('.pt-api-card .stars')?.getAttribute('aria-label'))).toBe('4 out of 5');
     // in French, the question is asked in French
     await page.evaluate(() => localStorage.setItem('apim.portal.lang', 'fr'));
     await go(page, `/${WS}/apis/${state.apiId}/plans`);

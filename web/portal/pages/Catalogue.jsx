@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useQuery } from '../../shared/router.jsx';
 import { Icon, Loader, useLoad, Empty } from '../../shared/ui.jsx';
-import { api } from '../context.jsx';
-import { useT } from '../i18n.jsx';
+import { Stars } from '../../shared/stars.jsx';
+import { api, usePortal } from '../context.jsx';
+import { usePortalText, useT } from '../i18n.jsx';
 import { LifecycleBadge, PageHeader } from '../common.jsx';
 
 export function ApiCard({ api: a }) {
@@ -31,23 +32,52 @@ export function ApiCard({ api: a }) {
         <span className="spacer" />
         <span className="faint tiny">{a.plans_count === 1 ? t('catalogue.plan') : t('catalogue.plans', { n: a.plans_count })}</span>
       </div>
+      <Signals a={a} />
     </Link>
   );
 }
+
+// what the consumers say of an api and how much it is used: two of the three axes of discovery
+export function Signals({ a }) {
+  const t = useT();
+  if (!a.rating && !a.usage?.applications && !a.featured) return null;
+  return (
+    <div className="row wrap gap-6 mt-8 small">
+      {a.featured && <span className="badge accent">{t('catalogue.featured')}</span>}
+      {a.rating && (
+        <span className="row gap-4">
+          <Stars value={a.rating.average} label={t('reviews.rating', { n: a.rating.average })} />
+          <span className="faint tiny">{a.rating.count === 1 ? t('reviews.one') : t('reviews.count', { n: a.rating.count })}</span>
+        </span>
+      )}
+      <span className="spacer" />
+      {a.usage?.applications > 0 && <span className="faint tiny">{a.usage.applications === 1 ? t('catalogue.app') : t('catalogue.apps', { n: a.usage.applications })}</span>}
+    </div>
+  );
+}
+
+const SORTS = ['featured', 'popular', 'rating', 'name', 'recent'];
 
 export function Catalogue() {
   const t = useT();
   const [params, setParams] = useQuery();
   const q = params.get('q') || '';
   const tag = params.get('tag') || '';
+  const category = params.get('category') || '';
+  const sort = SORTS.includes(params.get('sort')) ? params.get('sort') : 'featured';
+  const { portal } = usePortal();
+  const text_ = usePortalText(portal);
+  const categories = portal?.categories || [];
+  const shows = { reviews: portal?.discovery?.reviews !== false, usage: portal?.discovery?.usage !== false };
+  const sorts = SORTS.filter((x) => (x !== 'popular' || shows.usage) && (x !== 'rating' || shows.reviews));
   const [text, setText] = useState(q);
   useEffect(() => setText(q), [q]);
-  const state = useLoad(() => api.get('/apis'), []);
+  const state = useLoad(() => api.get(`/apis?sort=${sort}`), [sort]);
   const tags = useMemo(() => [...new Set((state.data || []).flatMap((a) => a.tags || []))].sort(), [state.data]);
   const filtered = (state.data || []).filter((a) => {
     const s = q.toLowerCase();
     const okQ = !s || a.name.toLowerCase().includes(s) || (a.description || '').toLowerCase().includes(s) || (a.tags || []).some((x) => x.toLowerCase().includes(s));
-    return okQ && (!tag || (a.tags || []).includes(tag));
+    return okQ && (!tag || (a.tags || []).includes(tag)) && (!category || (a.categories || []).includes(category));
   });
   // one card per api, its most recent version
   const latest = Object.values(
@@ -74,7 +104,29 @@ export function Catalogue() {
           </label>
           <input id="cat-search" value={text} onChange={(e) => setText(e.target.value)} onBlur={() => setParams({ q: text })} placeholder={t('catalogue.search')} />
         </form>
+        <label className="small muted" htmlFor="cat-sort">
+          {t('catalogue.sort')}
+        </label>
+        <select id="cat-sort" className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setParams({ sort: e.target.value === 'featured' ? null : e.target.value })}>
+          {sorts.map((x) => (
+            <option key={x} value={x}>
+              {t(`catalogue.sort.${x}`)}
+            </option>
+          ))}
+        </select>
       </div>
+      {categories.length > 0 && (
+        <div className="row wrap gap-6 mb-16" role="group" aria-label={t('catalogue.categories')}>
+          <button className={`pt-chip ${!category ? 'on' : ''}`} onClick={() => setParams({ category: null })} aria-pressed={!category}>
+            {t('catalogue.allcategories')}
+          </button>
+          {categories.map((c) => (
+            <button key={c.slug} className={`pt-chip ${category === c.slug ? 'on' : ''}`} onClick={() => setParams({ category: category === c.slug ? null : c.slug })} aria-pressed={category === c.slug}>
+              {text_(c.name) || c.slug}
+            </button>
+          ))}
+        </div>
+      )}
       {tags.length > 0 && (
         <div className="row wrap gap-6 mb-16" role="group" aria-label="tags">
           <button className={`pt-chip ${!tag ? 'on' : ''}`} onClick={() => setParams({ tag: null })} aria-pressed={!tag}>
@@ -94,11 +146,30 @@ export function Catalogue() {
               <Empty title={t('catalogue.none')} />
             </div>
           ) : latest.length ? (
-            <div className="pt-grid">
-              {latest.map((a) => (
-                <ApiCard key={a.id} api={a} />
-              ))}
-            </div>
+            <>
+              {!q && !tag && !category && sort === 'featured' && latest.some((a) => a.featured) && (
+                <>
+                  <h2 id="cat-featured" className="mb-16">
+                    {t('catalogue.featured')}
+                  </h2>
+                  <div className="pt-grid">
+                    {latest
+                      .filter((a) => a.featured)
+                      .map((a) => (
+                        <ApiCard key={a.id} api={a} />
+                      ))}
+                  </div>
+                  <h2 className="mb-16" style={{ marginTop: 40 }}>
+                    {t('catalogue.all')}
+                  </h2>
+                </>
+              )}
+              <div className="pt-grid">
+                {latest.map((a) => (
+                  <ApiCard key={a.id} api={a} />
+                ))}
+              </div>
+            </>
           ) : (
             <div className="card">
               <Empty title={t('catalogue.empty')} icon="search" />

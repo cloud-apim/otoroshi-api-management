@@ -5,6 +5,8 @@ import { api, usePortal } from '../context.jsx';
 import { pickLang, useI18n } from '../i18n.jsx';
 import { LifecycleBadge, authLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
+import { Reviews } from './Reviews.jsx';
+import { Stars } from '../../shared/stars.jsx';
 import { RequestComposer } from '../../shared/composer.jsx';
 
 const ApiReference = lazy(() => import('./ApiReference.jsx'));
@@ -41,6 +43,7 @@ function ApiView({ a, tab, page }) {
     // the reference of an api with its specification lets one try it (Scalar); the composer otherwise
     ...(a.has_openapi ? [{ id: 'reference', label: t('api.tab.reference'), to: `${base}/reference` }] : [{ id: 'try', label: t('api.tab.try'), to: `${base}/try` }]),
     { id: 'plans', label: t('api.tab.plans'), to: `${base}/plans`, count: a.plans.length },
+    ...(a.rating !== undefined ? [{ id: 'reviews', label: t('api.tab.reviews'), to: `${base}/reviews`, count: a.rating?.count || 0 }] : []),
   ];
   return (
     <>
@@ -62,6 +65,18 @@ function ApiView({ a, tab, page }) {
               <p className="muted mt-8" style={{ maxWidth: 760 }}>
                 {a.description}
               </p>
+              {(a.rating || a.usage?.applications > 0) && (
+                <div className="row wrap gap-8 mt-8 small">
+                  {a.rating && (
+                    <Link to={`${base}/reviews`} className="row gap-4 link">
+                      <Stars value={a.rating.average} label={t('reviews.rating', { n: a.rating.average })} />
+                      <span>{a.rating.count === 1 ? t('reviews.one') : t('reviews.count', { n: a.rating.count })}</span>
+                    </Link>
+                  )}
+                  {a.usage?.applications > 0 && <span className="muted">{a.usage.applications === 1 ? t('catalogue.app') : t('catalogue.apps', { n: a.usage.applications })}</span>}
+                  {a.usage?.calls_30d > 0 && <span className="muted">{t('catalogue.calls', { n: a.usage.calls_30d.toLocaleString() })}</span>}
+                </div>
+              )}
               <div className="row wrap gap-6 mt-8">
                 {(a.tags || []).map((x) => (
                   <Link key={x} to={`/apis?tag=${encodeURIComponent(x)}`} className="tag">
@@ -108,6 +123,7 @@ function ApiView({ a, tab, page }) {
         {tab === 'reference' && <Reference a={a} />}
         {tab === 'try' && <Try a={a} />}
         {tab === 'plans' && <Plans a={a} />}
+        {tab === 'reviews' && <Reviews a={a} />}
       </div>
     </>
   );

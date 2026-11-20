@@ -6,6 +6,7 @@ import { open, seal } from './secrets.js';
 import { config } from '../config.js';
 import { badRequest, conflict, forbidden, notFound, unauthorized } from '../http/router.js';
 import { audit } from './audit.js';
+import { normalizeCategories } from './discovery.js';
 
 export function publicUser(u) {
   if (!u) return null;
@@ -182,6 +183,7 @@ export async function updateWorkspace(ctx, ws, patch) {
   const description = patch.description ?? ws.description;
   const portal = patch.portal ? { ...ws.portal, ...patch.portal } : ws.portal;
   if (patch.portal?.pages !== undefined) portal.pages = normalizePages(patch.portal.pages);
+  if (patch.portal?.categories !== undefined) portal.categories = normalizeCategories(patch.portal.categories);
   // a masked secret sent back by the console keeps the stored one
   if (patch.portal?.oidc && (!patch.portal.oidc.clientSecret || String(patch.portal.oidc.clientSecret).includes('••')))
     portal.oidc = { ...portal.oidc, clientSecret: ws.portal?.oidc?.clientSecret || '' };
