@@ -502,6 +502,32 @@ create table api_reviews (
 );
 `,
   },
+  {
+    version: '0016_usage_reports',
+    sql: `
+-- the usage of the subscriptions to a plan with a usage price, pushed to the meter of the payment
+-- provider in batches: one report per subscription and batch of calls (by id, like the rollups),
+-- sent once — its id is the identifier the provider dedupes on — and replayed until it is
+create table usage_reports (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  subscription_id text not null references subscriptions(id) on delete cascade,
+  plan_id text not null,
+  from_id bigint not null,
+  to_id bigint not null,
+  value bigint not null,
+  meter_event_name text not null,
+  account text,
+  customer text,
+  status text not null default 'pending',
+  error text,
+  created_at timestamptz not null default now(),
+  sent_at timestamptz,
+  unique (subscription_id, to_id)
+);
+create index usage_reports_pending on usage_reports(created_at) where status = 'pending';
+`,
+  },
 ];
 
 export const analyticsMigrations = [

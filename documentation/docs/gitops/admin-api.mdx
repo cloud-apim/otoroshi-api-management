@@ -47,7 +47,7 @@ addressed by id or slug.
 | promotion | `GET …/apis/<api>/snapshots/<n \| deployed>/promotion`, `POST …/promotions` (`{"document": …, "dry_run": true, "deploy": true, "replace_draft": true}`) |
 | deployment | `GET …/deployments`, `POST …/deploy` (`{"snapshot": …, "dry_run": true}`), `POST …/undeploy`, `GET …/projection`, `POST …/test` |
 | applications | `GET POST …/applications`, `GET PUT DELETE …/applications/<app>` |
-| subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync,payment}`, `POST …/ending` (`{"at": "2027-01-31T00:00:00Z"}`, or `null`), `PUT …/metadata`, `POST …/credentials/<cred>/rotate` |
+| subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync,payment}`, `POST …/ending` (`{"at": "2027-01-31T00:00:00Z"}`, or `null`), `PUT …/metadata`, `POST …/credentials/<cred>/rotate`, `GET …/usage` (the usage billed) |
 | composition | `GET POST …/policy-groups`, `GET PUT DELETE …/policy-groups/<pg>`, `POST …/publish` |
 | metadata | `GET PUT …/metadata-fields` |
 | GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |

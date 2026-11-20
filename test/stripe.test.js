@@ -2,7 +2,7 @@
 // linked account, the pinned version, form encoded, idempotent), what it reads back, and the
 // signatures of the webhooks. No infrastructure.
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test';
-import { formEncode, lineItemOf, minorUnits, signPayload, stripeProvider, verifyWebhook } from '../server/payments/stripe.js';
+import { formEncode, lineItemOf, lineItemsOf, minorUnits, signPayload, stripeProvider, verifyWebhook } from '../server/payments/stripe.js';
 
 let double;
 const seen = [];
@@ -23,6 +23,7 @@ beforeAll(() => {
       if (url.pathname === '/v1/subscriptions/sub_1' && req.method === 'GET')
         return json({ id: 'sub_1', status: 'past_due', customer: 'cus_team', cancel_at_period_end: false, items: { data: [{ id: 'si_1', price: { product: 'prod_1' }, current_period_end: 1893456000 }] } });
       if (url.pathname === '/v1/subscriptions/sub_1') return json({ id: 'sub_1' });
+      if (url.pathname === '/v1/billing/meter_events') return json({ object: 'billing.meter_event', event_name: body.get('event_name'), identifier: body.get('identifier') });
       if (url.pathname === '/v1/billing_portal/sessions') return portalConfigured || body.get('configuration') ? json({ url: 'https://billing.stripe.test/p' }) : json({ error: { message: 'No configuration provided and your test mode default configuration has not been created.' } }, 400);
       if (url.pathname === '/v1/billing_portal/configurations') {
         portalConfigured = true;
@@ -50,7 +51,7 @@ describe('the Stripe api', () => {
 
   test('a Checkout on the linked account: its key, its version, the price of the plan, idempotent', async () => {
     const out = await provider().checkout('acct_seller', {
-      lineItem: lineItemOf(plan, 'Data 1.0.0 · Premium'),
+      lineItems: lineItemsOf(plan, 'Data 1.0.0 · Premium'),
       customer: 'cus_team',
       metadata: { apim_subscription_id: 'sub_apim' },
       reference: 'sub_apim',
@@ -88,6 +89,20 @@ describe('the Stripe api', () => {
     expect(await provider().portalUrl('acct_seller', 'cus_team', 'https://portal/back')).toBe('https://billing.stripe.test/p');
     expect(last('/v1/billing_portal/configurations').body).toMatchObject({ 'features[invoice_history][enabled]': 'true', 'features[subscription_cancel][mode]': 'at_period_end' });
     expect(last('/v1/billing_portal/sessions').body).toMatchObject({ customer: 'cus_team', return_url: 'https://portal/back', configuration: 'bpc_1' });
+  });
+
+  test('a usage price: a metered item, with the recurring price or alone; the usage pushed to the meter of the linked account', async () => {
+    const usage = { enabled: true, priceRef: 'price_metered', meterEventName: 'api_calls', counts: 'success' };
+    expect(lineItemsOf({ pricing: { ...plan.pricing, usage } }, 'x').map((i) => i.price || 'flat')).toEqual(['flat', 'price_metered']);
+    expect(lineItemsOf({ pricing: { kind: 'paid', amount: 0, currency: 'EUR', usage } }, 'x')).toEqual([{ price: 'price_metered' }]);
+    await provider().reportUsage('acct_seller', { eventName: 'api_calls', customer: 'cus_team', value: 42, identifier: 'usage_1', timestamp: '2030-01-01T00:00:00Z' });
+    const r = last('/v1/billing/meter_events');
+    expect(r.headers).toMatchObject({ 'stripe-account': 'acct_seller', 'idempotency-key': 'apim-usage-usage_1' });
+    expect(r.body).toEqual({ event_name: 'api_calls', 'payload[stripe_customer_id]': 'cus_team', 'payload[value]': '42', identifier: 'usage_1', timestamp: String(Date.UTC(2030, 0, 1) / 1000) });
+    // a move to a plan with a usage price replaces the items of the subscription
+    await provider().changePrice('acct_seller', 'sub_1', { ...plan, id: 'plan_metered', pricing: { ...plan.pricing, usage } }, 'Metered');
+    const moved = seen.filter((s) => s.path === '/v1/subscriptions/sub_1' && s.method === 'POST').pop();
+    expect(moved.body).toMatchObject({ 'items[0][id]': 'si_1', 'items[0][deleted]': 'true', 'items[1][price_data][product]': 'prod_1', 'items[2][price]': 'price_metered' });
   });
 
   test('a price named at Stripe is used as is; amounts in minor units', () => {

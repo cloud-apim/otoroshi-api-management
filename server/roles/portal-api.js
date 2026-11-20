@@ -18,6 +18,7 @@ import * as notifications from '../domain/notifications.js';
 import { resolveLocal } from '../otoroshi/vault-refs.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
+import { usageOf } from '../payments/usage.js';
 import { portalUrl } from '../portal-exposure.js';
 
 const r = new Router();
@@ -63,7 +64,15 @@ function publicPlan(p, draft) {
         : null,
     terms: p.terms.enabled ? { url: p.terms.url, page: p.terms.pageSlug } : null,
     usage_statement: p.usageStatement.enabled ? { required: p.usageStatement.required, prompt: p.usageStatement.prompt } : null,
-    pricing: p.pricing.kind === 'paid' ? { amount: p.pricing.amount, currency: p.pricing.currency, interval: p.pricing.interval } : null,
+    pricing:
+      p.pricing.kind === 'paid'
+        ? {
+            amount: p.pricing.amount,
+            currency: p.pricing.currency,
+            interval: p.pricing.interval,
+            usage: p.pricing.usage.enabled ? { unit_amount: Number(p.pricing.usage.unitAmount) || 0, counts: p.pricing.usage.counts } : null,
+          }
+        : null,
   };
 }
 
@@ -408,6 +417,13 @@ r.post('/apis/:api/test', async ({ ctx, params, body }) => {
 });
 
 r.post('/subscriptions/:sub/close', async ({ ctx, params }) => subscriptions.closeSubscription(ctx, await mySub(ctx, params.sub)));
+
+// what the consumer is billed for its usage: the calls reported to the payment provider
+r.get('/subscriptions/:sub/usage', async ({ ctx, params }) => {
+  const sub = await mySub(ctx, params.sub);
+  const u = await usageOf(sub.id);
+  return { sent: u.sent, pending: u.pending, reports: u.reports.filter((r) => r.status !== 'failed').map(({ error, ...r }) => r) };
+});
 
 // from the consumer's side: ask to move to an equivalent plan, or answer a proposal
 r.post('/subscriptions/:sub/transfer', async ({ ctx, params, body }) => {

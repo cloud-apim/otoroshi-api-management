@@ -83,7 +83,7 @@ function PlanSummary({ p, draft }) {
       </div>
       <div>
         <Icon name="eye" size={13} /> {tr(p.visibility)} · {p.subscribable ? tr('{0} approval', [tr(p.validation)]) : tr('not subscribable')}
-        {p.pricing.kind === 'paid' ? ` · ${p.pricing.amount} ${p.pricing.currency}/${tr(p.pricing.interval)}` : tr(' · free')}
+        {p.pricing.kind === 'paid' ? ` · ${p.pricing.amount} ${p.pricing.currency}/${tr(p.pricing.interval)}${p.pricing.usage?.enabled ? tr(' + usage') : ''}` : tr(' · free')}
       </div>
     </div>
   );
@@ -146,6 +146,49 @@ export function PlansTab({ draft, setDraft, readOnly, order }) {
       )}
       {editing && <PlanEditor value={editing} draft={draft} onSave={save} onClose={() => setEditing(null)} />}
     </div>
+  );
+}
+
+const USAGE_DEFAULTS = { enabled: false, priceRef: '', meterEventName: '', counts: 'success', unitAmount: 0 };
+
+// the usage part of a paid plan: its calls counted by the product, billed by a metered price at Stripe
+function UsagePricing({ usage, currency, onChange }) {
+  const u = { ...USAGE_DEFAULTS, ...(usage || {}) };
+  return (
+    <>
+      <Setting
+        label={tr('Usage price')}
+        help={tr('the calls of each subscription counted from the computed path and pushed in batches to a meter of Stripe, whose metered price bills them; with a price of 0 above, the plan is billed by its usage only')}
+      >
+        <Switch checked={u.enabled} onChange={(v) => onChange({ enabled: v })} label={tr('Bill the usage')} />
+      </Setting>
+      {u.enabled && (
+        <>
+          <Setting label={tr('Metered price')} help={tr('the price at Stripe that bills the usage (price_…), metered by the meter below')}>
+            <Input value={u.priceRef} onChange={(v) => onChange({ priceRef: v })} mono placeholder={tr('price_…')} />
+          </Setting>
+          <Setting label={tr('Meter event name')} help={tr('the event name of the meter at Stripe the usage is pushed to')}>
+            <Input value={u.meterEventName} onChange={(v) => onChange({ meterEventName: v })} mono placeholder="api_calls" />
+          </Setting>
+          <Setting label={tr('Counted calls')} help={tr('success: the calls answered below 400 · served: every call the gateway served, below 500, a 429 of the quotas aside')}>
+            <Seg
+              value={u.counts}
+              onChange={(v) => onChange({ counts: v })}
+              options={[
+                { value: 'success', label: tr('success') },
+                { value: 'served', label: tr('served') },
+              ]}
+            />
+          </Setting>
+          <Setting label={tr('Price of a call, shown')} help={tr('what the portal shows; the price billed is the one of the metered price at Stripe — keep them equal')}>
+            <div className="row">
+              <NumberInput value={u.unitAmount} onChange={(v) => onChange({ unitAmount: v })} />
+              <span className="muted">{tr('{0} per call', [currency])}</span>
+            </div>
+          </Setting>
+        </>
+      )}
+    </>
   );
 }
 
@@ -444,6 +487,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               <Setting label={tr('Grace period (days)')} help={tr('after a failed payment, before the key is disabled')}>
                 <NumberInput value={p.pricing.graceDays} onChange={(v) => setIn('pricing', { graceDays: v })} />
               </Setting>
+              <UsagePricing usage={p.pricing.usage} currency={p.pricing.currency} onChange={(patch) => setIn('pricing', { usage: { ...USAGE_DEFAULTS, ...(p.pricing.usage || {}), ...patch } })} />
             </>
           )}
         </div>

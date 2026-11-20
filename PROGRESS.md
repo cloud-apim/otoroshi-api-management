@@ -40,12 +40,12 @@ Last update: 2026-11-20.
   - R-12 found a gap, logged as **G-23** (open, not reported upstream): a key cannot serve several subscriptions — each one rebuilds the keys it references on its own api and plan — so one credential for the subscriptions of a consumer to several apis waits for Otoroshi.
   - R-20: the catalogue as a discovery system, on three axes — editorial (the categories of the portal, where each api stands across its versions, the featured ones, applied at once without a snapshot), the reviews of the consumers who subscribed (one per person and api, hidden by a producer, kept in the console), and the real usage (subscribed applications, calls of the last thirty days); the portal filters by category and sorts on them; a workspace keeps reviews or usage off its portal (`test/discovery.test.js`, `test/ui.test.js`).
   - R-25: the Threat Protection Suite per plan (D-10) — a tab of the plan configures the preset of the extension (firewall, bots, IP reputation, fail2ban, sensitive data, error leakage, uploads, login guard, api contract) and references its policies, projected in the plugins of the plan and watched by the drift detection; a gateway without the extension, which would let the calls through unprotected, gets the draft and the deployment warned; the `CloudApimSecurityEvent` of the suite are exported, ingested and attributed to the api and, through the key that called, the plan, the subscription and the application — Observability › Security, and the analytics of an api (`test/threat-protection.test.js`, `test/ingestion.test.js`, `test/model.test.js`). Three gaps of the extension logged: **G-24** (the global table of Threat Studio ignores the plan plugins), **G-25** (a challenge answers a page with status 200), **G-26** (a security event does not name the plan).
+  - R-34: usage-based billing (D-36) — a paid plan can bill the usage of its subscriptions with a metered price of Stripe, with its recurring price or alone; the calls counted from the computed path (success or served), pushed to the meter of the linked account in batches after the rollups, taken by id — exactly once, each report sent once with its id as identifier and replayed until it is; the calls kept until billed; the usage shown on the subscription (console, admin api, cli) and on the portal; a usage price refused on a provider that cannot meter (`test/payments.test.js`, `test/stripe.test.js`, `test/model.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-34** — usage-based billing.
-2. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
+1. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
 3. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
 4. **R-48** — compaction of old rollups (only if the volume calls for it).
 
@@ -57,7 +57,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (9)**
+**Doable (8)**
 
 | # | Effort | What |
 |---|---|---|
@@ -66,7 +66,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-25 | S | Threat protection checked against a gateway with the extension running (needs it built: to download on the owner's go) |
-| R-34 | M | Usage-based billing (Stripe Billing Meters) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
 | R-10 | L | Named compositions: resources and dictionaries |
 | R-19 | L | Custom portal templates |
@@ -135,7 +134,6 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-48 | D-33 | A daily **compaction** of the hourly rollups past a few months, should their volume call for it | S | |
-| R-34 | D-36 | **Usage-based billing**: push the computed counters per subscription in batches (Stripe Billing Meters); refuse a usage plan on a connector that cannot meter | M | R-7 |
 | R-35 | Q-12 | Who holds the billing account (team, proposed) and whether monetisation is in the MVP — **owner decision** | — | |
 
 ### Robustness and security

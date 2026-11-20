@@ -11,6 +11,8 @@ const token = (n) => randomBytes(n).toString('hex').slice(0, n);
 export function fakeProvider(cfg, { publicUrl }) {
   const sessions = new Map();
   const subscriptions = new Map();
+  // the meter events received, by identifier: one sent twice is counted once, as Stripe does
+  const meterEvents = new Map();
   const secret = cfg.webhookSecret || FAKE_SECRET;
   const event = (account, type, object) => ({ id: `evt_fake_${token(12)}`, object: 'event', type, account, livemode: false, created: Math.floor(Date.now() / 1000), data: { object } });
   const subscriptionObject = (s) => ({
@@ -27,19 +29,25 @@ export function fakeProvider(cfg, { publicUrl }) {
     secret,
     sessions,
     subscriptions,
+    meterEvents,
+    canMeter: true,
+    async reportUsage(accountId, { eventName, customer, value, identifier, timestamp }) {
+      if (!meterEvents.has(identifier)) meterEvents.set(identifier, { accountId, eventName, customer, value: Number(value), identifier, timestamp: new Date(timestamp).toISOString() });
+      return { identifier };
+    },
     authorizeUrl: ({ state, redirectUri }) => `${publicUrl}/payments/fake/authorize?${new URLSearchParams({ state, redirect_uri: redirectUri })}`,
     exchange: async (code) => ({ accountId: `acct_fake_${String(code).slice(0, 12)}`, name: 'Fake Stripe account', livemode: false }),
     deauthorize: async () => {},
     customer: async (accountId, { team }) => `cus_fake_${team.id.slice(-12)}`,
-    async checkout(accountId, { lineItem, customer, metadata, successUrl, cancelUrl }) {
+    async checkout(accountId, { lineItems, customer, metadata, successUrl, cancelUrl }) {
       const id = `cs_fake_${token(12)}`;
-      sessions.set(id, { id, accountId, lineItem, customer, metadata, successUrl, cancelUrl, status: 'open' });
+      sessions.set(id, { id, accountId, lineItems, lineItem: lineItems[0], customer, metadata, successUrl, cancelUrl, status: 'open' });
       return { id, url: `${publicUrl}/payments/fake/checkout/${id}` };
     },
     async subscription(accountId, id) {
       const s = subscriptions.get(id);
       if (!s || s.accountId !== accountId) throw new PaymentError('no such subscription', 404);
-      return { id, status: s.status, customerId: s.customerId, currentPeriodEnd: s.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: false, metadata: s.metadata };
+      return { id, status: s.status, customerId: s.customerId, currentPeriodEnd: s.currentPeriodEnd.toISOString(), cancelAtPeriodEnd: false, metadata: s.metadata, item: { id: `si_fake_${id}`, product: `prod_fake_${id}` }, items: [{ id: `si_fake_${id}`, price: null, metered: false }] };
     },
     portalUrl: async (accountId, customerId, returnUrl) => `${returnUrl}${returnUrl.includes('?') ? '&' : '?'}stripe-portal=fake`,
     async cancel(accountId, id) {

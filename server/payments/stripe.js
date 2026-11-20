@@ -69,6 +69,16 @@ export function lineItemOf(plan, productName, { product } = {}) {
   return { price_data: product ? { ...price_data, product } : { ...price_data, product_data: { name: productName } }, quantity: 1 };
 }
 
+// what a subscription to a plan is billed: its recurring price, and the metered price of its usage.
+// A plan billed by its usage only has no recurring price
+export function lineItemsOf(plan, productName, { product } = {}) {
+  const p = plan.pricing || {};
+  const usage = p.usage?.enabled ? p.usage : null;
+  const flat = !usage || p.priceRef || Number(p.amount) > 0;
+  // a metered item has no quantity: the meter says it
+  return [...(flat ? [lineItemOf(plan, productName, { product })] : []), ...(usage ? [{ price: usage.priceRef }] : [])];
+}
+
 const date = (s) => (s ? new Date(Number(s) * 1000).toISOString() : null);
 
 export function subscriptionOf(s) {
@@ -81,6 +91,7 @@ export function subscriptionOf(s) {
     cancelAtPeriodEnd: !!s.cancel_at_period_end,
     metadata: s.metadata || {},
     item: item ? { id: item.id, product: typeof item.price?.product === 'string' ? item.price.product : item.price?.product?.id } : null,
+    items: (s.items?.data || []).map((i) => ({ id: i.id, price: i.price?.id || null, metered: i.price?.recurring?.usage_type === 'metered' })),
   };
 }
 
@@ -130,11 +141,11 @@ export function stripeProvider(cfg, { fetchImpl = fetch } = {}) {
       const c = await call('POST', '/v1/customers', { name: team.name, email, metadata: { apim_team_id: team.id, apim_workspace: workspace.slug } }, { account: accountId, idempotencyKey: `apim-customer-${accountId}-${team.id}` });
       return c.id;
     },
-    async checkout(accountId, { lineItem, customer, metadata, reference, successUrl, cancelUrl, idempotencyKey }) {
+    async checkout(accountId, { lineItems, customer, metadata, reference, successUrl, cancelUrl, idempotencyKey }) {
       const s = await call(
         'POST',
         '/v1/checkout/sessions',
-        { mode: 'subscription', line_items: [lineItem], customer, client_reference_id: reference, success_url: successUrl, cancel_url: cancelUrl, metadata, subscription_data: { metadata } },
+        { mode: 'subscription', line_items: lineItems, customer, client_reference_id: reference, success_url: successUrl, cancel_url: cancelUrl, metadata, subscription_data: { metadata } },
         { account: accountId, idempotencyKey }
       );
       return { id: s.id, url: s.url };
@@ -165,12 +176,25 @@ export function stripeProvider(cfg, { fetchImpl = fetch } = {}) {
     async changePrice(accountId, id, plan, productName) {
       const s = await this.subscription(accountId, id);
       if (!s.item) throw new PaymentError(`the Stripe subscription ${id} has no item`, 400);
-      await call(
+      // a recurring price for a recurring price: the item changes its price. Otherwise the items of the
+      // subscription are replaced by the ones of the plan (a metered price comes or goes)
+      const simple = s.items.length <= 1 && !s.items[0]?.metered && !plan.pricing?.usage?.enabled;
+      const items = simple
+        ? [{ id: s.item.id, ...lineItemOf(plan, productName, { product: s.item.product }) }]
+        : [...s.items.map((i) => ({ id: i.id, deleted: true })), ...lineItemsOf(plan, productName, { product: s.item.product })];
+      await call('POST', `/v1/subscriptions/${encodeURIComponent(id)}`, { items, proration_behavior: 'create_prorations' }, { account: accountId, idempotencyKey: `apim-price-${id}-${plan.id}` });
+    },
+    // the usage of a subscription, a batch at a time, to the meter of the linked account: the
+    // identifier is the report's, so that a report sent twice is counted once
+    canMeter: true,
+    async reportUsage(accountId, { eventName, customer, value, identifier, timestamp }) {
+      const e = await call(
         'POST',
-        `/v1/subscriptions/${encodeURIComponent(id)}`,
-        { items: [{ id: s.item.id, ...lineItemOf(plan, productName, { product: s.item.product }) }], proration_behavior: 'create_prorations' },
-        { account: accountId, idempotencyKey: `apim-price-${id}-${plan.id}` }
+        '/v1/billing/meter_events',
+        { event_name: eventName, payload: { stripe_customer_id: customer, value: String(value) }, identifier, timestamp: Math.floor(new Date(timestamp).getTime() / 1000) },
+        { account: accountId, idempotencyKey: `apim-usage-${identifier}` }
       );
+      return { identifier: e?.identifier || identifier };
     },
     verifyEvent(payload, headers) {
       return verifyWebhook(payload, headers.get('stripe-signature'), cfg.webhookSecret);

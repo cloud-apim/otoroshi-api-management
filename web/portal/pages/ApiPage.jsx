@@ -3,7 +3,7 @@ import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, Code, CopyButton, Empty, ErrorBox, Icon, Loader, Loading, Markdown, Seg, Select, useLoad } from '../../shared/ui.jsx';
 import { api, usePortal } from '../context.jsx';
 import { pickLang, useI18n } from '../i18n.jsx';
-import { LifecycleBadge, authLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
+import { LifecycleBadge, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
 import { Reviews } from './Reviews.jsx';
 import { Stars } from '../../shared/stars.jsx';
@@ -419,7 +419,7 @@ export function PlanCard({ plan, onSubscribe, user }) {
             <h3 className="grow">{plan.name}</h3>
             {plan.status === 'deprecated' && <Badge kind="warning">{t('lifecycle.deprecated')}</Badge>}
           </div>
-          <div className="pt-price">{plan.pricing ? t('plan.price', { amount: plan.pricing.amount, currency: plan.pricing.currency, interval: plan.pricing.interval }) : t('plan.free')}</div>
+          <div className="pt-price">{priceLabel(t, plan.pricing)}</div>
           {plan.description && <p className="muted small mt-8">{plan.description}</p>}
         </div>
         <dl className="pt-plan-facts">

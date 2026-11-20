@@ -3,7 +3,7 @@ import { Link } from '../../shared/router.jsx';
 import { Callout, Field, Input, Modal, Secret, Select, TextArea, errorMessage, useLoad, Loading } from '../../shared/ui.jsx';
 import { api } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
-import { authLabel } from '../common.jsx';
+import { authLabel, priceLabel } from '../common.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 
 const TOKEN_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
@@ -110,7 +110,7 @@ export function SubscribeModal({ api: a, plan, onClose }) {
             <p className="muted small">{t('sub.pay.hint')}</p>
             <button className="btn primary" onClick={pay} disabled={busy}>
               {t('sub.pay')}
-              {plan.pricing ? ` · ${plan.pricing.amount} ${plan.pricing.currency}` : ''}
+              {plan.pricing ? ` · ${priceLabel(t, plan.pricing)}` : ''}
             </button>
           </>
         )}

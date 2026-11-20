@@ -19,7 +19,7 @@ import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { enqueue, registerTaskHandler, PermanentError } from '../domain/tasks.js';
 import * as subscriptions from '../domain/subscriptions.js';
 import { portalUrl } from '../portal-exposure.js';
-import { lineItemOf, PaymentError, stripeProvider } from './stripe.js';
+import { lineItemsOf, PaymentError, stripeProvider } from './stripe.js';
 import { fakeProvider } from './fake.js';
 
 // the statuses of a Stripe subscription its key works in (past_due: Stripe retries the payment)
@@ -146,7 +146,7 @@ export async function checkout(ctx, ws, sub, { email } = {}) {
   const back = `${portalUrl(ws.slug).replace(/\/$/, '')}/apps/${app.id}`;
   const metadata = { apim_subscription_id: sub.id, apim_workspace: ws.slug, apim_api: api.id, apim_plan: plan.id, ...(moving ? { apim_transfer: 'true' } : {}) };
   const session = await p.checkout(account, {
-    lineItem: lineItemOf(plan, `${api.name} ${api.version} · ${plan.name}`),
+    lineItems: lineItemsOf(plan, `${api.name} ${api.version} · ${plan.name}`),
     customer,
     metadata,
     reference: sub.id,
@@ -376,11 +376,13 @@ export function fakeCheckoutPage(id) {
   const p = paymentProvider();
   const s = p?.name === 'fake' ? p.sessions.get(id) : null;
   if (!s) throw notFound('no such checkout');
-  const item = s.lineItem.price_data ? `${(s.lineItem.price_data.unit_amount / 100).toFixed(2)} ${s.lineItem.price_data.currency.toUpperCase()} / ${s.lineItem.price_data.recurring.interval}` : s.lineItem.price;
+  const describe = (i) => (i.price_data ? `${(i.price_data.unit_amount / 100).toFixed(2)} ${i.price_data.currency.toUpperCase()} / ${i.price_data.recurring.interval}` : `${i.price}${i.quantity ? '' : ' (metered usage)'}`);
+  const items = (s.lineItems || [s.lineItem]).map(describe).join('<br>');
+  const name = (s.lineItems || [s.lineItem]).find((i) => i.price_data)?.price_data?.product_data?.name || '';
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fake Checkout</title>
 <style>body{font:15px system-ui;margin:0;display:grid;place-items:center;min-height:100vh;background:#f6f7f9;color:#111}main{background:#fff;border:1px solid #ddd;border-radius:12px;padding:28px;max-width:420px}button{font:inherit;padding:9px 16px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}button.pay{background:#0061bd;color:#fff;border-color:#0061bd}p{color:#555}</style></head>
 <body><main><h1 style="margin-top:0">Fake Checkout</h1><p>Stands for Stripe Checkout in the development: no money is involved.</p>
-<p><strong>${(s.lineItem.price_data?.product_data?.name || '').replace(/</g, '&lt;')}</strong><br>${String(item).replace(/</g, '&lt;')}</p>
+<p><strong>${name.replace(/</g, '&lt;')}</strong><br>${String(items).replace(/</g, '&lt;').replace(/&lt;br>/g, '<br>')}</p>
 <form method="post" action="/payments/fake/checkout/${s.id}/pay" style="display:inline"><button class="pay">Pay</button></form>
 <form method="post" action="/payments/fake/checkout/${s.id}/cancel" style="display:inline;margin-left:8px"><button>Cancel</button></form></main></body></html>`;
 }

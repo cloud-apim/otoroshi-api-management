@@ -163,6 +163,19 @@ describe('projection', () => {
   });
 });
 
+describe('usage price', () => {
+  const metered = (pricing) => defaultPlan({ name: 'metered', status: 'published', pricing: { kind: 'paid', amount: 0, currency: 'EUR', interval: 'month', ...pricing } });
+  test('a usage price names its metered price and its meter, on a paid plan; it never reaches the gateway', () => {
+    const ok = metered({ usage: { enabled: true, priceRef: 'price_m', meterEventName: 'api_calls' } });
+    expect(validateDraft(draft([ok])).ok).toBe(true);
+    const errors = (p) => validateDraft(draft([p])).errors.map((e) => e.path);
+    expect(errors(metered({ usage: { enabled: true } }))).toEqual(['plans[0].pricing.usage.priceRef', 'plans[0].pricing.usage.meterEventName']);
+    expect(errors(metered({ kind: 'free', usage: { enabled: true, priceRef: 'price_m', meterEventName: 'e' } }))).toEqual(['plans[0].pricing.usage']);
+    expect(errors(metered({ usage: { enabled: true, priceRef: 'price_m', meterEventName: 'e', counts: 'everything' } }))).toEqual(['plans[0].pricing.usage.counts']);
+    expect(JSON.stringify(buildOtoroshiApi({ api: { id: 'a', name: 'x', version: '1', workspace_id: 'ws' }, draft: draft([ok]) }))).not.toContain('price_m');
+  });
+});
+
 describe('threat protection', () => {
   const api = { id: 'a', name: 'x', version: '1', workspace_id: 'ws' };
   const protectedPlan = (tp, extra = {}) => defaultPlan({ id: 'p_tp', name: 'guarded', status: 'published', threatProtection: { enabled: true, threatPolicy: 'tp_strict', ...tp }, ...extra });

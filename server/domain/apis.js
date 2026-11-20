@@ -229,6 +229,10 @@ export async function validateWithMetadata(workspaceId, draft, { apiId = null } 
     errors.forEach((e) => v.errors.push({ path: `plans[${p.name}].metadata.${e.key}`, message: `plan "${p.name}": ${e.message}` }));
   }
   v.warnings.push(...(await threatWarnings(draft).catch(() => [])));
+  // a usage price needs a payment provider that meters (loaded late: the payments read the apis)
+  const metered = normalizeDraft(draft).plans.filter((p) => p.pricing.kind === 'paid' && p.pricing.usage.enabled);
+  if (metered.length && !(await import('../payments/usage.js')).meteringAvailable())
+    metered.forEach((p) => v.errors.push({ path: `plans[${p.name}].pricing.usage`, message: `plan "${p.name}": the payment provider of the installation cannot meter a usage` }));
   v.ok = v.errors.length === 0;
   return v;
 }

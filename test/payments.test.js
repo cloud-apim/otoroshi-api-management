@@ -19,17 +19,20 @@ const provider = config.payments.provider;
 config.payments.provider = 'fake';
 
 const { start } = await import('../server/main.js');
-const { db } = await import('../server/db/index.js');
+const { db, adb } = await import('../server/db/index.js');
 const billing = await import('../server/payments/billing.js');
 const { signPayload } = await import('../server/payments/stripe.js');
 const { FAKE_SECRET } = await import('../server/payments/fake.js');
 const { otoroshi } = await import('../server/otoroshi/client.js');
+const { runRetention } = await import('../server/domain/retention.js');
+const { invalidateAttributionCache } = await import('../server/domain/ingest.js');
 
 const RUN = Date.now().toString(36);
 const WS = `pay-${RUN}`;
 const ROOT = `http://localhost:${config.port}`;
 const DOMAIN = `pay-${RUN}.oto.tools`;
 const PLAN = `plan_premium_${RUN}`;
+const METERED = `plan_metered_${RUN}`;
 const email = `buyer-${RUN}@payments.test`;
 const PASSWORD = `pw-${RUN}-secret`;
 let server;
@@ -76,6 +79,15 @@ beforeAll(async () => {
     { id: PLAN, name: 'Premium', status: 'published', auth: { kind: 'apikey' }, validation: 'auto', pricing: { kind: 'paid', amount: 49, currency: 'EUR', interval: 'month', graceDays: 7 } },
     { id: `plan_gold_${RUN}`, name: 'Gold', status: 'published', auth: { kind: 'apikey' }, validation: 'auto', pricing: { kind: 'paid', amount: 99, currency: 'EUR', interval: 'month', graceDays: 7 } },
     { id: `plan_basic_${RUN}`, name: 'Basic', status: 'published', auth: { kind: 'apikey' }, validation: 'auto' },
+    // billed by its usage only: the calls answered below 400, pushed to the meter `api_calls`
+    {
+      id: METERED,
+      name: 'Pay as you go',
+      status: 'published',
+      auth: { kind: 'apikey' },
+      validation: 'auto',
+      pricing: { kind: 'paid', amount: 0, currency: 'EUR', interval: 'month', graceDays: 7, usage: { enabled: true, priceRef: 'price_metered', meterEventName: 'api_calls', counts: 'success', unitAmount: 0.002 } },
+    },
   ];
   await ok('PUT', `/workspaces/${WS}/apis/${api.id}/draft`, { draft });
   await ok('POST', `/workspaces/${WS}/apis/${api.id}/publish`, { comment: 'paid', deploy: true });
@@ -91,6 +103,7 @@ afterAll(async () => {
     await call('DELETE', `/workspaces/${WS}/apis/${state.apiId}`);
     await db`delete from applications where workspace_id = (select id from workspaces where slug = ${WS})`;
     await db`delete from payment_events where account = ${state.account || ''}`;
+    await adb`delete from calls where api_id = ${state.apiId || ''}`;
     await call('DELETE', `/workspaces/${WS}`);
     for (const u of await db`select id from users where email = ${email}`) {
       for (const t of ['sessions', 'team_members', 'workspace_members', 'notification_states', 'api_tokens']) await db.unsafe(`delete from ${t} where user_id = $1`, [u.id]);
@@ -241,6 +254,59 @@ describe('selling the paid plans of a workspace', () => {
     const r = await ok('POST', `/workspaces/${WS}/payments/reconcile`);
     expect(r.changed).toEqual([{ subscription: state.subId, outcome: 'subscription closed' }]);
     expect((await sub()).status).toBe('closed');
+  });
+
+  test('a usage price: the calls counted from the computed path, pushed to the meter in batches, each once', async () => {
+    // the portal shows the price of a call; the Checkout bills the metered price, alone
+    const shown = (await (await portal(`/apis/${state.apiId}`)).json()).plans.find((p) => p.id === METERED);
+    expect(shown.pricing.usage).toEqual({ unit_amount: 0.002, counts: 'success' });
+    const created = await (await portal('/subscriptions', { method: 'POST', body: JSON.stringify({ api_id: state.apiId, plan_id: METERED, application_id: state.appId }) })).json();
+    const { url } = await (await portal(`/subscriptions/${created.id}/checkout`, { method: 'POST', body: '{}' })).json();
+    expect(billing.paymentProvider().sessions.get(url.split('/').pop()).lineItems).toEqual([{ price: 'price_metered' }]);
+    await fetch(`${url}/pay`, { method: 'POST', redirect: 'manual' });
+    const paid = (await db`select * from subscriptions where id = ${created.id}`)[0];
+    expect(paid.status).toBe('active');
+    invalidateAttributionCache();
+    // the calls of the subscription, as the gateway exports them
+    const calls = (n, statuses) =>
+      statuses.map((status, i) => ({
+        '@type': 'GatewayEvent',
+        '@timestamp': Date.now(),
+        reqId: `usage-${RUN}-${n}-${i}`,
+        url: `http://${DOMAIN}/premium`,
+        method: 'GET',
+        status,
+        duration: 3,
+        identity: { identityType: 'APIKEY', identity: `key-${RUN}`, metadata: {}, apiRef: { api: state.apiId, plan: METERED, sub: created.id } },
+        route: { id: `route_${RUN}`, metadata: { 'Otoroshi-Api-Ref': state.apiId } },
+      }));
+    const ingest = (events) => fetch(`${ROOT}/ingest`, { method: 'POST', headers: { authorization: `Bearer ${config.ingest.token}` }, body: events.map((e) => JSON.stringify(e)).join('\n') });
+    // another ingester (the one of the stack) may hold the lock for a moment
+    const push = async () => {
+      for (let i = 0; i < 20; i++) {
+        const run = await runRetention({ settleMs: 0 });
+        if (!run.skipped && !run.usage?.skipped) return run;
+        await Bun.sleep(500);
+      }
+      throw new Error('the usage was never pushed');
+    };
+    const mine = () => [...billing.paymentProvider().meterEvents.values()].filter((e) => e.customer === paid.payment.customer && e.eventName === 'api_calls');
+    expect((await ingest(calls(1, [200, 201, 404, 500]))).status).toBe(200);
+    await push();
+    // two calls answered below 400: one report, sent to the linked account, its id the identifier
+    expect(mine().map((e) => [e.accountId, e.value])).toEqual([[state.account, 2]]);
+    const usage = await ok('GET', `/workspaces/${WS}/subscriptions/${created.id}/usage`);
+    expect(usage).toMatchObject({ sent: 2, pending: 0, failed: 0 });
+    expect(usage.reports[0].id).toBe(mine()[0].identifier);
+    // nothing new: nothing sent; the next calls, in the next batch
+    await push();
+    expect(mine().length).toBe(1);
+    await ingest(calls(2, [200, 200, 200, 429]));
+    await push();
+    expect(mine().map((e) => e.value).sort()).toEqual([2, 3]);
+    // the consumer sees what it is billed for
+    expect((await (await portal(`/subscriptions/${created.id}/usage`)).json())).toMatchObject({ sent: 5, pending: 0 });
+    await portal(`/subscriptions/${created.id}/close`, { method: 'POST', body: '{}' });
   });
 
   test('closed in the product, it is cancelled at Stripe; the account then unlinks', async () => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, Link } from '../../shared/router.jsx';
-import { AUTH_LABELS, fmtDate, fmtRelative } from '../../shared/lib.js';
+import { AUTH_LABELS, fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, DiffView, Drawer, Empty, Field, Icon, Loader, Secret, Select, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
@@ -131,6 +131,42 @@ function EndDate({ s, busy, act }) {
         </div>
       )}
       <p className="hint">{tr('From that day on, the subscription expires: its keys are disabled on the gateway.')}</p>
+    </div>
+  );
+}
+
+// the usage of a subscription to a plan with a usage price, pushed to the meter of Stripe batch by batch
+function UsageReports({ id }) {
+  const { wapi } = useWs();
+  const state = useLoad(() => wapi.get(`/subscriptions/${id}/usage`), [id]);
+  if (!state.data?.reports?.length) return null;
+  const u = state.data;
+  return (
+    <div className="col gap-6">
+      <div className="label">{tr('Usage billed')}</div>
+      <div className="small muted">{tr('{0} calls sent to the meter of Stripe · {1} waiting · {2} refused', [fmtNumber(u.sent), fmtNumber(u.pending), fmtNumber(u.failed)])}</div>
+      <div className="table-wrap">
+        <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          <thead>
+            <tr>
+              <th>{tr('Batch')}</th>
+              <th className="right">{tr('Calls')}</th>
+              <th>{tr('Status')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {u.reports.slice(0, 10).map((r) => (
+              <tr key={r.id} title={r.error || r.id}>
+                <td className="nowrap muted">{fmtDate(r.created_at)}</td>
+                <td className="right">{fmtNumber(r.value)}</td>
+                <td>
+                  <StatusBadge status={r.status === 'sent' ? 'active' : r.status === 'failed' ? 'error' : 'pending'} label={tr(r.status)} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -294,6 +330,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               </div>
             )}
             </fieldset>
+
+            {s.payment?.provider_subscription && <UsageReports id={s.id} />}
 
             <div className="col gap-6">
               <div className="label">{tr('Credentials')}</div>

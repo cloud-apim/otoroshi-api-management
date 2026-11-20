@@ -155,6 +155,16 @@ export function defaultThreatProtection() {
   };
 }
 
+// the usage part of a paid plan: the calls of each subscription counted from the computed path and
+// pushed in batches to a meter of the payment provider, whose metered price (`priceRef`) bills them.
+// `counts`: success — the calls answered below 400; served — every call the gateway served (below
+// 500, a 429 of the quotas aside). `unitAmount` is what the portal shows: the price is the provider's
+export const USAGE_COUNTS = ['success', 'served'];
+
+export function defaultUsagePricing() {
+  return { enabled: false, priceRef: '', meterEventName: '', counts: 'success', unitAmount: 0 };
+}
+
 export function defaultPlan(overrides = {}) {
   const kind = overrides?.auth?.kind || 'apikey';
   return {
@@ -188,7 +198,7 @@ export function defaultPlan(overrides = {}) {
     terms: { enabled: false, url: '', pageSlug: '' },
     usageStatement: { enabled: false, required: false, prompt: 'What do you plan to build with this API?' },
     // free, or a price held by a payment provider. Frozen in the snapshot, never projected.
-    pricing: { kind: 'free', amount: 0, currency: 'EUR', interval: 'month', provider: 'stripe', priceRef: '', graceDays: 7 },
+    pricing: { kind: 'free', amount: 0, currency: 'EUR', interval: 'month', provider: 'stripe', priceRef: '', graceDays: 7, usage: defaultUsagePricing() },
     metadata: {},
     ...overrides,
     auth: overrides.auth
@@ -265,6 +275,7 @@ export function normalizeDraft(input = {}) {
     plan.terms = { ...defaultPlan().terms, ...(p.terms || {}) };
     plan.usageStatement = { ...defaultPlan().usageStatement, ...(p.usageStatement || {}) };
     plan.pricing = { ...defaultPlan().pricing, ...(p.pricing || {}) };
+    plan.pricing.usage = { ...defaultUsagePricing(), ...(p.pricing?.usage || {}) };
     plan.threatProtection = { ...defaultThreatProtection(), ...(p.threatProtection || {}) };
     plan.threatProtection.loginPaths = asArray(plan.threatProtection.loginPaths).map(String).filter((x) => x.trim());
     plan.acl = asArray(p.acl);
@@ -382,6 +393,15 @@ export function validateDraft(draft) {
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)
       errors.push({ path: `plans[${i}].resourceFilter`, message: `plan "${p.name}" filters resources but allows none` });
+    const usage = p.pricing.usage;
+    if (usage.enabled) {
+      if (p.pricing.kind !== 'paid') errors.push({ path: `plans[${i}].pricing.usage`, message: `plan "${p.name}": a usage price is the price of a paid plan` });
+      if (!String(usage.priceRef || '').trim())
+        errors.push({ path: `plans[${i}].pricing.usage.priceRef`, message: `plan "${p.name}": the usage is billed by a metered price of the payment provider — name it (price_…)` });
+      if (!String(usage.meterEventName || '').trim())
+        errors.push({ path: `plans[${i}].pricing.usage.meterEventName`, message: `plan "${p.name}": the usage is pushed to a meter of the payment provider — name its event` });
+      if (!USAGE_COUNTS.includes(usage.counts)) errors.push({ path: `plans[${i}].pricing.usage.counts`, message: `plan "${p.name}": the usage counts one of ${USAGE_COUNTS.join(', ')}` });
+    }
     const tp = p.threatProtection;
     if (tp.enabled) {
       Object.entries(THREAT_MODES).forEach(([k, modes]) => {

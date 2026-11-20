@@ -41,6 +41,7 @@ bun cli/apim.js help
 | `subscriptions list <ws> [--status s] [--api id]` | |
 | `subscriptions accept\|reject\|suspend\|resume\|close <ws> <id> [--message m]` | |
 | `subscriptions ending <ws> <id> <date\|none>` | the end date of a subscription: past, it expires; `none` renews it |
+| `subscriptions usage <ws> <id>` | the usage billed: the batches of calls sent to the meter of the payment provider |
 | `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan |
 | `applications list <ws>` | |
 | `drift <ws>` | run drift detection and print the reports |

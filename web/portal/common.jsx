@@ -113,3 +113,12 @@ export function Section({ title, children, aside }) {
     </section>
   );
 }
+
+// the price of a plan as it applies: free, a recurring price, a price per call billed by its usage, or both
+export function priceLabel(t, pricing) {
+  if (!pricing) return t('plan.free');
+  const usage = pricing.usage ? t('plan.usage', { amount: pricing.usage.unit_amount, currency: pricing.currency }) : '';
+  if (usage && !(Number(pricing.amount) > 0)) return usage;
+  const flat = t('plan.price', { amount: pricing.amount, currency: pricing.currency, interval: pricing.interval });
+  return usage ? `${flat} + ${usage}` : flat;
+}

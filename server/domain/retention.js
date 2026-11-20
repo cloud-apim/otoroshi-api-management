@@ -7,6 +7,7 @@
 
 import { adb, db } from '../db/index.js';
 import { policy } from './ingest-policy.js';
+import { billedUntil, pushUsage } from '../payments/usage.js';
 
 // the upper bounds of the duration buckets, in ms: bucket 0 is < 5 ms, the last one ≥ 10 s
 export const DURATION_BOUNDS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
@@ -133,7 +134,10 @@ export async function sweep(p, now = new Date()) {
   const ai = before(p.retention.aiDays);
   const rollups = before(p.retention.rollupsDays);
   const raw = before(p.retention.rawDays);
-  const deletedCalls = await purge(() => adb`delete from calls where id in (select id from calls where at < ${calls} and id <= ${rolled.calls || 0} limit 20000)`);
+  // a call is deleted once rolled up, and once billed when a usage price bills the calls
+  const billed = await billedUntil();
+  const keep = Math.min(rolled.calls || 0, billed ?? Infinity);
+  const deletedCalls = await purge(() => adb`delete from calls where id in (select id from calls where at < ${calls} and id <= ${keep} limit 20000)`);
   // before this date, calls may be missing: the dashboards read the rollups there
   if (deletedCalls)
     await db`insert into settings (key, value) values ('ingest.purged_before', ${{ at: calls.toISOString() }})
@@ -156,8 +160,10 @@ export async function runRetention({ now = new Date(), settleMs } = {}) {
   const started = Date.now();
   const rolled = await rollUp({ settleMs });
   if (rolled === null) return { skipped: 'another runner holds the lock' };
+  // the usage of the subscriptions with a usage price, pushed to the payment provider
+  const usage = await pushUsage(settleMs === undefined ? {} : { settleMs }).catch((e) => ({ error: e.message }));
   const deleted = await sweep(p, now);
-  const run = { at: new Date().toISOString(), ms: Date.now() - started, rolled, deleted };
+  const run = { at: new Date().toISOString(), ms: Date.now() - started, rolled, usage, deleted };
   await db`insert into settings (key, value) values ('ingest.last_run', ${run}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   return run;
 }

@@ -302,6 +302,14 @@ function QuotaRow({ label, current, total, remaining }) {
   );
 }
 
+// the calls a subscription to a plan with a usage price is billed for, as reported to the billing
+function UsageBilled({ sub }) {
+  const { t } = useI18n();
+  const state = useLoad(() => api.get(`/subscriptions/${sub.id}/usage`).catch(() => null), [sub.id]);
+  if (!state.data?.reports?.length) return null;
+  return <div className="muted small">{t('subs.usage', { sent: fmtNumber(state.data.sent), pending: fmtNumber(state.data.pending) })}</div>;
+}
+
 function Quotas({ sub }) {
   const { t } = useI18n();
   const [state, setState] = useState(null);
@@ -575,6 +583,7 @@ function SubscriptionCard({ sub, app, onChange }) {
           </div>
         ))}
         {sub.status === 'active' && creds.length > 0 && <Quotas sub={sub} />}
+        {sub.payment?.provider_subscription && <UsageBilled sub={sub} />}
         {sub.payment?.status === 'past_due' && <Callout kind="warning">{t('subs.pastDue', { days: sub.payment.grace_days ?? 7 })}</Callout>}
         {sub.payment?.suspended_for_payment && sub.status === 'suspended' && <Callout kind="negative">{t('subs.unpaid')}</Callout>}
         {sub.payment?.customer && ['active', 'suspended'].includes(sub.status) && (

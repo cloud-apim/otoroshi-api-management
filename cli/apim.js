@@ -46,6 +46,7 @@ ${SETUP_HELP}
   subscriptions list <ws> [--status s] [--api id]
   subscriptions accept|reject|suspend|resume|close <ws> <id> [--message m]
   subscriptions ending <ws> <id> <date|none>   the end date of a subscription (past: it expires; none: renewed)
+  subscriptions usage <ws> <id>        the usage billed: the batches of calls sent to the meter of the payment provider
   subscriptions transfer <ws> <id> --plan <plan> [--api <api>]
   applications list <ws>
   drift <ws>                            run drift detection and print the reports
@@ -272,6 +273,12 @@ async function main() {
       if (['accept', 'reject', 'suspend', 'resume', 'close', 'resync'].includes(sub)) {
         const r = await call('POST', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/${sub}`, { message: flags.message || '' });
         return console.log(`subscription ${r.id || a2}: ${r.status || 'done'}`);
+      }
+      if (sub === 'usage') {
+        const u = await call('GET', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/usage`);
+        if (OUTPUT !== 'table') return print(u);
+        console.log(`${u.sent} calls sent · ${u.pending} waiting · ${u.failed} refused`);
+        return print(u.reports, [['at', 'created_at'], ['calls', 'value'], ['meter', 'meter_event_name'], ['status', 'status'], ['error', (r) => r.error || ''], ['id', 'id']]);
       }
       if (sub === 'ending') {
         const at = need(a3, '<date|none>');

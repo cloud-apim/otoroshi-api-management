@@ -36,6 +36,7 @@ import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exp
 import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
+import { usageOf } from '../payments/usage.js';
 
 const r = new Router();
 
@@ -917,6 +918,13 @@ r.get('/workspaces/:ws/subscriptions/:sub', async ({ ctx, params }) => {
     can_see_credentials: canSee,
     drift,
   };
+});
+
+// the usage of a subscription pushed to the meter of the payment provider, batch by batch
+r.get('/workspaces/:ws/subscriptions/:sub/usage', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const sub = await subscriptions.getSubscription(c.workspace.id, params.sub);
+  return usageOf(sub.id);
 });
 
 const subAction = (fn) => async ({ ctx, params, body }) => {

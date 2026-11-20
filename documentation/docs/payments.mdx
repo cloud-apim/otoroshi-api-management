@@ -74,6 +74,31 @@ to **pay** the move, through a Checkout of the paid plan, or to drop it. When St
 paid, the subscription moves to the paid plan with the same key, and its payment is followed as
 any other. Either side can drop a move that waits for its payment.
 
+## Billing the usage
+
+A paid plan can bill the **usage** of its subscriptions, with its recurring price or alone (a price
+of 0): **Plan › Pricing › Usage price**. It names a **metered price** at Stripe (`price_…`) and the
+**event name of its meter**, on the Stripe account of the workspace, and what is counted: the calls
+answered below 400 (`success`), or every call the gateway served — below 500, a `429` of the quotas
+aside (`served`). The Checkout then bills the metered price beside the recurring one. The price of a
+call the portal shows is the one the plan says: keep it equal to the metered price at Stripe.
+
+The usage is **counted from the computed path** — every call, never sampled — and **pushed to the
+meter in batches**, after the rollups, every five minutes: the gateway never sends an event per call.
+A batch is the calls received since the last one, taken by id like the rollups — a late call goes
+in the next batch, none is counted twice — and makes one report per subscription, at the price of the
+plan the calls were made on, in one transaction with the move of the watermark. A report is then
+sent once — its id is the identifier Stripe dedupes on — and replayed until it is. The calls are
+kept until they are billed.
+
+The reports of a subscription are on its drawer in the console (**Usage billed**), in the admin API
+(`GET …/subscriptions/<id>/usage`) and the CLI (`subscriptions usage`); the consumer sees, on the
+application in the portal, the calls reported to the billing. A plan with a usage price is refused
+when the payment provider of the installation cannot meter.
+
+Billing is where usage can be added up across the APIs of an application, after the fact: the
+invoice adds, the enforcement does not — each subscription keeps its own quotas.
+
 ## Lost webhooks, replayed ones
 
 A webhook is **checked by its signature** (and its age: five minutes, against a replay), **kept
