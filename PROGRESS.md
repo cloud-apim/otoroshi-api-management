@@ -45,9 +45,12 @@ Last update: 2026-11-20.
 
 ## Next, in the proposed order
 
-1. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
-3. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
-4. **R-48** — compaction of old rollups (only if the volume calls for it).
+1. **R-51** — the analytics of the console to the level of the API management consoles of the market (owner's request, 2026-11-20).
+2. **R-52** — the request log as a page of its own, with its filters and a CSV export.
+3. **R-53** — the analytics and the logs of an application on the portal.
+4. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
+5. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
+6. **R-48** — compaction of old rollups (only if the volume calls for it).
 
 Then the large ones: R-10, R-19.
 
@@ -57,10 +60,13 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (8)**
+**Doable (11)**
 
 | # | Effort | What |
 |---|---|---|
+| R-51 | M | Console analytics: filters, timeframes, latency and throughput, distributions over time, the tops (owner's request) |
+| R-52 | M | The request log as a page: filters, detail, CSV export, reached from every dashboard |
+| R-53 | M | Portal analytics and logs of an application (owner's request) |
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
@@ -106,6 +112,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
+| R-53 | §8, D-32 | **Analytics and logs of an application on the portal** (owner's request): the dashboard of R-51 restricted to the consumer's own applications — timeframes, the tops (paths, apis, failed and slow apis), status and latency over time, hits by api — and its request log with filters and a CSV export | M | |
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 
@@ -127,6 +134,8 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
+| R-51 | D-32 | **Console analytics, to the level of the API management consoles of the market** (owner's request): filters in the url by status class, plan, application and api; timeframes from 5 minutes to 90 days and a custom range, refresh and auto-refresh; KPIs — calls, requests per second, minimum, average, p95 and maximum latency, gateway overhead; over time — calls by status class, latency (backend and gateway), hits by application and by api; the tops — applications, apis, failed apis (5xx), slow apis and applications, paths and templated paths, hosts (a column to add at ingestion); the same dashboard on the workspace, an api and an application; "view the logs" carrying the filters. Charts per the dataviz method (palette, legend from 2 series, table view) | M | |
+| R-52 | D-33 | **The request log as a page of its own**: filters (status, method, path, api, plan, application, consumer, timeframe), the detail of a call, a CSV export of the filtered calls (traced in the audit trail, personal data), reached from every dashboard with its filters | M | |
 | R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
 
 ### Monetisation
