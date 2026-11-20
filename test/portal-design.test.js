@@ -6,6 +6,10 @@
 // Needs postgres (mise run up); nothing reaches the gateway.
 
 import { describe, test, expect, beforeAll, afterAll, setDefaultTimeout } from 'bun:test';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 setDefaultTimeout(60000);
 
@@ -156,5 +160,55 @@ describe('the design of a portal', () => {
     expect(edit.body.error).toContain('managed by catalog:design');
     // the same document again: nothing changes
     expect(await ok('POST', ws('/portal/apply?publish=true&managed_by=catalog:design'), next)).toMatchObject({ action: 'unchanged', version: 'unchanged' });
+  });
+
+  test('a folder synchronised with the cli: pulled, edited, pushed — the assets it holds already named by their digest', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'apim-portal-'));
+    const env = { ...process.env, APIM_URL: ROOT, APIM_TOKEN: 'design-test-token' };
+    const cli = async (...args) => {
+      const p = Bun.spawn(['bun', 'cli/apim.js', ...args], { env, stdout: 'pipe', stderr: 'pipe' });
+      const [code, out, err] = [await p.exited, await new Response(p.stdout).text(), await new Response(p.stderr).text()];
+      return { code, out: out + err };
+    };
+    try {
+      const pulled = await cli('portal', 'pull', WS, dir);
+      expect(pulled.code).toBe(0);
+      for (const f of ['portal.yaml', 'templates/home.en.md', 'assets/logo.png', 'assets/banner.png']) expect(existsSync(join(dir, f))).toBe(true);
+      expect(await readFile(join(dir, 'templates/home.en.md'), 'utf8')).toBe('# {% $portal.title %}');
+      expect(await readFile(join(dir, 'portal.yaml'), 'utf8')).toContain('file: templates/home.en.md');
+      await writeFile(join(dir, 'templates/home.en.md'), '# Built from a folder');
+      const uploads = async () => (await ok('GET', ws('/audit?action=portal.asset.upload'))).total;
+      const before = await uploads();
+      const pushed = await cli('portal', 'push', WS, dir, '--publish');
+      expect(pushed.out).toMatch(new RegExp(`portal ${WS}: draft updated, version \\d+`));
+      expect((await portal()).design.templates.home.en).toBe('# Built from a folder');
+      // its assets were known: none was sent again
+      expect(await uploads()).toBe(before);
+      // pushed by hand, the design is no longer owned by the catalog
+      expect((await ok('GET', ws('/portal/design'))).managedBy).toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('the portal of a remote catalog: previewed, applied and published by its sync, owned by the catalog', async () => {
+    const files = {
+      '/site/portal.yaml': `apiVersion: otoroshi-apim.io/v1\nkind: Portal\nmetadata: { name: ${WS} }\nspec:\n  mode: templates\n  texts: { title: { en: From the catalog } }\n  templates:\n    home: { en: { file: templates/home.en.md } }\n`,
+      '/site/templates/home.en.md': '# Served by a catalog',
+    };
+    const source = Bun.serve({ port: 0, fetch: (req) => (files[new URL(req.url).pathname] ? new Response(files[new URL(req.url).pathname]) : new Response('', { status: 404 })) });
+    try {
+      const cat = await ok('POST', ws('/catalogs'), { name: 'site', kind: 'http', url: `http://localhost:${source.port}/site/portal.yaml`, mode: 'publish' });
+      const preview = await ok('POST', ws(`/catalogs/${cat.id}/preview`));
+      expect(preview.items).toEqual([expect.objectContaining({ kind: 'portal', slug: WS, action: 'update' })]);
+      const sync = await ok('POST', ws(`/catalogs/${cat.id}/sync`));
+      expect(sync.ok).toBe(true);
+      expect((await portal()).design).toMatchObject({ mode: 'templates', texts: { title: { en: 'From the catalog' } }, templates: { home: { en: '# Served by a catalog' } } });
+      expect((await ok('GET', ws('/portal/design'))).managedBy).toBe(`catalog:${cat.id}`);
+      expect((await ok('POST', ws(`/catalogs/${cat.id}/preview`))).items[0].action).toBe('unchanged');
+      await ok('DELETE', ws(`/catalogs/${cat.id}`));
+    } finally {
+      source.stop(true);
+    }
   });
 });

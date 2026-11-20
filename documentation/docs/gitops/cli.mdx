@@ -40,6 +40,9 @@ bun cli/apim.js help
 | `apply <ws> -f <file> [--publish] [--deploy] [--managed-by <source>] [--comment c]` | upsert declarative documents — the content of their pages given by a file is read beside the file |
 | `subscriptions list <ws> [--status s] [--api id]` | |
 | `subscriptions accept\|reject\|suspend\|resume\|close <ws> <id> [--message m]` | |
+| `portal pull <ws> [dir]` | the design of the portal (its draft) into a folder: `portal.yaml`, and its pages, templates, style sheet, script and assets beside it (`./portal` by default) |
+| `portal push <ws> [dir] [--publish] [--comment c] [--watch]` | the folder into the draft of the design — a version with `--publish`; `--watch` pushes again on every change and prints the preview link; the assets the portal holds already are named by their digest, not sent again |
+| `portal preview\|publish\|versions <ws>` | a link to the draft for an hour, a version from the draft, the versions |
 | `policy-groups list\|upgrade <ws> [<group>] [--publish] [--deploy]` | the shared policy groups, their APIs behind; `upgrade` moves those to the latest version — their drafts, and on demand their snapshots and deployments |
 | `shared-resources list\|upgrade <ws> [<resource>] [--publish] [--deploy]` | the same for the shared resources |
 | `dictionaries list\|get\|set\|refresh\|delete <ws> [<name>]` | the dictionaries of a workspace; `set -f values.json` writes a static one |

@@ -20,7 +20,10 @@ in the manner of Otoroshi's remote catalogs. Configure them in **Workspace setti
 
 An HTTP catalog can send a header (a token, for instance); an S3 catalog signs its requests with an
 access key id and its secret. Both are sealed at rest ([secrets at rest](../install.mdx#secrets-at-rest))
-and never shown again. Documents of another kind than `Api` are ignored and counted.
+and never shown again. A catalog reconciles the `Api` documents, and the `Portal` document of its
+workspace — the design of its portal, the same folder `apim portal pull` writes —, applied and
+published by a sync unless the catalog writes drafts only, then owned by the catalog. Documents of
+another kind are ignored and counted.
 
 The content of a page can be [a file beside the document](./declarative-documents.mdx#the-pages):
 a git catalog reads it from the repository, an S3 catalog under its prefix, an HTTP catalog from the

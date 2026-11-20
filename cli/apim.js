@@ -7,9 +7,10 @@
 // The compiled binary is the command line too: otoroshi-apim <command> (server/bin.js).
 
 import YAML from 'yaml';
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
-import { inlinePageFiles } from '../server/domain/page-files.js';
+import { inlinePageFiles, inlinePortalFiles } from '../server/domain/page-files.js';
 import { SETUP_HELP, failed, formatSetup, setupRequest } from './setup.js';
 
 const HELP = `apim — otoroshi-api-management command line
@@ -45,6 +46,14 @@ ${SETUP_HELP}
   promote <ws> <api> --to <url> --to-token <token> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy] [--replace-draft]
                                        send a snapshot of this installation to the next one
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
+  portal pull <ws> [dir]               the design of the portal (its draft) into a folder: portal.yaml, its
+                                       pages, templates, styles, script and assets beside (default ./portal)
+  portal push <ws> [dir] [--publish] [--comment c] [--watch]
+                                       the folder into the draft of the design (and a version with --publish);
+                                       --watch pushes again on every change, and prints the preview link
+  portal preview <ws>                  a link to the portal showing the draft, for an hour
+  portal publish <ws> [--comment c]    a version of the design, from the draft
+  portal versions <ws>
   policy-groups list <ws>              the groups, their latest version, the apis that pin them and the ones behind
   policy-groups upgrade <ws> <group> [--publish] [--deploy]
                                        move the apis behind to its latest version: their drafts, and on demand
@@ -130,6 +139,58 @@ function readDocs(file) {
     return Array.isArray(d) ? d : [d];
   }
   return YAML.parseAllDocuments(text).map((d) => d.toJSON()).filter(Boolean);
+}
+
+// the design of a portal written into a folder: its texts as files, its assets as files, portal.yaml
+// naming them — the same folder a remote catalog reads
+async function pullPortal(w, dir) {
+  const doc = await call('GET', `/workspaces/${need(w, '<ws>')}/portal/document`);
+  const spec = doc.spec;
+  const files = [];
+  const put = (rel, content) => {
+    const target = join(dir, rel);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+    files.push(rel);
+    return { file: rel };
+  };
+  const texts = (o, name) => Object.fromEntries(Object.entries(o || {}).filter(([, t]) => t).map(([lang, t]) => [lang, put(`${name}.${lang}.md`, t)]));
+  const out = { apiVersion: doc.apiVersion, kind: doc.kind, metadata: { name: doc.metadata.name }, spec: { ...spec } };
+  out.spec.home = { ...spec.home, markdown: texts(spec.home?.markdown, 'home'), blocks: (spec.home?.blocks || []).map((b, i) => (b.content ? { ...b, content: texts(b.content, `home/block-${i + 1}`) } : b)) };
+  out.spec.pages = (spec.pages || []).map((p) => ({ ...p, content: texts(p.content, `pages/${p.slug}`) }));
+  out.spec.templates = Object.fromEntries(Object.entries(spec.templates || {}).map(([k, v]) => [k, texts(v, `templates/${k}`)]));
+  out.spec.css = spec.css ? put('styles.css', spec.css) : '';
+  out.spec.script = spec.script ? put('script.js', spec.script) : '';
+  out.spec.assets = [];
+  for (const a of spec.assets || []) {
+    const got = await call('GET', `/workspaces/${w}/portal/assets/${a.hash}`);
+    put(a.path, Buffer.from(got.data, 'base64'));
+    out.spec.assets.push({ path: a.path, file: a.path });
+  }
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'portal.yaml'), `# the design of the portal of ${w}: apim portal push ${w} ${dir} writes it back\n${YAML.stringify(out)}`);
+  return `portal ${w}: portal.yaml and ${files.length} file(s) in ${dir}`;
+}
+
+// a folder pushed into the draft of the design: its files inlined, the assets the portal already holds
+// named by their digest only
+async function pushPortal(w, dir, { publish = false, comment = '' } = {}) {
+  const file = join(dir, 'portal.yaml');
+  if (!existsSync(file)) throw new Error(`no portal.yaml in ${dir}: apim portal pull ${w} ${dir} writes one`);
+  const doc = YAML.parse(readFileSync(file, 'utf8'));
+  await inlinePortalFiles(doc, { readText: async (f) => readFileSync(join(dir, f), 'utf8'), readBytes: async (f) => readFileSync(join(dir, f)) });
+  const remote = await call('GET', `/workspaces/${need(w, '<ws>')}/portal/document`).catch(() => null);
+  const known = new Set((remote?.spec?.assets || []).map((a) => a.hash));
+  doc.spec.assets = (doc.spec.assets || []).map((a) => {
+    if (!a.data) return a;
+    const hash = createHash('sha256').update(Buffer.from(a.data, 'base64')).digest('hex');
+    return known.has(hash) ? { path: a.path, hash } : a;
+  });
+  const q = new URLSearchParams();
+  if (publish) q.set('publish', 'true');
+  if (comment) q.set('comment', comment);
+  const res = await call('POST', `/workspaces/${w}/portal/apply?${q}`, doc);
+  return `portal ${w}: draft ${res.action}${res.version ? `, version ${res.version}` : ''}`;
 }
 
 // the documents of a file, the content of their pages given by file read beside it
@@ -275,6 +336,38 @@ async function main() {
       const res = await call('POST', `${ws(sub)}/apply?${q}`, docs);
       res.forEach((r) => console.log(`api ${r.api.slug} ${r.api.version} ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));
       return;
+    }
+    case 'portal': {
+      // the design of a portal as a folder: portal.yaml and the files it names, beside it
+      const dir = a2 && !String(a2).startsWith('-') ? a2 : 'portal';
+      if (sub === 'pull') return console.log(await pullPortal(a1, dir));
+      if (sub === 'push') {
+        const once = () => pushPortal(a1, dir, { publish: !!flags.publish, comment: flags.comment }).then(console.log, (e) => console.error(e.message));
+        if (!flags.watch) return console.log(await pushPortal(a1, dir, { publish: !!flags.publish, comment: flags.comment }));
+        await once();
+        console.log(`preview: ${(await call('POST', `${ws(a1)}/portal/preview`)).url}`);
+        console.log(`watching ${dir} — every change is pushed to the draft`);
+        let timer = null;
+        watch(dir, { recursive: true }, () => {
+          clearTimeout(timer);
+          timer = setTimeout(once, 300);
+        });
+        return new Promise(() => {});
+      }
+      if (sub === 'preview') return console.log((await call('POST', `${ws(a1)}/portal/preview`)).url);
+      if (sub === 'publish') {
+        const v = await call('POST', `${ws(a1)}/portal/publish`, { comment: flags.comment || '' });
+        return console.log(`portal ${a1}: version ${v.number} published`);
+      }
+      if (sub === 'versions')
+        return print((await call('GET', `${ws(a1)}/portal/versions`)).items, [
+          ['version', 'number'],
+          ['mode', 'mode'],
+          ['published', 'published_at'],
+          ['by', 'published_by_email'],
+          ['comment', 'comment'],
+        ]);
+      throw new Error('portal pull|push|preview|publish|versions');
     }
     case 'policy-groups':
     case 'shared-resources': {

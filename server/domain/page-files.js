@@ -21,3 +21,51 @@ export async function inlinePageFiles(doc, read) {
   }
   return doc;
 }
+
+// A portal document names files too — its home, its pages, its templates, its style sheet, its
+// script as text, its assets as bytes —, read the same way, from paths relative to the document
+const ASSET_EXT = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon', svg: 'image/svg+xml', woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf', css: 'text/css' };
+export const MAX_ASSET_FILE = 2 * 1024 * 1024;
+
+function safe(file, what) {
+  const f = String(file || '');
+  if (!f || f.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(f) || f.split(/[\\/]/).includes('..')) throw badRequest(`${what}: a path relative to the document, within its source (${f})`);
+  return f;
+}
+const isFile = (v) => v && typeof v === 'object' && !Array.isArray(v) && 'file' in v;
+
+export async function inlinePortalFiles(doc, { readText, readBytes }) {
+  const spec = doc?.spec;
+  if (!spec || typeof spec !== 'object') return doc;
+  const text = async (v, what) => {
+    if (!isFile(v)) return v;
+    const t = await readText(safe(v.file, what));
+    if (Buffer.byteLength(t) > MAX_PAGE_FILE) throw badRequest(`${what}: ${v.file} is larger than ${MAX_PAGE_FILE / 1024} KB`);
+    return t;
+  };
+  const localized = async (o, what) => {
+    if (!o || typeof o !== 'object' || isFile(o)) return text(o, what);
+    for (const [lang, v] of Object.entries(o)) o[lang] = await text(v, `${what} (${lang})`);
+    return o;
+  };
+  if (spec.home) {
+    spec.home.markdown = await localized(spec.home.markdown, 'the home');
+    for (const [i, b] of (spec.home.blocks || []).entries()) if (b?.content) b.content = await localized(b.content, `block #${i + 1} of the home`);
+  }
+  for (const p of spec.pages || []) if (p?.content) p.content = await localized(p.content, `page ${p.slug}`);
+  for (const k of Object.keys(spec.templates || {})) spec.templates[k] = await localized(spec.templates[k], `the template ${k}`);
+  if (spec.css) spec.css = await text(spec.css, 'the style sheet');
+  if (spec.script) spec.script = await text(spec.script, 'the script');
+  if (Array.isArray(spec.assets))
+    for (const a of spec.assets) {
+      if (!isFile(a)) continue;
+      const bytes = Buffer.from(await readBytes(safe(a.file, `asset ${a.path}`)));
+      if (bytes.length > MAX_ASSET_FILE) throw badRequest(`asset ${a.path}: ${a.file} is larger than ${MAX_ASSET_FILE / 1024 / 1024} MB`);
+      const path = a.path || a.file;
+      const type = ASSET_EXT[String(path).split('.').pop().toLowerCase()];
+      if (!type) throw badRequest(`asset ${path}: an asset is an image, a font or a style sheet`);
+      delete a.file;
+      Object.assign(a, { path, contentType: type, data: bytes.toString('base64') });
+    }
+  return doc;
+}

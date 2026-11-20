@@ -35,6 +35,31 @@ describe('git remote catalog', () => {
     }
   });
 
+  test('the portal of the workspace: its pages, templates and assets read from the repository', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'apim-catalog-test-'));
+    try {
+      git(repo, 'init', '-q', '-b', 'main');
+      await mkdir(join(repo, 'portal', 'templates'), { recursive: true });
+      await mkdir(join(repo, 'portal', 'assets'), { recursive: true });
+      await writeFile(join(repo, 'portal', 'templates', 'home.en.md'), '# From git');
+      await writeFile(join(repo, 'portal', 'styles.css'), 'body { color: #222; }');
+      await writeFile(join(repo, 'portal', 'assets', 'logo.png'), Buffer.from('iVBORw0KGgo=', 'base64'));
+      await writeFile(
+        join(repo, 'portal', 'portal.yaml'),
+        'apiVersion: otoroshi-apim.io/v1\nkind: Portal\nmetadata: { name: default }\nspec:\n  mode: templates\n  templates:\n    home: { en: { file: templates/home.en.md } }\n  css: { file: styles.css }\n  assets:\n    - { path: assets/logo.png, file: assets/logo.png }\n'
+      );
+      git(repo, 'add', '.');
+      git(repo, 'commit', '-q', '-m', 'portal');
+      const [doc] = (await fetchGit({ url: `file://${repo}` })).docs;
+      expect(doc.kind).toBe('Portal');
+      expect(doc.spec.templates.home.en).toBe('# From git');
+      expect(doc.spec.css).toBe('body { color: #222; }');
+      expect(doc.spec.assets[0]).toEqual({ path: 'assets/logo.png', contentType: 'image/png', data: 'iVBORw0KGgo=' });
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   test('the content of a page given by a file beside the document, read from the repository', async () => {
     const repo = await mkdtemp(join(tmpdir(), 'apim-catalog-test-'));
     const page = (file) => `apiVersion: otoroshi-apim.io/v1\nkind: Api\nmetadata: { name: docs }\nspec:\n  version: 1.0.0\n  pages:\n    - slug: start\n      title: { en: Start }\n      content: { en: { file: ${file} } }\n`;

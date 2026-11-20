@@ -18,6 +18,9 @@ import { openValues, sealValues } from './secrets.js';
 import { diff } from './diff.js';
 import { normalizeDraft } from './model.js';
 import { API_KIND, apiDocument, applyApiDocument, docKey, inlinePageFiles } from './exchange.js';
+import { inlinePortalFiles } from './page-files.js';
+import { PORTAL_KIND, applyPortalDocument, draftOf, normalizeDesign } from './portal-design.js';
+import { createHash } from 'node:crypto';
 import { refsToIds } from './references.js';
 
 export const MODES = ['draft', 'publish', 'deploy'];
@@ -101,9 +104,11 @@ async function fetchHttp(cat) {
     if (url.origin !== base.origin) throw new Error(`${file} leaves the origin of the catalog`);
     const r = await fetch(url, { headers: cat.headers || {}, signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error(`${url} answered ${r.status}`);
-    return r.text();
+    return r;
   };
-  for (const d of docs) await inlinePageFiles(d, read);
+  const readText = async (file) => (await read(file)).text();
+  const readBytes = async (file) => Buffer.from(await (await read(file)).arrayBuffer());
+  for (const d of docs) await (d?.kind === PORTAL_KIND ? inlinePortalFiles(d, { readText, readBytes }) : inlinePageFiles(d, readText));
   return { docs, revision: res.headers.get('etag') || res.headers.get('last-modified') || null };
 }
 
@@ -134,12 +139,15 @@ export async function fetchGit(cat) {
     const docs = [];
     for (const f of await walk(root)) {
       // the files of the pages, beside the document, within the repository
-      const read = async (file) => {
-        const target = join(dirname(f), file);
-        if (relative(dir, target).startsWith('..')) throw new Error(`${file} leaves the repository`);
-        return readFile(target, 'utf8');
+      const target = (file) => {
+        const t = join(dirname(f), file);
+        if (relative(dir, t).startsWith('..')) throw new Error(`${file} leaves the repository`);
+        return t;
       };
-      for (const d of parseDocuments(await readFile(f, 'utf8'), f)) docs.push({ ...(await inlinePageFiles(d, read)), _source: relative(dir, f) });
+      const readText = async (file) => readFile(target(file), 'utf8');
+      const readBytes = async (file) => readFile(target(file));
+      for (const d of parseDocuments(await readFile(f, 'utf8'), f))
+        docs.push({ ...(await (d?.kind === PORTAL_KIND ? inlinePortalFiles(d, { readText, readBytes }) : inlinePageFiles(d, readText))), _source: relative(dir, f) });
     }
     return { docs, revision: rev };
   } finally {
@@ -172,12 +180,15 @@ export async function fetchS3(cat) {
   const docs = [];
   for (const o of files) {
     // the files of the pages, beside the document, under the prefix of the catalog
-    const read = async (file) => {
+    const keyOf = (file) => {
       const key = posix.normalize(posix.join(posix.dirname(o.key), file));
       if (key.startsWith('..') || (prefix && !key.startsWith(prefix.replace(/\/$/, '')))) throw new Error(`${file} leaves the prefix of the catalog`);
-      return client.file(key).text();
+      return key;
     };
-    for (const d of parseDocuments(await client.file(o.key).text(), o.key)) docs.push({ ...(await inlinePageFiles(d, read)), _source: o.key });
+    const readText = async (file) => client.file(keyOf(file)).text();
+    const readBytes = async (file) => Buffer.from(await client.file(keyOf(file)).arrayBuffer());
+    for (const d of parseDocuments(await client.file(o.key).text(), o.key))
+      docs.push({ ...(await (d?.kind === PORTAL_KIND ? inlinePortalFiles(d, { readText, readBytes }) : inlinePageFiles(d, readText))), _source: o.key });
   }
   const revision = new Bun.CryptoHasher('sha256').update(files.map((o) => `${o.key}:${o.eTag}`).join('\n')).digest('hex').slice(0, 16);
   return { docs, revision };
@@ -185,10 +196,12 @@ export async function fetchS3(cat) {
 
 async function fetchSource(cat) {
   const res = cat.kind === 'git' ? await fetchGit(cat) : cat.kind === 's3' ? await fetchS3(cat) : await fetchHttp(cat);
-  // only api documents are reconciled; anything else in the source is reported, not guessed at
+  // the api documents and the portal of the workspace are reconciled; anything else in the source is
+  // reported, not guessed at
   const apis = res.docs.filter((d) => d?.kind === API_KIND);
-  const ignored = res.docs.length - apis.length;
-  return { ...res, apis, ignored };
+  const portals = res.docs.filter((d) => d?.kind === PORTAL_KIND);
+  const ignored = res.docs.length - apis.length - portals.length;
+  return { ...res, apis, portals, ignored };
 }
 
 // ---------------------------------------------------------------- preview and sync
@@ -246,7 +259,24 @@ export async function preview(cat, fetched = null) {
   }
   const managed = await db`select slug, version from apis where workspace_id = ${ws.id} and managed_by = ${marker}`;
   for (const m of managed) if (!seen.has(`${m.slug}@${m.version}`)) items.push({ slug: m.slug, version: m.version, action: cat.prune ? 'delete' : 'orphaned' });
-  return { revision: src.revision, ignored: src.ignored, mode: cat.mode, items, docs: src.apis };
+  // the portal of the workspace, one at most: its design compared with the draft
+  if ((src.portals || []).length > 1) items.push({ kind: 'portal', slug: ws.slug, action: 'error', error: 'a catalog describes the portal of its workspace once' });
+  else if (src.portals?.length) {
+    const doc = src.portals[0];
+    const owner = ws.portal?.designManagedBy;
+    if (owner && owner !== marker) items.push({ kind: 'portal', slug: ws.slug, action: 'conflict', reason: `managed by ${owner}` });
+    else {
+      try {
+        const spec = doc.spec || {};
+        const assets = Object.fromEntries((spec.assets || []).map((a) => [a.path, a.hash || createHash('sha256').update(Buffer.from(String(a.data || ''), 'base64')).digest('hex')]));
+        const changes = diff(await draftOf(ws), normalizeDesign({ ...spec, assets }));
+        items.push({ kind: 'portal', slug: ws.slug, action: changes.length || owner !== marker ? 'update' : 'unchanged', changes: changes.slice(0, 30), source: doc._source || null });
+      } catch (e) {
+        items.push({ kind: 'portal', slug: ws.slug, action: 'error', error: e.message, source: doc._source || null });
+      }
+    }
+  }
+  return { revision: src.revision, ignored: src.ignored, mode: cat.mode, items, docs: src.apis, portal: src.portals?.length === 1 ? src.portals[0] : null };
 }
 
 export async function sync(ctx, cat, { deployments, apis }) {
@@ -264,6 +294,12 @@ export async function sync(ctx, cat, { deployments, apis }) {
         continue;
       }
       try {
+        // the portal: its design applied, and published unless the catalog writes drafts only
+        if (item.kind === 'portal') {
+          const res = await applyPortalDocument(sysCtx, ws, plan.portal, { managedBy: marker, publish: cat.mode !== 'draft', comment: `catalog ${cat.name}${plan.revision ? ` @ ${String(plan.revision).slice(0, 12)}` : ''}` });
+          out.push({ ...item, ...(res.version !== undefined ? { version: res.version } : {}) });
+          continue;
+        }
         if (item.action === 'delete') {
           const api = await apis.getApi(ws.id, item.slug);
           if ((await deployments.deploymentStatus(api)).on_gateway) await deployments.purgeFromGateway(api);
