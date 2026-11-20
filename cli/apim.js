@@ -45,6 +45,12 @@ ${SETUP_HELP}
   promote <ws> <api> --to <url> --to-token <token> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy] [--replace-draft]
                                        send a snapshot of this installation to the next one
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
+  policy-groups list <ws>              the groups, their latest version, the apis that pin them and the ones behind
+  policy-groups upgrade <ws> <group> [--publish] [--deploy]
+                                       move the apis behind to its latest version: their drafts, and on demand
+                                       their snapshots and their deployments (where they run)
+  shared-resources list <ws>
+  shared-resources upgrade <ws> <resource> [--publish] [--deploy]
   dictionaries list <ws>
   dictionaries get <ws> <name>         its values, and the expression that reads them
   dictionaries set <ws> <name> -f values.json [--description d]   a static dictionary, created or replaced
@@ -269,6 +275,35 @@ async function main() {
       const res = await call('POST', `${ws(sub)}/apply?${q}`, docs);
       res.forEach((r) => console.log(`api ${r.api.slug} ${r.api.version} ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));
       return;
+    }
+    case 'policy-groups':
+    case 'shared-resources': {
+      // the shared objects an api pins at a version: listed, and the apis behind upgraded on demand
+      const path = cmd === 'policy-groups' ? 'policy-groups' : 'shared-resources';
+      const list = await call('GET', `${ws(a1)}/${path}`);
+      if (sub === 'list')
+        return print(list, [
+          ['name', 'name'],
+          ['version', (x) => (x.last_version ? `v${x.last_version}` : 'draft only')],
+          ['apis', (x) => x.usage.length],
+          ['behind', (x) => x.usage.filter((u) => u.behind).length],
+        ]);
+      if (sub === 'upgrade') {
+        const ref = need(a2, cmd === 'policy-groups' ? '<group>' : '<resource>');
+        const found = list.find((x) => x.id === ref || x.name === ref);
+        if (!found) throw new Error(`unknown ${cmd === 'policy-groups' ? 'policy group' : 'shared resource'} ${ref}`);
+        const res = await call('POST', `${ws(a1)}/${path}/${found.id}/upgrade`, { publish: !!flags.publish || !!flags.deploy, deploy: !!flags.deploy });
+        if (!res.results.length) return console.log(`${found.name}: no api behind v${res.latest}`);
+        return print(res.results, [
+          ['api', (r) => `${r.name} ${r.version}`],
+          ['from', (r) => `v${r.from.join(', v')}`],
+          ['to', (r) => `v${r.to}`],
+          ['action', 'action'],
+          ['snapshot', (r) => r.snapshot || ''],
+          ['note', (r) => r.reason || ''],
+        ]);
+      }
+      throw new Error(`${cmd} list|upgrade`);
     }
     case 'dictionaries': {
       const w = a1;

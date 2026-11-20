@@ -1,12 +1,92 @@
 import React, { useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { fmtDate, fmtRelative } from '../../shared/lib.js';
-import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, Switch, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { PluginModal, PluginRow, moveItem } from './api/tabs.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
+
+const UPGRADE_KIND = { upgraded: 'accent', published: 'positive', deployed: 'positive', skipped: 'warning', error: 'negative' };
+
+// the apis behind a shared object — a policy group, a shared resource — moved to its latest version:
+// each by its own draft, and on demand its own snapshot and deployment. Nothing propagates by itself
+export function UpgradeModal({ path, name, latest, behind, onClose, onDone }) {
+  const { wapi, slug } = useWs();
+  const toast = useToast();
+  const [publish, setPublish] = useState(false);
+  const [deploy, setDeploy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(null);
+  const list = done ? done.results : behind;
+  const page = useLocalPaging(list, { local: true, size: 10, text: (u) => `${u.name} ${u.version} ${u.action || ''} ${u.reason || ''}` });
+  const run = async () => {
+    setBusy(true);
+    try {
+      setDone(await wapi.post(`${path}/upgrade`, { publish, deploy: publish && deploy }));
+      onDone?.();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title={tr('Upgrade the APIs behind to v{0}', [latest])}
+      onClose={onClose}
+      footer={
+        done ? (
+          <button className="btn" onClick={onClose}>
+            {tr('Close')}
+          </button>
+        ) : (
+          <button className="btn primary" disabled={busy || !behind.length} onClick={run}>
+            <Tr text={'Upgrade {0} API(s)'} args={[behind.length]} />
+          </button>
+        )
+      }
+    >
+      <div className="col gap-12">
+        <p className="muted small">
+          <Tr text={'{0} stays where each API pinned it until it is upgraded: an edit of its draft, then, when asked, a snapshot and a deployment of its own — every step in the audit trail.'} args={[<span className="bold">{name}</span>]} />
+        </p>
+        {!done && (
+          <div className="col gap-6">
+            <Switch checked={publish} onChange={setPublish} label={tr('Also publish a snapshot of each API')} />
+            <Switch checked={publish && deploy} disabled={!publish} onChange={setDeploy} label={tr('and deploy it, where it runs')} />
+            <Callout kind="info">{tr('An API managed by a source is upgraded at its source; one you do not manage is left to its team; one whose draft holds other unpublished changes is upgraded in its draft only — publishing would ship them along.')}</Callout>
+          </div>
+        )}
+        {list.length > 1 && <ListToolbar paging={page} placeholder={tr('search apis, versions')} />}
+        <div className="card">
+          {page.items.map((u) => (
+            <div key={u.id} className="list-item" style={{ display: 'flex', alignItems: 'flex-start' }}>
+              <div className="grow">
+                <Link to={`/ws/${slug}/apis/${u.id}`} className="bold">
+                  {u.name} <span className="faint">{u.version}</span>
+                </Link>
+                {u.reason && <div className="faint tiny">{u.reason}</div>}
+              </div>
+              <span className="small muted">
+                <Tr text={'v{0} → v{1}'} args={[(u.from || u.pinned).join(', v'), latest]} />
+              </span>
+              {u.action && (
+                <span className={`badge ${UPGRADE_KIND[u.action] || ''}`} style={{ marginLeft: 6 }}>
+                  {tr(u.action)}
+                  {u.snapshot ? ` #${u.snapshot}` : ''}
+                </span>
+              )}
+            </div>
+          ))}
+          {!page.items.length && <div className="card-body muted small">{page.q ? tr('No matching API') : tr('No API behind.')}</div>}
+          <Pager paging={page} total={page.total} />
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 // shared policy groups: a named composition of Otoroshi plugins with its own lifecycle
 export function ApisTabs({ current }) {
@@ -141,6 +221,7 @@ export function PolicyGroupPage({ id }) {
   const [draft, setDraft] = useState(null);
   const [editing, setEditing] = useState(null);
   const [comment, setComment] = useState('');
+  const [upgrading, setUpgrading] = useState(false);
   const usedPage = useLocalPaging(state.data?.usage, { prefix: 'used', size: 10, text: (u) => `${u.name} ${u.version} ${u.id} v${u.pinned.join(' v')} ${u.behind ? `behind v${u.latest}` : 'latest'}` });
   const versionsPage = useLocalPaging(state.data?.versions, { prefix: 'versions', size: 10, text: (v) => `v${v.number} ${v.comment || ''} ${v.published_by_email || ''}` });
   return (
@@ -238,6 +319,11 @@ export function PolicyGroupPage({ id }) {
                   <div className="card">
                     <div className="card-head">
                       <h3 className="grow">{tr('Used by')}</h3>
+                      {g.usage.some((u) => u.behind) && (
+                        <button className="btn sm" onClick={() => setUpgrading(true)}>
+                          <Icon name="refresh" /> <Tr text={'Upgrade the {0} behind'} args={[g.usage.filter((u) => u.behind).length]} />
+                        </button>
+                      )}
                     </div>
                     {g.usage.length ? (
                       <>
@@ -320,6 +406,16 @@ export function PolicyGroupPage({ id }) {
                     setDraft(editing.index < 0 ? [...plugins, p] : plugins.map((x, j) => (j === editing.index ? p : x)));
                     setEditing(null);
                   }}
+                />
+              )}
+              {upgrading && (
+                <UpgradeModal
+                  path={`/policy-groups/${g.id}`}
+                  name={g.name}
+                  latest={g.last_version}
+                  behind={g.usage.filter((u) => u.behind)}
+                  onClose={() => setUpgrading(false)}
+                  onDone={state.reload}
                 />
               )}
             </>

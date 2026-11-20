@@ -33,6 +33,22 @@ The group page lists the APIs that use it and which ones are behind; the flow of
 *"v2 available · Upgrade"*. Upgrading is an edit of the API's draft, then a publication — what runs
 only ever changes through a snapshot.
 
+A fix still travels, without propagating by itself:
+
+- **publishing a version tells the teams of the APIs behind**, in their notifications, with a link
+  to the group;
+- **Upgrade the N behind**, on the group page, moves them to the latest version at once — each API
+  by its own draft and, when asked, **its own snapshot** and **its own deployment** (only where it
+  runs), every step in the audit trail. An API the upgrade cannot touch is reported, not forced:
+  managed by a source (a catalog, Kubernetes: upgrade it there), not managed by you (left to its
+  team), or whose draft holds other unpublished changes — its draft is upgraded, its publication
+  left to its team, since publishing would ship those changes along.
+
+```bash
+bun cli/apim.js policy-groups list default
+bun cli/apim.js policy-groups upgrade default "Company security headers" --deploy
+```
+
 A flow referencing a group without a version is a draft error, and a group cannot be deleted while
 an API uses it.
 

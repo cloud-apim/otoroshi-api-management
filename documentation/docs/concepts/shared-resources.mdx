@@ -20,8 +20,10 @@ Like a [shared policy group](./shared-policy-groups.mdx), it creates no gateway 
   derive from a description of its own — the JWT verifier of a `jwt` plan, the auth module of an
   `oauth2-remote` plan, marked as the product's, reconciled, removed with the API;
 - **publishing a new version changes nothing** that runs: the page of the resource lists the APIs
-  that pin it, and the ones **behind** the latest version, upgraded one by one, each by a new
-  snapshot;
+  that pin it, and the ones **behind** the latest version; publishing tells their teams, and
+  **Upgrade the N behind** moves them, each by its own draft and, when asked, its own snapshot and
+  deployment — as for a [shared policy group](./shared-policy-groups.mdx#pinned-never-floating)
+  (`apim shared-resources upgrade <ws> <resource> [--publish] [--deploy]`);
 - a resource that a plan still pins cannot be deleted;
 - its name is one in the workspace: a [declarative document](../gitops/declarative-documents.mdx#what-it-pins-by-name)
   pins it by that name (`sharedResource: { name: Corporate IdP, version: 1 }`), and so moves from one

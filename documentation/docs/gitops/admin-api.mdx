@@ -49,7 +49,7 @@ addressed by id or slug.
 | applications | `GET POST …/applications`, `GET PUT DELETE …/applications/<app>` |
 | dictionaries | `GET POST …/dictionaries`, `GET PUT DELETE …/dictionaries/<name or id>`, `POST …/refresh` |
 | subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync,payment}`, `POST …/ending` (`{"at": "2027-01-31T00:00:00Z"}`, or `null`), `PUT …/metadata`, `POST …/credentials/<cred>/rotate`, `GET …/usage` (the usage billed) |
-| composition | `GET POST …/policy-groups`, `GET PUT DELETE …/policy-groups/<pg>`, `POST …/publish` |
+| composition | `GET POST …/policy-groups`, `GET PUT DELETE …/policy-groups/<pg>`, `POST …/publish`, `POST …/upgrade` (`{publish, deploy, apis}`: the APIs behind moved to the latest version) · the same for `…/shared-resources` |
 | metadata | `GET PUT …/metadata-fields` |
 | GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
 | observability | `GET …/analytics`, `GET …/analytics/calls`, `GET …/audit`, `GET POST …/drift`, `GET …/search`, `GET …/home` |

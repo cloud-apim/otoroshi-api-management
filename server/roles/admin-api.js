@@ -1246,6 +1246,12 @@ r.post('/workspaces/:ws/policy-groups/:pg/publish', async ({ ctx, params, body }
   const c = await ws(ctx, params);
   return policyGroups.publishGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg), body);
 });
+// the apis behind upgraded to the latest version: their drafts, and on demand their snapshots and
+// deployments; each api the caller manages, the others reported
+r.post('/workspaces/:ws/policy-groups/:pg/upgrade', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return policyGroups.upgradeGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg), { publish: !!body.publish, deploy: !!body.deploy, apis: Array.isArray(body.apis) ? body.apis : null });
+});
 r.delete('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);
   await policyGroups.deleteGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg));
@@ -1275,6 +1281,10 @@ r.put('/workspaces/:ws/shared-resources/:res', async ({ ctx, params, body }) => 
 r.post('/workspaces/:ws/shared-resources/:res/publish', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin', 'producer']);
   return sharedResources.publishResource(c, await sharedResources.getResource(c.workspace.id, params.res), body);
+});
+r.post('/workspaces/:ws/shared-resources/:res/upgrade', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return sharedResources.upgradeResource(c, await sharedResources.getResource(c.workspace.id, params.res), { publish: !!body.publish, deploy: !!body.deploy, apis: Array.isArray(body.apis) ? body.apis : null });
 });
 r.delete('/workspaces/:ws/shared-resources/:res', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);

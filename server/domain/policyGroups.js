@@ -10,6 +10,7 @@ import { badRequest, conflict, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { requireFreeName } from './references.js';
+import { notifyBehind, upgradePins } from './pins.js';
 
 function normalizePlugins(plugins) {
   return (Array.isArray(plugins) ? plugins : []).map((p) => ({
@@ -60,7 +61,20 @@ export async function publishGroup(ctx, group, { comment = '' } = {}) {
   const rows = await db`insert into policy_group_versions (id, group_id, number, plugins, comment, published_by)
     values (${newId('pgv')}, ${group.id}, ${number}, ${group.draft.plugins}, ${comment}, ${ctx.user?.id || null}) returning *`;
   await audit(ctx, { action: 'policy_group.publish', workspaceId: group.workspace_id, entityKind: 'policy_group', entityId: group.id, summary: `policy group ${group.name} v${number} published` });
+  // nothing runs differently: the teams of the apis behind are told, the upgrade is theirs
+  await notifyBehind({ workspaceId: group.workspace_id, label: 'policy group', name: group.name, number, usage: await groupUsage(group.workspace_id, group.id), link: `/policy-groups/${group.id}` });
   return rows[0];
+}
+
+// the apis behind moved to the latest version of the group, each by its own draft — and, when
+// asked, its own snapshot and deployment
+export async function upgradeGroup(ctx, group, { publish = false, deploy = false, apis = null } = {}) {
+  const latest = (await db`select max(number) as n from policy_group_versions where group_id = ${group.id}`)[0]?.n || 0;
+  const rewrite = (draft) => ({
+    ...draft,
+    flows: draft.flows.map((f) => ({ ...f, plugins: f.plugins.map((p) => (p.group === group.id && p.version < latest ? { ...p, version: latest } : p)) })),
+  });
+  return upgradePins(ctx, { workspaceId: group.workspace_id, kind: 'policy_group', label: 'policy group', name: group.name, entityId: group.id, latest, usage: await groupUsage(group.workspace_id, group.id), rewrite, publish, deploy, apiIds: apis });
 }
 
 export async function listVersions(groupId) {

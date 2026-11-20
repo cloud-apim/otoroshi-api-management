@@ -11,6 +11,7 @@ import { badRequest, conflict, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { requireFreeName } from './references.js';
+import { notifyBehind, upgradePins } from './pins.js';
 
 export const RESOURCE_KINDS = ['authorization-server'];
 // the kinds of plan a kind of resource serves
@@ -76,7 +77,23 @@ export async function publishResource(ctx, r, { comment = '' } = {}) {
   const rows = await db`insert into resource_versions (id, resource_id, number, content, comment, published_by)
     values (${newId('resv')}, ${r.id}, ${number}, ${r.draft}, ${comment}, ${ctx.user?.id || null}) returning *`;
   await audit(ctx, { action: 'resource.publish', workspaceId: r.workspace_id, entityKind: 'resource', entityId: r.id, summary: `resource ${r.name} v${number} published` });
+  // nothing runs differently: the teams of the apis behind are told, the upgrade is theirs
+  await notifyBehind({ workspaceId: r.workspace_id, label: 'shared resource', name: r.name, number, usage: await resourceUsage(r.workspace_id, r.id), link: `/shared-resources/${r.id}` });
   return rows[0];
+}
+
+// the apis behind moved to the latest version of the resource, each by its own draft — and, when
+// asked, its own snapshot and deployment
+export async function upgradeResource(ctx, r, { publish = false, deploy = false, apis = null } = {}) {
+  const latest = (await db`select max(number) as n from resource_versions where resource_id = ${r.id}`)[0]?.n || 0;
+  const rewrite = (draft) => ({
+    ...draft,
+    plans: draft.plans.map((p) => {
+      const pin = p.auth?.config?.sharedResource;
+      return pin?.id === r.id && pin.version < latest ? { ...p, auth: { ...p.auth, config: { ...p.auth.config, sharedResource: { ...pin, version: latest } } } } : p;
+    }),
+  });
+  return upgradePins(ctx, { workspaceId: r.workspace_id, kind: 'resource', label: 'shared resource', name: r.name, entityId: r.id, latest, usage: await resourceUsage(r.workspace_id, r.id), rewrite, publish, deploy, apiIds: apis });
 }
 
 export async function listVersions(resourceId) {

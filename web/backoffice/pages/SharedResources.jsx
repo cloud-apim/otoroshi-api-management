@@ -5,7 +5,7 @@ import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, 
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
-import { ApisTabs } from './PolicyGroups.jsx';
+import { ApisTabs, UpgradeModal } from './PolicyGroups.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
 const EMPTY = { issuer: '', jwksUrl: '', discoveryUrl: '', userInfoUrl: '', clientId: '', clientSecret: '', scope: 'openid' };
@@ -144,6 +144,7 @@ function ResourceEditor({ r, reload }) {
   const [c, setC] = useState({ ...EMPTY, ...(r.draft || {}) });
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const set = (patch) => setC((x) => ({ ...x, ...patch }));
   const usedPage = useLocalPaging(r.usage, { prefix: 'used', size: 10, text: (u) => `${u.name} ${u.version} ${u.id} v${u.pinned.join(' v')} ${u.behind ? 'behind' : ''}` });
   const versionsPage = useLocalPaging(r.versions, { prefix: 'versions', size: 10, text: (v) => `v${v.number} ${v.comment || ''} ${v.published_by_email || ''}` });
@@ -279,6 +280,11 @@ function ResourceEditor({ r, reload }) {
           <div className="card">
             <div className="card-head">
               <h3 className="grow">{tr('Used by')}</h3>
+              {r.usage.some((u) => u.behind) && (
+                <button className="btn sm" onClick={() => setUpgrading(true)}>
+                  <Icon name="refresh" /> <Tr text={'Upgrade the {0} behind'} args={[r.usage.filter((u) => u.behind).length]} />
+                </button>
+              )}
             </div>
             {r.usage.length ? (
               <>
@@ -343,6 +349,16 @@ function ResourceEditor({ r, reload }) {
           </div>
         </div>
       </div>
+      {upgrading && (
+        <UpgradeModal
+          path={`/shared-resources/${r.id}`}
+          name={r.name}
+          latest={r.versions[0]?.number}
+          behind={r.usage.filter((u) => u.behind)}
+          onClose={() => setUpgrading(false)}
+          onDone={reload}
+        />
+      )}
     </div>
   );
 }
