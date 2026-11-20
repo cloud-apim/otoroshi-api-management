@@ -1,7 +1,7 @@
 ---
 sidebar_position: 4
 title: Remote catalogs
-description: An HTTP file or a git repository becomes the source of truth of a set of APIs, reconciled on a schedule.
+description: An HTTP file, a git repository or an object store becomes the source of truth of a set of APIs, reconciled on a schedule.
 ---
 
 # Remote catalogs
@@ -16,9 +16,11 @@ in the manner of Otoroshi's remote catalogs. Configure them in **Workspace setti
 |---|---|
 | `http` | one URL serving [declarative documents](./declarative-documents.mdx): a multi-document YAML file, or JSON (a document, a list, or `{"items": […]}`) |
 | `git` | every `.yaml`, `.yml` and `.json` file of a repository directory, on a branch or tag; the commit is the revision |
+| `s3` | every `.yaml`, `.yml` and `.json` object under a prefix of a bucket — `s3://<bucket>/<prefix>` — of AWS S3 or of any object store that speaks its api (an endpoint and a region); the digest of the keys and their etags is the revision |
 
-An HTTP catalog can send a header (a token, for instance). Documents of another kind than `Api`
-are ignored and counted.
+An HTTP catalog can send a header (a token, for instance); an S3 catalog signs its requests with an
+access key id and its secret. Both are sealed at rest ([secrets at rest](../install.mdx#secrets-at-rest))
+and never shown again. Documents of another kind than `Api` are ignored and counted.
 
 ## What a sync does
 

@@ -617,12 +617,49 @@ function CatalogModal({ value, onClose, onSaved }) {
           <Input value={c.name} onChange={set('name')} />
         </Field>
         <Field label={tr('Kind')}>
-          <Select value={c.kind} onChange={set('kind')} options={[{ value: 'http', label: tr('HTTP (one url, yaml or json)') }, { value: 'git', label: tr('Git repository') }]} />
+          <Select
+            value={c.kind}
+            onChange={set('kind')}
+            options={[
+              { value: 'http', label: tr('HTTP (one url, yaml or json)') },
+              { value: 'git', label: tr('Git repository') },
+              { value: 's3', label: tr('Object store (S3)') },
+            ]}
+          />
         </Field>
       </div>
-      <Field label={tr('Url')} hint={c.kind === 'git' ? tr('https or file url of the repository') : tr('a yaml (multi-document) or json file of api documents')}>
-        <Input value={c.url} onChange={set('url')} mono />
+      <Field
+        label={tr('Url')}
+        hint={
+          c.kind === 'git'
+            ? tr('https or file url of the repository')
+            : c.kind === 's3'
+              ? tr('s3://<bucket>/<prefix>: every yaml and json object under the prefix')
+              : tr('a yaml (multi-document) or json file of api documents')
+        }
+      >
+        <Input value={c.url} onChange={set('url')} mono placeholder={c.kind === 's3' ? tr('s3://catalog/apis/') : ''} />
       </Field>
+      {c.kind === 's3' && (
+        <>
+          <div className="grid-2">
+            <Field label={tr('Endpoint')} hint={tr('empty for AWS; the url of another object store that speaks its api')}>
+              <Input value={c.options?.endpoint || ''} onChange={(v) => set('options')({ ...(c.options || {}), endpoint: v })} mono placeholder={tr('https://s3.fr-par.scw.cloud')} />
+            </Field>
+            <Field label={tr('Region')}>
+              <Input value={c.options?.region || ''} onChange={(v) => set('options')({ ...(c.options || {}), region: v })} mono placeholder={tr('eu-west-3')} />
+            </Field>
+          </div>
+          <div className="grid-2">
+            <Field label={tr('Access key id')}>
+              <Input value={c.headers?.access_key_id || ''} onChange={(v) => set('headers')({ ...(c.headers || {}), access_key_id: v })} mono />
+            </Field>
+            <Field label={tr('Secret access key')} hint={tr('sealed at rest, never shown again')}>
+              <Input value={c.headers?.secret_access_key || ''} onChange={(v) => set('headers')({ ...(c.headers || {}), secret_access_key: v })} mono type="password" />
+            </Field>
+          </div>
+        </>
+      )}
       {c.kind === 'git' && (
         <div className="grid-2">
           <Field label={tr('Branch or tag')}>
@@ -648,7 +685,7 @@ function CatalogModal({ value, onClose, onSaved }) {
         <Field label={tr('Interval (seconds)')}>
           <NumberInput value={c.interval_seconds} onChange={set('interval_seconds')} />
         </Field>
-        <Field label={tr('Header (e.g. a token)')}>
+        {c.kind !== 's3' && <Field label={tr('Header (e.g. a token)')}>
           <Input
             value={Object.entries(c.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
             onChange={(v) => {
@@ -658,7 +695,7 @@ function CatalogModal({ value, onClose, onSaved }) {
             mono
             placeholder={tr('Authorization: Bearer …')}
           />
-        </Field>
+        </Field>}
       </div>
       <div className="row gap-24">
         <Switch checked={c.enabled} onChange={set('enabled')} label={tr('Scheduled sync')} />

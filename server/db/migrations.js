@@ -465,6 +465,13 @@ alter table payment_events add column account text;
 alter table payment_events add column processed_at timestamptz;
 `,
   },
+  {
+    version: '0013_catalog_options',
+    sql: `
+-- what a kind of catalog needs beside its url: the endpoint and the region of an object store
+alter table remote_catalogs add column options jsonb not null default '{}';
+`,
+  },
 ];
 
 export const analyticsMigrations = [

@@ -135,6 +135,41 @@ describe('at rest, end to end', () => {
     await call('DELETE', `/audit/exporters/${ex.id}`);
   });
 
+  test('the keys of an s3 catalog are sealed, masked in what the api answers, and open the store', async () => {
+    const doc = 'apiVersion: otoroshi-apim.io/v1\nkind: Api\nmetadata: { name: harbour }\nspec: { name: Harbour, version: 1.0.0 }\n';
+    const seen = [];
+    const store = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const u = new URL(req.url);
+        seen.push(req.headers.get('authorization') || '');
+        if (u.pathname === '/catalog/')
+          return new Response(`<ListBucketResult><Name>catalog</Name><KeyCount>1</KeyCount><IsTruncated>false</IsTruncated><Contents><Key>apis/harbour.yaml</Key><ETag>"1"</ETag><Size>${doc.length}</Size></Contents></ListBucketResult>`);
+        return new Response(doc);
+      },
+    });
+    try {
+      const cat = await call('POST', `/workspaces/${WS}/catalogs`, {
+        name: 'store',
+        kind: 's3',
+        url: 's3://catalog/apis/',
+        options: { endpoint: `http://127.0.0.1:${store.port}`, region: 'us-east-1' },
+        headers: { access_key_id: `AKIA${RUN}`, secret_access_key: `s3-secret-${RUN}` },
+        enabled: false,
+      });
+      expect(cat.headers).toEqual({ access_key_id: '••••••', secret_access_key: '••••••' });
+      expect(cat.options).toEqual({ endpoint: `http://127.0.0.1:${store.port}`, region: 'us-east-1' });
+      const row = (await db`select headers from remote_catalogs where id = ${cat.id}`)[0];
+      expect(isSealed(row.headers.secret_access_key)).toBe(true);
+      const preview = await call('POST', `/workspaces/${WS}/catalogs/${cat.id}/preview`);
+      expect(preview.items.map((i) => i.slug)).toEqual(['harbour']);
+      expect(seen.every((a) => a.includes(`Credential=AKIA${RUN}/`))).toBe(true);
+      await call('DELETE', `/workspaces/${WS}/catalogs/${cat.id}`);
+    } finally {
+      store.stop(true);
+    }
+  });
+
   test('a secret stored in clear before the key was set is sealed at start', async () => {
     const { resealAll } = await import('../server/domain/secrets-store.js');
     const ex = await call('POST', '/audit/exporters', { name: `legacy ${RUN}`, url: 'http://127.0.0.1:9/legacy', headers: { Authorization: 'Bearer legacy' }, enabled: false });

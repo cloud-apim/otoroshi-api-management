@@ -30,12 +30,14 @@ Last update: 2026-11-20.
   - R-13: a producer gives a subscription an end date (console, admin api, cli); from that day it expires — on the gateway, its keys disabled — and a later date, or none, renews it with the same keys; the workers expire what is due every minute; a paid subscription takes none (`test/expiry.test.js`).
   - R-38: the interface tested in a headless Chromium (`test/ui.test.js`): every page of the console opens without an error or a 5xx, a producer makes an api and a plan from the console and saves the draft, the console speaks French, a consumer subscribes from the portal and sees its credentials. `mise run test` builds the interfaces first.
   - R-47: a move from a free plan to a paid one, once agreed, waits for the consumer's payment — the subscription on its free plan, its key working — and is applied when the Checkout of the paid plan is paid, with the same key; either side can drop it (`test/payments.test.js`).
+  - R-27: remote catalogs from an object store — `s3://<bucket>/<prefix>`, AWS or any store that speaks its api (endpoint, region) — every yaml and json object under the prefix, the digest of the keys and etags as revision, the access key sealed at rest (`test/catalogs.test.js`, `test/secrets.test.js`, against a local store that speaks the api).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-27** — remote catalogs from S3.
-2. **R-42** — free pages of the portal.
+1. **R-42** — free pages of the portal.
+2. **R-22** — metadata field labels in several languages.
+3. **R-23** — the shared request composer on the portal.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -45,11 +47,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (18)**
+**Doable (17)**
 
 | # | Effort | What |
 |---|---|---|
-| R-27 | S | Remote catalogs from S3 |
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
 | R-32 | S | Correlation id carried to the backends |
 | R-22 | S | Metadata field labels in several languages |
@@ -122,7 +123,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
 
@@ -188,7 +188,7 @@ waits for the data plane rather than working around it.
 | D-25 authentication | ✅ | OIDC console and portal verified against a dev IdP; "via Otoroshi" verified end to end: a person signed in on a basic auth module of the gateway, in front of the console route the setup makes, is the user of the console (`test/setup.test.js`) |
 | D-26 application, expected `client_id`, `id_ref` | ✅ | client certificates read and checked (console and portal), derived as certificates of the gateway while an mtls subscription is active (`test/derived-objects.test.js`); a subscription of a token or certificate plan carries no consumer identity on Otoroshi (G-17, MAIF/otoroshi#2937): its ApiSubscription carries the application's client id as metadata meanwhile |
 | D-27 console navigation | ✅ | gateway status at the bottom of the sidebar (left open by D-37: R-26): failed projections, waiting ones and drift counted apart, leading to the first of them; a failed task says what it works on, is retried or dismissed, and dismissed by itself when its object is gone |
-| D-28 administrable by program | 🟡 | admin API ✅, CLI ✅, remote catalogs http/git ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests and the Helm chart (linted, rendered) validated by a k3s api server — `test/kubernetes.test.js`; object store: R-27 |
+| D-28 administrable by program | ✅ | admin API ✅, CLI ✅, remote catalogs http/git/s3 ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests and the Helm chart (linted, rendered) validated by a k3s api server — `test/kubernetes.test.js` |
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | multi-api credential: R-12 |

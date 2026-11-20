@@ -34,18 +34,24 @@ export async function getCatalog(workspaceId, id) {
   return opened(rows[0]);
 }
 
+export const KINDS = ['http', 'git', 's3'];
+
 function checkInput(input) {
-  if (!['http', 'git'].includes(input.kind)) throw badRequest('kind must be http or git');
+  if (!KINDS.includes(input.kind)) throw badRequest(`kind must be one of ${KINDS.join(', ')}`);
   if (!input.url) throw badRequest('url is required');
+  if (input.kind === 's3' && !/^s3:\/\/[^/]+/.test(input.url)) throw badRequest('the url of an s3 catalog is s3://<bucket>[/<prefix>]');
   if (input.mode && !MODES.includes(input.mode)) throw badRequest(`mode must be one of ${MODES.join(', ')}`);
 }
+
+// an object store: its endpoint (empty for AWS) and its region
+const optionsOf = (c) => (c.kind === 's3' ? { endpoint: c.options?.endpoint || '', region: c.options?.region || '' } : {});
 
 export async function createCatalog(ctx, workspaceId, input) {
   checkInput(input);
   const id = newId('cat');
-  const rows = await db`insert into remote_catalogs (id, workspace_id, name, kind, url, ref, path, headers, mode, prune, interval_seconds, enabled)
+  const rows = await db`insert into remote_catalogs (id, workspace_id, name, kind, url, ref, path, headers, options, mode, prune, interval_seconds, enabled)
     values (${id}, ${workspaceId}, ${input.name || input.url}, ${input.kind}, ${input.url}, ${input.ref || null}, ${input.path || null},
-      ${sealValues(input.headers)}, ${input.mode || 'draft'}, ${!!input.prune}, ${input.interval_seconds || 300}, ${input.enabled !== false}) returning *`;
+      ${sealValues(input.headers)}, ${optionsOf(input)}, ${input.mode || 'draft'}, ${!!input.prune}, ${input.interval_seconds || 300}, ${input.enabled !== false}) returning *`;
   await audit(ctx, { action: 'catalog.create', workspaceId, entityKind: 'catalog', entityId: id, summary: `remote catalog ${rows[0].name} (${input.kind}) created` });
   return opened(rows[0]);
 }
@@ -54,7 +60,7 @@ export async function updateCatalog(ctx, cat, patch) {
   const next = { ...cat, ...patch };
   checkInput(next);
   const rows = await db`update remote_catalogs set name = ${next.name}, kind = ${next.kind}, url = ${next.url}, ref = ${next.ref || null},
-      path = ${next.path || null}, headers = ${sealValues(next.headers)}, mode = ${next.mode}, prune = ${!!next.prune},
+      path = ${next.path || null}, headers = ${sealValues(next.headers)}, options = ${optionsOf(next)}, mode = ${next.mode}, prune = ${!!next.prune},
       interval_seconds = ${next.interval_seconds || 300}, enabled = ${next.enabled !== false}, updated_at = now()
     where id = ${cat.id} returning *`;
   await audit(ctx, { action: 'catalog.update', workspaceId: cat.workspace_id, entityKind: 'catalog', entityId: cat.id, summary: `remote catalog ${next.name} updated` });
@@ -124,8 +130,36 @@ export async function fetchGit(cat) {
   }
 }
 
+// an object store (S3, or one that speaks its api): every yaml and json object under the prefix of
+// the url; the credentials are the access key id and secret kept with the headers, sealed at rest.
+// The revision is the digest of the keys and their etags: it changes when an object does.
+export async function fetchS3(cat) {
+  const m = /^s3:\/\/([^/]+)\/?(.*)$/.exec(cat.url);
+  if (!m) throw new Error('the url of an s3 catalog is s3://<bucket>[/<prefix>]');
+  const [, bucket, prefix] = m;
+  const h = cat.headers || {};
+  const client = new Bun.S3Client({
+    bucket,
+    ...(cat.options?.endpoint ? { endpoint: cat.options.endpoint } : {}),
+    ...(cat.options?.region ? { region: cat.options.region } : {}),
+    ...(h.access_key_id ? { accessKeyId: h.access_key_id, secretAccessKey: h.secret_access_key } : {}),
+  });
+  const objects = [];
+  let token;
+  do {
+    const page = await client.list({ prefix, ...(token ? { continuationToken: token } : {}) });
+    objects.push(...(page.contents || []));
+    token = page.isTruncated ? page.nextContinuationToken : null;
+  } while (token);
+  const files = objects.filter((o) => /\.(ya?ml|json)$/.test(o.key) && !o.key.split('/').some((s) => s.startsWith('.'))).sort((a, b) => a.key.localeCompare(b.key));
+  const docs = [];
+  for (const o of files) for (const d of parseDocuments(await client.file(o.key).text(), o.key)) docs.push({ ...d, _source: o.key });
+  const revision = new Bun.CryptoHasher('sha256').update(files.map((o) => `${o.key}:${o.eTag}`).join('\n')).digest('hex').slice(0, 16);
+  return { docs, revision };
+}
+
 async function fetchSource(cat) {
-  const res = cat.kind === 'git' ? await fetchGit(cat) : await fetchHttp(cat);
+  const res = cat.kind === 'git' ? await fetchGit(cat) : cat.kind === 's3' ? await fetchS3(cat) : await fetchHttp(cat);
   // only api documents are reconciled; anything else in the source is reported, not guessed at
   const apis = res.docs.filter((d) => d?.kind === API_KIND);
   const ignored = res.docs.length - apis.length;

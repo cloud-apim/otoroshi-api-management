@@ -35,3 +35,62 @@ describe('git remote catalog', () => {
     }
   });
 });
+
+// an object store that speaks the api of S3, enough of it: the listing (two keys a page) and the objects
+function fakeS3(objects) {
+  const requests = [];
+  const server = Bun.serve({
+    port: 0,
+    fetch(req) {
+      const u = new URL(req.url);
+      requests.push({ path: u.pathname, auth: req.headers.get('authorization') || '' });
+      const [, bucket, ...rest] = u.pathname.split('/');
+      if (bucket !== 'catalog') return new Response('<Error><Code>NoSuchBucket</Code></Error>', { status: 404 });
+      if (!rest.join('')) {
+        const prefix = u.searchParams.get('prefix') || '';
+        const keys = Object.keys(objects).filter((k) => k.startsWith(prefix)).sort();
+        const from = Number(u.searchParams.get('continuation-token') || 0);
+        const page = keys.slice(from, from + 2);
+        const more = from + 2 < keys.length;
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><ListBucketResult><Name>${bucket}</Name><Prefix>${prefix}</Prefix><KeyCount>${page.length}</KeyCount><MaxKeys>2</MaxKeys><IsTruncated>${more}</IsTruncated>${more ? `<NextContinuationToken>${from + 2}</NextContinuationToken>` : ''}${page
+          .map((k) => `<Contents><Key>${k}</Key><LastModified>2026-11-20T00:00:00.000Z</LastModified><ETag>"${Bun.hash(objects[k]).toString(16)}"</ETag><Size>${objects[k].length}</Size></Contents>`)
+          .join('')}</ListBucketResult>`;
+        return new Response(xml, { headers: { 'content-type': 'application/xml' } });
+      }
+      const key = decodeURIComponent(rest.join('/'));
+      return key in objects ? new Response(objects[key]) : new Response('', { status: 404 });
+    },
+  });
+  return { server, requests, endpoint: `http://127.0.0.1:${server.port}` };
+}
+
+describe('s3 remote catalog', () => {
+  test('reads every yaml and json object under the prefix, page by page, signed with its keys', async () => {
+    const { fetchS3 } = await import('../server/domain/catalogs.js');
+    const doc = (name) => `apiVersion: otoroshi-apim.io/v1\nkind: Api\nmetadata: { name: ${name} }\n`;
+    const objects = {
+      'apis/one.yaml': `${doc('one')}---\n${doc('two')}`,
+      'apis/team-a/three.json': JSON.stringify({ apiVersion: 'otoroshi-apim.io/v1', kind: 'Api', metadata: { name: 'three' } }),
+      'apis/README.md': 'not a document',
+      'apis/.drafts/hidden.yaml': doc('hidden'),
+      'other/outside.yaml': doc('outside'),
+    };
+    const s3 = fakeS3(objects);
+    try {
+      const cat = { url: 's3://catalog/apis/', options: { endpoint: s3.endpoint, region: 'us-east-1' }, headers: { access_key_id: 'AKIACATALOG', secret_access_key: 'catalog-secret' } };
+      const res = await fetchS3(cat);
+      expect(res.docs.map((d) => d.metadata.name).sort()).toEqual(['one', 'three', 'two']);
+      expect(res.docs.find((d) => d.metadata.name === 'three')._source).toBe('apis/team-a/three.json');
+      // the listing went over its pages; every request signed with the access key
+      expect(s3.requests.filter((r) => r.path === '/catalog/').length).toBe(2);
+      expect(s3.requests.every((r) => r.auth.includes('Credential=AKIACATALOG/'))).toBe(true);
+      // the revision follows the objects: the same source, the same revision; an object changed, another
+      expect((await fetchS3(cat)).revision).toBe(res.revision);
+      objects['apis/one.yaml'] = doc('one');
+      expect((await fetchS3(cat)).revision).not.toBe(res.revision);
+      await expect(fetchS3({ ...cat, url: 'https://not-s3' })).rejects.toThrow(/s3:\/\//);
+    } finally {
+      s3.server.stop(true);
+    }
+  });
+});
