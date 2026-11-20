@@ -77,7 +77,9 @@ Last update: 2026-11-20.
 the body of the GitHub release (marked pre-release while in 0.x); the documentation attached to the
 release as a zip, built to be served from the root of any static server (`DOCS_BASE_URL=/`), for
 the testers; the command line documented with the executable and the image first, `bun cli/apim.js`
-from a clone; migrations append-only from now on
+from a clone; a roadmap in the README (the owner's list — LLM, MCP and event-driven APIs, a European
+payment provider, several gateways for one installation — and what is still missing among the
+important things); migrations append-only from now on
 (`CLAUDE.md`, `server/db/migrations.js`); the documentation says beta. Left: the release workflow
 tried once by hand (it builds, publishes nothing), access for the testers to the private repository
 and its image; GitHub Pages is not enabled, so the documentation workflow fails at its deploy step

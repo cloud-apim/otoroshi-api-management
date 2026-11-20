@@ -116,6 +116,34 @@ Two PostgreSQL databases: application data, and events + analytics.
 | Scalar for OpenAPI and testing, bundled, behind a proxy | `web/portal`, `testProxy` |
 | GitOps: admin api + CLI + declarative documents | `cli/apim.js`, `server/domain/exchange.js` |
 
+## Roadmap
+
+0.1.0 manages REST APIs on one Otoroshi cluster. Next:
+
+- **LLM APIs** — an API in front of one or several AI providers, with budgets and plans counted in
+  tokens (the LLM extension of Otoroshi).
+- **MCP APIs** — MCP servers exposed, subscribed to and observed like any API (the LLM extension).
+- **Event-driven APIs** — brokers behind the gateway, documented with AsyncAPI, their messages
+  counted (the event brokers extension).
+- **A European payment provider**, beside Stripe Connect, for the paid plans.
+- **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
+  one Otoroshi cluster (today an installation drives exactly one).
+
+And what is still missing among the important things:
+
+- **One credential for several APIs** — a consumer subscribed to several APIs calls them with one
+  key; waits for Otoroshi ([#2963](https://github.com/MAIF/otoroshi/issues/2963)).
+- **Notifications outside the product** — email and outgoing webhooks: a subscription to review or
+  accepted, a key about to expire, a version deprecated, a quota nearly spent. Today they live in
+  the console and the portal only.
+- **The product's own metrics** — its projection queue, drift, ingestion and errors, for
+  Prometheus or OpenTelemetry; today a health check and `gateway status`.
+- **API quality** — the specifications linted, an API scored and reviewed before it is published.
+- **GraphQL and gRPC APIs.**
+- **Dynamic client registration** — the application's client created at the identity provider.
+- **Hardening for 1.0** — the suite run by the CI on every push, upgrades tested from one release
+  to the next, an accessibility audit of both faces, a security review.
+
 ## Otoroshi gaps
 
 Every data-plane gap hit while building this is logged in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md),
