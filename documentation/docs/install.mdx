@@ -1,10 +1,109 @@
 ---
 sidebar_position: 3
 title: Install
-description: Deployment roles, configuration, databases, the container image, the data exporter and the portal exposure.
+description: The architecture of an installation and what it needs, its roles, configuration, databases, the container image, the data exporter and the portal exposure.
 ---
 
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
+export function Architecture() {
+  const light = useBaseUrl('/img/architecture-light.svg');
+  const dark = useBaseUrl('/img/architecture-dark.svg');
+  return (
+    <ThemedImage
+      alt="The architecture of an installation: the product and its roles, its two PostgreSQL databases, the Otoroshi cluster it drives, the events it ingests, and the request path it is never in"
+      sources={{ light, dark }}
+    />
+  );
+}
+
 # Install
+
+## The architecture
+
+<Architecture />
+
+<small>The diagram at full size: [light](pathname:///otoroshi-api-management/img/architecture-light.svg), [dark](pathname:///otoroshi-api-management/img/architecture-dark.svg).</small>
+
+An installation is **the product** — one executable, or one container image — beside **an Otoroshi
+cluster** it drives, with **two PostgreSQL databases**. The product describes the APIs, their plans
+and their subscriptions, and **projects** them on the gateway through its admin API; the gateway
+serves the calls alone, and sends its **events** back to the product, which keeps the analytics.
+**The product is never in the request path**: when it is down, the gateway keeps serving what was
+projected (see [When the product is down](./gateway/product-down.mdx)).
+
+One installation drives **one** Otoroshi cluster. Environments — a test, a production — are
+installations of their own, a snapshot [promoted](./gitops/promotion.mdx) from one to the next.
+
+### What an installation needs
+
+| | Required | |
+|---|---|---|
+| **Otoroshi 18.1** or later | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
+| **PostgreSQL 14** or later | yes | **two databases**, created beforehand: the application data, and the events and analytics — two connection URLs, one server is enough; a user that owns them (the product creates its tables, the migrations run at startup) |
+| **The product** | yes | the executable (linux and macOS, x64 and arm64) or the image `ghcr.io/cloud-apim/otoroshi-api-management`; one instance or several, listening on one port (`9000`) |
+| A key for the secrets | in production | `APIM_SECRETS_KEY`: the secrets it keeps — of the credentials, of its key to the gateway, of the identity providers — are sealed with it ([secrets at rest](#secrets-at-rest)) |
+| An OpenID Connect provider | no | to sign in to the console, to a portal ([authentication](./authentication.mdx)); local accounts otherwise |
+| A Stripe account | no | to sell paid plans ([payments](./payments.mdx)) |
+| The extensions of the gateway | no | the **Threat Protection Suite** for the threat protection of the plans, the **LLM extension** for the AI and MCP audits |
+| A git repository, an S3 bucket, an HTTP server | no | as [remote catalogs](./gitops/remote-catalogs.mdx) of declarative documents |
+| A Kubernetes cluster | no | to describe APIs, applications and subscriptions as [resources](./gitops/kubernetes.mdx) |
+
+### The flows to open
+
+| From | To | For |
+|---|---|---|
+| Browsers | the product (`APIM_PUBLIC_URL`) — directly, or through routes of the gateway the [setup](./gateway/setup.mdx) makes | the console (`/backoffice`) and the portals (`/<workspace>/`, or a host per workspace) |
+| CI, scripts | the product, `/api` | the admin API, the [CLI](./gitops/cli.mdx) |
+| The product | the Otoroshi admin API (`OTOROSHI_URL`) | the projection, the drift detection, the setup |
+| **Otoroshi** | **the product, `/ingest`** (`APIM_INGEST_URL`) | the events of the gateway, sent by its data exporter — the gateway has to reach the product |
+| The product | PostgreSQL | its two databases |
+| Stripe | the product, `/payments/stripe/webhook` (an instance with the `api` role) | the events of the payments, when payments are on |
+| The product | an OIDC provider, Stripe, the catalogs, the sources of the dictionaries | when used |
+| Client applications | the gateway | the calls — the product is not on their way |
+
+### Its shape
+
+- **One instance** carrying every role — `APIM_ROLES=ingester,api,backoffice,portal`, the default —
+  is a whole installation: a test, a small production.
+- **Split by role** when the load or the exposure calls for it: the public portals and the ingester
+  do not have the profile of the console. The instances are stateless — sessions, the task queue and
+  the analytics live in PostgreSQL —, so a role scales by adding instances behind a load balancer.
+- **On Kubernetes**, the manifests and the Helm chart deploy the serving roles with several
+  replicas, and the controller apart ([on Kubernetes](#on-kubernetes)).
+
+The minimal configuration of an instance:
+
+```bash
+APIM_DATABASE_URL=postgres://apim:…@db:5432/apim
+APIM_ANALYTICS_DATABASE_URL=postgres://apim:…@db:5432/apim_analytics
+APIM_PUBLIC_URL=https://apim.example.com
+APIM_SECRETS_KEY=…                       # a long random secret, kept safe
+APIM_ADMIN_TOKEN=…                       # the first admin token: change it
+APIM_BOOTSTRAP_ADMINS=you@example.com    # the first administrators of the console
+APIM_BOOTSTRAP_PASSWORD=…
+APIM_INGEST_TOKEN=…                      # what the data exporter of the gateway presents
+APIM_INGEST_URL=https://apim.example.com/ingest
+OTOROSHI_URL=https://otoroshi-api.example.com
+OTOROSHI_HOST=otoroshi-api.example.com
+OTOROSHI_CLIENT_ID=…                     # the admin key of the gateway
+OTOROSHI_CLIENT_SECRET=…
+OTOROSHI_PUBLIC_SCHEME=https             # how consumers call the apis: https://<api domain>:443
+OTOROSHI_PUBLIC_PORT=443
+```
+
+On PostgreSQL, the two databases made once:
+
+```sql
+CREATE DATABASE apim OWNER apim;
+CREATE DATABASE apim_analytics OWNER apim;
+```
+
+Then the **setup** of the gateway — the product's own admin key, the data exporter, the routes of
+the console and of the portals — from the console (**Gateway › Setup**) or `otoroshi-apim setup`,
+with `--dry-run` first ([setup](./gateway/setup.mdx)).
+Every variable is described below.
 
 ## One binary, five roles
 

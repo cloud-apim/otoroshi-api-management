@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 760" width="1200" height="760" role="img" aria-label="The architecture of an installation">
+<defs>
+<marker id="arrow-f0883e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f0883e"/></marker>
+<marker id="arrow-start-f0883e" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f0883e"/></marker>
+<marker id="arrow-9da7b3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9da7b3"/></marker>
+<marker id="arrow-start-9da7b3" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9da7b3"/></marker>
+<marker id="arrow-6e7681" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/></marker>
+<marker id="arrow-start-6e7681" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6e7681"/></marker>
+<marker id="arrow-3fb950" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/></marker>
+<marker id="arrow-start-3fb950" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3fb950"/></marker>
+<marker id="arrow-58a6ff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+<marker id="arrow-start-58a6ff" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58a6ff"/></marker>
+</defs>
+<rect x="30" y="60" width="220" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="46" y="88" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">Administrators, producers</text>
+<text x="46" y="108" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">a browser</text>
+<rect x="30" y="160" width="220" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="46" y="188" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">Consumers</text>
+<text x="46" y="208" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">a browser</text>
+<rect x="30" y="260" width="220" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="46" y="288" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">CI, scripts</text>
+<text x="46" y="308" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">the cli, the admin api</text>
+<rect x="30" y="360" width="220" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="46" y="388" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">Kubernetes</text>
+<text x="46" y="408" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">resources (optional)</text>
+<rect x="330" y="40" width="430" height="410" rx="16" fill="#0d2136" stroke="#58a6ff" stroke-width="2"/>
+<text x="352" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="start">otoroshi-api-management</text>
+<text x="352" y="94" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">one executable or one image · stateless · N instances</text>
+<rect x="352" y="125" width="386" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="370" y="148" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">backoffice</text>
+<text x="370" y="167" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">/backoffice — the console</text>
+<rect x="352" y="195" width="386" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="370" y="218" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">portal</text>
+<text x="370" y="237" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">/&lt;workspace&gt;/ — the developer portals</text>
+<rect x="352" y="265" width="386" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="370" y="288" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">api</text>
+<text x="370" y="307" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">/api — the admin api</text>
+<rect x="352" y="335" width="386" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="370" y="358" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">ingester</text>
+<text x="370" y="377" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">/ingest — the events of the gateway</text>
+<rect x="352" y="400" width="386" height="36" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="370" y="423" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="14" font-weight="600" fill="#e6edf3" text-anchor="start">controller</text>
+<text x="470" y="423" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">the Kubernetes resources — optional</text>
+<polyline points="250,92 352,152" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-58a6ff)"/>
+<polyline points="250,192 352,222" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-58a6ff)"/>
+<polyline points="250,292 352,292" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-58a6ff)"/>
+<polyline points="250,392 352,418" fill="none" stroke="#58a6ff" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-58a6ff)"/>
+<rect x="330" y="500" width="430" height="230" rx="16" fill="#161b22" stroke="#8b949e" stroke-width="1.5"/>
+<text x="352" y="532" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="17" font-weight="700" fill="#e6edf3" text-anchor="start">PostgreSQL 14 or later</text>
+<text x="352" y="552" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">two databases, two urls — one server is enough</text>
+<path d="M355,584 a92.5,9 0 0,1 185,0 v114 a92.5,9 0 0,1 -185,0 z" fill="#161b22" stroke="#8b949e" stroke-width="1.4"/>
+<path d="M355,584 a92.5,9 0 0,0 185,0" fill="none" stroke="#8b949e" stroke-width="1.4"/>
+<text x="447.5" y="637.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="middle">apim</text>
+<text x="447.5" y="657.0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">workspaces, apis, plans,</text>
+<text x="447" y="682" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">subscriptions, audit</text>
+<path d="M552,584 a92.5,9 0 0,1 185,0 v114 a92.5,9 0 0,1 -185,0 z" fill="#161b22" stroke="#8b949e" stroke-width="1.4"/>
+<path d="M552,584 a92.5,9 0 0,0 185,0" fill="none" stroke="#8b949e" stroke-width="1.4"/>
+<text x="644.5" y="637.0" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="middle">apim_analytics</text>
+<text x="644.5" y="657.0" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">the calls, their rollups,</text>
+<text x="644" y="682" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">the security events</text>
+<polyline points="545,450 545,500" fill="none" stroke="#6e7681" stroke-width="1.6" marker-end="url(#arrow-6e7681)" marker-start="url(#arrow-start-6e7681)"/>
+<text x="557" y="480" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">SQL</text>
+<rect x="870" y="40" width="300" height="350" rx="16" fill="#10231a" stroke="#3fb950" stroke-width="2"/>
+<text x="892" y="72" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" font-weight="700" fill="#e6edf3" text-anchor="start">Otoroshi 18.1 cluster</text>
+<text x="892" y="94" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">leader and workers, its own datastore</text>
+<rect x="892" y="115" width="256" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="908" y="138" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">admin api</text>
+<text x="908" y="157" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">an admin key with every right</text>
+<rect x="892" y="185" width="256" height="54" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="908" y="208" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">data exporter</text>
+<text x="908" y="227" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">apim_ingester_exporter</text>
+<rect x="892" y="255" width="256" height="112" rx="10" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+<text x="908" y="280" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">gateway — the data plane</text>
+<text x="908" y="300" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">the routes and plans of the apis,</text>
+<text x="908" y="318" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">the keys of the subscriptions,</text>
+<text x="908" y="336" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">quotas, auth. modules, verifiers</text>
+<text x="908" y="354" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">(extensions: threat protection, llm)</text>
+<polyline points="738,292 838,292 838,142 892,142" fill="none" stroke="#58a6ff" stroke-width="1.6" marker-end="url(#arrow-58a6ff)"/>
+<text x="800" y="205" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">projection,</text>
+<text x="800" y="221" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">drift, setup</text>
+<polyline points="892,212 856,212 856,362 738,362" fill="none" stroke="#3fb950" stroke-width="1.6" marker-end="url(#arrow-3fb950)"/>
+<text x="800" y="322" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">events,</text>
+<text x="800" y="338" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="middle">in batches</text>
+<rect x="870" y="470" width="140" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="884" y="498" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">Client apps</text>
+<text x="884" y="518" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">of the consumers</text>
+<rect x="1030" y="470" width="140" height="64" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="1044" y="498" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" font-weight="600" fill="#e6edf3" text-anchor="start">Backends</text>
+<text x="1044" y="518" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">behind the apis</text>
+<polyline points="940,470 940,367" fill="none" stroke="#f0883e" stroke-width="1.6" marker-end="url(#arrow-f0883e)"/>
+<polyline points="1100,367 1100,470" fill="none" stroke="#f0883e" stroke-width="1.6" marker-end="url(#arrow-f0883e)"/>
+<text x="1020" y="566" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="600" fill="#f0883e" text-anchor="middle">the request path:</text>
+<text x="1020" y="584" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#f0883e" text-anchor="middle">client → gateway → backend,</text>
+<text x="1020" y="602" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="400" fill="#f0883e" text-anchor="middle">the product never in it</text>
+<rect x="30" y="478" width="220" height="262" rx="14" fill="#11161d" stroke="#30363d" stroke-width="1.5" stroke-dasharray="5 4"/>
+<text x="46" y="504" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="700" fill="#9da7b3" text-anchor="start">What it may use</text>
+<rect x="44" y="520" width="192" height="58" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="58" y="545" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#e6edf3" text-anchor="start">an OIDC provider</text>
+<text x="58" y="563" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">sign in, console and portals</text>
+<rect x="44" y="590" width="192" height="58" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="58" y="615" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#e6edf3" text-anchor="start">Stripe</text>
+<text x="58" y="633" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">the paid plans (Connect)</text>
+<rect x="44" y="660" width="192" height="58" rx="10" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+<text x="58" y="685" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#e6edf3" text-anchor="start">git · S3 · HTTP</text>
+<text x="58" y="703" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">the remote catalogs</text>
+<polyline points="345,450 250,500" fill="none" stroke="#6e7681" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow-6e7681)"/>
+</svg>
