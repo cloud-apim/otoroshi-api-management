@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useRouter } from '../../../shared/router.jsx';
 import { AUTH_LABELS, fmtDate, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import {
@@ -9,10 +9,18 @@ import { api as rootApi, useWs, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 import { CodeEditor, CodeView } from '../../../shared/code-editor.jsx';
 import { PluginForm, formFields } from './PluginForm.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 const rid = (p) => `${p}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+
+// a list that shrinks (a removal, a shorter specification) can leave its page past the last one;
+// an empty list (not loaded yet) keeps the page of the url
+// what a person types to find a plan or a resource of the draft
+export const planText = (p) => `${p.name} ${p.description || ''} ${p.auth.kind} ${tr(AUTH_LABELS[p.auth.kind])} ${p.status} ${tr(p.status)} ${p.visibility} ${p.validation} ${p.pricing?.kind || ''} ${p.id}`;
+export const resourceText = (r, draft) =>
+  `${r.name} ${r.description || ''} ${(r.methods.length ? r.methods : ['*']).join(' ')} ${r.path} ${draft.backends.find((b) => b.id === r.backendId)?.name || ''} ${draft.flows.find((f) => f.id === r.flowId)?.name || ''} ${r.enabled ? '' : tr('disabled')} ${r.id}`;
 
 // ---------------------------------------------------------------- overview
 
@@ -25,6 +33,8 @@ export function OverviewTab({ api, draft, validation, order }) {
   const js = `const res = await fetch('${base}${firstPath}', {\n  headers: {\n    'Otoroshi-Client-Id': process.env.CLIENT_ID,\n    'Otoroshi-Client-Secret': process.env.CLIENT_SECRET,\n  },\n});\nconsole.log(await res.json());`;
   const py = `import os, requests\n\nres = requests.get(\n    '${base}${firstPath}',\n    auth=(os.environ['CLIENT_ID'], os.environ['CLIENT_SECRET']),\n)\nprint(res.json())`;
   const [lang, setLang] = useState('curl');
+  const planPage = useLocalPaging(draft.plans, { prefix: 'oplans', size: 10, text: planText });
+  const resPage = useLocalPaging(draft.resources, { prefix: 'ores', size: 10, text: (r) => resourceText(r, draft) });
   return (
     <div className="col gap-24">
       {(validation.errors.length > 0 || validation.warnings.length > 0) && (
@@ -76,21 +86,29 @@ export function OverviewTab({ api, draft, validation, order }) {
               {tr('Edit plans')}
             </Link>
           </div>
-          {draft.plans.length ? (
-            draft.plans.map((p) => (
-              <div key={p.id} className="list-item">
-                <div className="grow">
-                  <div className="bold">{p.name}</div>
-                  <div className="muted small">
-                    <Tr text={'{0} · {1}{2}{3} · {4} approval'} args={[tr(AUTH_LABELS[p.auth.kind]), p.rateLimit.enabled ? tr('{0} calls / {1}', [fmtNumber(p.rateLimit.calls), fmtWindow(p.rateLimit.windowMs)]) : tr('no rate limit'), p.quota.daily ? tr(' · {0}/day', [fmtNumber(p.quota.daily)]) : '', p.quota.monthly ? tr(' · {0}/month', [fmtNumber(p.quota.monthly)]) : '', tr(p.validation)]} />
+          <div className="card-body" style={{ paddingBottom: 0 }}>
+            <ListToolbar paging={planPage} placeholder={tr('search plans, auth kinds, statuses')} />
+          </div>
+          {planPage.items.length ? (
+            <>
+              <div>
+                {planPage.items.map((p) => (
+                  <div key={p.id} className="list-item">
+                    <div className="grow">
+                      <div className="bold">{p.name}</div>
+                      <div className="muted small">
+                        <Tr text={'{0} · {1}{2}{3} · {4} approval'} args={[tr(AUTH_LABELS[p.auth.kind]), p.rateLimit.enabled ? tr('{0} calls / {1}', [fmtNumber(p.rateLimit.calls), fmtWindow(p.rateLimit.windowMs)]) : tr('no rate limit'), p.quota.daily ? tr(' · {0}/day', [fmtNumber(p.quota.daily)]) : '', p.quota.monthly ? tr(' · {0}/month', [fmtNumber(p.quota.monthly)]) : '', tr(p.validation)]} />
+                      </div>
+                    </div>
+                    <StatusBadge status={p.status} />
                   </div>
-                </div>
-                <StatusBadge status={p.status} />
+                ))}
               </div>
-            ))
+              <Pager paging={planPage} total={planPage.total} />
+            </>
           ) : (
-            <Empty title={tr('No plan')} icon="layers">
-              {tr('Without a published plan the gateway serves the routes to anyone.')}
+            <Empty title={planPage.q ? tr('No plan matches') : tr('No plan')} icon="layers">
+              {planPage.q ? null : tr('Without a published plan the gateway serves the routes to anyone.')}
             </Empty>
           )}
           {order.length > 0 && (
@@ -119,23 +137,33 @@ export function OverviewTab({ api, draft, validation, order }) {
             {draft.entrypoint.contextPath === '/' ? '' : draft.entrypoint.contextPath}
           </span>
         </div>
-        <div className="table-wrap">
-          <table className="table">
-            <tbody>
-              {draft.resources.map((r) => (
-                <tr key={r.id}>
-                  <td className="bold">{r.name}</td>
-                  <td className="mono small">
-                    {(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}
-                    {r.exact ? '' : '*'}
-                  </td>
-                  <td className="small muted">→ {draft.backends.find((b) => b.id === r.backendId)?.name}</td>
-                  <td className="small muted">{draft.flows.find((f) => f.id === r.flowId)?.name || tr('no flow')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <ListToolbar paging={resPage} placeholder={tr('search names, paths, methods, backends, flows')} />
         </div>
+        {resPage.items.length ? (
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <tbody>
+                  {resPage.items.map((r) => (
+                    <tr key={r.id}>
+                      <td className="bold">{r.name}</td>
+                      <td className="mono small">
+                        {(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}
+                        {r.exact ? '' : '*'}
+                      </td>
+                      <td className="small muted">→ {draft.backends.find((b) => b.id === r.backendId)?.name}</td>
+                      <td className="small muted">{draft.flows.find((f) => f.id === r.flowId)?.name || tr('no flow')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pager paging={resPage} total={resPage.total} />
+          </>
+        ) : (
+          <Empty title={resPage.q ? tr('No resource matches') : tr('No resource')} icon="api" />
+        )}
       </div>
       {api.previous_version_id && (
         <p className="muted small">
@@ -209,6 +237,7 @@ function ResourceModal({ value, draft, onSave, onClose }) {
 
 export function ResourcesTab({ draft, setDraft, readOnly }) {
   const [editing, setEditing] = useState(null);
+  const page = useLocalPaging(draft.resources, { prefix: 'res', size: 25, text: (r) => resourceText(r, draft) });
   const save = (r) => {
     setDraft((d) => ({ ...d, resources: d.resources.some((x) => x.id === r.id) ? d.resources.map((x) => (x.id === r.id ? r : x)) : [...d.resources, r] }));
     setEditing(null);
@@ -237,47 +266,57 @@ export function ResourcesTab({ draft, setDraft, readOnly }) {
             </button>
           )}
         </div>
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{tr('Name')}</th>
-                <th>{tr('Match')}</th>
-                <th>{tr('Backend')}</th>
-                <th>{tr('Flow')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {draft.resources.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <div className="bold">{r.name}</div>
-                    <div className="faint tiny">{r.description}</div>
-                  </td>
-                  <td className="mono small">
-                    {(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}
-                    {r.exact ? '' : '*'} {!r.enabled && <Badge>{tr('disabled')}</Badge>}
-                  </td>
-                  <td className="small">{draft.backends.find((b) => b.id === r.backendId)?.name || <span className="negative-text">{tr('unknown')}</span>}</td>
-                  <td className="small">{draft.flows.find((f) => f.id === r.flowId)?.name || '—'}</td>
-                  <td className="actions">
-                    {!readOnly && (
-                      <>
-                        <button className="btn ghost sm icon" onClick={() => setEditing(r)} aria-label={tr('edit')}>
-                          <Icon name="edit" />
-                        </button>
-                        <button className="btn ghost sm icon" onClick={() => setDraft((d) => ({ ...d, resources: d.resources.filter((x) => x.id !== r.id) }))} aria-label={tr('delete')}>
-                          <Icon name="trash" />
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <ListToolbar paging={page} placeholder={tr('search names, paths, methods, backends, flows')} />
         </div>
+        {page.items.length ? (
+          <>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>{tr('Name')}</th>
+                    <th>{tr('Match')}</th>
+                    <th>{tr('Backend')}</th>
+                    <th>{tr('Flow')}</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.items.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <div className="bold">{r.name}</div>
+                        <div className="faint tiny">{r.description}</div>
+                      </td>
+                      <td className="mono small">
+                        {(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}
+                        {r.exact ? '' : '*'} {!r.enabled && <Badge>{tr('disabled')}</Badge>}
+                      </td>
+                      <td className="small">{draft.backends.find((b) => b.id === r.backendId)?.name || <span className="negative-text">{tr('unknown')}</span>}</td>
+                      <td className="small">{draft.flows.find((f) => f.id === r.flowId)?.name || '—'}</td>
+                      <td className="actions">
+                        {!readOnly && (
+                          <>
+                            <button className="btn ghost sm icon" onClick={() => setEditing(r)} aria-label={tr('edit')}>
+                              <Icon name="edit" />
+                            </button>
+                            <button className="btn ghost sm icon" onClick={() => setDraft((d) => ({ ...d, resources: d.resources.filter((x) => x.id !== r.id) }))} aria-label={tr('delete')}>
+                              <Icon name="trash" />
+                            </button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pager paging={page} total={page.total} />
+          </>
+        ) : (
+          <Empty title={page.q ? tr('No resource matches') : tr('No resource')} icon="api" />
+        )}
       </div>
       {editing && <ResourceModal value={editing} draft={draft} onSave={save} onClose={() => setEditing(null)} />}
     </div>
@@ -355,6 +394,7 @@ function BackendModal({ value, onSave, onClose }) {
 
 export function BackendsTab({ draft, setDraft, readOnly }) {
   const [editing, setEditing] = useState(null);
+  const page = useLocalPaging(draft.backends, { prefix: 'backends', size: 25, text: (b) => `${b.name} ${b.loadBalancing} ${b.root} ${b.targets.map((t) => `${t.tls ? 'https' : 'http'}://${t.hostname}:${t.port}`).join(' ')} ${b.id}` });
   const save = (b) => {
     setDraft((d) => ({ ...d, backends: d.backends.some((x) => x.id === b.id) ? d.backends.map((x) => (x.id === b.id ? b : x)) : [...d.backends, b] }));
     setEditing(null);
@@ -362,41 +402,55 @@ export function BackendsTab({ draft, setDraft, readOnly }) {
   return (
     <div className="col gap-16">
       <p className="muted small">{tr('Backends are infrastructure: targets, TLS, timeouts, load balancing. They belong to the route side, never to the offer.')}</p>
-      <div className="grid-2">
-        {draft.backends.map((b) => (
-          <div key={b.id} className="card">
-            <div className="card-head">
-              <Icon name="box" />
-              <h3 className="grow">{b.name}</h3>
-              {!readOnly && (
-                <>
-                  <button className="btn ghost sm icon" onClick={() => setEditing(b)} aria-label={tr('edit')}>
-                    <Icon name="edit" />
-                  </button>
-                  <button
-                    className="btn ghost sm icon"
-                    disabled={draft.resources.some((r) => r.backendId === b.id)}
-                    title={draft.resources.some((r) => r.backendId === b.id) ? tr('used by a resource') : tr('delete')}
-                    onClick={() => setDraft((d) => ({ ...d, backends: d.backends.filter((x) => x.id !== b.id) }))}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </>
-              )}
-            </div>
-            <div className="card-body col gap-6">
-              {b.targets.map((t, i) => (
-                <div key={i} className="mono small">
-                  {t.tls ? tr('https') : tr('http')}://{t.hostname}:{t.port}
-                  {b.root !== '/' ? b.root : ''} <span className="faint"><Tr text={'w{0}'} args={[t.weight]} /></span>
+      <div>
+        <ListToolbar paging={page} placeholder={tr('search backends, targets')} />
+        {page.items.length ? (
+          <div className="grid-2">
+            {page.items.map((b) => (
+              <div key={b.id} className="card">
+                <div className="card-head">
+                  <Icon name="box" />
+                  <h3 className="grow">{b.name}</h3>
+                  {!readOnly && (
+                    <>
+                      <button className="btn ghost sm icon" onClick={() => setEditing(b)} aria-label={tr('edit')}>
+                        <Icon name="edit" />
+                      </button>
+                      <button
+                        className="btn ghost sm icon"
+                        disabled={draft.resources.some((r) => r.backendId === b.id)}
+                        title={draft.resources.some((r) => r.backendId === b.id) ? tr('used by a resource') : tr('delete')}
+                        onClick={() => setDraft((d) => ({ ...d, backends: d.backends.filter((x) => x.id !== b.id) }))}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </>
+                  )}
                 </div>
-              ))}
-              <div className="faint tiny">
-                <Tr text={'{0} · timeout {1} ms · {2} retries · used by {3} resource(s)'} args={[b.loadBalancing, b.timeouts.callMs, b.retries, draft.resources.filter((r) => r.backendId === b.id).length]} />
+                <div className="card-body col gap-6">
+                  {b.targets.map((t, i) => (
+                    <div key={i} className="mono small">
+                      {t.tls ? tr('https') : tr('http')}://{t.hostname}:{t.port}
+                      {b.root !== '/' ? b.root : ''} <span className="faint"><Tr text={'w{0}'} args={[t.weight]} /></span>
+                    </div>
+                  ))}
+                  <div className="faint tiny">
+                    <Tr text={'{0} · timeout {1} ms · {2} retries · used by {3} resource(s)'} args={[b.loadBalancing, b.timeouts.callMs, b.retries, draft.resources.filter((r) => r.backendId === b.id).length]} />
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
+        ) : (
+          <div className="card">
+            <Empty title={page.q ? tr('No backend matches') : tr('No backend')} icon="box" />
+          </div>
+        )}
+        {page.items.length > 0 && (
+          <div className="mt-16">
+            <Pager paging={page} total={page.total} />
+          </div>
+        )}
       </div>
       {!readOnly && (
         <button
@@ -516,7 +570,6 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
   const [p, setP] = useState(value);
   const [config, setConfig] = useState(JSON.stringify(value.config || {}, null, 2));
   const [picking, setPicking] = useState(isNew);
-  const [q, setQ] = useState('');
   const [category, setCategory] = useState('');
   // the form and the json edit the same configuration; the form is rebuilt when the
   // configuration changes from outside it (another plugin, a reset, the json view)
@@ -540,9 +593,10 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
     jsonError = `invalid json — ${e.message}`;
   }
   const categories = [...new Set((catalog || []).flatMap((c) => c.categories || []))].sort();
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const matches = (catalog || []).filter(
-    (c) => (!category || (c.categories || []).includes(category)) && words.every((w) => `${c.name} ${c.id} ${c.description || ''}`.toLowerCase().includes(w)),
+  // the catalog of the gateway, searched and paged in the modal (its state stays out of the url)
+  const page = useLocalPaging(
+    (catalog || []).filter((c) => !category || (c.categories || []).includes(category)),
+    { local: true, size: 25, text: (c) => `${c.name} ${c.id} ${c.description || ''} ${(c.categories || []).join(' ')}` }
   );
   // choosing a plugin brings its default configuration, unless the current one was edited
   const pick = (c) => {
@@ -573,22 +627,31 @@ export function PluginModal({ value, catalog, onSave, onClose }) {
         <div className="panel col gap-6">
           <div className="row">
             <div className="grow">
-              <Input value={q} onChange={setQ} placeholder={tr("search the gateway's {0} plugins", [catalog.length])} aria-label={tr('search plugins')} autoFocus />
+              <Input value={page.q} onChange={page.setQ} placeholder={tr("search the gateway's {0} plugins", [catalog.length])} aria-label={tr('search plugins')} autoFocus />
             </div>
             <div style={{ width: 220 }}>
-              <Select value={category} onChange={setCategory} options={[{ value: '', label: tr('all categories') }, ...categories]} aria-label={tr('category')} />
+              <Select
+                value={category}
+                onChange={(v) => {
+                  setCategory(v);
+                  page.setPage(1);
+                }}
+                options={[{ value: '', label: tr('all categories') }, ...categories]}
+                aria-label={tr('category')}
+              />
             </div>
           </div>
           <div style={{ maxHeight: 220, overflow: 'auto' }}>
-            {matches.slice(0, 80).map((c) => (
+            {page.items.map((c) => (
               <div key={c.id} className={`palette-item ${p.plugin === c.id ? 'on' : ''}`} onClick={() => pick(c)}>
                 <span className="bold small nowrap">{c.name}</span>
                 <span className="faint tiny ellipsis grow">{c.description}</span>
                 <span className="faint tiny nowrap">{(c.categories || [])[0]}</span>
               </div>
             ))}
-            {!matches.length && <div className="muted small" style={{ padding: 12 }}>{tr('No plugin matches.')}</div>}
+            {!page.total && <div className="muted small" style={{ padding: 12 }}>{tr('No plugin matches.')}</div>}
           </div>
+          {page.total > 0 && <Pager paging={page} total={page.total} />}
         </div>
       )}
       <PluginCard meta={meta} id={p.plugin} />
@@ -696,93 +759,117 @@ export function FlowsTab({ draft, setDraft, readOnly }) {
   const [addingGroup, setAddingGroup] = useState(null);
   const groupOf = (id) => (groups.data || []).find((g) => g.id === id);
   const updateFlow = (id, patch) => setDraft((d) => ({ ...d, flows: d.flows.map((f) => (f.id === id ? { ...f, ...patch } : f)) }));
+  // the names of the plugins and of the groups come with their catalogs: the search runs again then
+  const flows = useMemo(() => [...draft.flows], [draft.flows, catalog.data, groups.data]);
+  const page = useLocalPaging(flows, {
+    prefix: 'flows',
+    size: 25,
+    text: (f) =>
+      `${f.name} ${f.plugins.map((p) => (p.group ? groupOf(p.group)?.name || p.group : `${pluginOf(catalog.data, p.plugin)?.name || ''} ${p.plugin}`)).join(' ')} ${draft.resources.filter((r) => r.flowId === f.id).map((r) => r.name).join(' ')} ${draft.plans.filter((p) => p.flowRef === f.id).map((p) => p.name).join(' ')} ${f.id}`,
+  });
   return (
     <div className="col gap-16">
       <p className="muted small">
         {tr('A flow is a named chain of Otoroshi plugins, run in this order within each step of the request. A resource runs one flow; a plan can add its own flow (merged with the flow of the current route) to put a policy plan by plan. Shared policy groups are expanded in place.')}
       </p>
-      {draft.flows.map((f) => {
-        const resources = draft.resources.filter((r) => r.flowId === f.id);
-        const plans = draft.plans.filter((p) => p.flowRef === f.id);
-        const usedBy = resources.length;
-        const usedByPlans = plans.length;
-        const usage = [
-          resources.length ? `${resources.length > 1 ? 'resources' : 'resource'} ${resources.map((r) => r.name).join(', ')}` : '',
-          plans.length ? `${plans.length > 1 ? 'plans' : 'plan'} ${plans.map((p) => p.name).join(', ')}` : '',
-        ].filter(Boolean);
-        return (
-          <div key={f.id} className="card">
-            <div className="card-head">
-              <Icon name="layers" />
-              <input className="input" style={{ maxWidth: 280, fontWeight: 600 }} value={f.name} disabled={readOnly} onChange={(e) => updateFlow(f.id, { name: e.target.value })} aria-label={tr('flow name')} />
-              <span className="faint small grow ellipsis">{usage.length ? tr('runs for {0}', [usage.join(' · ')]) : tr('not used yet')}</span>
-              {!readOnly && (
-                <>
-                  <button className="btn sm" onClick={() => setEditing({ flowId: f.id, index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
-                    <Icon name="plus" /> {tr('Add plugin')}
-                  </button>
-                  <button className="btn sm" onClick={() => setAddingGroup(f.id)}>
-                    <Icon name="layers" /> {tr('Add policy group')}
-                  </button>
-                  <button className="btn ghost sm icon" disabled={usedBy + usedByPlans > 0} title={usedBy + usedByPlans > 0 ? tr('in use') : tr('delete flow')} onClick={() => setDraft((d) => ({ ...d, flows: d.flows.filter((x) => x.id !== f.id) }))}>
-                    <Icon name="trash" />
-                  </button>
-                </>
-              )}
-            </div>
-            {f.plugins.length ? (
-              f.plugins.map((p, i) => {
-                const move = (delta) => updateFlow(f.id, { plugins: moveItem(f.plugins, i, delta) });
-                const remove = () => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) });
-                return p.group ? (
-                  <div key={i} className="list-item">
-                    <span className="faint tiny">{i + 1}</span>
+      <div>
+        <ListToolbar paging={page} placeholder={tr('search flows, plugins, resources, plans')} />
+        {page.items.length ? (
+          <div className="col gap-16">
+            {page.items.map((f) => {
+              const resources = draft.resources.filter((r) => r.flowId === f.id);
+              const plans = draft.plans.filter((p) => p.flowRef === f.id);
+              const usedBy = resources.length;
+              const usedByPlans = plans.length;
+              const usage = [
+                resources.length ? `${resources.length > 1 ? 'resources' : 'resource'} ${resources.map((r) => r.name).join(', ')}` : '',
+                plans.length ? `${plans.length > 1 ? 'plans' : 'plan'} ${plans.map((p) => p.name).join(', ')}` : '',
+              ].filter(Boolean);
+              return (
+                <div key={f.id} className="card">
+                  <div className="card-head">
                     <Icon name="layers" />
-                    <div className="grow">
-                      <div className="bold small">
-                        {groupOf(p.group)?.name || p.group} <span className="badge"><Tr text={'v{0}'} args={[p.version]} /></span>
-                      </div>
-                      <div className="faint tiny">{tr('shared policy group, expanded inline at projection')}</div>
-                    </div>
-                    {groupOf(p.group)?.last_version > p.version && (
-                      <>
-                        <span className="badge warning"><Tr text={'v{0} available'} args={[groupOf(p.group).last_version]} /></span>
-                        {!readOnly && (
-                          <button className="btn xs" onClick={() => updateFlow(f.id, { plugins: f.plugins.map((x, j) => (j === i ? { ...x, version: groupOf(p.group).last_version } : x)) })}>
-                            {tr('Upgrade')}
-                          </button>
-                        )}
-                      </>
-                    )}
+                    <input className="input" style={{ maxWidth: 280, fontWeight: 600 }} value={f.name} disabled={readOnly} onChange={(e) => updateFlow(f.id, { name: e.target.value })} aria-label={tr('flow name')} />
+                    <span className="faint small grow ellipsis">{usage.length ? tr('runs for {0}', [usage.join(' · ')]) : tr('not used yet')}</span>
                     {!readOnly && (
                       <>
-                        <MoveButtons index={i} count={f.plugins.length} onMove={move} />
-                        <button className="btn ghost sm icon" onClick={remove} aria-label={tr('remove')}>
+                        <button className="btn sm" onClick={() => setEditing({ flowId: f.id, index: -1, value: { plugin: '', enabled: true, include: [], exclude: [], config: {} } })}>
+                          <Icon name="plus" /> {tr('Add plugin')}
+                        </button>
+                        <button className="btn sm" onClick={() => setAddingGroup(f.id)}>
+                          <Icon name="layers" /> {tr('Add policy group')}
+                        </button>
+                        <button className="btn ghost sm icon" disabled={usedBy + usedByPlans > 0} title={usedBy + usedByPlans > 0 ? tr('in use') : tr('delete flow')} onClick={() => setDraft((d) => ({ ...d, flows: d.flows.filter((x) => x.id !== f.id) }))}>
                           <Icon name="trash" />
                         </button>
                       </>
                     )}
                   </div>
-                ) : (
-                  <PluginRow
-                    key={i}
-                    index={i}
-                    count={f.plugins.length}
-                    plugin={p}
-                    catalog={catalog.data}
-                    readOnly={readOnly}
-                    onMove={move}
-                    onRemove={remove}
-                    onEdit={() => setEditing({ flowId: f.id, index: i, value: p })}
-                  />
-                );
-              })
-            ) : (
-              <div className="card-body muted small">{tr('No plugin.')}</div>
-            )}
+                  {f.plugins.length ? (
+                    f.plugins.map((p, i) => {
+                      const move = (delta) => updateFlow(f.id, { plugins: moveItem(f.plugins, i, delta) });
+                      const remove = () => updateFlow(f.id, { plugins: f.plugins.filter((_, j) => j !== i) });
+                      return p.group ? (
+                        <div key={i} className="list-item">
+                          <span className="faint tiny">{i + 1}</span>
+                          <Icon name="layers" />
+                          <div className="grow">
+                            <div className="bold small">
+                              {groupOf(p.group)?.name || p.group} <span className="badge"><Tr text={'v{0}'} args={[p.version]} /></span>
+                            </div>
+                            <div className="faint tiny">{tr('shared policy group, expanded inline at projection')}</div>
+                          </div>
+                          {groupOf(p.group)?.last_version > p.version && (
+                            <>
+                              <span className="badge warning"><Tr text={'v{0} available'} args={[groupOf(p.group).last_version]} /></span>
+                              {!readOnly && (
+                                <button className="btn xs" onClick={() => updateFlow(f.id, { plugins: f.plugins.map((x, j) => (j === i ? { ...x, version: groupOf(p.group).last_version } : x)) })}>
+                                  {tr('Upgrade')}
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {!readOnly && (
+                            <>
+                              <MoveButtons index={i} count={f.plugins.length} onMove={move} />
+                              <button className="btn ghost sm icon" onClick={remove} aria-label={tr('remove')}>
+                                <Icon name="trash" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <PluginRow
+                          key={i}
+                          index={i}
+                          count={f.plugins.length}
+                          plugin={p}
+                          catalog={catalog.data}
+                          readOnly={readOnly}
+                          onMove={move}
+                          onRemove={remove}
+                          onEdit={() => setEditing({ flowId: f.id, index: i, value: p })}
+                        />
+                      );
+                    })
+                  ) : (
+                    <div className="card-body muted small">{tr('No plugin.')}</div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        ) : (
+          <div className="card">
+            <Empty title={page.q ? tr('No flow matches') : tr('No flow')} icon="layers" />
+          </div>
+        )}
+        {page.items.length > 0 && (
+          <div className="mt-16">
+            <Pager paging={page} total={page.total} />
+          </div>
+        )}
+      </div>
       {!readOnly && (
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => setDraft((d) => ({ ...d, flows: [...d.flows, { id: rid('flow'), name: 'New flow', plugins: [] }] }))}>
           <Icon name="plus" /> {tr('Add flow')}
@@ -826,6 +913,8 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
   const teams = useLoad(() => wapi.get('/teams'), [slug]);
   const metaFields = useMetadataFields('api');
   const projection = useLoad(() => wapi.get(`/apis/${api.id}/projection`), [api.id]);
+  const gwPage = useLocalPaging(projection.data?.gateway_deployments, { prefix: 'gwdeps', size: 10, text: (d) => `${d.snapshot_number != null ? `#${d.snapshot_number}` : ''} ${d.ref || ''} ${d.owner || ''} ${fmtDate(d.at)} ${d.id}` });
+  const derivedPage = useLocalPaging(projection.data?.derived, { prefix: 'derived', size: 10, text: (d) => `${d.kind} ${d.id} ${d.name || ''} ${d.present ? tr('present') : tr('missing')}` });
   const [version, setVersion] = useState('');
   const lifecycle = async (l) => {
     try {
@@ -966,12 +1055,22 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                   <dt>{tr('Otoroshi deployments')}</dt>
                   <dd className="col gap-4">
                     {p.gateway_deployments?.length ? (
-                      p.gateway_deployments.map((d) => (
-                        <span key={d.id} className="small">
-                          {fmtDate(d.at)} — {d.snapshot_number != null ? tr('snapshot #{0}', [d.snapshot_number]) : <span className="mono">{d.ref || tr('no ref')}</span>}{' '}
-                          <span className="faint mono">{d.owner}</span>
-                        </span>
-                      ))
+                      <>
+                        <ListToolbar paging={gwPage} placeholder={tr('search snapshots, refs, owners')} onReload={projection.reload} loading={projection.loading} />
+                        {gwPage.items.length ? (
+                          <>
+                            {gwPage.items.map((d) => (
+                              <span key={d.id} className="small">
+                                {fmtDate(d.at)} — {d.snapshot_number != null ? tr('snapshot #{0}', [d.snapshot_number]) : <span className="mono">{d.ref || tr('no ref')}</span>}{' '}
+                                <span className="faint mono">{d.owner}</span>
+                              </span>
+                            ))}
+                            <Pager paging={gwPage} total={gwPage.total} />
+                          </>
+                        ) : (
+                          <span className="faint small">{tr('No deployment matches.')}</span>
+                        )}
+                      </>
                     ) : (
                       <span className="faint small">{tr('none recorded')}</span>
                     )}
@@ -980,11 +1079,19 @@ export function SettingsTab({ api, draft, setDraft, identity, setIdent, readOnly
                     <>
                       <dt>{tr('Derived objects')}</dt>
                       <dd className="col gap-4">
-                        {p.derived.map((d) => (
-                          <span key={d.id} className="small">
-                            {d.kind} <span className="mono">{d.id}</span> {d.present ? <StatusBadge status="deployed" label={tr('present')} /> : <StatusBadge status="missing" />}
-                          </span>
-                        ))}
+                        <ListToolbar paging={derivedPage} placeholder={tr('search kinds, ids, names')} />
+                        {derivedPage.items.length ? (
+                          <>
+                            {derivedPage.items.map((d) => (
+                              <span key={d.id} className="small">
+                                {d.kind} <span className="mono">{d.id}</span> {d.present ? <StatusBadge status="deployed" label={tr('present')} /> : <StatusBadge status="missing" />}
+                              </span>
+                            ))}
+                            <Pager paging={derivedPage} total={derivedPage.total} />
+                          </>
+                        ) : (
+                          <span className="faint small">{tr('No derived object matches.')}</span>
+                        )}
                       </dd>
                     </>
                   )}

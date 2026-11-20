@@ -342,7 +342,8 @@ function Members() {
       )}
       <ListToolbar paging={membersPage} placeholder={tr('search members, emails, roles, tags')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {() => (
+        {() =>
+          membersPage.items.length ? (
           <div className="card">
           <div className="table-wrap">
             <table className="table">
@@ -404,7 +405,12 @@ function Members() {
           </div>
           <Pager paging={membersPage} total={membersPage.total} />
           </div>
-        )}
+          ) : (
+            <div className="card">
+              <Empty title={membersPage.q ? tr('No member matches') : tr('No member')} icon="users" />
+            </div>
+          )
+        }
       </Loader>
     </div>
   );
@@ -414,6 +420,7 @@ function Teams() {
   const { wapi, slug } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/teams'), [slug]);
+  const page = useLocalPaging(state.data, { prefix: 'teams', size: 25, text: (t) => `${t.name} ${t.id}` });
   const [name, setName] = useState('');
   const [open, setOpen] = useState(null);
   return (
@@ -438,10 +445,12 @@ function Teams() {
           </button>
         </div>
       </div>
+      <ListToolbar paging={page} placeholder={tr('search teams')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(teams) => (
+        {() => (
           <div className="card">
-            {teams.map((t) => (
+            {!page.items.length && <Empty title={page.q ? tr('No team matches') : tr('No team')} icon="users" />}
+            {page.items.map((t) => (
               <div key={t.id} className="list-item">
                 <Icon name="users" />
                 <div className="grow">
@@ -456,6 +465,7 @@ function Teams() {
                 </button>
               </div>
             ))}
+            <Pager paging={page} total={page.total} />
           </div>
         )}
       </Loader>
@@ -468,6 +478,7 @@ function TeamMembers({ id, onClose }) {
   const { wapi, isAdmin, session } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get(`/teams/${id}`), [id]);
+  const page = useLocalPaging(state.data?.members, { local: true, size: 10, text: (m) => `${m.name} ${m.email} ${m.role}` });
   const [email, setEmail] = useState('');
   return (
     <Modal title={tr('Team members')} onClose={onClose}>
@@ -496,26 +507,38 @@ function TeamMembers({ id, onClose }) {
               </button>
             </div>
             )}
-            {t.members.map((m) => (
-              <div key={m.id} className="row">
-                <span className="grow">
-                  {m.name} <span className="faint small">{m.email}</span>
-                </span>
-                <Badge>{m.role}</Badge>
-                {manages && (
-                <button
-                  className="btn ghost sm icon"
-                  aria-label={tr('remove')}
-                  onClick={async () => {
-                    await wapi.del(`/teams/${id}/members/${m.id}`);
-                    state.reload();
-                  }}
-                >
-                  <Icon name="trash" />
-                </button>
+            <div>
+              <ListToolbar paging={page} placeholder={tr('search members, emails, roles')} />
+              <div className="card">
+                {page.items.length ? (
+                  <>
+                    {page.items.map((m) => (
+                      <div key={m.id} className="list-item">
+                        <span className="grow">
+                          {m.name} <span className="faint small">{m.email}</span>
+                        </span>
+                        <Badge>{m.role}</Badge>
+                        {manages && (
+                        <button
+                          className="btn ghost sm icon"
+                          aria-label={tr('remove')}
+                          onClick={async () => {
+                            await wapi.del(`/teams/${id}/members/${m.id}`);
+                            state.reload();
+                          }}
+                        >
+                          <Icon name="trash" />
+                        </button>
+                        )}
+                      </div>
+                    ))}
+                    <Pager paging={page} total={page.total} />
+                  </>
+                ) : (
+                  <Empty title={page.q ? tr('No member matches') : tr('No member')} icon="users" />
                 )}
               </div>
-            ))}
+            </div>
           </>
           );
         }}
@@ -542,10 +565,12 @@ function MetadataSettings() {
   const [fields, setFields] = useState(null);
   const [editing, setEditing] = useState(null);
   const [values, setValues] = useState(null);
+  // the fields as edited, before they are saved
+  const list = fields || state.data || [];
+  const page = useLocalPaging(list, { prefix: 'fields', size: 25, text: (f) => `${f.scope} ${f.key} ${f.label} ${f.type} ${(f.options || []).join(' ')} ${f.help || ''}` });
   return (
     <Loader state={state}>
-      {(stored) => {
-        const list = fields || stored;
+      {() => {
         const save = async () => {
           try {
             await wapi.put('/metadata-fields', { fields: list });
@@ -556,20 +581,24 @@ function MetadataSettings() {
             toast(errorMessage(e), 'error');
           }
         };
+        // read only, the edits are disabled but the fields are still searched and paged
         return (
-          <ReadOnly when={!isAdmin}>
           <div className="col gap-16">
+            {!isAdmin && <Callout kind="info">{tr('Read only: the administrators of the workspace change these settings.')}</Callout>}
             <Callout kind="info">
               <Tr text={'Typed key/values attached to an object, wherever the model cannot foresee everything. They serve display, notifications and the review of requests, and are never projected on the gateway. On the subscription scope, the fields marked {0} form the request form of every plan.'} args={[<b>{tr('portal')}</b>]} />
             </Callout>
             <div className="card">
               <div className="card-head">
                 <h3 className="grow">{tr('Fields')}</h3>
-                <button className="btn sm" onClick={() => setEditing({ scope: 'subscription', key: '', label: '', type: 'string', options: [], required: false, portal: false, help: '', _new: true })}>
+                <button className="btn sm" disabled={!isAdmin} onClick={() => setEditing({ scope: 'subscription', key: '', label: '', type: 'string', options: [], required: false, portal: false, help: '', _new: true })}>
                   <Icon name="plus" /> {tr('Add field')}
                 </button>
               </div>
-              {list.length ? (
+              <div className="card-body" style={{ paddingBottom: 0 }}>
+                <ListToolbar paging={page} placeholder={tr('search scopes, keys, labels, types')} />
+              </div>
+              {page.items.length ? (
                 <div className="table-wrap">
                   <table className="table">
                     <thead>
@@ -583,7 +612,7 @@ function MetadataSettings() {
                       </tr>
                     </thead>
                     <tbody>
-                      {list.map((f, i) => (
+                      {page.items.map((f) => (
                         <tr key={`${f.scope}:${f.key}`}>
                           <td>
                             <Badge>{f.scope}</Badge>
@@ -595,10 +624,10 @@ function MetadataSettings() {
                             {f.required && <Badge kind="warning">{tr('required')}</Badge>} {f.portal && <Badge kind="accent">{tr('portal')}</Badge>}
                           </td>
                           <td className="actions">
-                            <button className="btn ghost sm icon" onClick={() => setEditing({ ...f, _index: i })} aria-label={tr('edit')}>
+                            <button className="btn ghost sm icon" disabled={!isAdmin} onClick={() => setEditing({ ...f, _index: list.indexOf(f) })} aria-label={tr('edit')}>
                               <Icon name="edit" />
                             </button>
-                            <button className="btn ghost sm icon" onClick={() => setFields(list.filter((_, j) => j !== i))} aria-label={tr('remove')}>
+                            <button className="btn ghost sm icon" disabled={!isAdmin} onClick={() => setFields(list.filter((x) => x !== f))} aria-label={tr('remove')}>
                               <Icon name="trash" />
                             </button>
                           </td>
@@ -608,8 +637,9 @@ function MetadataSettings() {
                   </table>
                 </div>
               ) : (
-                <div className="card-body muted small">{tr('No field declared.')}</div>
+                <div className="card-body muted small">{page.q ? tr('No field matches.') : tr('No field declared.')}</div>
               )}
+              {page.items.length > 0 && <Pager paging={page} total={page.total} />}
               {fields && (
                 <div className="card-body row" style={{ borderTop: '1px solid var(--border)' }}>
                   <button className="btn primary sm" onClick={save}>
@@ -626,7 +656,7 @@ function MetadataSettings() {
                 <div className="card-head">
                   <h3>{tr('Values of this workspace')}</h3>
                 </div>
-                <div className="card-body col">
+                <fieldset disabled={!isAdmin} className="ro-fieldset card-body col">
                   <MetadataForm fields={wsFields} values={values || ws.metadata} onChange={setValues} />
                   <button
                     className="btn primary"
@@ -645,7 +675,7 @@ function MetadataSettings() {
                   >
                     {tr('Save')}
                   </button>
-                </div>
+                </fieldset>
               </div>
             )}
             {editing && (
@@ -715,7 +745,6 @@ function MetadataSettings() {
               </Modal>
             )}
           </div>
-          </ReadOnly>
         );
       }}
     </Loader>
@@ -847,6 +876,7 @@ function PreviewModal({ cat, onClose, onSynced }) {
   const { wapi } = useWs();
   const toast = useToast();
   const plan = useLoad(() => wapi.post(`/catalogs/${cat.id}/preview`), [cat.id]);
+  const page = useLocalPaging(plan.data?.items, { local: true, size: 10, text: (i) => `${i.slug} ${i.version} ${i.action} ${i.reason || ''}` });
   const [busy, setBusy] = useState(false);
   const kind = { create: 'positive', update: 'warning', delete: 'negative', conflict: 'negative', orphaned: 'info', unchanged: '' };
   return (
@@ -880,7 +910,8 @@ function PreviewModal({ cat, onClose, onSynced }) {
         {(p) => (
           <>
             {p.revision && <div className="small muted"><Tr text={'revision {0}{1}'} args={[<span className="mono">{String(p.revision).slice(0, 12)}</span>, p.ignored ? tr(' · {0} non-api document(s) ignored', [p.ignored]) : '']} /></div>}
-            {p.items.map((i) => (
+            {p.items.length > 0 && <ListToolbar paging={page} placeholder={tr('search apis, versions, actions')} />}
+            {page.items.map((i) => (
               <div key={`${i.slug}@${i.version}`} className="panel col gap-6">
                 <div className="row">
                   <Badge kind={kind[i.action]}>{i.action}</Badge>
@@ -893,6 +924,8 @@ function PreviewModal({ cat, onClose, onSynced }) {
                 {i.changes?.length > 0 && <DiffView changes={i.changes} />}
               </div>
             ))}
+            {p.items.length > 0 && !page.items.length && <p className="muted small">{tr('No api document matches.')}</p>}
+            {p.items.length > 0 && <Pager paging={page} total={page.total} />}
             {!p.items.length && <p className="muted small">{tr('The source carries no api document.')}</p>}
           </>
         )}
@@ -906,6 +939,7 @@ function Catalogs() {
   const toast = useToast();
   const confirm = useConfirm();
   const state = useLoad(() => wapi.get('/catalogs'), [slug]);
+  const page = useLocalPaging(state.data, { prefix: 'catalogs', size: 25, text: (c) => `${c.name} ${c.kind} ${c.mode} ${c.url} ${c.ref || ''} ${c.path || ''} ${c.last_sync?.error || ''}` });
   const [editing, setEditing] = useState(null);
   const [previewing, setPreviewing] = useState(null);
   return (
@@ -918,11 +952,12 @@ function Catalogs() {
           <Icon name="plus" /> {tr('Add catalog')}
         </button>
       </div>
+      <ListToolbar paging={page} placeholder={tr('search catalogs, urls, kinds, modes')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(list) =>
-          list.length ? (
+        {() =>
+          page.items.length ? (
             <div className="card">
-              {list.map((c) => (
+              {page.items.map((c) => (
                 <div key={c.id} className="list-item" style={{ alignItems: 'flex-start' }}>
                   <Icon name="git" />
                   <div className="grow" style={{ minWidth: 0 }}>
@@ -966,10 +1001,11 @@ function Catalogs() {
                   </button>
                 </div>
               ))}
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title={tr('No remote catalog')} icon="git" />
+              <Empty title={page.q ? tr('No catalog matches') : tr('No remote catalog')} icon="git" />
             </div>
           )
         }

@@ -1,9 +1,10 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, Code, CopyButton, Empty, ErrorBox, Icon, Loader, Loading, Markdown, Seg, Select, useLoad } from '../../shared/ui.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { api, usePortal } from '../context.jsx';
 import { pickLang, useI18n } from '../i18n.jsx';
-import { LifecycleBadge, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
+import { LifecycleBadge, SmallPager, SmallSearch, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
 import { Reviews } from './Reviews.jsx';
 import { Events } from './AsyncApi.jsx';
@@ -13,6 +14,8 @@ import { RequestComposer } from '../../shared/composer.jsx';
 const ApiReference = lazy(() => import('./ApiReference.jsx'));
 
 const LANG_NAMES = { en: 'English', fr: 'Français', de: 'Deutsch', es: 'Español', it: 'Italiano', nl: 'Nederlands', pt: 'Português' };
+// the plans beside the overview are a preview: the plans tab lists, searches and pages them all
+const PLANS_PREVIEW = 5;
 
 export function ApiPage({ id, tab, page }) {
   const { user } = usePortal();
@@ -144,6 +147,7 @@ function Overview({ a }) {
   const [creds, setCreds] = useState(null);
   const [credsMissing, setCredsMissing] = useState(false);
   const apps = useLoad(() => (user ? api.get('/applications') : Promise.resolve([])), [user?.id]);
+  const resources = useLocalPaging(a.resources, { local: true, size: 10, text: (r) => `${(r.methods || []).join(' ')} ${r.path} ${r.name || ''} ${r.description || ''}` });
   const spec = useLoad(() => (a.has_openapi ? api.get(`/apis/${a.id}/openapi`).catch(() => null) : Promise.resolve(null)), [a.id]);
   const sample = useMemo(() => {
     const paths = Object.entries(spec.data?.paths || {});
@@ -237,13 +241,16 @@ function Overview({ a }) {
             <h3>{t('api.resources')}</h3>
           </div>
           <div className="card-body col gap-6">
-            {a.resources.map((r, i) => (
-              <div key={i} className="row gap-6 small">
+            <SmallSearch paging={resources} count={a.resources.length} placeholder={t('api.resources.search')} />
+            {resources.items.map((r, i) => (
+              <div key={`${resources.offset + i}`} className="row gap-6 small">
                 <span className="tag mono">{r.methods?.length ? r.methods.join(' ') : t('api.allmethods')}</span>
                 <code className="ellipsis">{r.path}</code>
                 <span className="muted ellipsis grow">{r.name}</span>
               </div>
             ))}
+            {resources.q && !resources.items.length && <div className="muted small">{t('api.resources.nomatch')}</div>}
+            <SmallPager paging={resources} />
           </div>
         </div>
         <div className="card">
@@ -254,12 +261,17 @@ function Overview({ a }) {
             </Link>
           </div>
           <div className="card-body col gap-6">
-            {a.plans.map((p) => (
+            {a.plans.slice(0, PLANS_PREVIEW).map((p) => (
               <div key={p.id} className="row gap-6 small">
                 <span className="bold grow ellipsis">{p.name}</span>
                 <span className="tag">{authLabel(p.auth_kind)}</span>
               </div>
             ))}
+            {a.plans.length > PLANS_PREVIEW && (
+              <Link to={`/apis/${a.id}/plans`} className="link small">
+                {t('api.morePlans', { n: a.plans.length - PLANS_PREVIEW })}
+              </Link>
+            )}
             {!a.plans.length && <div className="muted small">{t('plan.none')}</div>}
           </div>
         </div>
@@ -288,12 +300,20 @@ function orderPages(pages) {
 function Docs({ a, page }) {
   const { t, lang } = useI18n();
   const pages = useMemo(() => orderPages(a.pages || []), [a.pages]);
+  // the pages of the menu, searched by their titles in every language; its state stays in the component
+  // from one page read to the next (their links leave the query string)
+  const nav = useLocalPaging(pages, { local: true, size: 25, text: (p) => `${p.slug} ${p.title && typeof p.title === 'object' ? Object.values(p.title).join(' ') : p.title || ''}` });
   const languages = a.languages?.length ? a.languages : ['en'];
   const [docLang, setDocLang] = useState(languages.includes(lang) ? lang : a.default_language || languages[0]);
   useEffect(() => {
     if (languages.includes(lang)) setDocLang(lang);
   }, [lang]);
   const current = page || pages[0]?.slug;
+  // the menu shows the page read
+  useEffect(() => {
+    const i = pages.findIndex((p) => p.slug === current);
+    if (!nav.q && i >= 0) nav.setPage(Math.floor(i / nav.limit) + 1);
+  }, [current, pages]);
   const state = useLoad(() => (current ? api.get(`/apis/${a.id}/pages/${current}`) : Promise.resolve(null)), [a.id, current]);
   if (!pages.length)
     return (
@@ -304,17 +324,22 @@ function Docs({ a, page }) {
   return (
     <div className="pt-docs">
       <nav className="pt-docs-nav" aria-label={t('api.tab.docs')}>
-        {pages.map((p) => (
+        {(pages.length > 1 || nav.q) && (
+          <input className="input mb-8" type="search" value={nav.q} onChange={(e) => nav.setQ(e.target.value)} placeholder={t('api.docs.search')} aria-label={t('api.docs.search')} />
+        )}
+        {nav.items.map((p) => (
           <Link
             key={p.id}
             to={`/apis/${a.id}/docs/${p.slug}`}
             className={`pt-docs-link ${p.slug === current ? 'on' : ''}`}
-            style={{ paddingLeft: 10 + p.depth * 14 }}
+            style={{ paddingLeft: 10 + (nav.q ? 0 : p.depth * 14) }}
             aria-current={p.slug === current ? 'page' : undefined}
           >
             {pickLang(p.title, docLang, a.default_language) || p.slug}
           </Link>
         ))}
+        {nav.q && !nav.items.length && <div className="muted small" style={{ padding: '7px 10px' }}>{t('api.docs.nomatch')}</div>}
+        <SmallPager paging={nav} />
       </nav>
       <article className="card pt-docs-body">
         <div className="card-body">
@@ -491,6 +516,7 @@ function Plans({ a }) {
   const { navigate, path } = useRouter();
   const [params, setParams] = useQuery();
   const wanted = params.get('subscribe');
+  const page = useLocalPaging(a.plans, { prefix: 'pl', size: 25, text: (p) => `${p.name} ${p.description || ''} ${authLabel(p.auth_kind)} ${priceLabel(t, p.pricing)}` });
   const [plan, setPlan] = useState(null);
   useEffect(() => {
     if (wanted && user) {
@@ -513,11 +539,23 @@ function Plans({ a }) {
     );
   return (
     <>
-      <div className="pt-plans">
-        {a.plans.map((p) => (
-          <PlanCard key={p.id} plan={p} user={user} onSubscribe={onSubscribe} />
-        ))}
-      </div>
+      <ListToolbar paging={page} placeholder={t('plan.search')} />
+      {page.items.length ? (
+        <div className="pt-plans">
+          {page.items.map((p) => (
+            <PlanCard key={p.id} plan={p} user={user} onSubscribe={onSubscribe} />
+          ))}
+        </div>
+      ) : (
+        <div className="card">
+          <Empty title={t('plan.nomatch')} icon="search" />
+        </div>
+      )}
+      {page.total > 0 && (
+        <div className="mt-16">
+          <Pager paging={page} total={page.total} />
+        </div>
+      )}
       <p className="muted small mt-16 row gap-6">
         <Icon name="info" size={14} />
         {t('plan.perCredential')}

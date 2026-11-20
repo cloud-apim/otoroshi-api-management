@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { Callout, Code, Empty, Field, Icon, Input, Loader, Modal, Secret, Select, TextArea, errorMessage, useConfirm, useLoad, useToast, Badge } from '../../shared/ui.jsx';
 import { fmtDate, fmtNumber } from '../../shared/lib.js';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { api } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
-import { PageHeader, RequireUser, SubStatus, authLabel, snippets } from '../common.jsx';
+import { PageHeader, RequireUser, SmallPager, SmallSearch, SubStatus, authLabel, snippets } from '../common.jsx';
 import { CertificateList } from '../../shared/certificates.jsx';
 
 const TOKEN_KINDS = ['jwt', 'mtls', 'oauth2-remote'];
@@ -78,6 +79,7 @@ function AppsList() {
   const { t } = useI18n();
   const { navigate } = useRouter();
   const state = useLoad(() => api.get('/applications'), []);
+  const page = useLocalPaging(state.data, { size: 25, text: (a) => `${a.name} ${a.description || ''} ${a.team_personal ? t('teams.personal') : a.team_name}` });
   const [creating, setCreating] = useState(false);
   return (
     <div className="pt-container pt-section">
@@ -113,30 +115,44 @@ function AppsList() {
               </Empty>
             </div>
           ) : (
-            <div className="pt-grid">
-              {apps.map((a) => (
-                <Link key={a.id} to={`/apps/${a.id}`} className="card pt-api-card">
-                  <div className="row gap-6">
-                    <span className="pt-api-icon" aria-hidden="true">
-                      <Icon name="apps" />
-                    </span>
-                    <div className="grow">
-                      <h3 className="ellipsis">{a.name}</h3>
-                      <div className="faint tiny">
-                        {t('apps.team')}: {a.team_personal ? t('teams.personal') : a.team_name}
-                      </div>
-                    </div>
+            <>
+              <ListToolbar paging={page} placeholder={t('apps.search')} onReload={state.reload} loading={state.loading} />
+              {page.items.length ? (
+                <>
+                  <div className="pt-grid">
+                    {page.items.map((a) => (
+                      <Link key={a.id} to={`/apps/${a.id}`} className="card pt-api-card">
+                        <div className="row gap-6">
+                          <span className="pt-api-icon" aria-hidden="true">
+                            <Icon name="apps" />
+                          </span>
+                          <div className="grow">
+                            <h3 className="ellipsis">{a.name}</h3>
+                            <div className="faint tiny">
+                              {t('apps.team')}: {a.team_personal ? t('teams.personal') : a.team_name}
+                            </div>
+                          </div>
+                        </div>
+                        {a.description && <p className="muted small mt-8 pt-clamp">{a.description}</p>}
+                        <div className="row wrap gap-6 mt-16">
+                          <Badge kind={a.active_subscriptions ? 'positive' : ''} dot>
+                            {t('apps.subs', { n: a.active_subscriptions })}
+                          </Badge>
+                          {a.pending_subscriptions > 0 && <Badge kind="warning">{t('apps.pending', { n: a.pending_subscriptions })}</Badge>}
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                  {a.description && <p className="muted small mt-8 pt-clamp">{a.description}</p>}
-                  <div className="row wrap gap-6 mt-16">
-                    <Badge kind={a.active_subscriptions ? 'positive' : ''} dot>
-                      {t('apps.subs', { n: a.active_subscriptions })}
-                    </Badge>
-                    {a.pending_subscriptions > 0 && <Badge kind="warning">{t('apps.pending', { n: a.pending_subscriptions })}</Badge>}
+                  <div className="mt-16">
+                    <Pager paging={page} total={page.total} />
                   </div>
-                </Link>
-              ))}
-            </div>
+                </>
+              ) : (
+                <div className="card">
+                  <Empty title={t('apps.nomatch')} icon="search" />
+                </div>
+              )}
+            </>
           )
         }
       </Loader>
@@ -167,6 +183,11 @@ function AppDetailView({ id }) {
   const confirm = useConfirm();
   const { navigate } = useRouter();
   const state = useLoad(() => api.get(`/applications/${id}`), [id]);
+  const subs = useLocalPaging(state.data?.subscriptions, {
+    prefix: 'subs',
+    size: 10,
+    text: (s) => `${s.api_name} v${s.api_version} ${s.request?.plan_name || s.plan_id} ${authLabel(s.auth_kind)} ${t(`status.${s.status}`)} ${(s.credentials || []).map((c) => c.client_id).join(' ')}`,
+  });
   const [form, setForm] = useState(null);
   // back from the Checkout of Stripe
   const checkout = new URLSearchParams(window.location.search).get('checkout');
@@ -229,7 +250,17 @@ function AppDetailView({ id }) {
                     <Empty title={t('apps.noSubs')} icon="key" />
                   </div>
                 ) : (
-                  app.subscriptions.map((s) => <SubscriptionCard key={s.id} sub={s} app={app} onChange={state.reload} />)
+                  <>
+                    <ListToolbar paging={subs} placeholder={t('apps.subs.search')} />
+                    {subs.items.length ? (
+                      subs.items.map((s) => <SubscriptionCard key={s.id} sub={s} app={app} onChange={state.reload} />)
+                    ) : (
+                      <div className="card">
+                        <Empty title={t('apps.subs.nomatch')} icon="search" />
+                      </div>
+                    )}
+                    {subs.total > 0 && <Pager paging={subs} total={subs.total} />}
+                  </>
                 )}
               </div>
               <aside className="col gap-16">
@@ -259,7 +290,7 @@ function AppDetailView({ id }) {
                         addLabel={t('apps.certs.add')}
                         addTitle={t('apps.certs.addTitle')}
                         addHelp={t('apps.certs.addHelp')}
-                        labels={Object.fromEntries(['selfSigned', 'validUntil', 'identifiedAs', 'useAsClientId', 'issuedBy', 'remove', 'cancel', 'add', 'incomplete'].map((k) => [k, t(`certs.${k}`)]))}
+                        labels={Object.fromEntries(['selfSigned', 'validUntil', 'identifiedAs', 'useAsClientId', 'issuedBy', 'remove', 'cancel', 'add', 'incomplete', 'search', 'nomatch'].map((k) => [k, t(`certs.${k}`)]))}
                         clientId={form.client_id}
                         onClientId={(v) => setForm({ ...form, client_id: v })}
                       />
@@ -308,12 +339,50 @@ function QuotaRow({ label, current, total, remaining }) {
   );
 }
 
-// the calls a subscription to a plan with a usage price is billed for, as reported to the billing
+// the calls a subscription to a plan with a usage price is billed for, batch by batch as reported to
+// the billing: searched and paged on the server, the batches of a long subscription are many
 function UsageBilled({ sub }) {
   const { t } = useI18n();
-  const state = useLoad(() => api.get(`/subscriptions/${sub.id}/usage`).catch(() => null), [sub.id]);
-  if (!state.data?.reports?.length) return null;
-  return <div className="muted small">{t('subs.usage', { sent: fmtNumber(state.data.sent), pending: fmtNumber(state.data.pending) })}</div>;
+  const page = usePaging({ local: true, size: 10 });
+  const state = useLoad(() => api.get(`/subscriptions/${sub.id}/usage?${page.query}`).catch(() => null), [sub.id, page.key]);
+  if (!state.data || (!state.data.total && !page.q)) return null;
+  const u = state.data;
+  return (
+    <div className="col gap-6">
+      <span className="label">{t('subs.usage.title')}</span>
+      <div className="muted small">{t('subs.usage', { sent: fmtNumber(u.sent), pending: fmtNumber(u.pending) })}</div>
+      <ListToolbar paging={page} placeholder={t('subs.usage.search')} onReload={state.reload} loading={state.loading} />
+      {u.reports.length ? (
+        <div className="table-wrap" style={{ opacity: state.loading ? 0.6 : 1 }}>
+          <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
+            <thead>
+              <tr>
+                <th>{t('subs.usage.batch')}</th>
+                <th className="right">{t('subs.usage.calls')}</th>
+                <th>{t('subs.usage.status')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {u.reports.map((r) => (
+                <tr key={r.id}>
+                  <td className="nowrap muted">{fmtDate(r.created_at)}</td>
+                  <td className="right">{fmtNumber(r.value)}</td>
+                  <td>
+                    <Badge kind={r.status === 'sent' ? 'positive' : 'warning'} dot>
+                      {t(r.status === 'sent' ? 'subs.usage.sent' : 'subs.usage.pending')}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="faint small">{t('subs.usage.nomatch')}</p>
+      )}
+      <Pager paging={page} total={u.total} />
+    </div>
+  );
 }
 
 function Quotas({ sub }) {
@@ -480,6 +549,7 @@ function SubscriptionCard({ sub, app, onChange }) {
   const toast = useToast();
   const confirm = useConfirm();
   const creds = (sub.credentials || []).filter((c) => c.status === 'active');
+  const credsPage = useLocalPaging(creds, { local: true, size: 10, text: (c) => `${c.client_id} ${c.kind || ''}` });
   const closable = ['active', 'pending', 'pending_payment', 'suspended', 'expired'].includes(sub.status);
   const [pay, setPay] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -564,7 +634,9 @@ function SubscriptionCard({ sub, app, onChange }) {
         {['active', 'suspended'].includes(sub.status) && !TOKEN_KINDS.includes(sub.auth_kind) && sub.auth_kind !== 'keyless' && !creds.length && (
           <div className="muted small">{t('subs.noCreds.sync')}</div>
         )}
-        {creds.map((c) => (
+        <SmallSearch paging={credsPage} count={creds.length} placeholder={t('subs.creds.search')} />
+        {credsPage.q && !credsPage.items.length && <div className="muted small">{t('subs.creds.nomatch')}</div>}
+        {credsPage.items.map((c) => (
           <div key={c.id} className="col gap-16">
             <dl className="kv">
               <dt>{t('subs.clientId')}</dt>
@@ -588,6 +660,7 @@ function SubscriptionCard({ sub, app, onChange }) {
             </details>
           </div>
         ))}
+        <SmallPager paging={credsPage} />
         {sub.status === 'active' && creds.length > 0 && <Quotas sub={sub} />}
         {sub.payment?.provider_subscription && <UsageBilled sub={sub} />}
         {sub.payment?.status === 'past_due' && <Callout kind="warning">{t('subs.pastDue', { days: sub.payment.grace_days ?? 7 })}</Callout>}

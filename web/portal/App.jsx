@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, Switch as Routes, useRouter } from '../shared/router.jsx';
 import { Icon, Loading, ErrorBox, Dropdown, MenuItem } from '../shared/ui.jsx';
 import { getThemePref, setThemePref } from '../shared/lib.js';
+import { usePaging } from '../shared/lists.jsx';
 import { api, usePortal } from './context.jsx';
 import { I18nProvider, useI18n, usePortalText, UI_LANGUAGES } from './i18n.jsx';
+import { SmallPager, SmallSearch } from './common.jsx';
 import { Home } from './pages/Home.jsx';
 import { Catalogue } from './pages/Catalogue.jsx';
 import { ApiPage } from './pages/ApiPage.jsx';
@@ -78,14 +80,62 @@ function LangMenu() {
   );
 }
 
+// the notifications in the menu, searched and paged on the server, in the menu itself: a click on the
+// search or the pager keeps it open
+function NotificationList({ data, page }) {
+  const { t } = useI18n();
+  const { navigate } = useRouter();
+  const keep = (e) => e.stopPropagation();
+  const items = data.items || [];
+  const paging = { ...page, total: data.total || 0 };
+  return (
+    <div style={{ width: 320 }}>
+      {(paging.total > 1 || page.q) && (
+        <div onClick={keep} style={{ padding: 6 }}>
+          <SmallSearch paging={page} count={paging.total} placeholder={t('notif.search')} />
+        </div>
+      )}
+      <div style={{ maxHeight: 360, overflow: 'auto' }}>
+        {!items.length && !page.q && (
+          <div className="muted small" style={{ padding: 10 }}>
+            {t('notif.empty')}
+          </div>
+        )}
+        {items.map((n) => (
+          <button key={n.id} className="btn ghost sm" style={{ width: '100%', height: 'auto', padding: '8px 10px', justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => n.link && navigate(n.link)}>
+            <span className="col gap-4" style={{ alignItems: 'flex-start' }}>
+              <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
+              {n.body && <span className="faint tiny">{n.body}</span>}
+            </span>
+          </button>
+        ))}
+        {page.q && !items.length && (
+          <div className="muted small" style={{ padding: 10 }}>
+            {t('notif.nomatch')}
+          </div>
+        )}
+      </div>
+      {paging.total > page.limit && (
+        <div onClick={keep} style={{ padding: '0 10px 6px' }}>
+          <SmallPager paging={paging} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // what happened to my subscriptions (systematic notification)
 function NotificationsMenu() {
   const { t } = useI18n();
-  const { navigate } = useRouter();
-  const [data, setData] = useState({ unread: 0, items: [] });
-  const load = () => api.get('/notifications').then(setData).catch(() => {});
+  const [data, setData] = useState({ unread: 0, items: [], total: 0 });
+  const page = usePaging({ local: true, size: 10 });
+  const query = useRef(page.query);
+  query.current = page.query;
+  const load = () => api.get(`/notifications?${query.current}`).then(setData).catch(() => {});
   useEffect(() => {
     load();
+  }, [page.key]);
+  useEffect(() => {
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, []);
@@ -109,22 +159,7 @@ function NotificationsMenu() {
         </button>
       )}
     >
-      <div style={{ width: 320, maxHeight: 360, overflow: 'auto' }}>
-        {data.items.length ? (
-          data.items.slice(0, 15).map((n) => (
-            <button key={n.id} className="btn ghost sm" style={{ width: '100%', height: 'auto', padding: '8px 10px', justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => n.link && navigate(n.link)}>
-              <span className="col gap-4" style={{ alignItems: 'flex-start' }}>
-                <span className={n.read_at ? '' : 'bold'}>{n.title}</span>
-                {n.body && <span className="faint tiny">{n.body}</span>}
-              </span>
-            </button>
-          ))
-        ) : (
-          <div className="muted small" style={{ padding: 10 }}>
-            {t('notif.empty')}
-          </div>
-        )}
-      </div>
+      <NotificationList data={data} page={page} />
     </Dropdown>
   );
 }

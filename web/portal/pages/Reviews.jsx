@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from '../../shared/router.jsx';
 import { Callout, Empty, Loader, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { Stars, StarsInput } from '../../shared/stars.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { api, usePortal } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
 
@@ -13,6 +14,7 @@ export function Reviews({ a }) {
   const toast = useToast();
   const state = useLoad(() => api.get(`/apis/${a.slug}/reviews`), [a.slug, user?.id]);
   const mine = state.data?.reviews.find((r) => r.mine);
+  const page = useLocalPaging(state.data?.reviews, { prefix: 'rv', size: 10, text: (x) => `${x.author || ''} ${x.comment || ''}` });
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
@@ -95,20 +97,34 @@ export function Reviews({ a }) {
             </Callout>
           )}
           {r.reviews.length ? (
-            <ul className="col gap-8 pt-reviews">
-              {r.reviews.map((x) => (
-                <li key={x.id} className="card">
-                  <div className="card-body col gap-4">
-                    <div className="row gap-8">
-                      <Stars value={x.rating} label={t('reviews.rating', { n: x.rating })} />
-                      <span className="bold small">{x.author}</span>
-                      <span className="faint tiny">{new Date(x.updated_at).toLocaleDateString(lang)}</span>
-                    </div>
-                    {x.comment && <p className="small pre-wrap">{x.comment}</p>}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div>
+              <ListToolbar paging={page} placeholder={t('reviews.search')} onReload={state.reload} loading={state.loading} />
+              {page.items.length ? (
+                <ul className="col gap-8 pt-reviews">
+                  {page.items.map((x) => (
+                    <li key={x.id} className="card">
+                      <div className="card-body col gap-4">
+                        <div className="row gap-8">
+                          <Stars value={x.rating} label={t('reviews.rating', { n: x.rating })} />
+                          <span className="bold small">{x.author}</span>
+                          <span className="faint tiny">{new Date(x.updated_at).toLocaleDateString(lang)}</span>
+                        </div>
+                        {x.comment && <p className="small pre-wrap">{x.comment}</p>}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="card">
+                  <Empty title={t('reviews.nomatch')} icon="search" />
+                </div>
+              )}
+              {page.total > 0 && (
+                <div className="mt-16">
+                  <Pager paging={page} total={page.total} />
+                </div>
+              )}
+            </div>
           ) : (
             !r.can_review && <Empty title={t('reviews.none')} />
           )}

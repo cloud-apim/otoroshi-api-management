@@ -4,6 +4,7 @@ import { fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { PluginModal, PluginRow, moveItem } from './api/tabs.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
@@ -33,6 +34,10 @@ export function PolicyGroupsPage() {
   const { navigate } = useRouter();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/policy-groups'), [slug]);
+  const page = useLocalPaging(state.data, {
+    size: 25,
+    text: (g) => `${g.name} ${g.description || ''} ${g.id} ${g.last_version ? `v${g.last_version}` : 'draft'} ${g.usage.map((u) => `${u.name} ${u.version}`).join(' ')}`,
+  });
   const [creating, setCreating] = useState(null);
   return (
     <div className="page">
@@ -46,10 +51,12 @@ export function PolicyGroupsPage() {
         }
       />
       <ApisTabs current="groups" />
+      <ListToolbar paging={page} placeholder={tr('search groups, apis')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(groups) =>
-          groups.length ? (
-            <div className="card table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -60,7 +67,7 @@ export function PolicyGroupsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groups.map((g) => (
+                  {page.items.map((g) => (
                     <tr key={g.id} className="clickable" onClick={() => navigate(`/ws/${slug}/policy-groups/${g.id}`)}>
                       <td>
                         <div className="bold">{g.name}</div>
@@ -79,11 +86,13 @@ export function PolicyGroupsPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title={tr('No shared policy group')} icon="layers">
-                {tr('For example: the security headers, the WAF and the CORS policy every public API must carry.')}
+              <Empty title={page.q ? tr('No policy group matches') : tr('No shared policy group')} icon="layers">
+                {page.q ? null : tr('For example: the security headers, the WAF and the CORS policy every public API must carry.')}
               </Empty>
             </div>
           )
@@ -132,6 +141,8 @@ export function PolicyGroupPage({ id }) {
   const [draft, setDraft] = useState(null);
   const [editing, setEditing] = useState(null);
   const [comment, setComment] = useState('');
+  const usedPage = useLocalPaging(state.data?.usage, { prefix: 'used', size: 10, text: (u) => `${u.name} ${u.version} ${u.id} v${u.pinned.join(' v')} ${u.behind ? `behind v${u.latest}` : 'latest'}` });
+  const versionsPage = useLocalPaging(state.data?.versions, { prefix: 'versions', size: 10, text: (v) => `v${v.number} ${v.comment || ''} ${v.published_by_email || ''}` });
   return (
     <div className="page">
       <Loader state={state}>
@@ -229,15 +240,24 @@ export function PolicyGroupPage({ id }) {
                       <h3 className="grow">{tr('Used by')}</h3>
                     </div>
                     {g.usage.length ? (
-                      g.usage.map((u) => (
-                        <Link key={u.id} to={`/ws/${slug}/apis/${u.id}/flows`} className="list-item" style={{ display: 'flex' }}>
-                          <span className="grow bold">
-                            {u.name} <span className="faint">{u.version}</span>
-                          </span>
-                          <span className="small"><Tr text={'pins v{0}'} args={[u.pinned.join(', v')]} /></span>
-                          {u.behind ? <span className="badge warning"><Tr text={'behind v{0}'} args={[u.latest]} /></span> : <span className="badge positive">{tr('latest')}</span>}
-                        </Link>
-                      ))
+                      <>
+                        <div className="card-body" style={{ paddingBottom: 0 }}>
+                          <ListToolbar paging={usedPage} placeholder={tr('search apis, versions')} />
+                        </div>
+                        <div>
+                          {usedPage.items.map((u) => (
+                            <Link key={u.id} to={`/ws/${slug}/apis/${u.id}/flows`} className="list-item" style={{ display: 'flex' }}>
+                              <span className="grow bold">
+                                {u.name} <span className="faint">{u.version}</span>
+                              </span>
+                              <span className="small"><Tr text={'pins v{0}'} args={[u.pinned.join(', v')]} /></span>
+                              {u.behind ? <span className="badge warning"><Tr text={'behind v{0}'} args={[u.latest]} /></span> : <span className="badge positive">{tr('latest')}</span>}
+                            </Link>
+                          ))}
+                        </div>
+                        {!usedPage.items.length && <div className="card-body muted small">{tr('No matching API')}</div>}
+                        <Pager paging={usedPage} total={usedPage.total} />
+                      </>
                     ) : (
                       <div className="card-body muted small">{tr('No API uses this group yet: add it from the policy flows of an API.')}</div>
                     )}
@@ -251,16 +271,28 @@ export function PolicyGroupPage({ id }) {
                     <div className="card-head">
                       <h3>{tr('Versions')}</h3>
                     </div>
-                    {g.versions.map((v) => (
-                      <div key={v.id} className="list-item">
-                        <Badge kind="accent"><Tr text={'v{0}'} args={[v.number]} /></Badge>
-                        <span className="grow small">{v.comment || <span className="faint">{tr('no comment')}</span>}</span>
-                        <span className="faint small">
-                          {fmtDate(v.published_at)} · {v.published_by_email}
-                        </span>
-                      </div>
-                    ))}
-                    {!g.versions.length && <div className="card-body muted small">{tr('Never published.')}</div>}
+                    {g.versions.length ? (
+                      <>
+                        <div className="card-body" style={{ paddingBottom: 0 }}>
+                          <ListToolbar paging={versionsPage} placeholder={tr('search numbers, comments, people')} />
+                        </div>
+                        <div>
+                          {versionsPage.items.map((v) => (
+                            <div key={v.id} className="list-item">
+                              <Badge kind="accent"><Tr text={'v{0}'} args={[v.number]} /></Badge>
+                              <span className="grow small">{v.comment || <span className="faint">{tr('no comment')}</span>}</span>
+                              <span className="faint small">
+                                {fmtDate(v.published_at)} · {v.published_by_email}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {!versionsPage.items.length && <div className="card-body muted small">{tr('No version matches.')}</div>}
+                        <Pager paging={versionsPage} total={versionsPage.total} />
+                      </>
+                    ) : (
+                      <div className="card-body muted small">{tr('Never published.')}</div>
+                    )}
                   </div>
                   <button
                     className="btn danger"

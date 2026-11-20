@@ -13,6 +13,7 @@ import { normalizeDraft } from '../domain/model.js';
 import { deployedSnapshot } from '../domain/deployments.js';
 import { enqueue, registerTaskHandler, PermanentError } from '../domain/tasks.js';
 import { paymentProvider } from './billing.js';
+import { likePattern } from '../http/paging.js';
 
 const LOCK = 7310452;
 const BATCH = 50000;
@@ -121,9 +122,17 @@ export function meteringAvailable() {
 }
 
 // the usage reported for a subscription
-export async function usageOf(subscriptionId) {
-  const reports = await db`select id, plan_id, value, meter_event_name, status, error, created_at, sent_at from usage_reports
-    where subscription_id = ${subscriptionId} order by created_at desc limit 200`;
-  const total = (s) => reports.filter((r) => !s || r.status === s).reduce((n, r) => n + Number(r.value), 0);
-  return { reports: reports.map((r) => ({ ...r, value: Number(r.value) })), sent: total('sent'), pending: total('pending'), failed: total('failed') };
+export async function usageOf(subscriptionId, { limit = 200, offset = 0, q = '', billedOnly = false } = {}) {
+  // the totals over every batch; the batches themselves searched (status, meter, error) and paged
+  const pattern = q ? likePattern(q) : null;
+  // the batches billed or to be: not the ones the provider refused
+  const kept = db`subscription_id = ${subscriptionId} and (not ${billedOnly}::boolean or status in ('sent', 'pending'))`;
+  const matches = db`(${pattern}::text is null or status ilike ${pattern} or meter_event_name ilike ${pattern} or coalesce(error, '') ilike ${pattern} or plan_id ilike ${pattern})`;
+  const [reports, [{ total }], sums] = await Promise.all([
+    db`select id, plan_id, value, meter_event_name, status, error, created_at, sent_at from usage_reports where ${kept} and ${matches} order by created_at desc limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from usage_reports where ${kept} and ${matches}`,
+    db`select status, coalesce(sum(value), 0)::bigint as value from usage_reports where ${kept} group by status`,
+  ]);
+  const sum = (s) => Number(sums.find((r) => r.status === s)?.value || 0);
+  return { reports: reports.map((r) => ({ ...r, value: Number(r.value) })), total, limit, offset, sent: sum('sent'), pending: sum('pending'), failed: sum('failed') };
 }

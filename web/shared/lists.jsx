@@ -9,23 +9,27 @@ import { tr, Tr } from './i18n.jsx';
 
 const SIZES = [10, 25, 50, 100];
 
-// search, page and page size of a list, in the url under a prefix (several lists on a page)
-export function usePaging({ prefix = '', size = 25 } = {}) {
+// search, page and page size of a list, in the url under a prefix (several lists on a page) — or,
+// with `local`, in the state of the component: a list in a modal or a drawer leaves the url alone
+export function usePaging({ prefix = '', size = 25, local = false } = {}) {
   const [params, setParams] = useQuery();
+  const [own, setOwn] = useState({});
   const k = (n) => (prefix ? `${prefix}_${n}` : n);
-  const q = params.get(k('q')) || '';
-  const asked = parseInt(params.get(k('size')), 10);
+  const get = (n) => (local ? own[n] : params.get(k(n)));
+  const set = (patch) => (local ? setOwn((x) => ({ ...x, ...patch })) : setParams(Object.fromEntries(Object.entries(patch).map(([n, v]) => [k(n), v]))));
+  const q = get('q') || '';
+  const asked = parseInt(get('size'), 10);
   const limit = SIZES.includes(asked) ? asked : size;
-  const page = Math.max(1, parseInt(params.get(k('page')), 10) || 1);
+  const page = Math.max(1, parseInt(get('page'), 10) || 1);
   const offset = (page - 1) * limit;
   return {
     q,
     limit,
     page,
     offset,
-    setQ: (v) => setParams({ [k('q')]: v, [k('page')]: null }),
-    setPage: (p) => setParams({ [k('page')]: p > 1 ? p : null }),
-    setSize: (s) => setParams({ [k('size')]: s === size ? null : s, [k('page')]: null }),
+    setQ: (v) => set({ q: v, page: null }),
+    setPage: (p) => set({ page: p > 1 ? p : null }),
+    setSize: (s) => set({ size: s === size ? null : s, page: null }),
     // the query string of a server-paged list
     query: `limit=${limit}&offset=${offset}${q ? `&q=${encodeURIComponent(q)}` : ''}`,
     key: `${q}|${limit}|${offset}`,
@@ -33,16 +37,21 @@ export function usePaging({ prefix = '', size = 25 } = {}) {
 }
 
 // a list already in memory, searched and paged the same way
-export function useLocalPaging(items, { prefix = '', size = 25, text = (x) => JSON.stringify(x) } = {}) {
-  const paging = usePaging({ prefix, size });
+export function useLocalPaging(items, { prefix = '', size = 25, local = false, text = (x) => JSON.stringify(x) } = {}) {
+  const paging = usePaging({ prefix, size, local });
   const filtered = useMemo(() => {
     const words = paging.q.toLowerCase().split(/\s+/).filter(Boolean);
     return words.length ? (items || []).filter((x) => words.every((w) => text(x).toLowerCase().includes(w))) : items || [];
   }, [items, paging.q]);
+  // a removal, or a shorter list, leaves the page past the last one: back to the last page
+  useEffect(() => {
+    const last = Math.max(1, Math.ceil(filtered.length / paging.limit));
+    if (filtered.length && paging.page > last) paging.setPage(last);
+  }, [filtered.length, paging.limit, paging.page]);
   return { ...paging, total: filtered.length, items: filtered.slice(paging.offset, paging.offset + paging.limit) };
 }
 
-export function SearchInput({ value, onChange, placeholder = 'search' }) {
+export function SearchInput({ value, onChange, placeholder = tr('search') }) {
   const [text, setText] = useState(value);
   const timer = useRef(null);
   useEffect(() => setText(value), [value]);
@@ -86,7 +95,8 @@ export function ListToolbar({ paging, placeholder, onReload, loading, children }
 }
 
 export function Pager({ paging, total, sizes = SIZES }) {
-  if (total === undefined || total === null) return null;
+  // nothing to page: the empty state of the list says why
+  if (!total) return null;
   const pages = Math.max(1, Math.ceil(total / paging.limit));
   const from = total ? paging.offset + 1 : 0;
   const to = Math.min(paging.offset + paging.limit, total);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useRouter } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Badge, Callout, Icon, Input, Loader, Modal, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
+import { Badge, Callout, Empty, Icon, Input, Loader, Modal, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
 import { CodeView } from '../../shared/code-editor.jsx';
 import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
 import { BarList, OTHER_COLOR, StackedColumns, StatTile, TimeSeries } from '../../shared/charts.jsx';
@@ -651,8 +651,8 @@ export function SecurityEvents({ fixed = {} }) {
           return (
             <div className="col gap-16" style={{ opacity: state.loading ? 0.6 : 1 }}>
               <div className="grid-3">
-                <StatTile label={tr('Security events')} value={fmtNumber(d.total)} hint={tr('kept {0} days, like the calls', [d.retention.days])} />
-                <StatTile label={tr('Refused or masked')} value={fmtNumber(refused)} hint={d.total ? tr('{0} % of the events', [((100 * refused) / d.total).toFixed(1)]) : ''} />
+                <StatTile label={tr('Security events')} value={fmtNumber(d.events)} hint={tr('kept {0} days, like the calls', [d.retention.days])} />
+                <StatTile label={tr('Refused or masked')} value={fmtNumber(refused)} hint={d.events ? tr('{0} % of the events', [((100 * refused) / d.events).toFixed(1)]) : ''} />
                 <StatTile label={tr('Categories')} value={fmtNumber(d.byCategory.length)} hint={d.byCategory[0] ? tr('most: {0}', [d.byCategory[0].category]) : ''} />
               </div>
               <div className="grid-3">
@@ -701,6 +701,11 @@ export function SecurityEvents({ fixed = {} }) {
                   <h3 className="grow">{tr('Recent security events')}</h3>
                   <span className="faint small">{tr('they carry the address of the caller: reading them is traced in the audit trail')}</span>
                 </div>
+                {d.events > 0 && (
+                  <div className="card-body" style={{ paddingBottom: 0 }}>
+                    <ListToolbar paging={paging} placeholder={tr('search categories, actions, messages, callers, addresses')} />
+                  </div>
+                )}
                 {d.items.length ? (
                   <>
                     <div className="table-wrap">
@@ -746,6 +751,8 @@ export function SecurityEvents({ fixed = {} }) {
                     </div>
                     <Pager paging={paging} total={d.total} />
                   </>
+                ) : paging.q ? (
+                  <Empty title={tr('No security event matches')} icon="search" />
                 ) : (
                   <div className="card-body muted small">
                     {tr(

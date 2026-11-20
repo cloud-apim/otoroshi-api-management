@@ -3,7 +3,7 @@ import { fmtDate, fmtRelative } from '../../../shared/lib.js';
 import { Badge, Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
-import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../../shared/lists.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
 function SnapshotView({ api, number, onClose }) {
@@ -30,10 +30,11 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
   const toast = useToast();
   const confirm = useConfirm();
   const snaps = useLoad(() => wapi.get(`/apis/${api.id}/snapshots`), [api.id]);
-  const deps = useLoad(() => wapi.get(`/apis/${api.id}/deployments`), [api.id]);
+  // the deployment history is searched and paged on the server: it grows with every deployment
+  const depPage = usePaging({ prefix: 'deps', size: 10 });
+  const deps = useLoad(() => wapi.get(`/apis/${api.id}/deployments?${depPage.query}`), [api.id, depPage.key]);
   const projection = useLoad(() => wapi.get(`/apis/${api.id}/projection`), [api.id]);
   const snapPage = useLocalPaging(snaps.data, { prefix: 'snaps', size: 10, text: (s) => `#${s.number} ${s.comment || ''} ${s.published_by_email || ''}` });
-  const depPage = useLocalPaging(deps.data?.history, { prefix: 'deps', size: 10, text: (x) => `#${x.snapshot_number} ${x.action} ${x.status} ${x.requested_by_email || ''} ${x.error || ''}` });
   const [viewing, setViewing] = useState(null);
   const current = api.deployment.current;
   // the snapshot as a promotion document, for the next installation
@@ -201,12 +202,13 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
           <ListToolbar paging={depPage} placeholder={tr('search snapshots, statuses, people, errors')} onReload={deps.reload} loading={deps.loading} />
         </div>
         <Loader state={deps}>
-          {() => (
+          {(d) => (
             <>
+            {!d.history.length && <div className="card-body muted small">{depPage.q ? tr('No deployment matches.') : tr('none recorded')}</div>}
             <div className="table-wrap">
               <table className="table">
                 <tbody>
-                  {depPage.items.map((x) => (
+                  {d.history.map((x) => (
                     <tr key={x.id}>
                       <td>{x.action === 'undeploy' ? tr('undeploy') : tr('snapshot #{0}', [x.snapshot_number])}</td>
                       <td>
@@ -221,7 +223,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                 </tbody>
               </table>
             </div>
-            <Pager paging={depPage} total={depPage.total} />
+            <Pager paging={depPage} total={d.total} />
             </>
           )}
         </Loader>

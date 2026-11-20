@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Badge, Callout, Empty, Loader, Setting, Switch, errorMessage, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { tr } from '../../../shared/i18n.jsx';
 import { Stars as SharedStars } from '../../../shared/stars.jsx';
 
@@ -17,6 +18,7 @@ export function CatalogueTab({ api, readOnly, onChanged }) {
   const toast = useToast();
   const workspace = useLoad(() => wapi.get(''), []);
   const reviews = useLoad(() => wapi.get(`/apis/${api.id}/reviews`), [api.id]);
+  const page = useLocalPaging(reviews.data?.reviews, { prefix: 'reviews', size: 10, text: (x) => `${x.author || ''} ${x.comment || ''} ${x.rating}/5 ${x.hidden ? tr('hidden by {0}', [x.hidden_by || '—']) : ''}` });
   const [placement, setPlacement] = useState({ categories: api.categories || [], featured: !!api.featured });
 
   const place = async (patch) => {
@@ -85,10 +87,12 @@ export function CatalogueTab({ api, readOnly, onChanged }) {
         </div>
         <div className="card-body col gap-8">
           <p className="muted small">{tr('Only the consumers whose applications subscribed to this api review it. A hidden review leaves the portal and its rating, and stays here.')}</p>
+          {workspace.data?.portal?.discovery?.reviews === false && <Callout kind="info">{tr('The reviews are off on this portal: the consumers neither see nor write them.')}</Callout>}
+          <ListToolbar paging={page} placeholder={tr('search authors, comments')} onReload={reviews.reload} loading={reviews.loading} />
           <Loader state={reviews}>
-            {(r) =>
-              r.reviews.length ? (
-                r.reviews.map((x) => (
+            {() =>
+              page.items.length ? (
+                page.items.map((x) => (
                   <div key={x.id} className="panel col gap-4">
                     <div className="row">
                       <Stars value={x.rating} />
@@ -106,12 +110,12 @@ export function CatalogueTab({ api, readOnly, onChanged }) {
                   </div>
                 ))
               ) : (
-                <Empty title={tr('No review yet')} />
+                <Empty title={page.q ? tr('No review matches') : tr('No review yet')} />
               )
             }
           </Loader>
-          {workspace.data?.portal?.discovery?.reviews === false && <Callout kind="info">{tr('The reviews are off on this portal: the consumers neither see nor write them.')}</Callout>}
         </div>
+        {page.items.length > 0 && <Pager paging={page} total={page.total} />}
       </div>
     </div>
   );

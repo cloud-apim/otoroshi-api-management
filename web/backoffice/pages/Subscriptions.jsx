@@ -5,7 +5,7 @@ import { Badge, Callout, DiffView, Drawer, Empty, Field, Icon, Loader, Secret, S
 import { useWs, useMetadataFields } from '../context.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
 import { PageHead } from '../layout.jsx';
-import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
 export function SubscriptionsTable({ query = '', showApi = true, showApp = true, onChanged }) {
@@ -138,13 +138,17 @@ function EndDate({ s, busy, act }) {
 // the usage of a subscription to a plan with a usage price, pushed to the meter of Stripe batch by batch
 function UsageReports({ id }) {
   const { wapi } = useWs();
-  const state = useLoad(() => wapi.get(`/subscriptions/${id}/usage`), [id]);
-  if (!state.data?.reports?.length) return null;
+  // searched and paged on the server: the batches of a long subscription are many
+  const page = usePaging({ local: true, size: 10 });
+  const state = useLoad(() => wapi.get(`/subscriptions/${id}/usage?${page.query}`), [id, page.key]);
+  if (!state.data || (!state.data.total && !page.q)) return null;
   const u = state.data;
   return (
     <div className="col gap-6">
       <div className="label">{tr('Usage billed')}</div>
       <div className="small muted">{tr('{0} calls sent to the meter of Stripe · {1} waiting · {2} refused', [fmtNumber(u.sent), fmtNumber(u.pending), fmtNumber(u.failed)])}</div>
+      <ListToolbar paging={page} placeholder={tr('search batches, statuses, errors')} onReload={state.reload} loading={state.loading} />
+      {u.reports.length ? (
       <div className="table-wrap">
         <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
           <thead>
@@ -155,7 +159,7 @@ function UsageReports({ id }) {
             </tr>
           </thead>
           <tbody>
-            {u.reports.slice(0, 10).map((r) => (
+            {u.reports.map((r) => (
               <tr key={r.id} title={r.error || r.id}>
                 <td className="nowrap muted">{fmtDate(r.created_at)}</td>
                 <td className="right">{fmtNumber(r.value)}</td>
@@ -167,6 +171,10 @@ function UsageReports({ id }) {
           </tbody>
         </table>
       </div>
+      ) : (
+        <p className="faint small">{tr('No batch matches.')}</p>
+      )}
+      <Pager paging={page} total={u.total} />
     </div>
   );
 }
@@ -181,6 +189,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
   const [transfer, setTransfer] = useState(null);
   const metaFields = useMetadataFields('subscription');
   const [meta, setMeta] = useState(null);
+  const credsPage = useLocalPaging(state.data?.credentials, { local: true, size: 10, text: (c) => `${c.kind} ${c.status} ${c.client_id} ${c.id}` });
+  const historyPage = useLocalPaging(state.data?.history, { local: true, size: 10, text: (h) => `${fmtDate(h.at)} ${h.from.plan_name} ${h.to.plan_name} ${h.by}` });
 
   const act = async (action, body = {}, label) => {
     setBusy(true);
@@ -335,8 +345,10 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
 
             <div className="col gap-6">
               <div className="label">{tr('Credentials')}</div>
+              {s.credentials.length > 0 && <ListToolbar paging={credsPage} placeholder={tr('search client ids, kinds, statuses')} />}
+              {s.credentials.length > 0 && !credsPage.items.length && <p className="faint small">{tr('No credential matches.')}</p>}
               {s.credentials.length ? (
-                s.credentials.map((c) => (
+                credsPage.items.map((c) => (
                   <div key={c.id} className="panel col gap-6">
                     <div className="row">
                       <Badge kind="accent">{c.kind}</Badge>
@@ -377,6 +389,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                     : tr('On this plan the consumer calls with its own token or certificate; the gateway identifies it by the client_id declared on the application.')}
                 </p>
               )}
+              {s.credentials.length > 0 && <Pager paging={credsPage} total={credsPage.total} />}
             </div>
 
             {s.pending_transfer && (
@@ -411,11 +424,14 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
             {s.history?.length > 0 && (
               <div className="col gap-6">
                 <div className="label">{tr('Transfers')}</div>
-                {s.history.map((h, i) => (
-                  <div key={i} className="small muted">
+                <ListToolbar paging={historyPage} placeholder={tr('search plans, people')} />
+                {!historyPage.items.length && <p className="faint small">{tr('No transfer matches.')}</p>}
+                {historyPage.items.map((h, i) => (
+                  <div key={`${h.at}-${i}`} className="small muted">
                     <Tr text={'{0} — {1} → {2} by {3}'} args={[fmtDate(h.at), h.from.plan_name, h.to.plan_name, h.by]} />
                   </div>
                 ))}
+                <Pager paging={historyPage} total={historyPage.total} />
               </div>
             )}
 

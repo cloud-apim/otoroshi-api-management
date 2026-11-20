@@ -16,7 +16,7 @@ import { sealSettings } from '../domain/secrets-store.js';
 import { EXPORTER_ID, runSetup, setupState } from '../domain/setup.js';
 import { runRetention } from '../domain/retention.js';
 import { listAudit, searchAudit, audit } from '../domain/audit.js';
-import { pageParams } from '../http/paging.js';
+import { likePattern, pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
 import { searchTasks, queueStats, enqueue, dismissTask } from '../domain/tasks.js';
 import { oto, gatewaySettings, gatewayPlugins, invalidateGatewaySettings, META } from '../otoroshi/client.js';
@@ -326,16 +326,21 @@ r.get('/gateway/unmanaged-apis', async ({ ctx }) => {
 
 // ---------------------------------------------------------------- users (an admin only sees members of its workspaces)
 
+// the people of the installation (an installation admin) or of the workspaces the caller administers,
+// searched (email, name, tags) and paged on the server
 r.get('/users', async ({ ctx, query }) => {
   identity.requireUser(ctx);
-  const q = query.get('q') ? `%${query.get('q').toLowerCase()}%` : null;
-  if (ctx.user.is_admin) {
-    return db`select id, email, name, tags, is_admin, created_at from users where (${q}::text is null or lower(email) like ${q} or lower(name) like ${q}) order by email limit 200`;
-  }
-  return db`select distinct u.id, u.email, u.name, u.tags, u.is_admin, u.created_at from users u
-    join workspace_members m on m.user_id = u.id
-    where m.workspace_id in (select workspace_id from workspace_members where user_id = ${ctx.user.id} and role = 'admin')
-      and (${q}::text is null or lower(u.email) like ${q} or lower(u.name) like ${q}) order by u.email limit 200`;
+  const { limit, offset, q } = pageParams(query, { defaultLimit: 50 });
+  const pattern = q ? likePattern(q.toLowerCase()) : null;
+  const visible = ctx.user.is_admin
+    ? db`true`
+    : db`u.id in (select m.user_id from workspace_members m where m.workspace_id in (select workspace_id from workspace_members where user_id = ${ctx.user.id} and role = 'admin'))`;
+  const matches = db`(${pattern}::text is null or lower(u.email) like ${pattern} or lower(u.name) like ${pattern} or lower(u.tags::text) like ${pattern})`;
+  const [items, [{ total }]] = await Promise.all([
+    db`select u.id, u.email, u.name, u.tags, u.is_admin, u.created_at from users u where ${visible} and ${matches} order by u.email limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from users u where ${visible} and ${matches}`,
+  ]);
+  return { items, total, limit, offset };
 });
 
 r.post('/users', async ({ ctx, body }) => {
@@ -671,10 +676,11 @@ r.post('/workspaces/:ws/promotions', async ({ ctx, params, body, query }) => {
 });
 
 // deployments: the described state is not the deployed state, and the diff comes first
-r.get('/workspaces/:ws/apis/:api/deployments', async ({ ctx, params }) => {
+r.get('/workspaces/:ws/apis/:api/deployments', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params);
-  return { status: await deployments.deploymentStatus(api), history: await deployments.listDeployments(api.id) };
+  const history = await deployments.listDeployments(api.id, pageParams(query, { defaultLimit: 50 }));
+  return { status: await deployments.deploymentStatus(api), history: history.items, total: history.total, limit: history.limit, offset: history.offset };
 });
 r.post('/workspaces/:ws/apis/:api/deploy', async ({ ctx, params, body, query }) => {
   const c = await ws(ctx, params);
@@ -923,10 +929,10 @@ r.get('/workspaces/:ws/subscriptions/:sub', async ({ ctx, params }) => {
 });
 
 // the usage of a subscription pushed to the meter of the payment provider, batch by batch
-r.get('/workspaces/:ws/subscriptions/:sub/usage', async ({ ctx, params }) => {
+r.get('/workspaces/:ws/subscriptions/:sub/usage', async ({ ctx, params, query }) => {
   const c = await ws(ctx, params);
   const sub = await subscriptions.getSubscription(c.workspace.id, params.sub);
-  return usageOf(sub.id);
+  return usageOf(sub.id, pageParams(query, { defaultLimit: 200 }));
 });
 
 const subAction = (fn) => async ({ ctx, params, body }) => {

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useQuery } from '../../shared/router.jsx';
 import { Icon, Loader, useLoad, Empty } from '../../shared/ui.jsx';
 import { Stars } from '../../shared/stars.jsx';
+import { Pager, usePaging } from '../../shared/lists.jsx';
 import { api, usePortal } from '../context.jsx';
 import { usePortalText, useT } from '../i18n.jsx';
 import { LifecycleBadge, PageHeader } from '../common.jsx';
@@ -57,11 +58,15 @@ export function Signals({ a }) {
 }
 
 const SORTS = ['featured', 'popular', 'rating', 'name', 'recent'];
+// the featured apis above the catalogue are a preview: all of them come first in the list below
+const FEATURED = 6;
 
 export function Catalogue() {
   const t = useT();
   const [params, setParams] = useQuery();
-  const q = params.get('q') || '';
+  // the search and the page of the catalogue, in the url: the home page searches it with `q`
+  const paging = usePaging({ size: 25 });
+  const q = paging.q;
   const tag = params.get('tag') || '';
   const category = params.get('category') || '';
   const sort = SORTS.includes(params.get('sort')) ? params.get('sort') : 'featured';
@@ -86,6 +91,8 @@ export function Catalogue() {
       return acc;
     }, {})
   );
+  const shown = latest.slice(paging.offset, paging.offset + paging.limit);
+  const search = () => text !== q && paging.setQ(text);
   return (
     <div className="pt-container pt-section">
       <PageHeader title={t('catalogue.title')} subtitle={t('catalogue.subtitle')} />
@@ -95,19 +102,19 @@ export function Catalogue() {
           role="search"
           onSubmit={(e) => {
             e.preventDefault();
-            setParams({ q: text });
+            search();
           }}
         >
           <Icon name="search" />
           <label htmlFor="cat-search" className="sr-only">
             {t('catalogue.search')}
           </label>
-          <input id="cat-search" value={text} onChange={(e) => setText(e.target.value)} onBlur={() => setParams({ q: text })} placeholder={t('catalogue.search')} />
+          <input id="cat-search" value={text} onChange={(e) => setText(e.target.value)} onBlur={search} placeholder={t('catalogue.search')} />
         </form>
         <label className="small muted" htmlFor="cat-sort">
           {t('catalogue.sort')}
         </label>
-        <select id="cat-sort" className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setParams({ sort: e.target.value === 'featured' ? null : e.target.value })}>
+        <select id="cat-sort" className="select" style={{ width: 'auto' }} value={sort} onChange={(e) => setParams({ sort: e.target.value === 'featured' ? null : e.target.value, page: null })}>
           {sorts.map((x) => (
             <option key={x} value={x}>
               {t(`catalogue.sort.${x}`)}
@@ -117,11 +124,11 @@ export function Catalogue() {
       </div>
       {categories.length > 0 && (
         <div className="row wrap gap-6 mb-16" role="group" aria-label={t('catalogue.categories')}>
-          <button className={`pt-chip ${!category ? 'on' : ''}`} onClick={() => setParams({ category: null })} aria-pressed={!category}>
+          <button className={`pt-chip ${!category ? 'on' : ''}`} onClick={() => setParams({ category: null, page: null })} aria-pressed={!category}>
             {t('catalogue.allcategories')}
           </button>
           {categories.map((c) => (
-            <button key={c.slug} className={`pt-chip ${category === c.slug ? 'on' : ''}`} onClick={() => setParams({ category: category === c.slug ? null : c.slug })} aria-pressed={category === c.slug}>
+            <button key={c.slug} className={`pt-chip ${category === c.slug ? 'on' : ''}`} onClick={() => setParams({ category: category === c.slug ? null : c.slug, page: null })} aria-pressed={category === c.slug}>
               {text_(c.name) || c.slug}
             </button>
           ))}
@@ -129,11 +136,11 @@ export function Catalogue() {
       )}
       {tags.length > 0 && (
         <div className="row wrap gap-6 mb-16" role="group" aria-label="tags">
-          <button className={`pt-chip ${!tag ? 'on' : ''}`} onClick={() => setParams({ tag: null })} aria-pressed={!tag}>
+          <button className={`pt-chip ${!tag ? 'on' : ''}`} onClick={() => setParams({ tag: null, page: null })} aria-pressed={!tag}>
             {t('catalogue.alltags')}
           </button>
           {tags.map((x) => (
-            <button key={x} className={`pt-chip ${tag === x ? 'on' : ''}`} onClick={() => setParams({ tag: tag === x ? null : x })} aria-pressed={tag === x}>
+            <button key={x} className={`pt-chip ${tag === x ? 'on' : ''}`} onClick={() => setParams({ tag: tag === x ? null : x, page: null })} aria-pressed={tag === x}>
               {x}
             </button>
           ))}
@@ -147,7 +154,7 @@ export function Catalogue() {
             </div>
           ) : latest.length ? (
             <>
-              {!q && !tag && !category && sort === 'featured' && latest.some((a) => a.featured) && (
+              {!q && !tag && !category && sort === 'featured' && paging.page === 1 && latest.some((a) => a.featured) && (
                 <>
                   <h2 id="cat-featured" className="mb-16">
                     {t('catalogue.featured')}
@@ -155,6 +162,7 @@ export function Catalogue() {
                   <div className="pt-grid">
                     {latest
                       .filter((a) => a.featured)
+                      .slice(0, FEATURED)
                       .map((a) => (
                         <ApiCard key={a.id} api={a} />
                       ))}
@@ -165,9 +173,12 @@ export function Catalogue() {
                 </>
               )}
               <div className="pt-grid">
-                {latest.map((a) => (
+                {shown.map((a) => (
                   <ApiCard key={a.id} api={a} />
                 ))}
+              </div>
+              <div className="mt-16">
+                <Pager paging={paging} total={latest.length} />
               </div>
             </>
           ) : (

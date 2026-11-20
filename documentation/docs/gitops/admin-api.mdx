@@ -70,10 +70,16 @@ credentials included.
 ## Paged lists
 
 The lists that grow — the audit trail (`GET …/audit`, `GET /audit`), the request log
-(`GET …/analytics/calls`) and the task queue (`GET /gateway/tasks`) — are searched and paged on the
+(`GET …/analytics/calls`), the task queue (`GET /gateway/tasks`) and the people (`GET /users`, searched
+by email, name and tags) — are searched and paged on the
 server: `?q=` (free text), `?limit=` (up to 500) and `?offset=`, answered as
-`{ "items": […], "total": 1234, "limit": 50, "offset": 0 }`. The console keeps the search and the
-page in its url, so a filtered list is a link.
+`{ "items": […], "total": 1234, "limit": 50, "offset": 0 }`. The same parameters search and page the
+deployment history of an api (`GET …/apis/<api>/deployments`: `history` and `total`), the usage billed
+for a subscription (`GET …/subscriptions/<sub>/usage`: `reports` and `total`, the sums over every
+batch) and the security events (`GET …/analytics/security`: `items` and `total` follow the search,
+`events` and the breakdowns follow the filters only). The other lists are answered whole; the console
+and the portal search and page every list, in the url so a filtered list is a link — or, in a modal
+or a drawer, in the list itself.
 
 ## A complete flow
 

@@ -94,7 +94,7 @@ export function NotificationsPage() {
               <Pager paging={paging} total={total} />
             </div>
           ) : (
-            <Empty title={filter === 'open' ? tr('Nothing to deal with') : filter === 'unread' ? tr('Nothing unread') : filter === 'done' ? tr('Nothing done yet') : tr('No notification')} icon="check" />
+            <Empty title={paging.q ? tr('No notification matches') : filter === 'open' ? tr('Nothing to deal with') : filter === 'unread' ? tr('Nothing unread') : filter === 'done' ? tr('Nothing done yet') : tr('No notification')} icon="check" />
           )
         }
       </Loader>

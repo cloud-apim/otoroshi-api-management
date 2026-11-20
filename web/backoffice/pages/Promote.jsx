@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { fmtDate } from '../../shared/lib.js';
 import { Badge, Callout, DiffView, FileButton, Modal, Switch, errorMessage, useToast } from '../../shared/ui.jsx';
 import { useWs } from '../context.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
 const REF_STATUS = {
@@ -19,6 +20,7 @@ const gatewayChanges = (changes) => (changes || []).map((c) => (c.path ? c : { o
 
 function Preview({ plan }) {
   const s = plan.source;
+  const refs = useLocalPaging(plan.vault_refs, { local: true, size: 10, text: (r) => `${r.ref} ${r.status} ${refStatus(r.status)}` });
   return (
     <div className="col gap-16">
       <div className="col gap-4">
@@ -54,12 +56,15 @@ function Preview({ plan }) {
         <div className="col gap-6">
           <h4 style={{ margin: 0 }}>{tr('Values of this environment')}</h4>
           <p className="muted small m-0">{tr('The snapshot names them as vault references: each gateway resolves its own.')}</p>
-          {plan.vault_refs.map((r) => (
+          <ListToolbar paging={refs} placeholder={tr('search references, statuses')} />
+          {!refs.items.length && <p className="faint small m-0">{tr('No reference matches.')}</p>}
+          {refs.items.map((r) => (
             <div key={r.ref} className="row gap-6">
               <span className="mono small grow">{r.ref}</span>
               <Badge kind={REF_STATUS[r.status][0]}>{refStatus(r.status)}</Badge>
             </div>
           ))}
+          <Pager paging={refs} total={refs.total} />
         </div>
       )}
       {plan.validation.errors.length > 0 && (
@@ -141,7 +146,7 @@ export function PromoteModal({ onClose, onDone }) {
         <FileButton accept=".json,application/json" onFile={load} className="btn">
           {doc ? tr('Another document…') : tr('Choose the promotion document…')}
         </FileButton>
-        {plan && <Preview plan={plan} />}
+        {plan && <Preview key={plan.digest} plan={plan} />}
         {plan?.draft.pending && !plan.already && (
           <Callout kind="warning" title={tr('The draft here has changes that are not in a snapshot')}>
             <div className="col gap-6">

@@ -43,7 +43,7 @@ function Events() {
               <Pager paging={paging} total={total} />
             </>
           ) : (
-            <Empty title={tr('Nothing received yet')} icon="inbox" />
+            <Empty title={paging.q ? tr('No event matches') : tr('Nothing received yet')} icon="inbox" />
           )
         }
       </Loader>

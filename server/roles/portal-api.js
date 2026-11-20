@@ -436,10 +436,11 @@ r.post('/apis/:api/test', async ({ ctx, params, body }) => {
 r.post('/subscriptions/:sub/close', async ({ ctx, params }) => subscriptions.closeSubscription(ctx, await mySub(ctx, params.sub)));
 
 // what the consumer is billed for its usage: the calls reported to the payment provider
-r.get('/subscriptions/:sub/usage', async ({ ctx, params }) => {
+r.get('/subscriptions/:sub/usage', async ({ ctx, params, query }) => {
   const sub = await mySub(ctx, params.sub);
-  const u = await usageOf(sub.id);
-  return { sent: u.sent, pending: u.pending, reports: u.reports.filter((r) => r.status !== 'failed').map(({ error, ...r }) => r) };
+  // the consumer sees what is billed or will be: not the batches the provider refused, nor their errors
+  const u = await usageOf(sub.id, { ...pageParams(query, { defaultLimit: 200 }), billedOnly: true });
+  return { sent: u.sent, pending: u.pending, total: u.total, limit: u.limit, offset: u.offset, reports: u.reports.map(({ error, ...r }) => r) };
 });
 
 // from the consumer's side: ask to move to an equivalent plan, or answer a proposal
@@ -452,9 +453,11 @@ r.post('/subscriptions/:sub/transfer/consent', async ({ ctx, params, body }) =>
   subscriptions.answerTransfer(ctx, await mySub(ctx, params.sub), { accept: !!body.accept }, { side: 'consumer' })
 );
 
-r.get('/notifications', async ({ ctx }) => {
+// the open notifications of the consumer, searched (title, body) and paged on the server
+r.get('/notifications', async ({ ctx, query }) => {
   requireUser(ctx);
-  return { unread: await notifications.unreadCount(ctx.user, ctx.workspace.id, 'portal'), items: await notifications.listFor(ctx.user, ctx.workspace.id, 'portal') };
+  const page = await notifications.searchFor(ctx.user, ctx.workspace.id, 'portal', pageParams(query, { defaultLimit: 50, max: 200 }));
+  return { unread: await notifications.unreadCount(ctx.user, ctx.workspace.id, 'portal'), ...page };
 });
 r.post('/notifications/read', async ({ ctx }) => {
   requireUser(ctx);

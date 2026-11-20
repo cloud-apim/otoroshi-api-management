@@ -4,7 +4,7 @@ import { fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
-import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
 const FORM_TITLES = () => ({ path: tr('by root path'), hostname: tr('by hostname'), root: tr('one workspace, at the root') });
@@ -52,6 +52,7 @@ function Workspaces() {
   const { navigate } = useRouter();
   const [f, setF] = useState({ name: '', slug: '' });
   const settings = useLoad(() => api.get('/settings'), []);
+  const page = useLocalPaging(session.workspaces, { prefix: 'ws', size: 25, text: (w) => `${w.name} ${w.slug} ${w.description || ''}` });
   // a single-workspace installation creates none
   const single = session.me.installation?.tenancy === 'single';
   return (
@@ -78,8 +79,10 @@ function Workspaces() {
           </button>
         </div>
       </div>
+      <ListToolbar paging={page} placeholder={tr('search workspaces, slugs')} onReload={session.reload} />
       <div className="card">
-        {session.workspaces.map((w) => (
+        {!page.items.length && <Empty title={page.q ? tr('No workspace matches') : tr('No workspace')} icon="layers" />}
+        {page.items.map((w) => (
           <div key={w.id} className="list-item">
             <span className="ws-avatar">{w.name[0]}</span>
             <div className="grow">
@@ -94,14 +97,16 @@ function Workspaces() {
             </button>
           </div>
         ))}
+        <Pager paging={page} total={page.total} />
       </div>
     </div>
   );
 }
 
+// the people are searched (email, name, tags) and paged on the server
 function Users() {
-  const state = useLoad(() => api.get('/users'), []);
-  const usersPage = useLocalPaging(state.data, { prefix: 'users', size: 25, text: (u) => `${u.name} ${u.email} ${(u.tags || []).join(' ')}` });
+  const usersPage = usePaging({ prefix: 'users', size: 25 });
+  const state = useLoad(() => api.get(`/users?${usersPage.query}`), [usersPage.key]);
   const toast = useToast();
   const [f, setF] = useState({ email: '', name: '', password: '', is_admin: false });
   return (
@@ -132,34 +137,40 @@ function Users() {
       </div>
       <ListToolbar paging={usersPage} placeholder={tr('search people, emails, tags')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {() => (
-          <div className="card">
-          <div className="table-wrap">
-            <table className="table">
-              <tbody>
-                {usersPage.items.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <div className="bold">{u.name}</div>
-                      <div className="faint tiny">{u.email}</div>
-                    </td>
-                    <td>{u.is_admin && <Badge kind="accent">{tr('installation admin')}</Badge>}</td>
-                    <td className="small">
-                      {(u.tags || []).map((t) => (
-                        <span key={t} className="tag" style={{ marginRight: 4 }}>
-                          {t}
-                        </span>
-                      ))}
-                    </td>
-                    <td className="muted small">{fmtRelative(u.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <Pager paging={usersPage} total={usersPage.total} />
-          </div>
-        )}
+        {({ items, total }) =>
+          items.length ? (
+            <div className="card">
+              <div className="table-wrap">
+                <table className="table">
+                  <tbody>
+                    {items.map((u) => (
+                      <tr key={u.id}>
+                        <td>
+                          <div className="bold">{u.name}</div>
+                          <div className="faint tiny">{u.email}</div>
+                        </td>
+                        <td>{u.is_admin && <Badge kind="accent">{tr('installation admin')}</Badge>}</td>
+                        <td className="small">
+                          {(u.tags || []).map((t) => (
+                            <span key={t} className="tag" style={{ marginRight: 4 }}>
+                              {t}
+                            </span>
+                          ))}
+                        </td>
+                        <td className="muted small">{fmtRelative(u.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Pager paging={usersPage} total={total} />
+            </div>
+          ) : (
+            <div className="card">
+              <Empty title={usersPage.q ? tr('No user matches') : tr('No user')} icon="users" />
+            </div>
+          )
+        }
       </Loader>
     </div>
   );
@@ -168,6 +179,7 @@ function Users() {
 // everything the console does replays from the cli with a token
 function Tokens() {
   const state = useLoad(() => api.get('/me/tokens'), []);
+  const page = useLocalPaging(state.data, { prefix: 'tokens', size: 25, text: (t) => `${t.name} ${t.prefix}` });
   const toast = useToast();
   const [name, setName] = useState('');
   const [created, setCreated] = useState(null);
@@ -201,10 +213,12 @@ function Tokens() {
           </div>
         </Callout>
       )}
+      <ListToolbar paging={page} placeholder={tr('search tokens')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(tokens) => (
+        {() => (
           <div className="card">
-            {tokens.map((t) => (
+            {!page.items.length && <Empty title={page.q ? tr('No token matches') : tr('No token yet')} icon="key" />}
+            {page.items.map((t) => (
               <div key={t.id} className="list-item">
                 <Icon name="key" />
                 <div className="grow">
@@ -224,6 +238,7 @@ function Tokens() {
                 </button>
               </div>
             ))}
+            <Pager paging={page} total={page.total} />
           </div>
         )}
       </Loader>
@@ -343,6 +358,8 @@ function AuditExport() {
   const toast = useToast();
   const confirm = useConfirm();
   const state = useLoad(() => api.get('/audit/exporters'), []);
+  const wsName = (id) => workspaces.find((w) => w.id === id)?.name || '';
+  const page = useLocalPaging(state.data, { prefix: 'exporters', size: 25, text: (e) => `${e.name} ${e.url} ${(e.actions || []).join(' ')} ${wsName(e.workspace_id)} ${e.last_error || ''}` });
   const [editing, setEditing] = useState(null);
   const set = (k) => (v) => setEditing((e) => ({ ...e, [k]: v }));
   return (
@@ -355,11 +372,12 @@ function AuditExport() {
           <Icon name="plus" /> {tr('Add exporter')}
         </button>
       </div>
+      <ListToolbar paging={page} placeholder={tr('search exporters, urls, actions, workspaces')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(list) =>
-          list.length ? (
+        {() =>
+          page.items.length ? (
             <div className="card">
-              {list.map((e) => (
+              {page.items.map((e) => (
                 <div key={e.id} className="list-item" style={{ alignItems: 'flex-start' }}>
                   <Icon name="upload" />
                   <div className="grow" style={{ minWidth: 0 }}>
@@ -396,10 +414,11 @@ function AuditExport() {
                   </button>
                 </div>
               ))}
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title={tr('No audit exporter')} icon="audit" />
+              <Empty title={page.q ? tr('No exporter matches') : tr('No audit exporter')} icon="audit" />
             </div>
           )
         }

@@ -337,8 +337,13 @@ export async function exportCalls(filter, { q = '', max = EXPORT_MAX } = {}) {
 
 // the security events of the Threat Protection Suite: what it judged, on which api and plan, and
 // what it did — the latest ones, and their counts by category, action and plan over the range
-export async function securityEvents(filter, { limit = 50, offset = 0 } = {}) {
+export async function securityEvents(filter, { limit = 50, offset = 0, q = '' } = {}) {
   const { start, end } = range(filter);
+  // the search narrows the list of events, not the breakdowns: they answer the filters
+  const pattern = q ? likePattern(q) : null;
+  const matches = () =>
+    adb`(${pattern}::text is null or category ilike ${pattern} or action ilike ${pattern} or outcome ilike ${pattern} or message ilike ${pattern}
+      or client_id ilike ${pattern} or from_ip ilike ${pattern} or incident_id ilike ${pattern})`;
   const where = () => adb`at >= ${start} and at <= ${end}
       and (${filter.workspaceId || null}::text is null or workspace_id = ${filter.workspaceId || null})
       and (${filter.apiId || null}::text is null or api_id = ${filter.apiId || null})
@@ -346,10 +351,11 @@ export async function securityEvents(filter, { limit = 50, offset = 0 } = {}) {
       and (${filter.applicationId || null}::text is null or application_id = ${filter.applicationId || null})
       and (${filter.category || null}::text is null or category = ${filter.category || null})
       and (${filter.action || null}::text is null or action = ${filter.action || null})`;
-  const [items, [{ total }], byCategory, byAction, byPlan] = await Promise.all([
+  const [items, [{ total }], [{ events }], byCategory, byAction, byPlan] = await Promise.all([
     adb`select id, at, category, action, outcome, severity, score, api_id, plan_id, subscription_id, application_id, client_id, from_ip, incident_id, message
-      from security_events where ${where()} order by at desc, id desc limit ${limit} offset ${offset}`,
-    adb`select count(*)::int as total from security_events where ${where()}`,
+      from security_events where ${where()} and ${matches()} order by at desc, id desc limit ${limit} offset ${offset}`,
+    adb`select count(*)::int as total from security_events where ${where()} and ${matches()}`,
+    adb`select count(*)::int as events from security_events where ${where()}`,
     adb`select category, count(*)::int as events from security_events where ${where()} group by 1 order by 2 desc`,
     adb`select action, count(*)::int as events from security_events where ${where()} group by 1 order by 2 desc`,
     adb`select api_id, plan_id, count(*)::int as events from security_events where ${where()} group by 1, 2 order by 3 desc limit 100`,
@@ -361,7 +367,9 @@ export async function securityEvents(filter, { limit = 50, offset = 0 } = {}) {
   const p = await policy();
   return {
     items: items.map((r) => ({ ...r, id: Number(r.id), api_name: r.api_id ? apiNames.get(r.api_id) : null, application_name: r.application_id ? appNames.get(r.application_id) : null })),
+    // the events the search found (the list), and the events of the filters (the figures)
     total,
+    events,
     limit,
     offset,
     byCategory,

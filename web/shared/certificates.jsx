@@ -1,9 +1,10 @@
 // A list of certificates read by the product: the trusted CAs of an mtls plan, the client
 // certificates of an application. The browser cannot read X.509: `inspect` asks the server.
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { fmtDate } from './lib.js';
 import { Badge, Callout, Field, Icon, Modal, Setting, errorMessage, useLoad } from './ui.jsx';
 import { CodeEditor } from './code-editor.jsx';
+import { MiniPager, SearchInput, useLocalPaging } from './lists.jsx';
 import { tr, Tr } from './i18n.jsx';
 
 // the defaults, in the language of the console; the portal gives its own
@@ -21,6 +22,8 @@ const EN = () => ({
   cancel: tr('Cancel'),
   add: tr('Add'),
   incomplete: tr('paste the whole certificate, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----'),
+  search: tr('search certificates'),
+  nomatch: tr('No certificate matches'),
 });
 
 const cnOf = (subject) => /CN=([^,]+)/.exec(subject || '')?.[1] || null;
@@ -103,13 +106,26 @@ export function CertificateList({ value = [], onChange, inspect, mode = 'ca', la
   const L = { ...EN(), ...labels };
   const [adding, setAdding] = useState(false);
   const infos = useLoad(() => Promise.all(value.map((pem) => inspect(pem).catch((e) => ({ error: errorMessage(e) })))), [value.join('|')]);
+  // searched by what the server read of them, paged in the component; each keeps its index for its removal
+  const all = useMemo(() => value.map((_, i) => ({ i, info: infos.data?.[i] })), [value.join('|'), infos.data]);
+  const page = useLocalPaging(all, { local: true, size: 10, text: ({ info }) => (info ? `${info.subject || ''} ${info.issuer || ''} ${info.dn || ''} ${info.fingerprint || ''}` : '') });
+  // a removal can empty the last page
+  useEffect(() => {
+    if (!page.items.length && page.page > 1) page.setPage(page.page - 1);
+  }, [page.items.length, page.page]);
   const Wrap = layout === 'field' ? FieldWrap : Setting;
   return (
     <Wrap label={label} help={help}>
-      {value.map((pem, i) => (
+      {(value.length > 1 || page.q) && (
+        <div className="row">
+          <SearchInput value={page.q} onChange={page.setQ} placeholder={L.search} />
+        </div>
+      )}
+      {page.q && !page.items.length && <div className="muted small">{L.nomatch}</div>}
+      {page.items.map(({ i, info }) => (
         <div key={i} className="panel row" style={{ alignItems: 'flex-start' }}>
           <div className="grow" style={{ minWidth: 0 }}>
-            <CertificateFacts info={infos.data?.[i]} mode={mode} labels={labels} clientId={clientId} onClientId={readOnly ? null : onClientId} />
+            <CertificateFacts info={info} mode={mode} labels={labels} clientId={clientId} onClientId={readOnly ? null : onClientId} />
           </div>
           {!readOnly && (
             <button type="button" className="btn ghost sm icon" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label={L.remove}>
@@ -118,6 +134,7 @@ export function CertificateList({ value = [], onChange, inspect, mode = 'ca', la
           )}
         </div>
       ))}
+      <MiniPager page={page.page} pages={Math.ceil(page.total / page.limit)} onPage={page.setPage} from={page.offset + 1} to={Math.min(page.offset + page.limit, page.total)} total={page.total} />
       {!readOnly && (
         <button type="button" className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setAdding(true)}>
           <Icon name="plus" /> {addLabel}

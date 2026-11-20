@@ -507,6 +507,7 @@ const LEVEL_KIND = { ok: 'positive', warning: 'warning', error: 'negative' };
 const PART_KIND = { ok: 'positive', changed: 'positive', would_change: 'warning', skipped: '', error: 'negative' };
 
 function SetupReport({ report }) {
+  const checks = useLocalPaging(report.checks, { prefix: 'checks', size: 25, text: (c) => `${c.level} ${tr(c.level)} ${c.code} ${c.message}` });
   return (
     <div className="col gap-16">
       <div className="card">
@@ -549,7 +550,8 @@ function SetupReport({ report }) {
           <h3>{tr('Checks')}</h3>
         </div>
         <div className="card-body col gap-6">
-          {report.checks.map((c) => (
+          <ListToolbar paging={checks} placeholder={tr('search levels, codes, messages')} />
+          {checks.items.map((c) => (
             <div key={c.code + c.message} className="row gap-6">
               <Badge kind={LEVEL_KIND[c.level]} dot>
                 {tr(c.level)}
@@ -557,7 +559,9 @@ function SetupReport({ report }) {
               <span className="small">{c.message}</span>
             </div>
           ))}
+          {checks.q && !checks.items.length && <span className="muted small">{tr('No check matches.')}</span>}
         </div>
+        {checks.items.length > 0 && <Pager paging={checks} total={checks.total} />}
       </div>
     </div>
   );

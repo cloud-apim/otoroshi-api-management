@@ -4,6 +4,7 @@ import { fmtDate, fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, StatusBadge, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api as rootApi, useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
@@ -16,6 +17,10 @@ export function SharedResourcesPage() {
   const { navigate } = useRouter();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/shared-resources'), [slug]);
+  const page = useLocalPaging(state.data, {
+    size: 25,
+    text: (r) => `${r.name} ${r.description || ''} ${r.draft?.issuer || ''} ${r.id} ${r.last_version ? `v${r.last_version}` : 'draft'} ${r.usage.map((u) => `${u.name} ${u.version}`).join(' ')}`,
+  });
   const [creating, setCreating] = useState(null);
   return (
     <div className="page">
@@ -31,10 +36,12 @@ export function SharedResourcesPage() {
         }
       />
       <ApisTabs current="resources" />
+      <ListToolbar paging={page} placeholder={tr('search resources, issuers, apis')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(list) =>
-          list.length ? (
-            <div className="card table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -45,7 +52,7 @@ export function SharedResourcesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((r) => (
+                  {page.items.map((r) => (
                     <tr key={r.id} className="clickable" onClick={() => navigate(`/ws/${slug}/shared-resources/${r.id}`)}>
                       <td>
                         <div className="bold">{r.name}</div>
@@ -78,11 +85,13 @@ export function SharedResourcesPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title={tr('No shared resource')} icon="layers">
-                {tr('For example: the identity provider of the company, that every jwt and oauth2 plan validates its tokens with.')}
+              <Empty title={page.q ? tr('No shared resource matches') : tr('No shared resource')} icon="layers">
+                {page.q ? null : tr('For example: the identity provider of the company, that every jwt and oauth2 plan validates its tokens with.')}
               </Empty>
             </div>
           )
@@ -136,6 +145,8 @@ function ResourceEditor({ r, reload }) {
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (patch) => setC((x) => ({ ...x, ...patch }));
+  const usedPage = useLocalPaging(r.usage, { prefix: 'used', size: 10, text: (u) => `${u.name} ${u.version} ${u.id} v${u.pinned.join(' v')} ${u.behind ? 'behind' : ''}` });
+  const versionsPage = useLocalPaging(r.versions, { prefix: 'versions', size: 10, text: (v) => `v${v.number} ${v.comment || ''} ${v.published_by_email || ''}` });
   const last = r.versions[0];
   const dirty = JSON.stringify({ ...EMPTY, ...(r.draft || {}) }) !== JSON.stringify(c);
   const changed = !last || JSON.stringify(last.content) !== JSON.stringify(r.draft);
@@ -270,21 +281,30 @@ function ResourceEditor({ r, reload }) {
               <h3 className="grow">{tr('Used by')}</h3>
             </div>
             {r.usage.length ? (
-              r.usage.map((u) => (
-                <Link key={u.id} to={`/ws/${slug}/apis/${u.id}/plans`} className="list-item" style={{ display: 'flex' }}>
-                  <span className="grow">
-                    {u.name} {u.version}
-                  </span>
-                  <span className="small muted">
-                    <Tr text={'pins v{0}'} args={[u.pinned.join(', v')]} />
-                  </span>
-                  {u.behind && (
-                    <span className="badge warning" style={{ marginLeft: 6 }}>
-                      {tr('behind')}
-                    </span>
-                  )}
-                </Link>
-              ))
+              <>
+                <div className="card-body" style={{ paddingBottom: 0 }}>
+                  <ListToolbar paging={usedPage} placeholder={tr('search apis, versions')} />
+                </div>
+                <div>
+                  {usedPage.items.map((u) => (
+                    <Link key={u.id} to={`/ws/${slug}/apis/${u.id}/plans`} className="list-item" style={{ display: 'flex' }}>
+                      <span className="grow">
+                        {u.name} {u.version}
+                      </span>
+                      <span className="small muted">
+                        <Tr text={'pins v{0}'} args={[u.pinned.join(', v')]} />
+                      </span>
+                      {u.behind && (
+                        <span className="badge warning" style={{ marginLeft: 6 }}>
+                          {tr('behind')}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+                {!usedPage.items.length && <div className="card-body muted small">{tr('No matching API')}</div>}
+                <Pager paging={usedPage} total={usedPage.total} />
+              </>
             ) : (
               <div className="card-body muted small">{tr('No plan pins it yet: a jwt or oauth2-remote plan chooses it in its Access tab.')}</div>
             )}
@@ -294,20 +314,29 @@ function ResourceEditor({ r, reload }) {
               <h3>{tr('Versions')}</h3>
             </div>
             {r.versions.length ? (
-              r.versions.map((v) => (
-                <div key={v.id} className="list-item" style={{ display: 'flex' }}>
-                  <Badge kind="accent">
-                    <Tr text={'v{0}'} args={[v.number]} />
-                  </Badge>
-                  <span className="grow small" style={{ marginLeft: 8 }}>
-                    {v.comment || '—'}
-                  </span>
-                  <span className="faint tiny">
-                    {fmtDate(v.published_at)}
-                    {v.published_by_email ? ` · ${v.published_by_email}` : ''}
-                  </span>
+              <>
+                <div className="card-body" style={{ paddingBottom: 0 }}>
+                  <ListToolbar paging={versionsPage} placeholder={tr('search numbers, comments, people')} />
                 </div>
-              ))
+                <div>
+                  {versionsPage.items.map((v) => (
+                    <div key={v.id} className="list-item" style={{ display: 'flex' }}>
+                      <Badge kind="accent">
+                        <Tr text={'v{0}'} args={[v.number]} />
+                      </Badge>
+                      <span className="grow small" style={{ marginLeft: 8 }}>
+                        {v.comment || '—'}
+                      </span>
+                      <span className="faint tiny">
+                        {fmtDate(v.published_at)}
+                        {v.published_by_email ? ` · ${v.published_by_email}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {!versionsPage.items.length && <div className="card-body muted small">{tr('No version matches.')}</div>}
+                <Pager paging={versionsPage} total={versionsPage.total} />
+              </>
             ) : (
               <div className="card-body muted small">{tr('No version yet: publish one, and the plans can pin it.')}</div>
             )}

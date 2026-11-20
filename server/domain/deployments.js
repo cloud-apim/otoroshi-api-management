@@ -4,6 +4,7 @@
 // acting. Rollback is the redeployment of an earlier snapshot.
 
 import { db, newId } from '../db/index.js';
+import { likePattern } from '../http/paging.js';
 import { threatWarnings } from '../otoroshi/threats.js';
 import { badRequest, notFound } from '../http/router.js';
 import { audit } from './audit.js';
@@ -78,10 +79,18 @@ export async function currentDeployment(apiId) {
   return d;
 }
 
-export async function listDeployments(apiId) {
-  return db`select d.*, s.number as snapshot_number, u.email as requested_by_email from api_deployments d
-    left join api_snapshots s on s.id = d.snapshot_id left join users u on u.id = d.requested_by
-    where d.api_id = ${apiId} order by d.requested_at desc limit 50`;
+// the deployments of an api, newest first, searched (action, status, snapshot number, who, error) and paged
+export async function listDeployments(apiId, { limit = 50, offset = 0, q = '' } = {}) {
+  const pattern = q ? likePattern(q.replace(/^#/, '')) : null;
+  const matches = db`(${pattern}::text is null or d.action ilike ${pattern} or d.status ilike ${pattern} or s.number::text ilike ${pattern}
+    or coalesce(u.email, '') ilike ${pattern} or coalesce(d.error, '') ilike ${pattern})`;
+  const from = db`api_deployments d left join api_snapshots s on s.id = d.snapshot_id left join users u on u.id = d.requested_by`;
+  const [items, [{ total }]] = await Promise.all([
+    db`select d.*, s.number as snapshot_number, u.email as requested_by_email from ${from}
+      where d.api_id = ${apiId} and ${matches} order by d.requested_at desc limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from ${from} where d.api_id = ${apiId} and ${matches}`,
+  ]);
+  return { items, total, limit, offset };
 }
 
 export async function deployedSnapshot(apiId) {

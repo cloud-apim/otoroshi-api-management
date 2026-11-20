@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import { CodeEditor } from '../../shared/code-editor.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
@@ -39,6 +40,10 @@ export function DictionariesPage() {
   const { navigate } = useRouter();
   const toast = useToast();
   const state = useLoad(() => wapi.get('/dictionaries'), [slug]);
+  const page = useLocalPaging(state.data, {
+    size: 25,
+    text: (d) => `${d.name} ${d.description || ''} ${d.id} ${d.source.kind === 'url' ? d.source.url : 'static'} ${d.gateway} ${d.refreshed?.status === 'error' ? 'source failing' : ''}`,
+  });
   const [creating, setCreating] = useState(null);
   return (
     <div className="page">
@@ -52,10 +57,12 @@ export function DictionariesPage() {
         }
       />
       <ApisTabs current="dictionaries" />
+      <ListToolbar paging={page} placeholder={tr('search dictionaries, sources')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(list) =>
-          list.length ? (
-            <div className="card table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -67,7 +74,7 @@ export function DictionariesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((d) => (
+                  {page.items.map((d) => (
                     <tr key={d.id} className="clickable" onClick={() => navigate(`/ws/${slug}/dictionaries/${d.id}`)}>
                       <td>
                         <div className="bold mono">{d.name}</div>
@@ -92,11 +99,13 @@ export function DictionariesPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
             <div className="card">
-              <Empty title={tr('No dictionary')} icon="layers">
-                {tr('For example: the tiers of the partners, the backend of each region, the limits of each country.')}
+              <Empty title={page.q ? tr('No dictionary matches') : tr('No dictionary')} icon="layers">
+                {page.q ? null : tr('For example: the tiers of the partners, the backend of each region, the limits of each country.')}
               </Empty>
             </div>
           )
@@ -209,6 +218,7 @@ function DictionaryEditor({ d, reload }) {
     }
   };
   const keys = keysOf(d.entries);
+  const keysPage = useLocalPaging(keys, { prefix: 'keys', size: 25, text: ([k, v]) => `${k} ${String(v)}` });
   return (
     <div className="page">
       <PageHead
@@ -336,7 +346,9 @@ function DictionaryEditor({ d, reload }) {
               <Tr text={'A plugin of any API reads a value with {0}, in a header, a body, an url: the gateway resolves it at each call, from its own config.'} args={[<code key="e">{d.expression}</code>]} />
             </p>
             {!keys.length && <span className="faint small">{tr('No value yet.')}</span>}
-            {keys.map(([k, v]) => {
+            {keys.length > 0 && <ListToolbar paging={keysPage} placeholder={tr('search keys, values')} />}
+            {keys.length > 0 && !keysPage.items.length && <span className="faint small">{tr('No key matches.')}</span>}
+            {keysPage.items.map(([k, v]) => {
               const expr = d.expression.replace('<key>', k);
               return (
                 <div key={k} className="row small" title={expr}>
@@ -347,6 +359,7 @@ function DictionaryEditor({ d, reload }) {
               );
             })}
           </div>
+          {keys.length > 0 && <Pager paging={keysPage} total={keysPage.total} />}
         </div>
       </div>
     </div>

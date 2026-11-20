@@ -5,12 +5,15 @@ import { Empty, Icon, Loader, StatusBadge, useLoad } from '../../shared/ui.jsx';
 import { StatTile, TimeSeries } from '../../shared/charts.jsx';
 import { useWs } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
 
 export function Home() {
   const { wapi, slug, ws, session } = useWs();
   const state = useLoad(() => wapi.get('/home'), [slug]);
   const traffic = useLoad(() => wapi.get('/analytics'), [slug]);
+  // the previews (to review, recent activity) link to their full lists; the apis out of sync have none
+  const oos = useLocalPaging(state.data?.out_of_sync, { prefix: 'oos', size: 10, text: (a) => `${a.name} ${a.version} ${a.id}` });
   return (
     <div className="page">
       <PageHead title={tr('Welcome, {0}', [session.user.name])} sub={tr('{0} — what needs your attention, and how the catalogue is doing.', [ws.name])} />
@@ -54,19 +57,28 @@ export function Home() {
                   <h3 className="grow">{tr('Out of sync')}</h3>
                 </div>
                 {h.out_of_sync.length ? (
-                  h.out_of_sync.map((a) => (
-                    <Link key={a.id} to={`/ws/${slug}/apis/${a.id}/deployment`} className="list-item" style={{ display: 'flex' }}>
-                      <div className="grow bold">
-                        {a.name} <span className="faint">{a.version}</span>
-                      </div>
-                      <span className="badge warning">{tr('published, not deployed')}</span>
-                    </Link>
-                  ))
+                  <>
+                    <div className="card-body" style={{ paddingBottom: 0 }}>
+                      <ListToolbar paging={oos} placeholder={tr('search apis, versions')} />
+                    </div>
+                    <div>
+                      {oos.items.map((a) => (
+                        <Link key={a.id} to={`/ws/${slug}/apis/${a.id}/deployment`} className="list-item" style={{ display: 'flex' }}>
+                          <div className="grow bold">
+                            {a.name} <span className="faint">{a.version}</span>
+                          </div>
+                          <span className="badge warning">{tr('published, not deployed')}</span>
+                        </Link>
+                      ))}
+                    </div>
+                    {!oos.items.length && <div className="card-body muted small">{tr('No matching API')}</div>}
+                    <Pager paging={oos} total={oos.total} />
+                  </>
                 ) : (
                   <Empty title={tr('Everything published is deployed')} icon="check" />
                 )}
                 {h.counts.drifted > 0 && (
-                  <Link to="/gateway/drift" className="list-item" style={{ display: 'flex' }}>
+                  <Link to="/gateway/drift" className="list-item" style={{ display: 'flex', borderTop: '1px solid var(--border)' }}>
                     <Icon name="alert" />
                     <span className="grow"><Tr text={'{0} projected objects drifted on the gateway'} args={[h.counts.drifted]} /></span>
                     <Icon name="chevronRight" />

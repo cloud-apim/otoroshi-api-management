@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useRouter, Link } from '../shared/router.jsx';
 import { Badge, Icon, Loading } from '../shared/ui.jsx';
 import { AUTH_LABELS, fmtNumber } from '../shared/lib.js';
+import { MiniPager, SearchInput } from '../shared/lists.jsx';
 import { usePortal } from './context.jsx';
 import { useI18n, windowLabel } from './i18n.jsx';
 
@@ -33,6 +34,21 @@ export function PageHeader({ title, subtitle, actions, back }) {
       </div>
     </div>
   );
+}
+
+// a list inside a card, a column or a menu (useLocalPaging with `local`): its search once it holds
+// more than one record (or while a search is on), its pager past one page
+export function SmallSearch({ paging, count, placeholder }) {
+  if (count < 2 && !paging.q) return null;
+  return (
+    <div className="row">
+      <SearchInput value={paging.q} onChange={paging.setQ} placeholder={placeholder} />
+    </div>
+  );
+}
+
+export function SmallPager({ paging }) {
+  return <MiniPager page={paging.page} pages={Math.ceil(paging.total / paging.limit)} onPage={paging.setPage} from={paging.offset + 1} to={Math.min(paging.offset + paging.limit, paging.total)} total={paging.total} />;
 }
 
 export function LifecycleBadge({ lifecycle }) {

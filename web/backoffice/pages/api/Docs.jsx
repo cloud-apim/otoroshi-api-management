@@ -3,6 +3,7 @@ import YAML from 'yaml';
 import { Callout, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Select, Seg, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeEditor, codeLanguage } from '../../../shared/code-editor.jsx';
+import { ListToolbar, MiniPager, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 import { channelsOf } from '../../../shared/asyncapi.js';
 
@@ -13,6 +14,7 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
   const toast = useToast();
   const confirm = useConfirm();
   const pages = useLoad(() => wapi.get(`/apis/${api.id}/pages`), [api.id]);
+  const paging = useLocalPaging(pages.data, { prefix: 'pages', size: 25, text: (p) => `${Object.values(p.title || {}).join(' ')} ${p.slug}` });
   const [selected, setSelected] = useState(null);
   const langs = draft.documentation.languages;
   useEffect(() => {
@@ -44,53 +46,70 @@ export function DocsTab({ api, draft, setDraft, readOnly, reload, dirty }) {
           <p className="muted small grow">{tr('Pages are saved as you go, in the draft: the portal shows them once a snapshot is published and deployed.')}</p>
         </div>
       </div>
-      <Loader state={pages}>
-        {(list) => (
-          <div className="split">
-            <div className="card" style={{ padding: 8 }}>
-              <div className="pagelist col gap-4">
-                {list.map((p) => (
-                  <button key={p.id} className={selected === p.id ? 'on' : ''} onClick={() => setSelected(p.id)}>
-                    <Icon name="doc" />
-                    <span className="grow ellipsis">{p.title?.[draft.documentation.defaultLanguage] || Object.values(p.title || {})[0] || p.slug}</span>
-                    <span className="faint tiny">{Object.keys(p.title || {}).length}</span>
-                  </button>
-                ))}
-                {!readOnly && (
-                  <button onClick={add}>
-                    <Icon name="plus" /> {tr('New page')}
-                  </button>
+      <div>
+        <ListToolbar paging={paging} placeholder={tr('search pages, titles, slugs')} onReload={pages.reload} loading={pages.loading} />
+        <Loader state={pages}>
+          {() => (
+            <div className="split">
+              <div className="card" style={{ padding: 8 }}>
+                <div className="pagelist col gap-4">
+                  {paging.items.map((p) => (
+                    <button key={p.id} className={selected === p.id ? 'on' : ''} onClick={() => setSelected(p.id)}>
+                      <Icon name="doc" />
+                      <span className="grow ellipsis">{p.title?.[draft.documentation.defaultLanguage] || Object.values(p.title || {})[0] || p.slug}</span>
+                      <span className="faint tiny">{Object.keys(p.title || {}).length}</span>
+                    </button>
+                  ))}
+                  {paging.q && !paging.items.length && (
+                    <div className="muted small" style={{ padding: '8px 10px' }}>
+                      {tr('No page matches.')}
+                    </div>
+                  )}
+                  {!readOnly && (
+                    <button onClick={add}>
+                      <Icon name="plus" /> {tr('New page')}
+                    </button>
+                  )}
+                </div>
+                {/* the side column is narrow: the small pager of a widget */}
+                <MiniPager
+                  page={paging.page}
+                  pages={Math.max(1, Math.ceil(paging.total / paging.limit))}
+                  onPage={paging.setPage}
+                  from={paging.total ? paging.offset + 1 : 0}
+                  to={Math.min(paging.offset + paging.limit, paging.total)}
+                  total={paging.total}
+                />
+              </div>
+              <div>
+                {selected ? (
+                  <PageEditor
+                    key={selected}
+                    api={api}
+                    pageId={selected}
+                    langs={langs}
+                    readOnly={readOnly}
+                    onSaved={() => {
+                      pages.reload();
+                      if (!dirty) reload();
+                    }}
+                    onDelete={async (p) => {
+                      if (!(await confirm({ title: tr('Delete page {0}?', [p.slug]), danger: true, confirmLabel: tr('Delete') }))) return;
+                      await wapi.del(`/apis/${api.id}/pages/${p.id}`);
+                      setSelected(null);
+                      pages.reload();
+                    }}
+                  />
+                ) : (
+                  <div className="card">
+                    <Empty title={tr('No page')} icon="doc" action={!readOnly && <button className="btn primary" onClick={add}>{tr('Write the first page')}</button>} />
+                  </div>
                 )}
               </div>
             </div>
-            <div>
-              {selected ? (
-                <PageEditor
-                  key={selected}
-                  api={api}
-                  pageId={selected}
-                  langs={langs}
-                  readOnly={readOnly}
-                  onSaved={() => {
-                    pages.reload();
-                    if (!dirty) reload();
-                  }}
-                  onDelete={async (p) => {
-                    if (!(await confirm({ title: tr('Delete page {0}?', [p.slug]), danger: true, confirmLabel: tr('Delete') }))) return;
-                    await wapi.del(`/apis/${api.id}/pages/${p.id}`);
-                    setSelected(null);
-                    pages.reload();
-                  }}
-                />
-              ) : (
-                <div className="card">
-                  <Empty title={tr('No page')} icon="doc" action={!readOnly && <button className="btn primary" onClick={add}>{tr('Write the first page')}</button>} />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </Loader>
+          )}
+        </Loader>
+      </div>
     </div>
   );
 }
@@ -196,6 +215,11 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
     }
   }
   const paths = parsed?.paths ? Object.entries(parsed.paths) : [];
+  const methodsOf = (ops) =>
+    Object.keys(ops || {})
+      .filter((m) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(m))
+      .map((m) => m.toUpperCase());
+  const pathPage = useLocalPaging(paths, { prefix: 'paths', size: 25, text: ([p, ops]) => `${p} ${methodsOf(ops).join(' ')} ${Object.values(ops || {}).map((o) => `${o?.operationId || ''} ${o?.summary || ''}`).join(' ')}` });
   const set = (v) => setDraft((d) => ({ ...d, openapi: { ...d.openapi, content: v } }));
   return (
     <div className="col gap-16">
@@ -266,18 +290,17 @@ export function OpenApiTab({ draft, setDraft, readOnly }) {
                     <Tr text={'{0} · version {1} · {2} paths'} args={[parsed.openapi || parsed.swagger, parsed.info?.version, paths.length]} />
                   </div>
                 </div>
-                {paths.map(([p, ops]) => (
+                <ListToolbar paging={pathPage} placeholder={tr('search paths, methods')} />
+                {pathPage.items.map(([p, ops]) => (
                   <div key={p} className="mono small">
-                    {Object.keys(ops)
-                      .filter((m) => ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'].includes(m))
-                      .map((m) => m.toUpperCase())
-                      .join(' ')}{' '}
-                    {p}
+                    {methodsOf(ops).join(' ')} {p}
                   </div>
                 ))}
+                {pathPage.q && !pathPage.items.length && <p className="muted small">{tr('No path matches.')}</p>}
               </>
             )}
           </div>
+          {parsed && !error && pathPage.items.length > 0 && <Pager paging={pathPage} total={pathPage.total} />}
         </div>
       </div>
     </div>
@@ -299,6 +322,12 @@ export function AsyncApiTab({ draft, setDraft, readOnly }) {
     }
   }
   const channels = parsed && !error ? channelsOf(parsed) : [];
+  const sideOf = (o) => (o.side === 'send' ? tr('consumers send') : tr('consumers receive'));
+  const channelPage = useLocalPaging(channels, {
+    prefix: 'channels',
+    size: 25,
+    text: (c) => `${c.name} ${c.address || ''} ${c.description || ''} ${c.operations.map((o) => `${sideOf(o)} ${o.summary || ''} ${(o.messages || []).map((m) => m?.name || m?.title || '').join(' ')}`).join(' ')}`,
+  });
   const set = (v) => setDraft((d) => ({ ...d, asyncapi: { ...(d.asyncapi || { format: 'yaml' }), content: v } }));
   return (
     <div className="col gap-16">
@@ -369,14 +398,17 @@ export function AsyncApiTab({ draft, setDraft, readOnly }) {
                     <Tr text={'AsyncAPI {0} · version {1} · {2} channels'} args={[parsed.asyncapi, parsed.info?.version, channels.length]} />
                   </div>
                 </div>
-                {channels.map((c) => (
+                <ListToolbar paging={channelPage} placeholder={tr('search channels, addresses, operations')} />
+                {channelPage.items.map((c) => (
                   <div key={c.name} className="mono small">
-                    {c.operations.map((o) => (o.side === 'send' ? tr('consumers send') : tr('consumers receive'))).join(' · ') || '—'} — {c.address}
+                    {c.operations.map(sideOf).join(' · ') || '—'} — {c.address}
                   </div>
                 ))}
+                {channelPage.q && !channelPage.items.length && <p className="muted small">{tr('No channel matches.')}</p>}
               </>
             )}
           </div>
+          {parsed && !error && channelPage.items.length > 0 && <Pager paging={channelPage} total={channelPage.total} />}
         </div>
       </div>
     </div>

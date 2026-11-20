@@ -61,7 +61,7 @@ beforeAll(async () => {
   ids.ws = (await ok('admin', 'POST', '/workspaces', { name: `Permissions ${RUN}`, slug: WS })).id;
   for (const [who, role] of [['alice', 'producer'], ['bob', 'producer'], ['carl', 'consumer']]) {
     await ok('admin', 'POST', `/workspaces/${WS}/members`, { email: email(who), name: who, password: PASSWORD, role });
-    ids[who] = (await ok('admin', 'GET', `/users?q=${encodeURIComponent(email(who))}`))[0].id;
+    ids[who] = (await ok('admin', 'GET', `/users?q=${encodeURIComponent(email(who))}`)).items[0].id;
     tokens[who] = await tokenOf(who);
   }
   ids.teamA = (await ok('admin', 'POST', `/workspaces/${WS}/teams`, { name: 'Team A', owner_id: ids.alice })).id;

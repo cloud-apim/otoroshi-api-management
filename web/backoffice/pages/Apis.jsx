@@ -4,7 +4,7 @@ import { fmtRelative } from '../../shared/lib.js';
 import { Badge, Callout, Empty, Field, Icon, Input, Loader, Modal, Select, StatusBadge, TagsInput, errorMessage, useLoad, useToast } from '../../shared/ui.jsx';
 import { useWs, api } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
-import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
+import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { ApisTabs } from './PolicyGroups.jsx';
 import { PromoteModal } from './Promote.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
@@ -85,15 +85,18 @@ function AdoptModal({ onClose, onAdopted }) {
   const { wapi } = useWs();
   const toast = useToast();
   const state = useLoad(() => api.get('/gateway/unmanaged-apis'), []);
+  const page = useLocalPaging(state.data, { local: true, size: 10, text: (a) => `${a.name} ${a.id} ${a.domain || ''}${a.contextPath || ''} ${a.plans.map((p) => `${p.name} ${p.kind}`).join(' ')}` });
   return (
     <Modal title={tr('Adopt an API from the gateway')} onClose={onClose} size="wide">
       <Callout kind="info">
         <Tr text={'Adopt mode takes over an existing Otoroshi {0} without overwriting it: it becomes a draft in the product, its subscriptions and their keys become the product\'s, and nothing is written to the gateway until you publish and deploy. The ids and the keys are kept, so the first deployment updates them in place: the consumers keep calling with the keys they have.'} args={[<code>Api</code>]} />
       </Callout>
+      <ListToolbar paging={page} placeholder={tr('search apis, ids, domains, plans')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
-        {(list) =>
-          list.length ? (
-            <div className="card flat table-wrap">
+        {() =>
+          page.items.length ? (
+            <div className="card flat">
+              <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -105,7 +108,7 @@ function AdoptModal({ onClose, onAdopted }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.map((a) => (
+                  {page.items.map((a) => (
                     <tr key={a.id}>
                       <td>
                         <div className="bold">{a.name}</div>
@@ -137,9 +140,11 @@ function AdoptModal({ onClose, onAdopted }) {
                   ))}
                 </tbody>
               </table>
+              </div>
+              <Pager paging={page} total={page.total} />
             </div>
           ) : (
-            <Empty title={tr('No unmanaged API on the gateway')} />
+            <Empty title={page.q ? tr('No matching API') : tr('No unmanaged API on the gateway')} />
           )
         }
       </Loader>

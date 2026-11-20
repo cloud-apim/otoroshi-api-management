@@ -5,6 +5,8 @@ import { api as rootApi, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 import { AuthorizationServer, SharedResourcePicker, TrustedCAs } from './PlanAuth.jsx';
 import { THREAT_DEFAULTS, ThreatProtection } from './PlanThreats.jsx';
+import { planText, resourceText } from './tabs.jsx';
+import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
 // the kinds whose extractor can pass on a call with a selection: the others are told apart by the key
@@ -91,6 +93,7 @@ function PlanSummary({ p, draft }) {
 
 export function PlansTab({ draft, setDraft, readOnly, order }) {
   const [editing, setEditing] = useState(null);
+  const page = useLocalPaging(draft.plans, { prefix: 'plans', size: 25, text: planText });
   const save = (p) => {
     setDraft((d) => ({ ...d, plans: d.plans.some((x) => x.id === p.id) ? d.plans.map((x) => (x.id === p.id ? p : x)) : [...d.plans, p] }));
     setEditing(null);
@@ -108,42 +111,54 @@ export function PlansTab({ draft, setDraft, readOnly, order }) {
           </button>
         )}
       </div>
-      {draft.plans.length === 0 ? (
-        <div className="card">
-          <Empty title={tr('No plan')} icon="layers" action={!readOnly && <button className="btn primary" onClick={() => setEditing(newPlan())}>{tr('Add a plan')}</button>}>
-            {tr('Without a published plan, the gateway refuses every call to this api: publish a keyless plan for an open api.')}
-          </Empty>
-        </div>
-      ) : (
-        <div className="grid-3">
-          {draft.plans.map((p) => (
-            <div key={p.id} className="card plan-card">
-              <div className="row">
-                <span className="plan-kind">{tr(AUTH_LABELS[p.auth.kind])}</span>
-                <span className="spacer" />
-                <StatusBadge status={p.status} />
-              </div>
-              <h3>{p.name}</h3>
-              {p.description && <p className="small muted">{p.description}</p>}
-              <PlanSummary p={p} draft={draft} />
-              {!readOnly && (
-                <div className="row mt-8">
-                  <button className="btn sm" onClick={() => setEditing(p)}>
-                    <Icon name="edit" /> {tr('Edit')}
-                  </button>
-                  <button className="btn sm ghost" onClick={() => duplicate(p)}>
-                    <Icon name="copy" /> {tr('Duplicate')}
-                  </button>
-                  <span className="spacer" />
-                  <button className="btn sm ghost icon" aria-label={tr('delete plan')} onClick={() => setDraft((d) => ({ ...d, plans: d.plans.filter((x) => x.id !== p.id) }))}>
-                    <Icon name="trash" />
-                  </button>
+      <div>
+        <ListToolbar paging={page} placeholder={tr('search plans, auth kinds, statuses')} />
+        {draft.plans.length === 0 ? (
+          <div className="card">
+            <Empty title={tr('No plan')} icon="layers" action={!readOnly && <button className="btn primary" onClick={() => setEditing(newPlan())}>{tr('Add a plan')}</button>}>
+              {tr('Without a published plan, the gateway refuses every call to this api: publish a keyless plan for an open api.')}
+            </Empty>
+          </div>
+        ) : page.items.length === 0 ? (
+          <div className="card">
+            <Empty title={tr('No plan matches')} icon="layers" />
+          </div>
+        ) : (
+          <>
+            <div className="grid-3">
+              {page.items.map((p) => (
+                <div key={p.id} className="card plan-card">
+                  <div className="row">
+                    <span className="plan-kind">{tr(AUTH_LABELS[p.auth.kind])}</span>
+                    <span className="spacer" />
+                    <StatusBadge status={p.status} />
+                  </div>
+                  <h3>{p.name}</h3>
+                  {p.description && <p className="small muted">{p.description}</p>}
+                  <PlanSummary p={p} draft={draft} />
+                  {!readOnly && (
+                    <div className="row mt-8">
+                      <button className="btn sm" onClick={() => setEditing(p)}>
+                        <Icon name="edit" /> {tr('Edit')}
+                      </button>
+                      <button className="btn sm ghost" onClick={() => duplicate(p)}>
+                        <Icon name="copy" /> {tr('Duplicate')}
+                      </button>
+                      <span className="spacer" />
+                      <button className="btn sm ghost icon" aria-label={tr('delete plan')} onClick={() => setDraft((d) => ({ ...d, plans: d.plans.filter((x) => x.id !== p.id) }))}>
+                        <Icon name="trash" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+            <div className="mt-16">
+              <Pager paging={page} total={page.total} />
+            </div>
+          </>
+        )}
+      </div>
       {editing && <PlanEditor value={editing} draft={draft} onSave={save} onClose={() => setEditing(null)} />}
     </div>
   );
@@ -204,6 +219,8 @@ function PlanEditor({ value, draft, onSave, onClose }) {
   const kindChange = (kind) => setP((x) => ({ ...x, auth: { kind, config: AUTH_DEFAULTS[kind] }, selection: SELECTABLE.includes(kind) ? x.selection || [] : [] }));
   const sameKind = draft.plans.filter((x) => x.id !== p.id && ['published', 'deprecated'].includes(x.status) && x.auth.kind === p.auth.kind);
   const setSelection = (i, patch) => set({ selection: p.selection.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
+  // the resources a plan can be restricted to, searched and paged in the drawer (out of the url)
+  const resPage = useLocalPaging(draft.resources, { local: true, size: 25, text: (r) => resourceText(r, draft) });
   const windows = [
     { value: 1000, label: tr('second') },
     { value: 60000, label: tr('minute') },
@@ -424,7 +441,8 @@ function PlanEditor({ value, draft, onSave, onClose }) {
             <Select value={p.resourceFilter.mode} onChange={(v) => setIn('resourceFilter', { mode: v })} options={[{ value: 'all', label: tr('All resources') }, { value: 'only', label: tr('Only some resources') }]} />
             {p.resourceFilter.mode === 'only' && (
               <div className="col gap-6">
-                {draft.resources.map((r) => (
+                <ListToolbar paging={resPage} placeholder={tr('search names, paths, methods, backends, flows')} />
+                {resPage.items.map((r) => (
                   <label key={r.id} className="checkbox small">
                     <input
                       type="checkbox"
@@ -434,6 +452,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
                     {r.name} <span className="mono faint">{(r.methods.length ? r.methods : ['*']).join(' ')} {r.path}</span>
                   </label>
                 ))}
+                {resPage.items.length ? <Pager paging={resPage} total={resPage.total} /> : <span className="faint small">{resPage.q ? tr('No resource matches') : tr('No resource')}</span>}
                 {p.auth.kind === 'oauth2-local' && <Callout kind="warning">{tr('The gateway gives the keys of an oauth2-local plan no restrictions: on this plan the filter is not enforced.')}</Callout>}
               </div>
             )}
