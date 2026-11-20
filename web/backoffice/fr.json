@@ -680,6 +680,7 @@
   "No application": "Aucune application",
   "No application matches": "Aucune application ne correspond",
   "No audit exporter": "Aucun exporteur d’audit",
+  "No call in this period, for these filters.": "Aucun appel sur cette période, pour ces filtres.",
   "No call in this period. Install the data exporter from the Gateway page to feed the ingester.": "Aucun appel sur cette période. Installez l’exporteur de données depuis la page Gateway pour alimenter l’ingesteur.",
   "No call matches.": "Aucun appel ne correspond.",
   "No category declared for this portal yet.": "Aucune catégorie déclarée pour ce portail.",
