@@ -43,6 +43,7 @@ yet.
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
+| G-23 | — | A key cannot serve **several subscriptions**: each one rebuilds the keys it references on its own api and plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
 
 ---
 
@@ -336,4 +337,29 @@ the error it lets go: `sendEvent = false` on the verification of `NgJwtApikeyExt
 `NgOidcApikeyExtractor`, and on `passWithApiKeyFromCache` when `ApikeyCalls` is not mandatory — the
 call then has one event, its own, which already carries the reason of a refusal
 (`apikey_rejection_reason`, `token_rejection_reason`) when the call is refused in the end.
+
+## G-23 — a key cannot serve several subscriptions — medium — open
+
+Not reported upstream yet. Found on 18.1.0-dev while implementing R-12 (one credential for several
+subscriptions of a consumer, D-31: the identity grouped, the quotas never pooled).
+
+**Observed.** A key minted for an `ApiSubscription` is built from its api and its plan only:
+`authorizedEntities = Seq(ApiIdentifier(api.id))`, `apiRef = {api, plan, sub}`, the throttling of
+the plan (`ApiSubscription.generateNewApikeyFromPlan`, `next/models/Api.scala:1323`). Every write of
+the subscription, and every change of its plan, rebuilds each key of its `token_refs` the same way
+(`updateApikeyFromPlan`, `:1458`, through `rebuildApikey`, `:1418`). A second subscription that
+references the key of the first in its `token_refs` therefore rewrites it on its own api and plan:
+the last write wins, and the api of the other subscription refuses the key (`ApikeyCalls` checks
+`authorizedEntities`). Deleting either subscription deletes the key both rely on (`deleteKeys`,
+`:1254`, only spares a key whose `apiRef` names another subscription). So one key cannot carry the
+subscriptions of a consumer to several apis — what `authorizedEntities` allows for a classic apikey.
+
+**The product.** One key per subscription. R-12 waits for this.
+
+**Fix to propose.** A subscription that joins the key of another subscription of the same owner
+(e.g. `token_refs: [{"apikey": "<client id>", "shared": true}]`, or a `credential_ref`): the key is
+authorized on the union of the apis of the subscriptions that reference it, each call is enforced
+with the plan of the subscription of the api called (its rate, quotas and restrictions, counted per
+key and plan — no pooled quota), the `apiRef` of the event is the one of that subscription, and the
+key goes with the last subscription that references it.
 

@@ -39,3 +39,4 @@ one found since. The product requires 18.1, and relies on the fixes: ✅ followe
 | G-20 | An admin key narrowed by its access rights **read the secret of every admin key** of its teams | high | ✅ | nothing to change: the product's key is its own, super admin |
 | G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |
 | G-22 | An extractor that does not identify the caller sends an error event for a call that then succeeds | medium | ⬜ open | nothing: the dashboards count these as errors |
+| G-23 | A key cannot serve several subscriptions: each one rebuilds the keys it references on its own api and plan | medium | ⬜ open | one key per subscription; a credential for several subscriptions waits for it |
