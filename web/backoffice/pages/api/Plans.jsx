@@ -3,7 +3,7 @@ import { AUTH_LABELS, fmtNumber, fmtWindow } from '../../../shared/lib.js';
 import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, Tabs, useLoad } from '../../../shared/ui.jsx';
 import { api as rootApi, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
-import { AuthorizationServer, TrustedCAs } from './PlanAuth.jsx';
+import { AuthorizationServer, SharedResourcePicker, TrustedCAs } from './PlanAuth.jsx';
 import { THREAT_DEFAULTS, ThreatProtection } from './PlanThreats.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
@@ -288,7 +288,18 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               </Setting>
             </>
           )}
-          {p.auth.kind === 'jwt' && (
+          {['jwt', 'oauth2-remote'].includes(p.auth.kind) && <SharedResourcePicker config={p.auth.config} setAuthConfig={setAuthConfig} />}
+          {p.auth.kind === 'jwt' && p.auth.config.sharedResource?.id && (
+            <>
+              <Setting label={tr('Expected audience')} help={tr('the aud a token must carry: the audience of this api at the authorization server')}>
+                <Input value={p.auth.config.derive?.audience || ''} onChange={(v) => setAuthConfig({ derive: { ...(p.auth.config.derive || {}), audience: v } })} mono />
+              </Setting>
+              <Setting label={tr('Client id claim')} help={tr("where the consumer's client_id is read in the token")}>
+                <Input value={p.auth.config.clientIdPath} onChange={(v) => setAuthConfig({ clientIdPath: v })} mono />
+              </Setting>
+            </>
+          )}
+          {p.auth.kind === 'jwt' && !p.auth.config.sharedResource?.id && (
             <Setting label={tr('Token validation')} help={tr('describe how the tokens are validated and the product derives the Otoroshi JWT verifier, keeps it reconciled and removes it with the api — or reference an existing one')}>
               <Seg
                 value={p.auth.config.derive?.enabled ? 'derive' : 'reference'}
@@ -315,8 +326,8 @@ function PlanEditor({ value, draft, onSave, onClose }) {
               )}
             </Setting>
           )}
-          {p.auth.kind === 'oauth2-remote' && <AuthorizationServer config={p.auth.config} setAuthConfig={setAuthConfig} authModules={refs.data?.authModules} />}
-          {p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled && (
+          {p.auth.kind === 'oauth2-remote' && <AuthorizationServer config={p.auth.config} setAuthConfig={setAuthConfig} authModules={refs.data?.authModules} shared={!!p.auth.config.sharedResource?.id} />}
+          {p.auth.kind === 'jwt' && !p.auth.config.derive?.enabled && !p.auth.config.sharedResource?.id && (
             <>
               <Setting label={tr('JWT verifier')} help={tr('infrastructure of the gateway the plan references')}>
                 <Select

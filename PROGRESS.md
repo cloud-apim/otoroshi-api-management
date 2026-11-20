@@ -48,13 +48,14 @@ Last update: 2026-11-20.
   - R-31: the AI audits checked with real calls on the gateway running the LLM extension — a chat completion through an api whose flow proxies a provider (a fake one, a route of the gateway answering as OpenAI), an MCP tool called through another api. What the real events showed: the audits are generic `AuditEvent`s (`audit: LLMUsageAudit | McpAudit`), so the exporter never sent them and the ingester did not know them — both fixed; the tokens are under `usage` (`generation_tokens`), the cost under `costs.total_cost` in dollars, the tool of an MCP call under `mcp_request_payload.params.name`; and an audit carries the prompt, the answer, the arguments and the result of a tool, and the whole key with its secret — the ingester now keeps the usage only, the key named, the address and the end user pseudonymised (`test/ai-usage.test.js`, `test/ingestion.test.js`).
   - R-55: an AsyncAPI specification (2.x or 3.x) in the draft and the snapshots of an api — a tab of the console, an outline of its channels — never projected; the portal renders it in an Events tab: its channels from the side of a consumer (what it sends, what it receives, whatever the version), the messages with their payloads and examples, its local references resolved, its servers the gateway (the brokers stay private); a specification the portal cannot read is said on the draft (`test/discovery.test.js`, `test/model.test.js`, `test/ui.test.js`).
   - R-10, first half: **dictionaries** (D-16) — a named set of values of a workspace, given here or refreshed from an external source (an url answering json, a json pointer, headers sealed, a failing source keeping its last values), projected into the global env of the gateway under the product's own part, `apim.dictionaries.<workspace>.<name>`, where the expression language of any plugin reads it (`${global_config.env.apim.dictionaries…}`): changed, what runs changes without redeploying the apis; what the gateway holds compared (in sync, changed on the gateway, missing); a page under APIs › Dictionaries, the admin api, the cli (`test/dictionaries.test.js`, which reads a value through a plugin of an api).
+  - R-10, second half: **shared resources** (D-16) — an authorization server described once for the workspace (issuer, keys, discovery, user info, the client of the gateway), published by immutable versions; a jwt or oauth2-remote plan pins a version instead of describing its server, the snapshot freezes it, and the projection derives from it the very JWT verifier or auth module a description derives; a new version changes nothing until an api is upgraded, the apis behind listed; a resource still pinned is not deleted; checked with a real token of the identity provider of the stack (`test/shared-resources.test.js`, `test/model.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
 1. **R-48** — compaction of old rollups (only if the volume calls for it).
 
-Then the large ones: R-10, R-19, and the event-driven apis (R-54).
+Then the large ones: R-19, and the event-driven apis (R-54).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -62,7 +63,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (7)**
+**Doable (6)**
 
 | # | Effort | What |
 |---|---|---|
@@ -71,7 +72,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
-| R-10 | M | Named compositions: resources (the dictionaries are done) |
 | R-19 | L | Custom portal templates |
 
 
@@ -102,7 +102,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-10 | D-16 | Named compositions, the last one: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan rather than reconfigured). The dictionaries are done | M | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | — | G-23 |
 | R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
 
@@ -176,7 +175,7 @@ waits for the data plane rather than working around it.
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, and it reads the global configuration, super admin only by design (G-21) |
 | D-15 derived objects | ✅ | JWT verifiers ✅ derived from the plan description (JWKS or HMAC, iss, aud), marked, in the deployment diff and the drift, removed with the api — reference catalogue test; trusted CAs of mtls plans ✅ derived as certificates (the trusted CAs of their plan, `trusted_ca_refs`), auth modules of oauth2-remote plans ✅ derived from the described authorization server (with discovery); both marked, in the deployment diff and the drift, removed after the Api — `test/derived-objects.test.js` against the real gateway, a token of the dev IdP passing; client certificates of applications ✅ derived while an mtls subscription is active; the inventory of every kind of the gateway ✅ |
-| D-16 named compositions | 🟡 | shared policy groups ✅ (pinned versions, upgrade); resources and dictionaries: R-10 |
+| D-16 named compositions | ✅ | shared policy groups (pinned versions, upgrade), shared resources (an authorization server, pinned versions, derived like a description), dictionaries (projected into the global env, read by the expression language) |
 | D-17 testing | ✅ | portal: Scalar + proxy for an api with its specification, the composer shared with the console otherwise ✅; console ✅ with the trace of the policies (the request tester of the gateway) |
 | D-18 typed metadata, one mechanism | ✅ | 5 scopes, request form, publication blocked by a missing required field |
 | D-19 workspace + teams, global users | ✅ | an admin only sees the members of its workspaces |

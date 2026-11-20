@@ -16,6 +16,7 @@ import { diff, stable } from './diff.js';
 import { isTeamMember } from './identity.js';
 import { normalizeDraft } from './model.js';
 import { resolveGroups } from './policyGroups.js';
+import { resolveResources } from './resources.js';
 import * as apis from './apis.js';
 import * as deployments from './deployments.js';
 import { checkRefs, vaultRefs } from '../otoroshi/vault-refs.js';
@@ -150,6 +151,14 @@ export async function promote(ctx, ws, doc, { dryRun = false, deploy = false, re
   } catch (e) {
     warnings.push({
       code: 'policy_group_unknown',
+      message: `${e.message}: the snapshot carries the frozen version it was published with, but a snapshot published here from this draft will not resolve it`,
+    });
+  }
+  try {
+    await resolveResources(content.draft);
+  } catch (e) {
+    warnings.push({
+      code: 'shared_resource_unknown',
       message: `${e.message}: the snapshot carries the frozen version it was published with, but a snapshot published here from this draft will not resolve it`,
     });
   }

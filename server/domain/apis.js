@@ -10,6 +10,7 @@ import { diff } from './diff.js';
 import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
+import { resolveResources } from './resources.js';
 import { threatWarnings } from '../otoroshi/threats.js';
 import { checkValues, listFields, validateValues } from './metadata.js';
 
@@ -205,14 +206,18 @@ export async function composeDraft(api, { strict = false } = {}) {
   const view = draftView(api);
   // the pinned versions of the shared policy groups are frozen into the snapshot
   let policyGroups = {};
+  let sharedResources = {};
   try {
     policyGroups = await resolveGroups(view.draft);
+    // and so are the pinned versions of the shared resources its plans reference
+    sharedResources = await resolveResources(view.draft);
   } catch (e) {
     if (strict) throw e;
   }
   return {
     ...view,
     policyGroups,
+    sharedResources,
     docs: {
       pages: pages.map((p) => ({ id: p.id, parent_id: p.parent_id, slug: p.slug, position: p.position, title: p.title, content: p.content })),
     },

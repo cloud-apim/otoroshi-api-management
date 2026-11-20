@@ -37,6 +37,7 @@ import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
 import * as dictionaries from '../domain/dictionaries.js';
+import * as sharedResources from '../domain/resources.js';
 import { usageOf } from '../payments/usage.js';
 
 const r = new Router();
@@ -1229,6 +1230,36 @@ r.post('/workspaces/:ws/policy-groups/:pg/publish', async ({ ctx, params, body }
 r.delete('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);
   await policyGroups.deleteGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg));
+  return { deleted: true };
+});
+
+// ---------------------------------------------------------------- shared resources
+
+r.get('/workspaces/:ws/shared-resources', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const list = await sharedResources.listResources(c.workspace.id);
+  return Promise.all(list.map(async (x) => ({ ...x, usage: await sharedResources.resourceUsage(c.workspace.id, x.id), versions: (await sharedResources.listVersions(x.id)).map((v) => v.number) })));
+});
+r.post('/workspaces/:ws/shared-resources', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return sharedResources.createResource(c, c.workspace.id, body);
+});
+r.get('/workspaces/:ws/shared-resources/:res', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const x = await sharedResources.getResource(c.workspace.id, params.res);
+  return { ...x, versions: await sharedResources.listVersions(x.id), usage: await sharedResources.resourceUsage(c.workspace.id, x.id) };
+});
+r.put('/workspaces/:ws/shared-resources/:res', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return sharedResources.updateResource(c, await sharedResources.getResource(c.workspace.id, params.res), body);
+});
+r.post('/workspaces/:ws/shared-resources/:res/publish', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return sharedResources.publishResource(c, await sharedResources.getResource(c.workspace.id, params.res), body);
+});
+r.delete('/workspaces/:ws/shared-resources/:res', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  await sharedResources.deleteResource(c, await sharedResources.getResource(c.workspace.id, params.res));
   return { deleted: true };
 });
 

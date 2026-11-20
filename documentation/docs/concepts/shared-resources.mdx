@@ -1,0 +1,38 @@
+---
+sidebar_position: 7.5
+title: Shared resources
+description: An authorization server described once for the workspace, published by versions, pinned by the plans that use it.
+---
+
+# Shared resources
+
+A plan that validates tokens — a `jwt` or an `oauth2-remote` plan — describes the authorization
+server that issues them: its issuer, its keys, its endpoints, the client the gateway uses with it.
+On thirty APIs, that is thirty copies of the same identity provider, and a change of its keys is
+thirty changes. A **shared resource** names it once for the workspace (**APIs → Shared resources**),
+and the plans **reference** it rather than describing it again.
+
+Like a [shared policy group](./shared-policy-groups.mdx), it creates no gateway capability:
+
+- the resource has a **draft** and **published versions**, immutable;
+- a plan **pins a version** (its tab **Access → Shared authorization server**); the next snapshot of
+  the API **freezes** that version, and the projection derives from it exactly what the plan would
+  derive from a description of its own — the JWT verifier of a `jwt` plan, the auth module of an
+  `oauth2-remote` plan, marked as the product's, reconciled, removed with the API;
+- **publishing a new version changes nothing** that runs: the page of the resource lists the APIs
+  that pin it, and the ones **behind** the latest version, upgraded one by one, each by a new
+  snapshot;
+- a resource that a plan still pins cannot be deleted.
+
+What stays the plan's own: the claim the client id is read in, the audiences a token must carry (the
+audience of this API at the server), the user profile an `oauth2-remote` plan fetches. The issuer is
+the server's.
+
+:::note
+These are the *resources* of the composition model — a dependency a policy consumes —, not the
+resources of an API, its endpoints. An authorization server is the first kind; others (a token cache,
+a directory) would come the same way.
+:::
+
+The client secret of the gateway at the server is kept in the versions and the snapshots as it is
+given: prefer a vault reference (`${vault://…}`).

@@ -365,7 +365,7 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}`} icon="home" exact>
               {tr('Home')}
             </NavLink>
-            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} also={[`/ws/${ws}/policy-groups`, `/ws/${ws}/dictionaries`]}>
+            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} also={[`/ws/${ws}/policy-groups`, `/ws/${ws}/shared-resources`, `/ws/${ws}/dictionaries`]}>
               {tr('APIs')}
             </NavLink>
             <NavLink to={`/ws/${ws}/applications`} icon="apps">

@@ -1,7 +1,7 @@
 // Unit tests of the model and the projection — no database, no gateway.
 import { describe, expect, test } from 'bun:test';
 import { normalizeDraft, validateDraft, resolutionOrder, plansAreEquivalent, defaultPlan } from '../server/domain/model.js';
-import { buildOtoroshiApi, buildOtoroshiSubscription, restrictionsFor, restrictionPath, rateLimitingFor, comparableApi, THREAT_PRESET, threatFromPreset, threatPresetConfig } from '../server/otoroshi/projection.js';
+import { buildOtoroshiApi, derivedEntities, buildOtoroshiSubscription, restrictionsFor, restrictionPath, rateLimitingFor, comparableApi, THREAT_PRESET, threatFromPreset, threatPresetConfig } from '../server/otoroshi/projection.js';
 import { diff } from '../server/domain/diff.js';
 import { maskUrl } from '../server/domain/ingest.js';
 
@@ -259,3 +259,33 @@ describe('asyncapi', () => {
     expect(validateDraft(d).warnings.map((w) => w.code)).not.toContain('asyncapi_unreadable');
   });
 });
+
+describe('shared resources', () => {
+  const api = { id: 'a', name: 'x', version: '1', workspace_id: 'ws' };
+  const server = { name: 'Corporate IdP', kind: 'authorization-server', content: { issuer: 'https://idp.test', jwksUrl: 'https://idp.test/jwks', discoveryUrl: 'https://idp.test/.well-known/openid-configuration', userInfoUrl: 'https://idp.test/userinfo', clientId: 'gw', clientSecret: '${vault://local/idp}', scope: 'openid' } };
+  test('a plan that references a shared resource derives what a plan describing its server derives, from the version the snapshot froze', () => {
+    const jwt = defaultPlan({ id: 'p_jwt', status: 'published', auth: { kind: 'jwt', config: { sharedResource: { id: 'res_1', version: 2 }, clientIdPath: 'sub' } } });
+    const remote = defaultPlan({ id: 'p_remote', status: 'published', auth: { kind: 'oauth2-remote', config: { sharedResource: { id: 'res_1', version: 2 }, audiences: ['books'] } } });
+    const d = draft([jwt, remote]);
+    const snapshot = { api, draft: d, sharedResources: { 'res_1@2': server } };
+    expect(validateDraft(d).errors).toEqual([]);
+    const entity = buildOtoroshiApi(snapshot);
+    expect(entity.plans.map((p) => p.access_mode_configuration.verifier)).toEqual(['apim_jwt_a_p_jwt', 'apim_auth_a_p_remote']);
+    const derived = derivedEntities(snapshot);
+    expect(derived.map((e) => e.kind).sort()).toEqual(['AuthModule', 'JwtVerifier']);
+    expect(JSON.stringify(derived.find((e) => e.kind === 'JwtVerifier').entity)).toContain('https://idp.test/jwks');
+    const module = derived.find((e) => e.kind === 'AuthModule').entity;
+    expect([module.oidConfig, module.clientId, module.clientSecret, module.jwtVerifier.url]).toEqual(['https://idp.test/.well-known/openid-configuration', 'gw', '${vault://local/idp}', 'https://idp.test/jwks']);
+    // the audiences of the plan are its own; the issuer is the server's
+    expect(entity.plans[1].access_mode_configuration).toMatchObject({ issuer: 'https://idp.test', audiences: ['books'] });
+    // a snapshot that does not carry the pinned version cannot be projected
+    expect(() => buildOtoroshiApi({ api, draft: d, sharedResources: {} })).toThrow(/res_1 v2/);
+  });
+
+  test('a reference pins a version, on a plan that uses an authorization server', () => {
+    const errors = (config, kind = 'jwt') => validateDraft(draft([defaultPlan({ status: 'published', auth: { kind, config } })])).errors.map((e) => e.path);
+    expect(errors({ sharedResource: { id: 'res_1' } })).toEqual(['plans[0].auth.config.sharedResource']);
+    expect(errors({ sharedResource: { id: 'res_1', version: 1 } }, 'apikey')).toEqual(['plans[0].auth.config.sharedResource']);
+  });
+});
+

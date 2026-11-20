@@ -158,6 +158,7 @@ describe.skipIf(!ready)('the console', () => {
       ...['overview', 'resources', 'backends', 'flows', 'plans', 'documentation', 'openapi', 'asyncapi', 'catalogue', 'subscriptions', 'deployment', 'test', 'analytics', 'settings'].map((t) => `${W}/apis/${state.apiId}/${t}`),
       `${W}/policy-groups`,
       `${W}/dictionaries`,
+      `${W}/shared-resources`,
       `${W}/applications`,
       `${W}/applications/${state.appId}`,
       `${W}/subscriptions`,

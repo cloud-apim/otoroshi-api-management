@@ -431,7 +431,7 @@ function derivedAuthModule(api, p) {
 
 export function derivedEntities(snapshot) {
   const api = snapshot.api;
-  const draft = normalizeDraft(snapshot.draft);
+  const draft = withResources(normalizeDraft(snapshot.draft), snapshot.sharedResources);
   const out = [];
   for (const p of draft.plans) {
     if (p.auth.kind === 'mtls') out.push(...derivedCertificates(api, p));
@@ -527,9 +527,32 @@ export function comparableDerived(e) {
 }
 
 // snapshot = { api: {...}, draft: {...}, docs: {...} } — see apis.publish()
+// the plans that reference a shared resource get its description from the version the snapshot froze: the
+// projection derives from it what a plan describing its authorization server derives. A snapshot
+// that does not carry the pinned version cannot be projected
+export function withResources(draft, resources = {}) {
+  for (const p of draft.plans) {
+    const ref = p.auth?.config?.sharedResource;
+    if (!ref?.id) continue;
+    const r = resources[`${ref.id}@${ref.version}`];
+    if (!r) throw new Error(`plan ${p.name} references resource ${ref.id} v${ref.version}, which the snapshot does not carry`);
+    const c = r.content || {};
+    if (p.auth.kind === 'jwt') {
+      p.auth.config.verifier = '';
+      p.auth.config.derive = { ...p.auth.config.derive, enabled: true, kind: 'jwks', jwksUrl: c.jwksUrl, issuer: c.issuer || p.auth.config.derive?.issuer || '' };
+    }
+    if (p.auth.kind === 'oauth2-remote') {
+      p.auth.config.verifier = '';
+      p.auth.config.issuer = c.issuer || p.auth.config.issuer || '';
+      p.auth.config.derive = { enabled: true, discoveryUrl: c.discoveryUrl, jwksUrl: c.jwksUrl, userInfoUrl: c.userInfoUrl, clientId: c.clientId, clientSecret: c.clientSecret, scope: c.scope || 'openid' };
+    }
+  }
+  return draft;
+}
+
 export function buildOtoroshiApi(snapshot, { snapshotId, snapshotNumber, lifecycle } = {}) {
   const api = snapshot.api;
-  const draft = normalizeDraft(snapshot.draft);
+  const draft = withResources(normalizeDraft(snapshot.draft), snapshot.sharedResources);
   draft.__apiId = api.id;
   return {
     _loc: { tenant: 'default', teams: ['default'] }, // never an otoroshi tenant

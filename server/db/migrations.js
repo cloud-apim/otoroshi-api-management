@@ -549,6 +549,34 @@ create table dictionaries (
 );
 `,
   },
+  {
+    version: '0018_resources',
+    sql: `
+-- the resources of a workspace: a dependency a plan consumes — an authorization server — named,
+-- versioned like a shared policy group, referenced by the plans by a pinned version
+create table resources (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null,
+  description text not null default '',
+  kind text not null,
+  draft jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table resource_versions (
+  id text primary key,
+  resource_id text not null references resources(id) on delete cascade,
+  number int not null,
+  content jsonb not null,
+  comment text not null default '',
+  published_by text,
+  published_at timestamptz not null default now(),
+  unique (resource_id, number)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

@@ -353,6 +353,8 @@ export function validateDraft(draft) {
       if (!derive.jwksUrl) errors.push({ path: `plans[${i}].auth.config.derive.jwksUrl`, message: `plan "${p.name}" derives its auth module: give the JWKS url of the authorization server` });
       if (p.auth.config.fetchUser && !derive.userInfoUrl)
         errors.push({ path: `plans[${i}].auth.config.derive.userInfoUrl`, message: `plan "${p.name}" fetches the user profile: give the userinfo url of the authorization server` });
+    } else if (p.auth.config?.sharedResource?.id) {
+      // its authorization server is a shared resource: checked when it is published
     } else if (p.auth.kind === 'jwt' && !p.auth.config.verifier)
       errors.push({ path: `plans[${i}].auth.config.verifier`, message: `plan "${p.name}" needs a verifier: reference one, or describe how its tokens are validated` });
     else if (p.auth.kind === 'oauth2-remote' && !p.auth.config.verifier)
@@ -380,7 +382,7 @@ export function validateDraft(draft) {
           message: `plan "${p.name}": without a trusted CA, the plan accepts a client certificate from any authority the gateway trusts (JDK CAs included), and an issuer pattern only compares text anyone can write in a certificate of their own — give the CA that signs the certificates of its consumers`,
         });
     }
-    if (p.auth.kind === 'oauth2-remote' && SERVED_STATUSES.includes(p.status) && !p.auth.config.issuer && !(p.auth.config.audiences || []).length)
+    if (p.auth.kind === 'oauth2-remote' && SERVED_STATUSES.includes(p.status) && !p.auth.config.sharedResource?.id && !p.auth.config.issuer && !(p.auth.config.audiences || []).length)
       warnings.push({
         path: `plans[${i}].auth.config.audiences`,
         code: 'token_claims_not_checked',
@@ -394,6 +396,12 @@ export function validateDraft(draft) {
     const days = p.auth.kind === 'apikey' ? p.auth.config.validityDays : null;
     if (days != null && days !== '' && !(Number(days) > 0))
       errors.push({ path: `plans[${i}].auth.config.validityDays`, message: `plan "${p.name}": the validity of a key is a number of days, more than zero` });
+    const shared = p.auth.config?.sharedResource;
+    if (shared?.id) {
+      if (!['jwt', 'oauth2-remote'].includes(p.auth.kind))
+        errors.push({ path: `plans[${i}].auth.config.sharedResource`, message: `plan "${p.name}": a ${p.auth.kind} plan uses no authorization server` });
+      if (!shared.version) errors.push({ path: `plans[${i}].auth.config.sharedResource`, message: `plan "${p.name}" references a shared resource without a version: pin one` });
+    }
     if (p.flowRef && !d.flows.find((f) => f.id === p.flowRef))
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)
