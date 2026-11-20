@@ -13,7 +13,7 @@ Last update: 2026-11-20.
 
 ## Now
 
-- **Following the upstream fixes** (Otoroshi `18.1.0-dev`, [where we are](./OTOROSHI-GAPS.md#where-we-are)), on the stack run with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up`. The suite passed on it unchanged (152/152): the new behaviours are opt-in. Done so far:
+- **The upstream fixes are followed** (2026-11-20, Otoroshi `18.1.0-dev`, [where we are](./OTOROSHI-GAPS.md#where-we-are)): the product requires Otoroshi 18.1, its workarounds and warnings are gone, R-14, R-15, R-16, R-24 and R-33 are done. Run the stack with `OTOROSHI_JAR=<absolute path to ../otoroshi/otoroshi/target/scala-3.8.4/otoroshi.jar> mise run up` until a release carries the fixes. The suite passed on that jar unchanged first (152/152: the new behaviours are opt-in), then followed the fixes one by one:
   - G-10: the derived certificates are written with the upsert of the generic api, which computes their subject and dates from the chain.
   - Otoroshi 18.1 required by the setup check. G-8: the `Api` is managed as code, `created_by=external=otoroshi-api-management`. G-7, R-33: the snapshot id is the `deployment_ref` of the `Api`, the ref of each deployment Otoroshi records; the console lists the gateway's deployments by snapshot.
   - G-1, G-2, G-18, G-20: closing a subscription deletes it, Otoroshi revokes its keys; deleting an api deletes its `Api`, Otoroshi its subscriptions and keys; the warning `plan_id_shared` and the cleanup of minted keys in the tests are gone. Undeploying now disables the `Api` rather than deleting it, so that the consumers keep their keys at the next deployment.
@@ -24,6 +24,7 @@ Last update: 2026-11-20.
   - A bug of the product, found on the way: a subscription made again on the gateway (gone from it) kept its old credential active beside the new one; it is revoked now.
   - A bug of the product, found on the way: the restriction paths are regexes, and `/v1/pets*` did not allow `/v1/pets/42`; they are `/v1/pets(/.*)?` now.
   - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
+  - Left to do: the screens tour (`bun run screenshots`) is to run again — the plan editor, the *Test* tab, the deploy dialog and the technical details of a deployment changed. The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
@@ -33,7 +34,7 @@ Last update: 2026-11-20.
 4. **R-13** — subscription expiry.
 5. **R-38** — UI tests.
 
-These do not depend on the projection: they come once the product follows the upstream fixes ([where we are](./OTOROSHI-GAPS.md#where-we-are)).
+Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 

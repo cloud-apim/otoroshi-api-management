@@ -9,14 +9,15 @@ Found on Otoroshi `18.0.1`, source lines from the `18.1.0-dev` checkout in `../o
 
 ## Where we are
 
-Every gap logged by then was fixed upstream on 2026-11-19, in `18.1.0-dev`, but three that are not by decision of
-the owner (G-11, G-19, G-21). The product requires Otoroshi 18.1 (the setup check says so) and
-drops its workarounds rather than keeping them for 18.0: nothing depends on the product with 18.0.
+G-1 to G-21 were fixed upstream on 2026-11-19, in `18.1.0-dev`, but three that are not by decision
+of the owner (G-11, G-19, G-21). The product requires Otoroshi 18.1 (the setup check says so) and
+dropped its workarounds rather than keeping them for 18.0: nothing depends on the product with 18.0.
 
-The product now **follows** the fixes, gap by gap: its workarounds and warnings go, the items they
-blocked are done. Status: ✅ **followed** — the product relies on the fix; 🔜 **to follow** — fixed
-upstream, the product still does what the last column says; ➖ **not fixed**, by decision; ⬜ **open**, found
-since, reported upstream, not fixed yet.
+On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
+they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
+contract on the gateway. Found on the way: G-22, reported upstream. Status: ✅ **followed** — the
+product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
+yet.
 
 | # | Issue | Gap | Severity | Status | The product |
 |---|---|---|---|---|---|
