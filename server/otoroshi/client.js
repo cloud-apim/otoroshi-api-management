@@ -135,4 +135,19 @@ export const oto = {
   createDataExporter: (e) => otoroshi('POST', '/api/data-exporter-configs', e),
   updateDataExporter: (e) => otoroshi('PUT', `/api/data-exporter-configs/${e.id}`, e),
   pluginsCatalog: () => otoroshi('GET', '/api/plugins/all'),
+  listEntities: (path) => otoroshi('GET', path),
 };
+
+// the gateway's plugin catalog, kept a minute: the flows tab, the plugin editor and the validation
+// of a draft read it often. Empty when the gateway cannot be reached and was never read
+let pluginCatalog = { at: 0, list: null };
+export async function gatewayPlugins() {
+  if (pluginCatalog.list && Date.now() - pluginCatalog.at < 60000) return pluginCatalog.list;
+  const all = await oto.pluginsCatalog().catch(() => null);
+  if (!all) return pluginCatalog.list || [];
+  const list = (Array.isArray(all) ? all : all.plugins || [])
+    .filter((p) => (p.plugin_type || p.pluginType) === 'ng' || String(p.id || '').startsWith('cp:otoroshi.next'))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  pluginCatalog = { at: Date.now(), list };
+  return list;
+}

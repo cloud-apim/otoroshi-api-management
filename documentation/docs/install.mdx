@@ -269,7 +269,7 @@ curl -X POST http://localhost:9000/api/gateway/exporter \
 ```
 
 It creates (or updates) an Otoroshi `webhook` data exporter with the id `apim_ingester_exporter`,
-filtered on `GatewayEvent`, `LLMUsageAudit` and `McpAudit`, sending batches to `/ingest` with
+filtered on `GatewayEvent`, `LLMUsageAudit`, `McpAudit` and `CloudApimSecurityEvent`, sending batches to `/ingest` with
 `Authorization: Bearer <APIM_INGEST_TOKEN>`. An exporter is gateway infrastructure: this
 helper only creates the one it marks as its own and never touches the others.
 

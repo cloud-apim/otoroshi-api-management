@@ -15,7 +15,8 @@ dropped its workarounds rather than keeping them for 18.0: nothing depends on th
 
 On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
 they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
-contract on the gateway. Found on the way: G-22, reported upstream. Status: ✅ **followed** — the
+contract on the gateway. Found on the way: G-22, reported upstream; G-23 in Otoroshi and G-24 to
+G-26 in the Threat Protection Suite, not reported yet. Status: ✅ **followed** — the
 product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
 yet.
 
@@ -44,6 +45,9 @@ yet.
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sends an error event** for a call that then succeeds: the call is counted twice, once as a `400` | medium | ⬜ | nothing: the dashboards count these events as errors |
 | G-23 | — | A key cannot serve **several subscriptions**: each one rebuilds the keys it references on its own api and plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
+| G-24 | — | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins** and can add a second WAF on a plan protected by the product | medium | ⬜ | nothing: an operator keeps the global table off the apis the product protects per plan |
+| G-25 | — | Threat Protection Suite: a **challenge answers a page, status 200**, which an api client takes for a success | high | ⬜ | the plan screen says it of a threat policy that can challenge, and advises one that refuses |
+| G-26 | — | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
 
 ---
 
@@ -362,4 +366,59 @@ authorized on the union of the apis of the subscriptions that reference it, each
 with the plan of the subscription of the api called (its rate, quotas and restrictions, counted per
 key and plan — no pooled quota), the `apiRef` of the event is the one of that subscription, and the
 key goes with the last subscription that references it.
+
+## G-24 — the global table of Threat Studio does not see the plan plugins — medium — open
+
+Not reported upstream yet. In the Threat Protection Suite (`../otoroshi-waf-extension`), found while
+implementing R-25 (threat protection per plan, D-10).
+
+**Observed.** The global preset (`CloudApimSecuritySuiteGlobalPreset`) protects every route a rule of
+its table claims, and stands down on a route that carries its own protection when
+`skip_protected_routes` is on. It decides that from the plugins of the route only:
+`carriesOwnProtection(route) = route.plugins.slots.exists(...)` (`plugins/globalpreset.scala:202`).
+The plugins of a plan (`ApiPlanPlugins`) are composed into the chain at call time, after the plan is
+selected (`next/models/plugins.scala:366` in Otoroshi): the route of an Api whose plans carry the
+preset looks unprotected to the table, which can add a second WAF on top of the plan's — the calls
+judged twice, by two configurations.
+
+**The product.** Nothing: the docs ask an operator to keep the global table off the apis the product
+protects per plan.
+
+**Fix to propose.** `carriesOwnProtection` also looks at the plans of the Api the route belongs to
+(`route.apiRef` → its plans' `plugins.plugins`, and the flow they reference), or the global preset
+runs after the plan chain and stands down when a preset of the plan already ran for the call.
+
+## G-25 — a challenge answers a page with status 200 — high — open
+
+Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25.
+
+**Observed.** A threat policy whose tier action is `challenge` answers the call with the interstitial
+page: `Results.Ok(Interstitial.render(provider, issued)).as("text/html; charset=utf-8")`
+(`plugins/threat.scala:461`). It suits a browser route; an api client — a program, not a person —
+reads a `200` and takes the html for the answer of the api. Nothing in the response says that the
+call was not served.
+
+**The product.** The plan screen says it of a threat policy that has a challenge tier, and advises a
+policy that refuses for an api.
+
+**Fix to propose.** Answer a challenge to a caller that does not accept html (no `text/html` in
+`Accept`, or an api route) with a refusal — `429` or `403`, a json body naming the challenge and the
+url where a person answers it — and keep the page for the browsers.
+
+## G-26 — a security event names the api, not the plan — low — open
+
+Not reported upstream yet. In the Threat Protection Suite, found while implementing R-25.
+
+**Observed.** `CloudApimSecurityEvent` carries the route and the api of the route
+(`otoroshi.api_id`, from `route.apiRef`, `security/events.scala:137`), and the client id of the key
+that called (`source.apikey`), but not the plan the engine selected for the call, nor its
+subscription. For a keyless plan, or a caller refused before it was identified, the plan is lost.
+
+**The product.** The ingester takes the plan, the subscription and the application from the key that
+called when there is one (the key of a subscription of the product); otherwise the event is the api's
+only, shown as "no plan: caller not identified".
+
+**Fix to propose.** Add the `apiRef` of the call to the event (`api`, `plan`, `sub`), as the
+`GatewayEvent` of Otoroshi does in `identity.apiRef`: the plan the engine selected, empty when it
+selected none.
 

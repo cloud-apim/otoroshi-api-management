@@ -149,6 +149,42 @@ export async function searchCalls(filter, { limit = 50, offset = 0, q = '' } = {
   return { items, total, limit, offset, retention: { callsDays: p.retention.callsDays, from: await horizon() } };
 }
 
+// the security events of the Threat Protection Suite: what it judged, on which api and plan, and
+// what it did — the latest ones, and their counts by category, action and plan over the range
+export async function securityEvents(filter, { limit = 50, offset = 0 } = {}) {
+  const { start, end } = range(filter);
+  const where = () => adb`at >= ${start} and at <= ${end}
+      and (${filter.workspaceId || null}::text is null or workspace_id = ${filter.workspaceId || null})
+      and (${filter.apiId || null}::text is null or api_id = ${filter.apiId || null})
+      and (${filter.planId || null}::text is null or plan_id = ${filter.planId || null})
+      and (${filter.applicationId || null}::text is null or application_id = ${filter.applicationId || null})
+      and (${filter.category || null}::text is null or category = ${filter.category || null})
+      and (${filter.action || null}::text is null or action = ${filter.action || null})`;
+  const [items, [{ total }], byCategory, byAction, byPlan] = await Promise.all([
+    adb`select id, at, category, action, outcome, severity, score, api_id, plan_id, subscription_id, application_id, client_id, from_ip, incident_id, message
+      from security_events where ${where()} order by at desc, id desc limit ${limit} offset ${offset}`,
+    adb`select count(*)::int as total from security_events where ${where()}`,
+    adb`select category, count(*)::int as events from security_events where ${where()} group by 1 order by 2 desc`,
+    adb`select action, count(*)::int as events from security_events where ${where()} group by 1 order by 2 desc`,
+    adb`select api_id, plan_id, count(*)::int as events from security_events where ${where()} group by 1, 2 order by 3 desc limit 100`,
+  ]);
+  const names = await named({ byApi: items, byApp: items, byPlan });
+  const apiNames = new Map(names.byApi.map((r) => [r.api_id, r.name]));
+  const appNames = new Map(names.byApplication.map((r) => [r.application_id, r.name]));
+  const planNames = new Map(names.byPlan.map((r) => [`${r.api_id}|${r.plan_id}`, r.plan_name]));
+  const p = await policy();
+  return {
+    items: items.map((r) => ({ ...r, id: Number(r.id), api_name: r.api_id ? apiNames.get(r.api_id) : null, application_name: r.application_id ? appNames.get(r.application_id) : null })),
+    total,
+    limit,
+    offset,
+    byCategory,
+    byAction,
+    byPlan: names.byPlan.map((r) => ({ ...r, plan_name: r.plan_id ? planNames.get(`${r.api_id}|${r.plan_id}`) : null })),
+    retention: { days: p.retention.callsDays },
+  };
+}
+
 // the calls of each api over the last days, exact: the rollups, and the calls not rolled up yet
 export async function callsByApi(workspaceId, days = 30) {
   const start = new Date(Date.now() - days * 86400000);

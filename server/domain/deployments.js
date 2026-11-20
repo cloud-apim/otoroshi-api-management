@@ -4,6 +4,7 @@
 // acting. Rollback is the redeployment of an earlier snapshot.
 
 import { db, newId } from '../db/index.js';
+import { threatWarnings } from '../otoroshi/threats.js';
 import { badRequest, notFound } from '../http/router.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
@@ -43,7 +44,7 @@ async function syncDerived(apiId, snapshotContent, between = async () => null) {
 // what the gateway's own settings make of the snapshot: they are infrastructure the product
 // consumes and does not change, so it says when they defeat a plan
 async function gatewayWarnings(content, derived) {
-  return tlsWarnings(content, derived);
+  return [...(await tlsWarnings(content, derived)), ...(await threatWarnings(content.draft).catch(() => []))];
 }
 
 async function tlsWarnings(content, derived) {

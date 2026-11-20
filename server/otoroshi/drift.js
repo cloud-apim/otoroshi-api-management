@@ -8,7 +8,7 @@ import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
 import { open, seal } from '../domain/secrets.js';
-import { CORRELATION_PLUGIN, IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
+import { CORRELATION_PLUGIN, THREAT_PRESET, threatFromPreset, IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
   await db`insert into drift_reports (id, workspace_id, entity_kind, entity_id, otoroshi_kind, otoroshi_id, status, diff, checked_at)
@@ -208,6 +208,7 @@ function planFromOtoroshi(p, cas = {}) {
     quota: { daily: q.daily && q.daily < MAX ? q.daily : null, monthly: q.monthly && q.monthly < MAX ? q.monthly : null },
     flowRef: p.plugins?.flow_ref || null,
     selection: (p.selection || []).map((c) => ({ path: c.path, value: c.value })),
+    ...((preset) => (preset ? { threatProtection: threatFromPreset(preset.config) } : {}))((p.plugins?.plugins || []).find((x) => x.plugin === THREAT_PRESET && x.enabled !== false)),
     counterFailure: p.counter_failure?.mode === 'allow' ? 'allow' : 'deny',
     circuitBreaker: p.circuit_breaker_scope === 'consumer' ? 'subscription' : 'api',
   });

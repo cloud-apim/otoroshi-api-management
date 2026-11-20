@@ -40,3 +40,6 @@ one found since. The product requires 18.1, and relies on the fixes: ✅ followe
 | G-21 | The global configuration is readable by super admins only — by design, not a gap | — | ➖ | the product's key keeps every right |
 | G-22 | An extractor that does not identify the caller sends an error event for a call that then succeeds | medium | ⬜ open | nothing: the dashboards count these as errors |
 | G-23 | A key cannot serve several subscriptions: each one rebuilds the keys it references on its own api and plan | medium | ⬜ open | one key per subscription; a credential for several subscriptions waits for it |
+| G-24 | Threat Protection Suite: the global table of Threat Studio does not see the plan plugins, and can add a second WAF on a plan protected by the product | medium | ⬜ open | keep the global table off the apis protected per plan |
+| G-25 | Threat Protection Suite: a challenge answers a page with status 200, which an api client takes for a success | high | ⬜ open | the plan screen warns of a threat policy that can challenge |
+| G-26 | Threat Protection Suite: a security event names the api, not the plan | low | ⬜ open | the plan from the key that called; the api only otherwise |

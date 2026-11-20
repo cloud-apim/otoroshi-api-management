@@ -10,6 +10,7 @@ import { diff } from './diff.js';
 import { defaultDraft, defaultPlan, normalizeDraft, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
 import { resolveGroups } from './policyGroups.js';
+import { threatWarnings } from '../otoroshi/threats.js';
 import { checkValues, listFields, validateValues } from './metadata.js';
 
 export function apiSummary(row) {
@@ -227,6 +228,7 @@ export async function validateWithMetadata(workspaceId, draft, { apiId = null } 
     const { errors } = validateValues(fields, p.metadata);
     errors.forEach((e) => v.errors.push({ path: `plans[${p.name}].metadata.${e.key}`, message: `plan "${p.name}": ${e.message}` }));
   }
+  v.warnings.push(...(await threatWarnings(draft).catch(() => [])));
   v.ok = v.errors.length === 0;
   return v;
 }

@@ -1,7 +1,7 @@
 // Unit tests of the model and the projection — no database, no gateway.
 import { describe, expect, test } from 'bun:test';
 import { normalizeDraft, validateDraft, resolutionOrder, plansAreEquivalent, defaultPlan } from '../server/domain/model.js';
-import { buildOtoroshiApi, buildOtoroshiSubscription, restrictionsFor, restrictionPath, rateLimitingFor, comparableApi } from '../server/otoroshi/projection.js';
+import { buildOtoroshiApi, buildOtoroshiSubscription, restrictionsFor, restrictionPath, rateLimitingFor, comparableApi, THREAT_PRESET, threatFromPreset, threatPresetConfig } from '../server/otoroshi/projection.js';
 import { diff } from '../server/domain/diff.js';
 import { maskUrl } from '../server/domain/ingest.js';
 
@@ -160,6 +160,43 @@ describe('projection', () => {
     expect(diff(comparableApi(e), comparableApi(fromGateway))).toEqual([]);
     fromGateway.routes[0].frontend.methods = ['GET', 'DELETE'];
     expect(diff(comparableApi(e), comparableApi(fromGateway)).map((c) => c.path)).toEqual(['routes[Pets].methods']);
+  });
+});
+
+describe('threat protection', () => {
+  const api = { id: 'a', name: 'x', version: '1', workspace_id: 'ws' };
+  const protectedPlan = (tp, extra = {}) => defaultPlan({ id: 'p_tp', name: 'guarded', status: 'published', threatProtection: { enabled: true, threatPolicy: 'tp_strict', ...tp }, ...extra });
+
+  test('a plan carries the preset of the Threat Protection Suite in its plugins, after the flow it references', () => {
+    const e = buildOtoroshiApi({ api, draft: draft([protectedPlan({ waf: true, wafConfig: 'waf_api', login: true, loginPaths: ['/login'] }, { flowRef: 'f1' })]) });
+    const plugins = e.plans[0].plugins;
+    expect(plugins.flow_ref).toBe('f1');
+    expect(plugins.plugins.map((p) => p.plugin)).toEqual([THREAT_PRESET]);
+    expect(plugins.plugins[0].config).toMatchObject({ threat_policy: 'tp_strict', waf: true, waf_config: 'waf_api', login: true, login_paths: ['/login'], reputation_mode: 'block', fail2ban: false });
+    // nothing when the plan asks for nothing
+    expect(buildOtoroshiApi({ api, draft: draft([defaultPlan({ status: 'published' })]) }).plans[0].plugins).toBeNull();
+    expect(buildOtoroshiApi({ api, draft: draft([defaultPlan({ status: 'published', flowRef: 'f1' })]) }).plans[0].plugins).toEqual({ plugins: [], overrides: false, flow_ref: 'f1' });
+  });
+
+  test('a change of its protection is drift on the gateway, and adopt mode takes it back as it was', () => {
+    const tp = normalizeDraft({ plans: [protectedPlan({ fail2ban: true, apiContract: true, apiContractId: 'c1', apiContractMode: 'enforce' })] }).plans[0].threatProtection;
+    expect(threatFromPreset(threatPresetConfig(tp))).toEqual(tp);
+    const a = comparableApi(buildOtoroshiApi({ api, draft: draft([protectedPlan({ fail2ban: false })]) }));
+    const b = comparableApi(buildOtoroshiApi({ api, draft: draft([protectedPlan({ fail2ban: true })]) }));
+    expect(diff(a, b).map((c) => c.path)).toEqual(['plans[guarded].plugins[0].config.fail2ban']);
+  });
+
+  test('a protection that records only, or a guard with nothing to guard, is said; a wrong mode is refused', () => {
+    const codes = (tp) => validateDraft(draft([protectedPlan(tp)])).warnings.map((w) => w.code);
+    expect(codes({ threatPolicy: '' })).toContain('threat_protection_dry_run');
+    expect(codes({})).not.toContain('threat_protection_dry_run');
+    expect(codes({ login: true })).toContain('login_guard_idle');
+    expect(codes({ apiContract: true })).toContain('api_contract_idle');
+    const v = validateDraft(draft([protectedPlan({ reputationMode: 'shout' })]));
+    expect(v.ok).toBe(false);
+    expect(v.errors[0].message).toContain('reputationMode is one of block, monitor');
+    // a plan that is not protected says nothing of it
+    expect(validateDraft(draft([defaultPlan({ status: 'published', threatProtection: { enabled: false, reputationMode: 'shout' } })])).ok).toBe(true);
   });
 });
 

@@ -623,4 +623,36 @@ create table rollup_state (
 );
 `,
   },
+  {
+    version: '0003_security_events',
+    sql: `
+-- the security events of the Threat Protection Suite (CloudApimSecurityEvent), attributed to the
+-- catalogue like the calls: the api from the event, the plan, the subscription and the application
+-- from the key that called when there was one
+create table security_events (
+  id bigserial primary key,
+  at timestamptz not null,
+  received_at timestamptz not null default now(),
+  workspace_id text,
+  api_id text,
+  otoroshi_api_id text,
+  route_id text,
+  plan_id text,
+  subscription_id text,
+  application_id text,
+  client_id text,
+  category text not null,
+  action text not null,
+  outcome text,
+  severity int,
+  score int,
+  from_ip text,
+  incident_id text,
+  message text,
+  payload jsonb not null default '{}'
+);
+create index security_events_ws_at on security_events(workspace_id, at);
+create index security_events_at on security_events(at);
+`,
+  },
 ];

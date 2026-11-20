@@ -23,7 +23,8 @@ it with the API. Otherwise it is infrastructure: referenced, read, never owned.
 | Not used | the product neither reads nor writes it |
 
 The list follows the kinds the gateway declares (`GET /apis/entities`): a kind the inventory does
-not know fails the tests of the product.
+not know fails the tests of the product. The kinds of the Threat Protection Suite
+(`waf.extensions.cloud-apim.com`) are there when the gateway has the extension.
 
 | Kind | Group | Treatment | How |
 |---|---|---|---|
@@ -40,6 +41,10 @@ not know fails the tests of the product.
 | `WasmPlugin` | `plugins.otoroshi.io` | Consumed | a wasm plugin a flow of an api uses, referenced in its configuration |
 | `Workflow` | `plugins.otoroshi.io` | Consumed | a workflow a flow of an api calls, referenced in its configuration |
 | `CorazaConfig` | `coraza-waf.extensions.otoroshi.io` | Consumed | a firewall configuration a flow of an api references (threat protection) |
+| `ThreatPolicy` | `waf.extensions.cloud-apim.com` | Consumed | a threat policy a plan with threat protection references: how a score turns into an action; read to say when it records only, or can challenge a caller |
+| `BotPolicy` | `waf.extensions.cloud-apim.com` | Consumed | a bot policy a plan with threat protection references |
+| `WafConfig` | `waf.extensions.cloud-apim.com` | Consumed | a firewall configuration a plan with threat protection references |
+| `ApiContract` | `waf.extensions.cloud-apim.com` | Consumed | an api contract a plan with threat protection checks its calls against |
 | `Organization` | `organize.otoroshi.io` | Consumed | everything the product writes is in the `default` location: a workspace is never a tenant of the gateway |
 | `Tenant` | `organize.otoroshi.io` | Consumed | the same, under its other name: the `default` tenant |
 | `Team` | `organize.otoroshi.io` | Consumed | the `default` team; the teams of the product are its own |
@@ -59,3 +64,13 @@ not know fails the tests of the product.
 | `UserAlert` | `analytics.otoroshi.io` | Not used | — |
 | `RemoteCatalog` | `catalogs.otoroshi.io` | Not used | the remote catalogs of the product are its own: they write drafts, not Apis |
 | `GreenScore` | `green-score.extensions.otoroshi.io` | Not used | — |
+| `WafRuleset` | `waf.extensions.cloud-apim.com` | Not used | the rules of a firewall configuration: the operator's, in Threat Studio |
+| `ChallengeProvider` | `waf.extensions.cloud-apim.com` | Not used | the challenges of a threat policy |
+| `HoneypotPolicy` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `MalwareScanner` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `RuleFeed` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `ThreatFeed` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `GeoDatabase` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `AsnDatabase` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `AlertRule` | `waf.extensions.cloud-apim.com` | Not used | — |
+| `CrowdSecBouncer` | `waf.extensions.cloud-apim.com` | Not used | — |

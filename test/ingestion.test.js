@@ -88,6 +88,7 @@ afterAll(async () => {
   else await db`delete from settings where key = 'ingest'`;
   invalidatePolicy();
   await adb`delete from calls where api_id = ${apiId}`;
+  await adb`delete from security_events where otoroshi_api_id = ${apiId}`;
   await adb`delete from call_rollups where api_id = ${apiId}`;
   await adb`delete from raw_events where payload -> 'route' -> 'metadata' ->> 'Otoroshi-Api-Ref' = ${apiId}`;
   server?.stop(true);
@@ -196,12 +197,62 @@ describe('the retention', () => {
 });
 
 describe('the attribution', () => {
+  test('a security event of the Threat Protection Suite is attributed from the key that called', async () => {
+    const api = await ok('GET', `/workspaces/${WS}/apis/${apiId}`);
+    const planId = api.draft.plans[0].id;
+    const team = (await ok('GET', `/workspaces/${WS}/teams`))[0];
+    const app = await ok('POST', `/workspaces/${WS}/applications`, { name: 'Scanner', team_id: team.id });
+    await ok('POST', `/workspaces/${WS}/apis/${apiId}/publish`, { comment: 'security', deploy: true });
+    const sub = await ok('POST', `/workspaces/${WS}/subscriptions`, { api_id: apiId, plan_id: planId, application_id: app.id });
+    await ok('POST', `/workspaces/${WS}/subscriptions/${sub.id}/resync`);
+    const clientId = (await ok('GET', `/workspaces/${WS}/subscriptions/${sub.id}`)).credentials[0].client_id;
+    invalidateAttributionCache();
+    // the event as the extension sends it (security/events.scala): ECS-shaped, the api of the route,
+    // the client id of the key that called
+    const security = (id, apikey, category, action) => ({
+      '@type': 'CloudApimSecurityEvent',
+      '@id': id,
+      '@timestamp': Date.now(),
+      '@serviceId': `route_${RUN}`,
+      event: { kind: 'alert', module: 'cloud-apim.security-suite', dataset: `cloud-apim.${category}`, category, action, outcome: 'failure', severity: 7 },
+      source: { ip: '203.0.113.9', apikey, user: null },
+      threat: { score: 42, tags: ['sqli'], signals: {} },
+      otoroshi: { route_id: `route_${RUN}`, route_name: 'r', node: 'n', tenant: 'default', teams: [], api_id: apiId, groups: [] },
+      incident: { id: `inc-${id}`, count: 1 },
+      message: `${category}: ${action}`,
+    });
+    const received = await ingest([security(`sec-${RUN}-1`, clientId, 'waf', 'deny'), security(`sec-${RUN}-2`, null, 'bots', 'log')]);
+    expect(received.security).toBe(2);
+    const found = await ok('GET', `/workspaces/${WS}/analytics/security?api=${apiId}`);
+    expect(found.total).toBe(2);
+    // the key says the plan, the subscription and the application; an unidentified caller, the api only
+    expect(found.items.map((e) => [e.category, e.action, e.plan_id, e.subscription_id, e.application_name, e.api_name]).sort()).toEqual([
+      ['bots', 'log', null, null, null, 'Users 1.0.0'],
+      ['waf', 'deny', planId, sub.id, 'Scanner', 'Users 1.0.0'],
+    ]);
+    expect(found.byAction.map((r) => [r.action, r.events]).sort()).toEqual([
+      ['deny', 1],
+      ['log', 1],
+    ]);
+    expect(found.byPlan.map((r) => [r.plan_id, r.plan_name, r.events]).sort()).toEqual([
+      [null, null, 1],
+      [planId, api.draft.plans[0].name, 1],
+    ]);
+    expect((await ok('GET', `/workspaces/${WS}/analytics/security?api=${apiId}&action=deny`)).items.map((e) => e.category)).toEqual(['waf']);
+    // they carry the address of the caller: reading them is traced
+    const trail = await ok('GET', `/workspaces/${WS}/audit?action=analytics.security.read`);
+    expect((trail.items || trail).length).toBeGreaterThan(0);
+  });
+
   test('a call is attributed from the apiRef the gateway gives its event', async () => {
     const api = await ok('GET', `/workspaces/${WS}/apis/${apiId}`);
     const planId = api.draft.plans[0].id;
     const team = (await ok('GET', `/workspaces/${WS}/teams`))[0];
     const app = await ok('POST', `/workspaces/${WS}/applications`, { name: 'Dashboards', team_id: team.id });
-    await ok('POST', `/workspaces/${WS}/apis/${apiId}/publish`, { comment: 'attribution', deploy: true });
+    // deployed by the test before, the same draft
+    await ok('POST', `/workspaces/${WS}/apis/${apiId}/publish`, { comment: 'attribution', deploy: true }).catch((e) => {
+      if (!e.message.includes('-> 409')) throw e;
+    });
     const sub = await ok('POST', `/workspaces/${WS}/subscriptions`, { api_id: apiId, plan_id: planId, application_id: app.id });
     invalidateAttributionCache();
     const consumer = (reqId, apiRef) => ({ ...event(reqId), identity: { identityType: 'APIKEY', identity: `key-${reqId}`, label: 'k', metadata: {}, apiRef } });

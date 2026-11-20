@@ -4,6 +4,7 @@ import { Badge, Callout, Drawer, Empty, Field, Icon, Input, NumberInput, Seg, Se
 import { api as rootApi, useMetadataFields } from '../../context.jsx';
 import { MetadataForm } from '../../../shared/metadata.jsx';
 import { AuthorizationServer, TrustedCAs } from './PlanAuth.jsx';
+import { THREAT_DEFAULTS, ThreatProtection } from './PlanThreats.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
 // the kinds whose extractor can pass on a call with a selection: the others are told apart by the key
@@ -51,6 +52,7 @@ export function newPlan(kind = 'apikey') {
     circuitBreaker: 'api',
     resourceFilter: { mode: 'all', resources: [] },
     flowRef: null,
+    threatProtection: { ...THREAT_DEFAULTS },
     visibility: 'public',
     acl: [],
     subscribable: true,
@@ -77,6 +79,7 @@ function PlanSummary({ p, draft }) {
       <div>
         <Icon name="api" size={13} /> {p.resourceFilter.mode === 'all' ? tr('all resources') : tr('{0} of {1} resources', [p.resourceFilter.resources.length, draft.resources.length])}
         {p.flowRef ? tr(' · + flow {0}', [draft.flows.find((f) => f.id === p.flowRef)?.name || p.flowRef]) : ''}
+        {p.threatProtection?.enabled ? tr(' · threat protection') : ''}
       </div>
       <div>
         <Icon name="eye" size={13} /> {tr(p.visibility)} · {p.subscribable ? tr('{0} approval', [tr(p.validation)]) : tr('not subscribable')}
@@ -187,6 +190,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           { id: 'general', label: tr('General') },
           { id: 'access', label: tr('Access') },
           { id: 'limits', label: tr('Limits') },
+          { id: 'security', label: tr('Threat protection') },
           { id: 'catalogue', label: tr('Catalogue & approval') },
           { id: 'pricing', label: tr('Pricing') },
         ]}
@@ -212,6 +216,7 @@ function PlanEditor({ value, draft, onSave, onClose }) {
           )}
         </div>
       )}
+      {section === 'security' && <ThreatProtection value={p.threatProtection} onChange={(v) => set({ threatProtection: v })} />}
       {section === 'access' && (
         <div>
           <Setting label={tr('Auth mechanism')} help={AUTH_HELP()[p.auth.kind]}>

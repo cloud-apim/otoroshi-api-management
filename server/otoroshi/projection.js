@@ -244,8 +244,74 @@ export function planJson(plan, draft) {
     counter_failure: { mode: plan.counterFailure === 'deny' ? 'deny' : 'allow' },
     // one circuit breaker per route, shared by every caller, or one per consumer
     circuit_breaker_scope: plan.circuitBreaker === 'subscription' ? 'consumer' : 'route',
-    plugins: plan.flowRef ? { plugins: [], overrides: false, flow_ref: plan.flowRef } : null,
+    plugins: planPlugins(plan),
   };
+}
+
+// the preset of the Threat Protection Suite: one plugin, expanded by the gateway into its modules
+export const THREAT_PRESET = 'cp:otoroshi_plugins.com.cloud.apim.otoroshi.extensions.waf.plugins.CloudApimSecuritySuitePreset';
+
+export function threatPresetConfig(tp) {
+  return {
+    threat_policy: tp.threatPolicy || null,
+    gate: !!tp.gate,
+    response: !!tp.response,
+    waf: !!tp.waf,
+    waf_config: tp.wafConfig || null,
+    bots: !!tp.bots,
+    bot_policy: tp.botPolicy || null,
+    reputation: !!tp.reputation,
+    reputation_mode: tp.reputationMode,
+    fail2ban: !!tp.fail2ban,
+    fail2ban_dry_run: !!tp.fail2banDryRun,
+    sensitive_data: !!tp.sensitiveData,
+    sensitive_data_mode: tp.sensitiveDataMode,
+    error_leakage: !!tp.errorLeakage,
+    error_leakage_mode: tp.errorLeakageMode,
+    uploads: !!tp.uploads,
+    uploads_mode: tp.uploadsMode,
+    login: !!tp.login,
+    login_paths: tp.loginPaths || [],
+    api_contract: !!tp.apiContract,
+    api_contract_id: tp.apiContractId || null,
+    api_contract_mode: tp.apiContractMode,
+  };
+}
+
+// the threat protection a preset of the gateway describes (adopt mode)
+export function threatFromPreset(c = {}) {
+  return {
+    enabled: true,
+    threatPolicy: c.threat_policy || '',
+    gate: c.gate !== false,
+    response: c.response !== false,
+    waf: c.waf !== false,
+    wafConfig: c.waf_config || '',
+    bots: c.bots !== false,
+    botPolicy: c.bot_policy || '',
+    reputation: c.reputation !== false,
+    reputationMode: c.reputation_mode || 'block',
+    fail2ban: !!c.fail2ban,
+    fail2banDryRun: c.fail2ban_dry_run !== false,
+    sensitiveData: !!c.sensitive_data,
+    sensitiveDataMode: c.sensitive_data_mode || 'enforce',
+    errorLeakage: !!c.error_leakage,
+    errorLeakageMode: c.error_leakage_mode || 'mask',
+    uploads: !!c.uploads,
+    uploadsMode: c.uploads_mode || 'enforce',
+    login: !!c.login,
+    loginPaths: c.login_paths || [],
+    apiContract: !!c.api_contract,
+    apiContractId: c.api_contract_id || '',
+    apiContractMode: c.api_contract_mode || 'monitor',
+  };
+}
+
+// the plugins of a plan: the flow it references, extended by the threat protection it carries
+function planPlugins(plan) {
+  const slots = plan.threatProtection?.enabled ? [{ plugin: THREAT_PRESET, enabled: true, debug: false, include: [], exclude: [], config: threatPresetConfig(plan.threatProtection) }] : [];
+  if (!plan.flowRef && !slots.length) return null;
+  return { plugins: slots, overrides: false, flow_ref: plan.flowRef || null };
 }
 
 // ---------------------------------------------------------------- derived objects
@@ -602,6 +668,8 @@ export function comparableApi(entity) {
       restrictions: p.access_mode_configuration?.restrictions?.enabled
         ? (({ allowLast, allowed, forbidden, notFound }) => ({ allowLast, allowed, forbidden, notFound }))(p.access_mode_configuration.restrictions)
         : null,
+      flow_ref: p.plugins?.flow_ref || null,
+      plugins: stripPlugins(p.plugins?.plugins),
     })),
   };
 }

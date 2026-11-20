@@ -39,12 +39,13 @@ Last update: 2026-11-20.
   - R-17: adopt mode takes over the subscriptions of an Api and their keys too — an application per owner, the same subscription ids, the same client ids and secrets — and the first deployment updates them in place: the consumer keeps calling with its key (`test/adopt.test.js`). The plans of an adopted Api keep the new attributes of the contract (selection, counter failure, circuit breaker, issuer and audiences, trusted CAs, validity).
   - R-12 found a gap, logged as **G-23** (open, not reported upstream): a key cannot serve several subscriptions — each one rebuilds the keys it references on its own api and plan — so one credential for the subscriptions of a consumer to several apis waits for Otoroshi.
   - R-20: the catalogue as a discovery system, on three axes — editorial (the categories of the portal, where each api stands across its versions, the featured ones, applied at once without a snapshot), the reviews of the consumers who subscribed (one per person and api, hidden by a producer, kept in the console), and the real usage (subscribed applications, calls of the last thirty days); the portal filters by category and sorts on them; a workspace keeps reviews or usage off its portal (`test/discovery.test.js`, `test/ui.test.js`).
+  - R-25: the Threat Protection Suite per plan (D-10) — a tab of the plan configures the preset of the extension (firewall, bots, IP reputation, fail2ban, sensitive data, error leakage, uploads, login guard, api contract) and references its policies, projected in the plugins of the plan and watched by the drift detection; a gateway without the extension, which would let the calls through unprotected, gets the draft and the deployment warned; the `CloudApimSecurityEvent` of the suite are exported, ingested and attributed to the api and, through the key that called, the plan, the subscription and the application — Observability › Security, and the analytics of an api (`test/threat-protection.test.js`, `test/ingestion.test.js`, `test/model.test.js`). Three gaps of the extension logged: **G-24** (the global table of Threat Studio ignores the plan plugins), **G-25** (a challenge answers a page with status 200), **G-26** (a security event does not name the plan).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-25** — threat protection per plan, and its events in observability.
-2. **R-34** — usage-based billing.
+1. **R-34** — usage-based billing.
+2. **R-25** — the threat protection checked with the extension running (needs it built: to download on the owner's go).
 3. **R-31** — the LLM and MCP ingestion checked with real events (needs the LLM extension: to download on the owner's go).
 4. **R-48** — compaction of old rollups (only if the volume calls for it).
 
@@ -64,7 +65,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
-| R-25 | M | Threat protection per plan, and its events in observability |
+| R-25 | S | Threat protection checked against a gateway with the extension running (needs it built: to download on the owner's go) |
 | R-34 | M | Usage-based billing (Stripe Billing Meters) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
 | R-10 | L | Named compositions: resources and dictionaries |
@@ -113,7 +114,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-25 | D-10 | **Threat protection**: configure the Threat Protection Suite per plan from a dedicated screen (possible today as plan plugins), and render its security events in observability | M | D-10 notes: plan-level attribution of `CloudApimSecurityEvent` |
+| R-25 | D-10 | **Threat protection**: configured per plan from a dedicated screen and rendered in observability — done; what remains is the check against a gateway that runs the extension | S | needs the extension built (downloads) |
 | R-26 | D-27 | Validate with the owner where the gateway health, the projection state and the drift live (proposed: bottom of the sidebar + a Gateway page) | — | |
 
 ### Industrialisation (GitOps, environments, operations)
@@ -169,7 +170,7 @@ waits for the data plane rather than working around it.
 | D-9 n°3 nothing essential hidden | ✅ | warnings: an api closed without a served plan, a plan without selection shadowing another, an oauth2-remote plan without issuer nor audience, an mtls plan without CA, a filter an oauth2-local plan cannot hold; the resolution order |
 | D-9 n°4 reversibility | ✅ | export / import ✅; uninstalling leaves a working configuration, taken over by hand with Otoroshi alone (revoke, subscribe, change a plan, remove the marker) — `test/product-down.test.js`, documented in *When the product is down* |
 | D-9 n°5 Apache 2.0 | ✅ | `LICENSE`, `NOTICE` |
-| D-10 WAF in the extension | 🟡 | usable as plugins in a flow or a policy group; no dedicated screen: R-25 |
+| D-10 WAF in the extension | ✅ | the Threat Protection Suite per plan (its preset in the plan plugins, its policies referenced), its security events attributed to the api and the plan in Observability › Security; the three gaps of the extension logged (G-24, G-25, G-26); the check with the extension running: R-25 |
 | D-11 i18n | ✅ | multilingual docs ✅, portal en/fr ✅, the portal's texts (title, tagline, home) per language ✅, console en/fr ✅ (texts keyed by their English, `mise run check` fails on a text without French); the admin api's messages stay in English (owner), the pages of the portal per language ✅, the labels and help of the metadata fields per language ✅ |
 | D-12 light / dark / system | ✅ | console and portal |
 | D-14 no need to open Otoroshi | ✅ | complete APIM; certificates and auth modules derived; one executable — the server and its roles, the console and the portal embedded, the migrations, the command line (`otoroshi-apim <command>`), built for linux and macos, x64 and arm64 (`mise run build:binary`, `build:binaries`, `test/binary.test.js`); the setup of the gateway (`otoroshi-apim setup`, `apim gateway setup`, Gateway › Setup), given an Otoroshi admin key, idempotent, part by part, a dry run first: the product's own admin key, the data exporter, the routes of the console (behind an auth module with the info token, if asked) and of the portals, the TLS client authentication for mtls plans; its checks — `test/setup.test.js`; the product's key is not narrowed: G-20, and it reads the global configuration, super admin only by design (G-21) |

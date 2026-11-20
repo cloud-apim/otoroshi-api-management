@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '../../shared/router.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { Callout, Loader, Modal, Seg, Select, StatusBadge, useLoad } from '../../shared/ui.jsx';
+import { Badge, Callout, Loader, Modal, Seg, Select, StatusBadge, Tabs, useLoad } from '../../shared/ui.jsx';
 import { CodeView } from '../../shared/code-editor.jsx';
 import { ListToolbar, Pager, ReloadButton, usePaging } from '../../shared/lists.jsx';
 import { BarList, StatTile, TimeSeries } from '../../shared/charts.jsx';
@@ -216,11 +216,162 @@ export function AnalyticsDashboard({ fixed = {} }) {
   );
 }
 
+// the actions of the Threat Protection Suite that refused or rewrote a call
+const REFUSING = ['deny', 'ban', 'mask'];
+
+// The security events of the Threat Protection Suite (otoroshi-waf-extension), attributed to the
+// catalogue: what it judged, on which api and plan, and what it did. The plan comes from the key that
+// called: a keyless caller, or one refused before it was identified, has the api only.
+export function SecurityEvents({ fixed = {} }) {
+  const { wapi, slug } = useWs();
+  const [params, setParams] = useQuery();
+  const range = params.get('range') || '24h';
+  const apiFilter = fixed.api || params.get('api') || '';
+  const category = params.get('category') || '';
+  const action = params.get('action') || '';
+  const ms = RANGES.find((r) => r.value === range)?.ms || 86400e3;
+  const paging = usePaging({ prefix: 'security', size: 25 });
+  const qs = () => {
+    const q = new URLSearchParams({ from: new Date(Date.now() - ms).toISOString() });
+    if (apiFilter) q.set('api', apiFilter);
+    if (category) q.set('category', category);
+    if (action) q.set('action', action);
+    return q.toString();
+  };
+  const state = useLoad(() => wapi.get(`/analytics/security?${qs()}&${paging.query}`), [slug, range, apiFilter, category, action, paging.key]);
+  const apis = useLoad(() => (fixed.api ? Promise.resolve([]) : wapi.get('/apis')), [slug]);
+  const [open, setOpen] = useState(null);
+  return (
+    <div className="col gap-16">
+      <div className="row wrap">
+        {!fixed.api && <Seg value={range} onChange={(v) => setParams({ range: v, security_page: null })} options={RANGES} />}
+        {!fixed.api && (
+          <Select
+            value={apiFilter}
+            onChange={(v) => setParams({ api: v, security_page: null })}
+            options={[{ value: '', label: tr('All APIs') }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
+            style={{ width: 220 }}
+            aria-label={tr('filter by api')}
+          />
+        )}
+        {(category || action) && (
+          <button className="btn ghost sm" onClick={() => setParams({ category: null, action: null, security_page: null })}>
+            {tr('Clear the filters: {0}', [[category, action].filter(Boolean).join(', ')])}
+          </button>
+        )}
+        <span className="spacer" />
+        <ReloadButton onReload={state.reload} loading={state.loading} />
+      </div>
+      <Loader state={state}>
+        {(d) => {
+          const refused = d.byAction.filter((r) => REFUSING.includes(r.action)).reduce((n, r) => n + r.events, 0);
+          return (
+            <div className="col gap-16" style={{ opacity: state.loading ? 0.6 : 1 }}>
+              <div className="grid-3">
+                <StatTile label={tr('Security events')} value={fmtNumber(d.total)} hint={tr('kept {0} days, like the calls', [d.retention.days])} />
+                <StatTile label={tr('Refused or masked')} value={fmtNumber(refused)} hint={d.total ? tr('{0} % of the events', [((100 * refused) / d.total).toFixed(1)]) : ''} />
+                <StatTile label={tr('Categories')} value={fmtNumber(d.byCategory.length)} hint={d.byCategory[0] ? tr('most: {0}', [d.byCategory[0].category]) : ''} />
+              </div>
+              <div className="grid-3">
+                <div className="card">
+                  <div className="card-head">
+                    <h3>{tr('By category')}</h3>
+                  </div>
+                  <div className="card-body">
+                    <BarList items={d.byCategory.map((r) => ({ label: r.category, value: r.events }))} />
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-head">
+                    <h3>{tr('By action')}</h3>
+                  </div>
+                  <div className="card-body">
+                    <BarList items={d.byAction.map((r) => ({ label: r.action, value: r.events }))} />
+                  </div>
+                </div>
+                <div className="card">
+                  <div className="card-head">
+                    <h3>{tr('By plan')}</h3>
+                  </div>
+                  <div className="card-body">
+                    <BarList items={d.byPlan.map((r) => ({ label: `${fixed.api ? '' : `${r.api_name} · `}${r.plan_id ? r.plan_name : tr('(no plan: caller not identified)')}`, value: r.events }))} />
+                  </div>
+                </div>
+              </div>
+              <div className="card">
+                <div className="card-head">
+                  <h3 className="grow">{tr('Recent security events')}</h3>
+                  <span className="faint small">{tr('they carry the address of the caller: reading them is traced in the audit trail')}</span>
+                </div>
+                {d.items.length ? (
+                  <>
+                    <div className="table-wrap">
+                      <table className="table small" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <thead>
+                          <tr>
+                            <th>{tr('Time')}</th>
+                            <th>{tr('Category')}</th>
+                            <th>{tr('Action')}</th>
+                            <th className="right">{tr('Score')}</th>
+                            {!fixed.api && <th>{tr('API')}</th>}
+                            <th>{tr('Caller')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {d.items.map((r) => (
+                            <tr key={r.id} className="clickable" onClick={() => setOpen(r)}>
+                              <td className="nowrap muted">{fmtDate(r.at)}</td>
+                              <td>
+                                <button className="btn ghost sm" onClick={(e) => (e.stopPropagation(), setParams({ category: r.category, security_page: null }))}>
+                                  {r.category}
+                                </button>
+                              </td>
+                              <td>
+                                <Badge kind={REFUSING.includes(r.action) ? 'negative' : r.action === 'log' || r.action === 'allow' ? '' : 'warning'}>{r.action}</Badge>
+                              </td>
+                              <td className="right">{r.score ?? '—'}</td>
+                              {!fixed.api && <td>{r.api_name || '—'}</td>}
+                              <td className="mono faint">{r.application_name || r.client_id || r.from_ip || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Pager paging={paging} total={d.total} />
+                  </>
+                ) : (
+                  <div className="card-body muted small">{tr('No security event in this period: the Threat Protection Suite reports here once a plan carries it (plan › Threat protection) and the data exporter of the setup is installed.')}</div>
+                )}
+              </div>
+            </div>
+          );
+        }}
+      </Loader>
+      {open && (
+        <Modal title={`${open.category} — ${open.action}`} size="wide" onClose={() => setOpen(null)}>
+          <p className="muted small">{[fmtDate(open.at), open.api_name, open.application_name, open.message].filter(Boolean).join(' · ')}</p>
+          <CodeView value={open} maxHeight={520} ariaLabel={tr('security event')} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export function ObservabilityPage() {
+  const [params, setParams] = useQuery();
+  const view = params.get('view') === 'security' ? 'security' : 'usage';
   return (
     <div className="page">
       <PageHead title={tr('Observability')} sub={tr("Usage of the catalogue, from the ingester's computed path — exhaustive, attributed to apis, plans and applications at ingestion.")} />
-      <AnalyticsDashboard />
+      <Tabs
+        value={view}
+        onChange={(v) => setParams({ view: v === 'usage' ? null : v })}
+        tabs={[
+          { id: 'usage', label: tr('Usage') },
+          { id: 'security', label: tr('Security') },
+        ]}
+      />
+      {view === 'security' ? <SecurityEvents /> : <AnalyticsDashboard />}
     </div>
   );
 }

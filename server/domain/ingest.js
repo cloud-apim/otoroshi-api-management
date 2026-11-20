@@ -1,5 +1,5 @@
-// The ingester: receives GatewayEvent, LLMUsageAudit and McpAudit from an Otoroshi data
-// exporter, and stores them twice:
+// The ingester: receives GatewayEvent, LLMUsageAudit, McpAudit and the CloudApimSecurityEvent of the
+// Threat Protection Suite from an Otoroshi data exporter, and stores them twice:
 //  - computed (mandatory, exhaustive): attributed to the catalogue — api, plan, subscription,
 //    application — at ingestion time. A quota, an attribution, a token count are counted, not sampled.
 //  - raw (optional): where lightening and sampling belong.
@@ -83,6 +83,7 @@ export async function ingest(events) {
   const p = await policy();
   const calls = [];
   const ai = [];
+  const security = [];
   const raws = [];
   for (const e of events) {
     if (!e || typeof e !== 'object') continue;
@@ -144,14 +145,43 @@ export async function ingest(events) {
         cost_micro_usd: e.cost?.micro_usd ?? null,
         payload: lighten(p, e),
       });
+    } else if (type === 'CloudApimSecurityEvent') {
+      // the event names the api of the route; the plan comes from the key that called, when one did
+      const clientId = e.source?.apikey || null;
+      const otoApiId = e.otoroshi?.api_id || null;
+      const attr = attribute(null, otoApiId);
+      // the key of a subscription to this api says the plan; a key of another api says nothing of it
+      const cred = clientId ? cache.byClientId.get(clientId) : null;
+      if (cred && (!attr.api_id || cred.api_id === attr.api_id)) Object.assign(attr, cred);
+      security.push({
+        at,
+        workspace_id: attr.workspace_id,
+        api_id: attr.api_id,
+        otoroshi_api_id: otoApiId,
+        route_id: e.otoroshi?.route_id || null,
+        plan_id: attr.plan_id,
+        subscription_id: attr.subscription_id,
+        application_id: attr.application_id,
+        client_id: clientId,
+        category: String(e.event?.category || 'unknown'),
+        action: String(e.event?.action || 'log'),
+        outcome: e.event?.outcome || null,
+        severity: Number.isFinite(e.event?.severity) ? e.event.severity : null,
+        score: Number.isFinite(e.threat?.score) ? e.threat.score : null,
+        from_ip: ipOf(p, e.source?.ip || null),
+        incident_id: e.incident?.id || null,
+        message: e.message ? String(e.message).slice(0, 1000) : null,
+        payload: lighten(p, e),
+      });
     }
     // the raw path: a share of the requests, their errors always
     if (p.storeRaw && sampled(p, e)) raws.push({ at, type: type || 'unknown', payload: lighten(p, e, { headers: p.raw.headers }) });
   }
   if (calls.length) await adb`insert into calls ${adb(calls)}`;
   if (ai.length) await adb`insert into ai_usage ${adb(ai)}`;
+  if (security.length) await adb`insert into security_events ${adb(security)}`;
   if (raws.length) await adb`insert into raw_events ${adb(raws)}`;
-  return { received: events.length, calls: calls.length, ai: ai.length, raw: raws.length };
+  return { received: events.length, calls: calls.length, ai: ai.length, security: security.length, raw: raws.length };
 }
 
 export function parseEvents(text) {

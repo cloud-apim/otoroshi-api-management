@@ -19,7 +19,8 @@ import { listAudit, searchAudit, audit } from '../domain/audit.js';
 import { pageParams } from '../http/paging.js';
 import { validateDraft, resolutionOrder, normalizeDraft, AUTH_KINDS } from '../domain/model.js';
 import { searchTasks, queueStats, enqueue, dismissTask } from '../domain/tasks.js';
-import { oto, gatewaySettings, invalidateGatewaySettings, META } from '../otoroshi/client.js';
+import { oto, gatewaySettings, gatewayPlugins, invalidateGatewaySettings, META } from '../otoroshi/client.js';
+import { threatProtectionCatalog } from '../otoroshi/threats.js';
 import { runDriftDetection, driftReports, unmanagedApis, draftFromOtoroshi, adoptSubscriptions, trustedChains } from '../otoroshi/drift.js';
 import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
@@ -197,19 +198,6 @@ r.get('/gateway/references', async ({ ctx }) => {
   };
 });
 
-// the gateway's plugin catalog, kept a minute: the flows tab and the plugin editor read it often
-let pluginCatalog = { at: 0, list: null };
-async function gatewayPlugins() {
-  if (pluginCatalog.list && Date.now() - pluginCatalog.at < 60000) return pluginCatalog.list;
-  const all = await oto.pluginsCatalog().catch(() => null);
-  if (!all) return pluginCatalog.list || [];
-  const list = (Array.isArray(all) ? all : all.plugins || [])
-    .filter((p) => (p.plugin_type || p.pluginType) === 'ng' || String(p.id || '').startsWith('cp:otoroshi.next'))
-    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  pluginCatalog = { at: Date.now(), list };
-  return list;
-}
-
 const pluginSummary = (p) => ({
   id: p.id,
   name: p.name,
@@ -217,6 +205,13 @@ const pluginSummary = (p) => ({
   steps: p.plugin_steps || p.steps || [],
   categories: p.plugin_categories || [],
   defaultConfig: p.default_config ?? null,
+});
+
+// what the Threat Protection Suite of the gateway offers a plan: whether it is installed, and the
+// policies a plan references (entities of the extension: consumed, never written by the product)
+r.get('/gateway/threat-protection', async ({ ctx }) => {
+  identity.requireUser(ctx);
+  return threatProtectionCatalog();
 });
 
 r.get('/gateway/plugins', async ({ ctx }) => {
@@ -977,6 +972,27 @@ r.get('/workspaces/:ws/analytics/calls', async ({ ctx, params, query }) => {
   }, pageParams(query));
   // reading request logs is a processing of personal data: it is traced
   await audit(c, { action: 'analytics.calls.read', entityKind: 'workspace', entityId: c.workspace.id, summary: 'request log consulted', data: { filter: Object.fromEntries(query) } });
+  return rows;
+});
+
+// the security events of the Threat Protection Suite, attributed to the catalogue; they carry the
+// address of the caller: reading them is traced like the request log
+r.get('/workspaces/:ws/analytics/security', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params);
+  const rows = await analytics.securityEvents(
+    {
+      workspaceId: c.workspace.id,
+      apiId: query.get('api'),
+      planId: query.get('plan'),
+      applicationId: query.get('application'),
+      category: query.get('category'),
+      action: query.get('action'),
+      from: query.get('from'),
+      to: query.get('to'),
+    },
+    pageParams(query)
+  );
+  await audit(c, { action: 'analytics.security.read', entityKind: 'workspace', entityId: c.workspace.id, summary: 'security events consulted', data: { filter: Object.fromEntries(query) } });
   return rows;
 });
 

@@ -145,6 +145,8 @@ export async function sweep(p, now = new Date()) {
       (await purge(() => adb`delete from call_rollups where ctid in (select ctid from call_rollups where hour < ${rollups} limit 20000)`)) +
       (await purge(() => adb`delete from ai_rollups where ctid in (select ctid from ai_rollups where hour < ${rollups} limit 20000)`)),
     raw: await purge(() => adb`delete from raw_events where id in (select id from raw_events where at < ${raw} limit 20000)`),
+    // the security events are kept as long as the calls they judged
+    security: await purge(() => adb`delete from security_events where id in (select id from security_events where at < ${calls} limit 20000)`),
   };
 }
 

@@ -6,8 +6,9 @@ description: The two storage paths of the ingester, attribution to the catalogue
 
 # Analytics and the ingester
 
-The ingester receives the events Otoroshi exports — `GatewayEvent`, `LLMUsageAudit` and
-`McpAudit` — and stores them twice, for two purposes. Install the exporter as described
+The ingester receives the events Otoroshi exports — `GatewayEvent`, `LLMUsageAudit`, `McpAudit`
+and the `CloudApimSecurityEvent` of the Threat Protection Suite — and stores them twice, for two
+purposes. Install the exporter as described
 in [Install](../install.mdx#the-data-exporter).
 
 ## `/ingest`
@@ -93,6 +94,16 @@ Otoroshi exports the events whole — other uses need them — and leaves maskin
 sampling to whoever stores them ([G-19](../otoroshi-gaps.mdx)): what reaches the ingester has the
 personal data in clear, over the exporter's connection.
 
+### Security events
+
+The Threat Protection Suite sends one normalised event per decision, `CloudApimSecurityEvent`
+(category, action, outcome, severity, score, the caller, the route and its api, an incident). The
+ingester keeps it in a table of its own, attributed like the calls: the API from the event, and the
+plan, the subscription and the application from the key that called. A keyless caller, or one
+refused before it was identified, has the API only: the event does not carry the plan
+([G-26](../otoroshi-gaps.mdx)). The address of the caller is pseudonymised like the calls'; the
+events are kept as long as the calls.
+
 ## Rollups and retention
 
 The calls are kept **30 days**. Before they go, they are **rolled up by the hour**: one row per hour,
@@ -124,6 +135,10 @@ They speak the catalogue's vocabulary — APIs, plans, applications — not the 
   adds `Otoroshi headers in` to the flows of an API, unless its settings say otherwise:
   **Settings › Correlation**), and the request log keeps it — a request id a consumer or a backend
   quotes finds its call in the search of the request log.
+- **Console → Observability → Security**, and the *Analytics* tab of an API whose plans carry the
+  threat protection: the security events by category, action and plan, how many were refused or
+  masked, the latest ones. Reading them is recorded in the audit trail: they carry the address of
+  the caller.
 - **Portal → Usage**: the same, restricted to the consumer's own applications.
 - **Portal → My apps**: the live quotas of each key, as the gateway counts them (read-only, never on
   the request path).

@@ -116,6 +116,45 @@ export function defaultAuthConfig(kind) {
   }
 }
 
+// the modules of the preset of the Threat Protection Suite, and how each judges. The policies are
+// entities of the extension the plan references: `threatPolicy` empty is its built-in policy, which
+// records and never enforces
+export const THREAT_MODES = {
+  reputationMode: ['block', 'monitor'],
+  sensitiveDataMode: ['enforce', 'monitor'],
+  errorLeakageMode: ['mask', 'monitor'],
+  uploadsMode: ['enforce', 'monitor'],
+  apiContractMode: ['monitor', 'enforce'],
+};
+
+export function defaultThreatProtection() {
+  return {
+    enabled: false,
+    threatPolicy: '',
+    gate: true,
+    response: true,
+    waf: true,
+    wafConfig: '',
+    bots: true,
+    botPolicy: '',
+    reputation: true,
+    reputationMode: 'block',
+    fail2ban: false,
+    fail2banDryRun: true,
+    sensitiveData: false,
+    sensitiveDataMode: 'enforce',
+    errorLeakage: false,
+    errorLeakageMode: 'mask',
+    uploads: false,
+    uploadsMode: 'enforce',
+    login: false,
+    loginPaths: [],
+    apiContract: false,
+    apiContractId: '',
+    apiContractMode: 'monitor',
+  };
+}
+
 export function defaultPlan(overrides = {}) {
   const kind = overrides?.auth?.kind || 'apikey';
   return {
@@ -138,6 +177,9 @@ export function defaultPlan(overrides = {}) {
     resourceFilter: { mode: 'all', resources: [] },
     // plugins of the plan, by reference to a flow of the api (ApiPlanPlugins.flowRef)
     flowRef: null,
+    // the Threat Protection Suite on the calls of this plan (otoroshi-waf-extension, its preset):
+    // configured here, implemented by the extension, never by the product
+    threatProtection: defaultThreatProtection(),
     // catalogue: never projected
     visibility: 'public',
     acl: [],
@@ -223,6 +265,8 @@ export function normalizeDraft(input = {}) {
     plan.terms = { ...defaultPlan().terms, ...(p.terms || {}) };
     plan.usageStatement = { ...defaultPlan().usageStatement, ...(p.usageStatement || {}) };
     plan.pricing = { ...defaultPlan().pricing, ...(p.pricing || {}) };
+    plan.threatProtection = { ...defaultThreatProtection(), ...(p.threatProtection || {}) };
+    plan.threatProtection.loginPaths = asArray(plan.threatProtection.loginPaths).map(String).filter((x) => x.trim());
     plan.acl = asArray(p.acl);
     plan.selection = asArray(p.selection).map((c) => ({ path: String(c?.path || ''), value: c?.value ?? '' }));
     delete plan.selectionRule;
@@ -338,6 +382,22 @@ export function validateDraft(draft) {
       errors.push({ path: `plans[${i}].flowRef`, message: `plan "${p.name}" references an unknown flow` });
     if (p.resourceFilter.mode === 'only' && !p.resourceFilter.resources.length)
       errors.push({ path: `plans[${i}].resourceFilter`, message: `plan "${p.name}" filters resources but allows none` });
+    const tp = p.threatProtection;
+    if (tp.enabled) {
+      Object.entries(THREAT_MODES).forEach(([k, modes]) => {
+        if (!modes.includes(tp[k])) errors.push({ path: `plans[${i}].threatProtection.${k}`, message: `plan "${p.name}": threat protection ${k} is one of ${modes.join(', ')}` });
+      });
+      if (!tp.threatPolicy)
+        warnings.push({
+          path: `plans[${i}].threatProtection.threatPolicy`,
+          code: 'threat_protection_dry_run',
+          message: `plan "${p.name}": no threat policy — the built-in one of the Threat Protection Suite records what it sees and never refuses a call`,
+        });
+      if (tp.login && !tp.loginPaths.length)
+        warnings.push({ path: `plans[${i}].threatProtection.loginPaths`, code: 'login_guard_idle', message: `plan "${p.name}": the login guard has no login path — it counts nothing` });
+      if (tp.apiContract && !tp.apiContractId)
+        warnings.push({ path: `plans[${i}].threatProtection.apiContractId`, code: 'api_contract_idle', message: `plan "${p.name}": the api contract names no contract — nothing is checked` });
+    }
     // the keys of an oauth2-local plan carry no restrictions on the gateway
     if (p.resourceFilter.mode === 'only' && p.auth.kind === 'oauth2-local')
       warnings.push({ path: `plans[${i}].resourceFilter`, code: 'filter_not_enforced', message: `plan "${p.name}" (oauth2-local): the gateway gives the keys of an oauth2-local plan no restrictions — this filter is not enforced` });

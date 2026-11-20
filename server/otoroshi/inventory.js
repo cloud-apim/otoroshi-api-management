@@ -32,6 +32,11 @@ export const INVENTORY = [
   { kind: 'WasmPlugin', group: 'plugins.otoroshi.io', treatment: 'consumed', how: 'a wasm plugin a flow of an api uses, referenced in its configuration' },
   { kind: 'Workflow', group: 'plugins.otoroshi.io', treatment: 'consumed', how: 'a workflow a flow of an api calls, referenced in its configuration' },
   { kind: 'CorazaConfig', group: 'coraza-waf.extensions.otoroshi.io', treatment: 'consumed', how: 'a firewall configuration a flow of an api references (threat protection)' },
+  // the Threat Protection Suite (otoroshi-waf-extension), when the gateway has it
+  { kind: 'ThreatPolicy', group: 'waf.extensions.cloud-apim.com', treatment: 'consumed', how: 'a threat policy a plan with threat protection references: how a score turns into an action; read to say when it records only, or can challenge a caller' },
+  { kind: 'BotPolicy', group: 'waf.extensions.cloud-apim.com', treatment: 'consumed', how: 'a bot policy a plan with threat protection references' },
+  { kind: 'WafConfig', group: 'waf.extensions.cloud-apim.com', treatment: 'consumed', how: 'a firewall configuration a plan with threat protection references' },
+  { kind: 'ApiContract', group: 'waf.extensions.cloud-apim.com', treatment: 'consumed', how: 'an api contract a plan with threat protection checks its calls against' },
   { kind: 'Organization', group: 'organize.otoroshi.io', treatment: 'consumed', how: 'everything the product writes is in the `default` location: a workspace is never a tenant of the gateway' },
   { kind: 'Tenant', group: 'organize.otoroshi.io', treatment: 'consumed', how: 'the same, under its other name: the `default` tenant' },
   { kind: 'Team', group: 'organize.otoroshi.io', treatment: 'consumed', how: 'the `default` team; the teams of the product are its own' },
@@ -52,6 +57,16 @@ export const INVENTORY = [
   { kind: 'UserAlert', group: 'analytics.otoroshi.io', treatment: 'unused', how: '' },
   { kind: 'RemoteCatalog', group: 'catalogs.otoroshi.io', treatment: 'unused', how: 'the remote catalogs of the product are its own: they write drafts, not Apis' },
   { kind: 'GreenScore', group: 'green-score.extensions.otoroshi.io', treatment: 'unused', how: '' },
+  { kind: 'WafRuleset', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: 'the rules of a firewall configuration: the operator\'s, in Threat Studio' },
+  { kind: 'ChallengeProvider', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: 'the challenges of a threat policy' },
+  { kind: 'HoneypotPolicy', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'MalwareScanner', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'RuleFeed', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'ThreatFeed', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'GeoDatabase', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'AsnDatabase', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'AlertRule', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
+  { kind: 'CrowdSecBouncer', group: 'waf.extensions.cloud-apim.com', treatment: 'unused', how: '' },
 ];
 
 export const TREATMENTS = ['projected', 'derived', 'setup', 'minted', 'consumed', 'unused'];

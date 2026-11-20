@@ -209,7 +209,36 @@ enforced there (`filter_not_enforced`).
 ## Plan plugins
 
 A plan can add one of the API's policy flows on top of the flow of the route, for its consumers
-only — projected as the plan's `flow_ref`. That is how a protection is put plan by plan.
+only — projected as the plan's `flow_ref`.
+
+## Threat protection
+
+A plan can put the **Threat Protection Suite** of the gateway
+([otoroshi-waf-extension](https://github.com/cloud-apim/otoroshi-waf-extension)) on the calls of its
+consumers, from the plan's tab **Threat protection**: the firewall (SecLang, the OWASP core rule set
+by default), the bot guard, the IP reputation, fail2ban, the sensitive data and error leakage guards,
+the upload guard, the login guard, the API contract. The product **configures it, the extension
+enforces it**: the plan carries the preset of the extension in its plugins, after the flow it
+references, and the drift detection watches it like the rest of the plan.
+
+The policies are the extension's — threat policies, bot policies, firewall configurations, API
+contracts, made in Threat Studio — and a plan **references** them, it never writes them. Without a
+threat policy, the extension applies its built-in one, which records what it sees and **never
+refuses a call**: the draft says it (`threat_protection_dry_run`), as it says a login guard without
+a login path (`login_guard_idle`) or an API contract that names no contract (`api_contract_idle`).
+
+A gateway without the extension ignores a plugin it does not know, and the calls go through
+**unprotected**: the draft and the deployment say it (`threat_protection_unavailable`), and the tab
+says it before you start. The events of the suite are in **Observability → Security**, attributed to
+the API and the plan.
+
+:::caution What the extension does not do yet
+A threat policy that **challenges** a caller answers a page with status `200`, which an API client
+takes for a success ([G-25](../otoroshi-gaps.mdx)): for an API, prefer a policy that refuses — the
+tab warns of a policy that can challenge. The global table of Threat Studio does not see the plugins
+of a plan and can add a second firewall on top ([G-24](../otoroshi-gaps.mdx)): keep it off the APIs
+the product protects per plan.
+:::
 
 ## Catalogue and approval — never projected
 

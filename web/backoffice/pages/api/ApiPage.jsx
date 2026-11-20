@@ -9,7 +9,7 @@ import { DocsTab, OpenApiTab } from './Docs.jsx';
 import { DeploymentTab } from './Deployment.jsx';
 import { CatalogueTab } from './Catalogue.jsx';
 import { SubscriptionsTable } from '../Subscriptions.jsx';
-import { AnalyticsDashboard } from '../Observability.jsx';
+import { AnalyticsDashboard, SecurityEvents } from '../Observability.jsx';
 import { RequestComposer } from '../../../shared/composer.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
@@ -203,7 +203,17 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
       {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
       {tab === 'test' && <TestTab api={api} draft={draft} />}
-      {tab === 'analytics' && <AnalyticsDashboard fixed={{ api: api.id }} />}
+      {tab === 'analytics' && (
+        <div className="col gap-24">
+          <AnalyticsDashboard fixed={{ api: api.id }} />
+          {draft.plans.some((p) => p.threatProtection?.enabled) && (
+            <section className="col gap-12" aria-labelledby="api-security">
+              <h2 id="api-security">{tr('Security')}</h2>
+              <SecurityEvents fixed={{ api: api.id }} />
+            </section>
+          )}
+        </div>
+      )}
       {tab === 'settings' && <SettingsTab {...ctx} />}
 
       {dirty && !readOnly && (
