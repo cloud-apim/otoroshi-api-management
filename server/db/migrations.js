@@ -528,6 +528,27 @@ create table usage_reports (
 create index usage_reports_pending on usage_reports(created_at) where status = 'pending';
 `,
   },
+  {
+    version: '0017_dictionaries',
+    sql: `
+-- the dictionaries of a workspace: a named set of values, static or refreshed from an external
+-- source, given to the expression language of the gateway (its global env, under apim.dictionaries)
+create table dictionaries (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null,
+  description text not null default '',
+  source jsonb not null default '{"kind": "static"}',
+  entries jsonb not null default '{}',
+  refreshed jsonb not null default '{}',
+  projection jsonb not null default '{}',
+  created_by text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (workspace_id, name)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

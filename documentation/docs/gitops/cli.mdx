@@ -40,6 +40,7 @@ bun cli/apim.js help
 | `apply <ws> -f <file> [--publish] [--deploy] [--managed-by <source>] [--comment c]` | upsert declarative documents |
 | `subscriptions list <ws> [--status s] [--api id]` | |
 | `subscriptions accept\|reject\|suspend\|resume\|close <ws> <id> [--message m]` | |
+| `dictionaries list\|get\|set\|refresh\|delete <ws> [<name>]` | the dictionaries of a workspace; `set -f values.json` writes a static one |
 | `subscriptions ending <ws> <id> <date\|none>` | the end date of a subscription: past, it expires; `none` renews it |
 | `subscriptions usage <ws> <id>` | the usage billed: the batches of calls sent to the meter of the payment provider |
 | `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan |

@@ -27,7 +27,7 @@ export const INVENTORY = [
   { kind: 'Route', group: 'proxy.otoroshi.io', treatment: 'setup', how: 'the routes of the console and of the portals (`apim_setup_console`, `apim_setup_portals`); the routes of an api are inside its Api, not Route entities' },
   { kind: 'DataExporter', group: 'events.otoroshi.io', treatment: 'setup', how: 'the exporter of the events to the ingester, `apim_ingester_exporter`; the other exporters are the operator\'s' },
   // infrastructure the product references or reads
-  { kind: 'GlobalConfig', group: 'config.otoroshi.io', treatment: 'consumed', how: 'read: the TLS settings (client authentication of mtls plans, trusted CAs) and the env of the local vault; the setup sets the TLS client authentication when asked' },
+  { kind: 'GlobalConfig', group: 'config.otoroshi.io', treatment: 'consumed', how: 'read: the TLS settings (client authentication of mtls plans, trusted CAs) and the env of the local vault; the setup sets the TLS client authentication when asked; the product writes its own part of the env, `apim.dictionaries` (the dictionaries), nothing else' },
   { kind: 'Script', group: 'plugins.otoroshi.io', treatment: 'consumed', how: 'the plugins of the flows of an api, chosen in the catalog of the gateway, by their id' },
   { kind: 'WasmPlugin', group: 'plugins.otoroshi.io', treatment: 'consumed', how: 'a wasm plugin a flow of an api uses, referenced in its configuration' },
   { kind: 'Workflow', group: 'plugins.otoroshi.io', treatment: 'consumed', how: 'a workflow a flow of an api calls, referenced in its configuration' },

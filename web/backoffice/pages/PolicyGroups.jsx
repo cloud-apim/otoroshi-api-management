@@ -18,6 +18,9 @@ export function ApisTabs({ current }) {
       <Link to={`/ws/${slug}/policy-groups`} className={current === 'groups' ? 'on' : ''}>
         {tr('Shared policy groups')}
       </Link>
+      <Link to={`/ws/${slug}/dictionaries`} className={current === 'dictionaries' ? 'on' : ''}>
+        {tr('Dictionaries')}
+      </Link>
     </div>
   );
 }

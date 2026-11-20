@@ -131,6 +131,8 @@ export const oto = {
   listAuthModules: () => otoroshi('GET', '/api/auths'),
   listCertificates: () => otoroshi('GET', '/api/certificates'),
   globalConfig: () => otoroshi('GET', '/api/globalconfig'),
+  // a JSON patch of the global config: the product touches its own part only, never the rest
+  patchGlobalConfig: (ops) => otoroshi('PATCH', '/api/globalconfig', ops),
   listDataExporters: () => otoroshi('GET', '/api/data-exporter-configs'),
   createDataExporter: (e) => otoroshi('POST', '/api/data-exporter-configs', e),
   updateDataExporter: (e) => otoroshi('PUT', `/api/data-exporter-configs/${e.id}`, e),

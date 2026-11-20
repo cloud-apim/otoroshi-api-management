@@ -47,6 +47,7 @@ Last update: 2026-11-20.
   - R-25 checked on a gateway running the Threat Protection Suite 1.0.0 and the LLM extension 0.0.90 (their latest releases, on the classpath of the development gateway: `OTOROSHI_EXTENSIONS`): a legitimate call served, an injection refused by the threat response, its security event attributed to the api, the plan, the subscription and the application (`test/threat-protection.test.js`, which runs either case). On the way: **G-24** confirmed (the global table of Threat Studio runs a second firewall on a plan already protected, the scores add up), **G-26** confirmed, **G-27** (every call scores a firewall match with the core rule set) and **G-28** (a firewall that blocks on its own sends no security event) found; **G-25** withdrawn — a challenge is for a person in a browser. G-24, G-26, G-27 and G-28 reported to the extension (cloud-apim/otoroshi-waf-extension#60 to #63); the threat protection is left aside for now (owner). Also found on the way, in the product: the ingester read its attribution cache every 15 seconds, so the first calls of an api or a key made meanwhile were unattributed — an unknown api, subscription or key now reads it again, once a second at most (`test/ingestion.test.js`).
   - R-31: the AI audits checked with real calls on the gateway running the LLM extension — a chat completion through an api whose flow proxies a provider (a fake one, a route of the gateway answering as OpenAI), an MCP tool called through another api. What the real events showed: the audits are generic `AuditEvent`s (`audit: LLMUsageAudit | McpAudit`), so the exporter never sent them and the ingester did not know them — both fixed; the tokens are under `usage` (`generation_tokens`), the cost under `costs.total_cost` in dollars, the tool of an MCP call under `mcp_request_payload.params.name`; and an audit carries the prompt, the answer, the arguments and the result of a tool, and the whole key with its secret — the ingester now keeps the usage only, the key named, the address and the end user pseudonymised (`test/ai-usage.test.js`, `test/ingestion.test.js`).
   - R-55: an AsyncAPI specification (2.x or 3.x) in the draft and the snapshots of an api — a tab of the console, an outline of its channels — never projected; the portal renders it in an Events tab: its channels from the side of a consumer (what it sends, what it receives, whatever the version), the messages with their payloads and examples, its local references resolved, its servers the gateway (the brokers stay private); a specification the portal cannot read is said on the draft (`test/discovery.test.js`, `test/model.test.js`, `test/ui.test.js`).
+  - R-10, first half: **dictionaries** (D-16) — a named set of values of a workspace, given here or refreshed from an external source (an url answering json, a json pointer, headers sealed, a failing source keeping its last values), projected into the global env of the gateway under the product's own part, `apim.dictionaries.<workspace>.<name>`, where the expression language of any plugin reads it (`${global_config.env.apim.dictionaries…}`): changed, what runs changes without redeploying the apis; what the gateway holds compared (in sync, changed on the gateway, missing); a page under APIs › Dictionaries, the admin api, the cli (`test/dictionaries.test.js`, which reads a value through a plugin of an api).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
@@ -70,7 +71,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
-| R-10 | L | Named compositions: resources and dictionaries |
+| R-10 | M | Named compositions: resources (the dictionaries are done) |
 | R-19 | L | Custom portal templates |
 
 
@@ -101,7 +102,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
+| R-10 | D-16 | Named compositions, the last one: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan rather than reconfigured). The dictionaries are done | M | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | — | G-23 |
 | R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
 

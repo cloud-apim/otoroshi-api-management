@@ -59,6 +59,12 @@ export async function resealAll() {
       await db`update remote_catalogs set headers = ${headersOf(row)} where id = ${row.id}`;
       return true;
     });
+  for (const row of await db`select id, source from dictionaries where source->>'kind' = 'url'`)
+    await attempt(`dictionary ${row.id}`, async () => {
+      if (allCurrent(Object.values(row.source.headers || {}))) return false;
+      await db`update dictionaries set source = ${{ ...row.source, headers: headersOf(row.source) }} where id = ${row.id}`;
+      return true;
+    });
   for (const row of await db`select id, headers from audit_exporters`)
     await attempt(`audit exporter ${row.id}`, async () => {
       if (allCurrent(Object.values(row.headers || {}))) return false;

@@ -1,0 +1,58 @@
+---
+sidebar_position: 8
+title: Dictionaries
+description: A named set of values, static or refreshed from an external source, given to the expression language of the gateway.
+---
+
+# Dictionaries
+
+A plugin of an API often needs a value that is not the API's: the tier of a partner, the backend of a
+region, the limit of a country. Written by hand in thirty plugins, it is changed in thirty places. A
+**dictionary** names that set of values once, for the workspace, and gives it to the **expression
+language** of the gateway: any plugin of any API reads it, and changing it changes what runs —
+without publishing or deploying the APIs that read it.
+
+Like a [shared policy group](./shared-policy-groups.mdx), it creates no gateway capability: it names
+what is composed by hand, gives it a lifecycle and a scope.
+
+## Its values
+
+- **Given here**: a JSON object, its values strings, numbers, booleans, or objects of the same. A key
+  holds no dot: the expression language reads a path of dots.
+- **From a source**: an `http(s)` URL answering a JSON object, read again every few minutes (30 seconds
+  to 24 hours), the object at a JSON pointer of the answer (`/data`), with headers — a token — kept
+  sealed and never shown back. **Refresh now** reads it at once. A source that fails keeps the last
+  values it gave: the gateway never loses its values because a source is down.
+
+## On the gateway
+
+The values land in the **global env** of the gateway, under the product's own part of it,
+`apim.dictionaries.<workspace>.<name>` — the product writes that part and nothing else of the global
+config. A plugin reads a value with
+
+```text
+${global_config.env.apim.dictionaries.<workspace>.<name>.<key>}
+```
+
+in a header, a body, an URL: the gateway resolves it at each call, from its own config. Never in the
+request path: the product projects a change through its queue, and the gateway keeps what it has when
+the product is down. The page of a dictionary lists the expression of each of its keys.
+
+What the gateway holds is compared with the product's: **on the gateway**, **changed on the gateway**
+(the next save sets it again), **not on the gateway**. Deleting a dictionary removes it from the
+gateway: the expressions that read it get nothing.
+
+:::note
+Writing the global config needs a **super admin** key, as reading it does: with a narrower key, a
+dictionary is not projected and its page says why.
+:::
+
+## From the admin API and the CLI
+
+```bash
+curl -X POST $APIM_URL/api/workspaces/default/dictionaries -H "Authorization: Bearer $APIM_TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name": "partners", "entries": {"acme": "gold"}}'
+apim dictionaries set default partners -f partners.json
+apim dictionaries get default partners
+apim dictionaries refresh default capitals
+```

@@ -22,6 +22,7 @@ import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
 import { SubscriptionsPage } from './pages/Subscriptions.jsx';
 import { PolicyGroupsPage, PolicyGroupPage } from './pages/PolicyGroups.jsx';
+import { DictionariesPage, DictionaryPage } from './pages/Dictionaries.jsx';
 import { tr, Tr } from '../shared/i18n.jsx';
 
 initTheme();
@@ -192,6 +193,8 @@ function App() {
             ['/ws/:ws/apis/:api/:tab', (p) => <ApiPage id={p.api} tab={p.tab} />],
             ['/ws/:ws/policy-groups', () => <PolicyGroupsPage />],
             ['/ws/:ws/policy-groups/:pg', (p) => <PolicyGroupPage id={p.pg} />],
+            ['/ws/:ws/dictionaries', () => <DictionariesPage />],
+            ['/ws/:ws/dictionaries/:d', (p) => <DictionaryPage id={p.d} />],
             ['/ws/:ws/applications', () => <ApplicationsPage />],
             ['/ws/:ws/applications/:app', (p) => <ApplicationPage id={p.app} />],
             ['/ws/:ws/subscriptions', () => <SubscriptionsPage />],

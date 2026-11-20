@@ -341,6 +341,9 @@ async function start() {
     // the subscriptions whose end date passed expire
     const subsMod = await import('./domain/subscriptions.js');
     setInterval(() => subsMod.expirySweep().catch((e) => console.error('[apim] subscription expiry failed', e.message)), 60000);
+    // the dictionaries refreshed from their source, when due
+    const dictionaries = await import('./domain/dictionaries.js');
+    setInterval(() => dictionaries.refreshSweep().catch((e) => console.error('[apim] dictionary refresh failed', e.message)), 30000);
     setInterval(() => billing.reconcile().catch((e) => console.error('[apim] payment reconciliation failed', e.message)), config.payments.reconcileMs);
     const { deliverAll } = await import('./domain/auditExport.js');
     setInterval(() => deliverAll().catch((e) => console.error('[apim] audit export failed', e.message)), 5000);

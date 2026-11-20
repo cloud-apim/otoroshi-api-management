@@ -37,7 +37,7 @@ are there when the gateway has the extension.
 | `Route` | `proxy.otoroshi.io` | Made by the setup | the routes of the console and of the portals (`apim_setup_console`, `apim_setup_portals`); the routes of an api are inside its Api, not Route entities |
 | `DataExporter` | `events.otoroshi.io` | Made by the setup | the exporter of the events to the ingester, `apim_ingester_exporter`; the other exporters are the operator's |
 | `Apikey` | `apim.otoroshi.io` | Minted by Otoroshi | minted by Otoroshi for the subscriptions and the consumers of the plans: the product reads them (credentials, drift, quotas), rotates a secret on demand; the key of the product itself, `apim_product_admin`, is made by the setup |
-| `GlobalConfig` | `config.otoroshi.io` | Consumed | read: the TLS settings (client authentication of mtls plans, trusted CAs) and the env of the local vault; the setup sets the TLS client authentication when asked |
+| `GlobalConfig` | `config.otoroshi.io` | Consumed | read: the TLS settings (client authentication of mtls plans, trusted CAs) and the env of the local vault; the setup sets the TLS client authentication when asked; the product writes its own part of the env, `apim.dictionaries` (the dictionaries), nothing else |
 | `Script` | `plugins.otoroshi.io` | Consumed | the plugins of the flows of an api, chosen in the catalog of the gateway, by their id |
 | `WasmPlugin` | `plugins.otoroshi.io` | Consumed | a wasm plugin a flow of an api uses, referenced in its configuration |
 | `Workflow` | `plugins.otoroshi.io` | Consumed | a workflow a flow of an api calls, referenced in its configuration |

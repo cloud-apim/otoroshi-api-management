@@ -43,6 +43,11 @@ ${SETUP_HELP}
   promote <ws> <api> --to <url> --to-token <token> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy] [--replace-draft]
                                        send a snapshot of this installation to the next one
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
+  dictionaries list <ws>
+  dictionaries get <ws> <name>         its values, and the expression that reads them
+  dictionaries set <ws> <name> -f values.json [--description d]   a static dictionary, created or replaced
+  dictionaries refresh <ws> <name>     read again from its source
+  dictionaries delete <ws> <name>
   subscriptions list <ws> [--status s] [--api id]
   subscriptions accept|reject|suspend|resume|close <ws> <id> [--message m]
   subscriptions ending <ws> <id> <date|none>   the end date of a subscription (past: it expires; none: renewed)
@@ -255,6 +260,38 @@ async function main() {
       const res = await call('POST', `${ws(sub)}/apply?${q}`, docs);
       res.forEach((r) => console.log(`api ${r.api.slug} ${r.api.version} ${r.action}${r.snapshot ? `, snapshot ${r.snapshot}` : ''}${r.deployment ? `, ${r.deployment}` : ''}`));
       return;
+    }
+    case 'dictionaries': {
+      const w = a1;
+      const name = a2;
+      if (sub === 'list')
+        return print(await call('GET', `${ws(w)}/dictionaries`), [
+          ['name', 'name'],
+          ['source', (d) => (d.source.kind === 'url' ? d.source.url : 'static')],
+          ['values', (d) => Object.keys(d.entries || {}).length],
+          ['gateway', 'gateway'],
+          ['refreshed', (d) => d.refreshed?.status || ''],
+        ]);
+      if (sub === 'get') {
+        const d = await call('GET', `${ws(w)}/dictionaries/${need(name, '<name>')}`);
+        if (OUTPUT === 'table') {
+          console.log(`${d.name} — ${d.gateway}; read with ${d.expression}`);
+          return console.log(JSON.stringify(d.entries, null, 2));
+        }
+        return print(d);
+      }
+      if (sub === 'refresh') return print(await call('POST', `${ws(w)}/dictionaries/${need(name, '<name>')}/refresh`), [['name', 'name'], ['refreshed', (d) => d.refreshed?.status], ['error', (d) => d.refreshed?.error || '']]);
+      if (sub === 'set') {
+        // the values of a static dictionary, from a json file: created, or replaced
+        const entries = JSON.parse(readFileSync(need(flags.file, '-f <values.json>'), 'utf8'));
+        const existing = await call('GET', `${ws(w)}/dictionaries/${need(name, '<name>')}`).catch(() => null);
+        const d = existing
+          ? await call('PUT', `${ws(w)}/dictionaries/${existing.id}`, { entries, ...(flags.description ? { description: flags.description } : {}) })
+          : await call('POST', `${ws(w)}/dictionaries`, { name, entries, description: flags.description || '' });
+        return console.log(`dictionary ${d.name}: ${Object.keys(d.entries).length} values, ${d.projection?.status || 'pending'}`);
+      }
+      if (sub === 'delete') return print(await call('DELETE', `${ws(w)}/dictionaries/${need(name, '<name>')}`));
+      throw new Error('dictionaries list|get|set|refresh|delete');
     }
     case 'subscriptions': {
       if (sub === 'list') {

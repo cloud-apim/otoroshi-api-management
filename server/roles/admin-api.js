@@ -36,6 +36,7 @@ import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exp
 import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
+import * as dictionaries from '../domain/dictionaries.js';
 import { usageOf } from '../payments/usage.js';
 
 const r = new Router();
@@ -1228,6 +1229,44 @@ r.post('/workspaces/:ws/policy-groups/:pg/publish', async ({ ctx, params, body }
 r.delete('/workspaces/:ws/policy-groups/:pg', async ({ ctx, params }) => {
   const c = await ws(ctx, params, ['admin']);
   await policyGroups.deleteGroup(c, await policyGroups.getGroup(c.workspace.id, params.pg));
+  return { deleted: true };
+});
+
+// ---------------------------------------------------------------- dictionaries
+
+// a dictionary as the console shows it: what the gateway holds of it, and how a plugin reads it
+const dictionaryView = (c, d, state) => ({ ...d, gateway: state?.[d.id] || 'unknown', expression: dictionaries.expressionOf(c.workspace.slug, d.name) });
+
+r.get('/workspaces/:ws/dictionaries', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const list = await dictionaries.listDictionaries(c.workspace.id);
+  const state = await dictionaries.gatewayState(c.workspace.slug, list);
+  return list.map((d) => dictionaryView(c, d, state));
+});
+r.post('/workspaces/:ws/dictionaries', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return dictionaries.createDictionary(c, c.workspace.id, body);
+});
+r.get('/workspaces/:ws/dictionaries/:d', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const d = await dictionaries.getDictionary(c.workspace.id, params.d);
+  return dictionaryView(c, d, await dictionaries.gatewayState(c.workspace.slug, [d]));
+});
+r.put('/workspaces/:ws/dictionaries/:d', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return dictionaries.updateDictionary(c, await dictionaries.getDictionary(c.workspace.id, params.d), body);
+});
+r.post('/workspaces/:ws/dictionaries/:d/refresh', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  const d = await dictionaries.getDictionary(c.workspace.id, params.d);
+  if (d.source?.kind !== 'url') throw badRequest('a static dictionary is not refreshed: its values are the ones given');
+  await dictionaries.refresh(await db`select * from dictionaries where id = ${d.id}`.then((r) => r[0]));
+  await audit(c, { action: 'dictionary.refresh', entityKind: 'dictionary', entityId: d.id, summary: `dictionary ${d.name} refreshed from its source` });
+  return dictionaries.getDictionary(c.workspace.id, d.id);
+});
+r.delete('/workspaces/:ws/dictionaries/:d', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  await dictionaries.deleteDictionary(c, await dictionaries.getDictionary(c.workspace.id, params.d));
   return { deleted: true };
 });
 
