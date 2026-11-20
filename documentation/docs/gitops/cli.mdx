@@ -6,14 +6,23 @@ description: apim, the command line of the product, in the manner of otoroshictl
 
 # Command line
 
-`cli/apim.js` only talks to the [admin API](./admin-api.mdx) — so everything the console does can be
-scripted and run from a CI.
+The command line only talks to the [admin API](./admin-api.mdx) — so everything the console does can
+be scripted and run from a CI. It needs nothing but the URL of the product and a token: neither its
+databases nor its configuration.
 
 ```bash
-export APIM_URL=http://localhost:9000
+export APIM_URL=https://apim.example.com
 export APIM_TOKEN=<a token from the console>
-bun cli/apim.js help
+otoroshi-apim help
 ```
+
+The same commands, three ways:
+
+| | |
+|---|---|
+| **The executable** — `otoroshi-apim <command>` | the one of the [releases](../install.mdx#releases), linux and macOS, x64 and arm64: the server and the command line are one program. The examples of this page use it |
+| **The image** — `docker run --rm -e APIM_URL -e APIM_TOKEN ghcr.io/cloud-apim/otoroshi-api-management <command>` | the same executable, for a CI that runs containers; the files it reads (`apply -f`, `portal push`) mounted: `-v "$PWD:/work" -w /work` |
+| **From the repository** — `bun cli/apim.js <command>` | with Bun, in a clone of the repository: the form the other pages of this documentation write |
 
 | Flag | Environment | Default |
 |---|---|---|
@@ -61,16 +70,16 @@ bun cli/apim.js help
 ## Round trip
 
 ```bash
-bun cli/apim.js apis get default petstore -o yaml > petstore.yaml
+otoroshi-apim apis get default petstore -o yaml > petstore.yaml
 # edit the plans, the resources, the documentation…
-bun cli/apim.js apply default -f petstore.yaml
-bun cli/apim.js apis changes default petstore
-bun cli/apim.js apis deploy default petstore --dry-run
-bun cli/apim.js apis publish default petstore --comment "from git" --deploy
+otoroshi-apim apply default -f petstore.yaml
+otoroshi-apim apis changes default petstore
+otoroshi-apim apis deploy default petstore --dry-run
+otoroshi-apim apis publish default petstore --comment "from git" --deploy
 ```
 
 ```shell-session
-$ bun cli/apim.js apis deploy default petstore --dry-run
+$ otoroshi-apim apis deploy default petstore --dry-run
 dry run: snapshot #3 replaces #2
 catalogue changes:
   change draft.plans[Discovery].rateLimit.calls
