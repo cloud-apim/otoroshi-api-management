@@ -4,9 +4,19 @@ import { Icon, Markdown, useLoad } from '../../shared/ui.jsx';
 import { api, usePortal } from '../context.jsx';
 import { usePortalText, useT } from '../i18n.jsx';
 import { ApiCard } from './Catalogue.jsx';
+import { BlocksHome, DesignMarkdown, Template } from '../design.jsx';
 
+// the home: the default template, the blocks of a themed portal, or the template of the home
 export function Home() {
-  const { portal, workspace } = usePortal();
+  const { portal, design } = usePortal();
+  const text = usePortalText(portal);
+  if (design?.mode === 'templates' && text(design.templates?.home)) return <div className="pt-container pt-section"><Template source={text(design.templates.home)} /></div>;
+  if (design && design.mode !== 'default') return <BlocksHome blocks={design.home?.blocks || []} />;
+  return <DefaultHome />;
+}
+
+function DefaultHome() {
+  const { portal, design, workspace } = usePortal();
   const t = useT();
   const text = usePortalText(portal);
   const { navigate } = useRouter();
@@ -21,8 +31,8 @@ export function Home() {
         <div className="pt-container">
           <div className="pt-hero-inner">
             <div className="pt-eyebrow">{workspace?.name}</div>
-            <h1 className="pt-hero-title">{text(portal?.title)}</h1>
-            {text(portal?.tagline) && <p className="pt-hero-tagline">{text(portal?.tagline)}</p>}
+            <h1 className="pt-hero-title">{text(design?.texts?.title)}</h1>
+            {text(design?.texts?.tagline) && <p className="pt-hero-tagline">{text(design?.texts?.tagline)}</p>}
             <form
               className="pt-hero-search"
               role="search"
@@ -57,10 +67,10 @@ export function Home() {
           ))}
         </div>
 
-        {text(portal?.homeMarkdown) && (
+        {text(design?.home?.markdown) && (
           <div className="card mt-24">
             <div className="card-body">
-              <Markdown source={text(portal?.homeMarkdown)} />
+              <DesignMarkdown source={text(design?.home?.markdown)} />
             </div>
           </div>
         )}

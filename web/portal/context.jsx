@@ -2,6 +2,8 @@
 // window.__APIM__; every call goes to <base>/front/api.
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { client } from '../shared/lib.js';
+import { applyDesign } from './design.jsx';
+import { pickLang } from './i18n.jsx';
 
 export const runtime = window.__APIM__ || { workspace: 'default', base: '', exposure: 'path' };
 export const api = client(`${runtime.base}/front/api`);
@@ -9,13 +11,28 @@ export const testProxyUrl = `${window.location.origin}${runtime.base}/front/api/
 
 const PortalCtx = createContext(null);
 
+// a preview of the draft of the design: the link of the console carries a token, kept for the
+// navigation within the portal (this tab only)
+function previewToken() {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get('preview');
+    if (fromUrl) sessionStorage.setItem('apim.portal.preview', fromUrl);
+    return fromUrl || sessionStorage.getItem('apim.portal.preview') || null;
+  } catch {
+    return null;
+  }
+}
+export const preview = previewToken();
+
 export function PortalProvider({ children }) {
   const [state, setState] = useState({ loading: true, error: null, portal: null, workspace: null, user: null });
   const reload = useCallback(async () => {
     try {
-      const data = await api.get('/portal');
+      const data = await api.get(`/portal${preview ? `?preview=${encodeURIComponent(preview)}` : ''}`);
       setState({ loading: false, error: null, ...data });
-      applyBrand(data.portal);
+      applyDesign(data.design, { preview: data.design?.preview ? preview : null });
+      const title = pickLang(data.design?.texts?.title, document.documentElement.lang, data.portal?.defaultLanguage);
+      if (title) document.title = title;
       return data;
     } catch (error) {
       setState((s) => ({ ...s, loading: false, error }));
@@ -36,16 +53,3 @@ export function usePortal() {
   return useContext(PortalCtx);
 }
 
-// the portal carries the visual identity of its organisation
-function applyBrand(portal) {
-  const root = document.documentElement;
-  if (portal?.accentColor && /^#[0-9a-f]{3,8}$/i.test(portal.accentColor)) {
-    root.style.setProperty('--brand', portal.accentColor);
-    root.dataset.brand = 'on';
-  } else {
-    root.style.removeProperty('--brand');
-    delete root.dataset.brand;
-  }
-  const title = portal?.title && typeof portal.title === 'object' ? portal.title[portal.defaultLanguage] || Object.values(portal.title)[0] : portal?.title;
-  if (title) document.title = title;
-}

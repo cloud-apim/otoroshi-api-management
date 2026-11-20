@@ -6,6 +6,7 @@ import { usePaging } from '../shared/lists.jsx';
 import { api, usePortal } from './context.jsx';
 import { I18nProvider, useI18n, usePortalText, UI_LANGUAGES } from './i18n.jsx';
 import { SmallPager, SmallSearch } from './common.jsx';
+import { assetUrl, DesignLink, PreviewBanner } from './design.jsx';
 import { Home } from './pages/Home.jsx';
 import { Catalogue } from './pages/Catalogue.jsx';
 import { ApiPage } from './pages/ApiPage.jsx';
@@ -226,9 +227,10 @@ function NavLink({ to, children, onClick }) {
 }
 
 function Shell() {
-  const { portal, workspace, user } = usePortal();
+  const { portal, design, workspace, user } = usePortal();
   const portalText = usePortalText(portal);
-  const title = portalText(portal?.title);
+  const title = portalText(design?.texts?.title);
+  const logo = assetUrl(design?.theme?.logo, design);
   useEffect(() => {
     if (title) document.title = title;
   }, [title]);
@@ -240,23 +242,29 @@ function Shell() {
       <a href="#main" className="pt-skip">
         Skip to content
       </a>
+      <PreviewBanner />
       <header className="pt-topbar">
         <div className="pt-container pt-topbar-inner">
           <Link to="/" className="pt-brand" onClick={close}>
-            {portal?.logoUrl ? <img src={portal.logoUrl} alt="" className="pt-logo" /> : <span className="pt-mark" aria-hidden="true">{(workspace?.name || 'A').slice(0, 1)}</span>}
+            {logo ? <img src={logo} alt="" className="pt-logo" /> : <span className="pt-mark" aria-hidden="true">{(workspace?.name || 'A').slice(0, 1)}</span>}
             <span className="pt-brand-name">{title || workspace?.name}</span>
           </Link>
           <nav className={`pt-nav ${menu ? 'open' : ''}`} aria-label="main">
             <NavLink to="/apis" onClick={close}>
               {t('nav.apis')}
             </NavLink>
-            {(portal?.pages || [])
+            {(design?.pages || [])
               .filter((p) => p.nav)
               .map((p) => (
                 <NavLink key={p.slug} to={`/pages/${p.slug}`} onClick={close}>
                   {portalText(p.title)}
                 </NavLink>
               ))}
+            {(design?.navigation?.header || []).map((l, i) => (
+              <DesignLink key={`h${i}`} href={l.href} className="pt-navlink">
+                {portalText(l.label)}
+              </DesignLink>
+            ))}
             {user && (
               <>
                 <NavLink to="/apps" onClick={close}>
@@ -318,6 +326,11 @@ function Shell() {
           <span className="faint small">
             © {new Date().getFullYear()} {workspace?.name}
           </span>
+          {(design?.navigation?.footer || []).map((l, i) => (
+            <DesignLink key={`f${i}`} href={l.href} className="link small">
+              {portalText(l.label)}
+            </DesignLink>
+          ))}
           <span className="spacer" />
           <span className="faint small">{t('footer.powered')}</span>
         </div>

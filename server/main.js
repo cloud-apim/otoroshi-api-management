@@ -5,6 +5,7 @@
 //   portal     -> /, /front/api             (one portal per workspace)
 //   controller -> no route: reconciles the Kubernetes resources of the product (not a default role)
 
+import { randomBytes } from 'node:crypto';
 import { normalize } from 'node:path';
 import { uiFile } from './ui-files.js';
 import { config, hasRole } from './config.js';
@@ -79,15 +80,42 @@ async function serveStatic(face, relPath) {
   return null;
 }
 
-async function spaIndex(face, inject) {
+async function spaIndex(face, inject, { csp } = {}) {
   const file = await uiFile(face, 'index.html');
   if (!file) {
     return new Response('ui not built: run `bun run build`', { status: 503 });
   }
   let html = await file.text();
   if (inject) html = html.replace('</head>', `<script>window.__APIM__ = ${JSON.stringify(inject).replace(/</g, '\\u003c')};</script></head>`);
-  return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' } });
+  // a content security policy: the inline scripts of the page carry its nonce, nothing else inline runs
+  const headers = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' };
+  if (csp) {
+    const nonce = randomBytes(16).toString('base64');
+    html = html.replaceAll('<script>', `<script nonce="${nonce}">`);
+    headers['content-security-policy'] = csp(nonce);
+  }
+  return new Response(html, { headers });
 }
+
+// the portal: its own scripts, its inline ones by nonce; images and fonts of the web, never a frame of
+// another site. A portal whose administrators allowed scripts lets its script load others from the web
+const portalCsp = (ws) => (nonce) => {
+  const scripts = portalDesign.scriptsOf(ws).enabled;
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}'${scripts ? ' https:' : ''}`,
+    "style-src 'self' 'unsafe-inline' https:",
+    "font-src 'self' data: https:",
+    "img-src 'self' data: blob: https:",
+    `connect-src 'self'${scripts ? ' https:' : ''}`,
+    "worker-src 'self' blob:",
+    "frame-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+};
 
 // ---------------------------------------------------------------- roles
 
@@ -284,7 +312,7 @@ async function handlePortal(req, url, server) {
     checkCsrf(req);
     return dispatch(portalRouter, req, path, ctx);
   }
-  return spaIndex('portal', { workspace: ws.slug, base, exposure: currentForm().kind });
+  return spaIndex('portal', { workspace: ws.slug, base, exposure: currentForm().kind }, { csp: portalCsp(ws) });
 }
 
 // assets are never scripts: an svg is a document of its own, sandboxed; nothing is sniffed

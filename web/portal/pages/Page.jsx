@@ -5,12 +5,13 @@ import { Link } from '../../shared/router.jsx';
 import { Markdown } from '../../shared/ui.jsx';
 import { usePortal } from '../context.jsx';
 import { useI18n, usePortalText } from '../i18n.jsx';
+import { DesignMarkdown, Template } from '../design.jsx';
 
 export function Page({ slug }) {
-  const { portal } = usePortal();
+  const { portal, design } = usePortal();
   const { t } = useI18n();
   const text = usePortalText(portal);
-  const page = (portal?.pages || []).find((p) => p.slug === slug);
+  const page = (design?.pages || []).find((p) => p.slug === slug);
   if (!page)
     return (
       <div className="pt-container pt-section">
@@ -28,7 +29,8 @@ export function Page({ slug }) {
         <h1>{text(page.title)}</h1>
         <div className="card mt-24">
           <div className="card-body">
-            <Markdown source={text(page.content)} />
+            {/* a page of a portal written as templates is a template too */}
+            {design?.mode === 'templates' ? <Template source={text(page.content)} /> : <DesignMarkdown source={text(page.content)} />}
           </div>
         </div>
       </article>

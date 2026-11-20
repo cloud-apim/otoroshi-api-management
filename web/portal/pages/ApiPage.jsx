@@ -3,7 +3,8 @@ import { Link, useQuery, useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, Code, CopyButton, Empty, ErrorBox, Icon, Loader, Loading, Markdown, Seg, Select, useLoad } from '../../shared/ui.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../shared/lists.jsx';
 import { api, usePortal } from '../context.jsx';
-import { pickLang, useI18n } from '../i18n.jsx';
+import { pickLang, useI18n, usePortalText } from '../i18n.jsx';
+import { Template } from '../design.jsx';
 import { LifecycleBadge, SmallPager, SmallSearch, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
 import { Reviews } from './Reviews.jsx';
@@ -123,7 +124,7 @@ function ApiView({ a, tab, page }) {
             <Callout kind="warning">{t('api.deprecated')}</Callout>
           </div>
         )}
-        {tab === 'overview' && <Overview a={a} />}
+        {tab === 'overview' && <OverviewOrTemplate a={a} />}
         {tab === 'docs' && <Docs a={a} page={page} />}
         {tab === 'reference' && <Reference a={a} />}
         {tab === 'try' && <Try a={a} />}
@@ -136,6 +137,15 @@ function ApiView({ a, tab, page }) {
 }
 
 // ---------------------------------------------------------------- overview
+
+// the overview, or the template of an api a portal written as templates gives itself
+function OverviewOrTemplate({ a }) {
+  const { portal, design } = usePortal();
+  const text = usePortalText(portal);
+  const source = design?.mode === 'templates' ? text(design.templates?.api) : '';
+  if (!source) return <Overview a={a} />;
+  return <Template source={source} variables={{ api: { name: a.name, version: a.version, description: a.description || '', slug: a.slug, baseUrl: a.base_url } }} />;
+}
 
 function Overview({ a }) {
   const { t } = useI18n();

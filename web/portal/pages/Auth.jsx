@@ -28,7 +28,7 @@ function AuthCard({ title, subtitle, children, footer }) {
 
 export function SignIn() {
   const t = useT();
-  const { portal, reload } = usePortal();
+  const { portal, design, reload } = usePortal();
   const { navigate } = useRouter();
   const [params] = useQuery();
   const next = params.get('next');
@@ -54,7 +54,7 @@ export function SignIn() {
   return (
     <AuthCard
       title={t('auth.signin.title')}
-      subtitle={t('auth.signin.subtitle', { portal: pickLang(portal?.title, document.documentElement.lang, portal?.defaultLanguage) })}
+      subtitle={t('auth.signin.subtitle', { portal: pickLang(design?.texts?.title, document.documentElement.lang, portal?.defaultLanguage) })}
       footer={
         portal?.selfSignup && portal?.localLogin !== false && (
           <>
@@ -97,7 +97,7 @@ export function SignIn() {
 
 export function SignUp() {
   const t = useT();
-  const { portal, reload } = usePortal();
+  const { portal, design, reload } = usePortal();
   const { navigate } = useRouter();
   const [params] = useQuery();
   const next = params.get('next');
@@ -131,7 +131,7 @@ export function SignUp() {
   return (
     <AuthCard
       title={t('auth.signup.title')}
-      subtitle={t('auth.signup.subtitle', { portal: pickLang(portal?.title, document.documentElement.lang, portal?.defaultLanguage) })}
+      subtitle={t('auth.signup.subtitle', { portal: pickLang(design?.texts?.title, document.documentElement.lang, portal?.defaultLanguage) })}
       footer={
         <>
           {t('auth.hasaccount')}{' '}

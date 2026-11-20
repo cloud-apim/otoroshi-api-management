@@ -138,6 +138,22 @@ describe('the design of a portal', () => {
     expect((await fetch(`${ROOT}/${WS}/_design/script.js`)).status).toBe(404);
   });
 
+  test('the page of the portal carries a content security policy: its inline scripts by nonce, the web opened to scripts only where allowed', async () => {
+    const page = await fetch(`${ROOT}/${WS}/`);
+    const csp = page.headers.get('content-security-policy');
+    const nonce = /'nonce-([^']+)'/.exec(csp)?.[1];
+    expect(nonce).toBeTruthy();
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).toMatch(/script-src 'self' 'nonce-[^']+'(;|$)/);
+    const html = await page.text();
+    expect(html.match(/<script>/g)).toBeNull();
+    expect(html).toContain(`<script nonce="${nonce}">`);
+    await ok('PUT', ws('/portal/scripts'), { enabled: true, acknowledge: true });
+    expect((await fetch(`${ROOT}/${WS}/`)).headers.get('content-security-policy')).toMatch(/script-src 'self' 'nonce-[^']+' https:/);
+    await ok('PUT', ws('/portal/scripts'), { enabled: false });
+  });
+
   test('its declarative document: exported, applied with its assets inline, a file refused, owned by its source', async () => {
     const doc = await ok('GET', ws('/portal/document'));
     expect(doc).toMatchObject({ kind: 'Portal', metadata: { name: WS }, spec: { mode: 'themed' } });

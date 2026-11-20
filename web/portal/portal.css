@@ -130,3 +130,16 @@ a.pt-api-card:hover { border-color: var(--accent-border); box-shadow: var(--shad
 .pt-meter > div { height: 100%; border-radius: 4px; }
 .pt-details summary { cursor: pointer; color: var(--accent-text); font-size: 13px; font-weight: 550; }
 .pt-details summary:focus-visible { outline: 2px solid var(--accent); }
+
+/* the design of the portal: a preview banner, the layout tags of its templates */
+.pt-preview-banner { position: sticky; top: 0; z-index: 30; background: var(--warning-bg, #fff4d6); color: var(--ink); border-bottom: 1px solid var(--border-strong); text-align: center; font-size: 13px; padding: 6px 12px; }
+.pt-template > * + * { margin-top: 16px; }
+.pt-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+.pt-column > * + * { margin-top: 12px; }
+/* the components a template inserts are not prose: no underline, their own spacing */
+.pt-template .pt-api-card,
+.pt-template .pt-api-card *,
+.pt-template .card a,
+.pt-template a.btn { text-decoration: none; }
+.pt-template a.btn { margin: 0 8px 8px 0; }
+.pt-template .pt-grid { margin-top: 8px; }
