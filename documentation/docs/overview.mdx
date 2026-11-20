@@ -66,6 +66,17 @@ and [remote catalogs](./gitops/remote-catalogs.mdx) reconcile them from HTTP or 
 **One installation drives one Otoroshi cluster**. Geography is carried by Otoroshi's own
 leader/worker cluster; each environment is its own installation.
 
+## Lists
+
+Every list of the console and of the developer portal is **searched and paged** — the APIs, the
+subscriptions, the workspaces, the teams, the tokens, and the lists inside a page too: the
+versions of a shared policy group, the resources of an API, the credentials of a subscription. The
+search and the page are kept in the url, so a filtered list is a link to bookmark or share; in a
+modal or a drawer, in the list itself. The lists that grow are searched and paged on the server
+(the audit trail, the request log, the people, the deployment history of an API, the usage billed
+for a subscription): the [admin API](./gitops/admin-api.mdx#paged-lists) takes `?q=`, `?limit=` and
+`?offset=`.
+
 ## Languages
 
 The console and the developer portal speak **English and French**. Each follows the language of

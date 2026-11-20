@@ -31,7 +31,10 @@ Each object gets a report:
 | `unmanaged` | an Otoroshi `Api` without the product's marker — a candidate for adopt mode |
 
 Reports show in **Gateway → Drift**, on the deployment tab of each API, in the subscription review
-and from the CLI:
+and from the CLI. The banner at the top of an API says it too, from the last detection since its
+deployment: **no longer on the gateway** — the gateway lost it, a restart without storage, a hand in
+its console — or **changed on the gateway**, each with **Deploy #n again**, which deploys the snapshot
+that ran. What the product put on the gateway is not taken for what the gateway holds:
 
 ```bash
 bun cli/apim.js drift default

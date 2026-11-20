@@ -53,9 +53,10 @@ of its teams. A team has **owners** — the person who creates it is one — and
 | Workspace settings — Payments: the linked Stripe account | — | read | ✓ | ✓ |
 | Workspace settings — Payments: link, unlink, the events, reconcile | — | — | ✓ | ✓ |
 | Workspace settings — Remote catalogs, Export / import | — | — | ✓ | ✓ |
-| Gateway — status, run the detection | — | ✓ | ✓ | ✓ |
-| Gateway — projection queue, drift reports | — | its workspaces | its workspaces | all |
-| Gateway — retry or dismiss a task, install the data exporter, connection | — | — | — | ✓ |
+| Gateway — status (does it answer), run the detection | — | ✓ | ✓ | ✓ |
+| Gateway — projection queue, drift reports, the counts of the gateway pill | — | its workspaces | its workspaces | all |
+| Gateway — its settings: Connection & events, Ingestion, Setup (the url of the gateway, the data exporter, the volumes of the installation) | — | — | — | ✓ |
+| Gateway — retry or dismiss a task | — | — | — | ✓ |
 | Global settings — API tokens (one's own) | — | ✓ | ✓ | ✓ |
 | Global settings — Workspaces, Users, Authentication, Audit export | — | — | — | ✓ |
 | Create a workspace, delete a workspace | — | — | — | ✓ |
@@ -75,10 +76,13 @@ of its teams. A team has **owners** — the person who creates it is one — and
   what it owns. Deleting a team is a workspace administrator's.
 - **Users** are global. A workspace administrator only sees the users of the workspaces it
   administers; an installation administrator sees them all.
-- **The gateway pages** are the installation's: everyone signed in sees the gateway status, and
-  the projection queue and the drift reports of their own workspaces (an installation
-  administrator sees all of them). The connection settings, the data exporter and the retry or the dismissal of a
-  task are an installation administrator's.
+- **The gateway pages** are the installation's: everyone signed in sees the state of the gateway —
+  whether it answers, and the projection queue and the drift of their own workspaces, the gateway
+  pill counting those only (an installation administrator sees all of them). **Its settings are an
+  installation administrator's only**: the tabs Connection & events, Ingestion and Setup are not
+  shown to anyone else, the admin API refuses them, and the status it answers anyone else carries
+  neither the url of the gateway, nor its errors, nor the volumes of the installation. The retry or
+  the dismissal of a task are an installation administrator's too.
 - **The audit trail** of a workspace is open to its producers and administrators. The audit of the
   whole installation is read through the API (`GET /api/audit`), by an installation administrator.
 - **Consumers** work on the [developer portal](../developer-portal.mdx). What they see there — which
