@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter } from '../../shared/router.jsx';
-import { Badge, Callout, DiffView, Empty, Field, FileButton, Icon, Input, Loader, Markdown, Modal, NumberInput, Seg, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Empty, Field, FileButton, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { CodeEditor } from '../../shared/code-editor.jsx';
 import { fmtRelative } from '../../shared/lib.js';
 import { useWs, useMetadataFields } from '../context.jsx';
@@ -59,252 +59,6 @@ function General() {
       </div>
     </div>
     </ReadOnly>
-  );
-}
-
-// a text of the portal: one string per language; a plain string is the default language's
-const asLocalized = (v, def) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
-
-// the pages a workspace writes for its portal, beyond its home: in the language chosen above, in
-// the navigation of the portal or reached by their link only
-function PortalPages({ pages, onChange, lang, def, ro }) {
-  const [open, setOpen] = useState(null);
-  const update = (i, patch) => onChange(pages.map((p, j) => (j === i ? { ...p, ...patch } : p)));
-  const localized = (v) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
-  const move = (i, d) => {
-    const next = [...pages];
-    [next[i], next[i + d]] = [next[i + d], next[i]];
-    onChange(next);
-  };
-  return (
-    <div className="card">
-      <div className="card-head">
-        <h3 className="grow">{tr('Pages')}</h3>
-        {!ro && (
-          <button className="btn sm" onClick={() => (onChange([...pages, { slug: `page-${pages.length + 1}`, title: { [def]: tr('New page') }, content: {}, nav: true }]), setOpen(pages.length))}>
-            <Icon name="plus" /> {tr('Add a page')}
-          </button>
-        )}
-      </div>
-      <div className="card-body col gap-12">
-        <p className="muted small">{tr('Pages of the portal beyond its home — terms, a guide, a contact page — written in markdown, in each language of the portal; at /pages/<slug>.')}</p>
-        {!pages.length && <span className="faint small">{tr('No page yet.')}</span>}
-        {pages.map((p, i) => (
-          <div key={i} className="panel col gap-8">
-            <div className="row">
-              <button className="btn ghost sm" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
-                <Icon name={open === i ? 'chevronDown' : 'chevronRight'} size={14} /> {localized(p.title)[lang] || localized(p.title)[def] || p.slug}
-              </button>
-              <span className="faint mono small">{`/pages/${p.slug}`}</span>
-              {p.nav && <Badge>{tr('in the navigation')}</Badge>}
-              <span className="spacer" />
-              {!ro && (
-                <>
-                  <button className="btn ghost sm icon" aria-label={tr('move up')} disabled={i === 0} onClick={() => move(i, -1)}>
-                    <Icon name="chevronUp" size={14} />
-                  </button>
-                  <button className="btn ghost sm icon" aria-label={tr('move down')} disabled={i === pages.length - 1} onClick={() => move(i, 1)}>
-                    <Icon name="chevronDown" size={14} />
-                  </button>
-                  <button className="btn ghost sm icon" aria-label={tr('delete the page')} onClick={() => onChange(pages.filter((_, j) => j !== i))}>
-                    <Icon name="trash" />
-                  </button>
-                </>
-              )}
-            </div>
-            {open === i && (
-              <fieldset disabled={ro} className="ro-fieldset col gap-8">
-                <div className="grid-2">
-                  <Field label={tr('Slug')}>
-                    <Input value={p.slug} onChange={(v) => update(i, { slug: v })} mono />
-                  </Field>
-                  <Field label={tr('Title ({0})', [lang])}>
-                    <Input value={localized(p.title)[lang] || ''} onChange={(v) => update(i, { title: { ...localized(p.title), [lang]: v } })} placeholder={lang !== def ? localized(p.title)[def] : ''} />
-                  </Field>
-                </div>
-                <Switch checked={p.nav !== false} onChange={(v) => update(i, { nav: v })} label={tr('In the navigation of the portal')} />
-                <CodeEditor
-                  key={`${i}-${lang}`}
-                  value={localized(p.content)[lang] || ''}
-                  onChange={(v) => update(i, { content: { ...localized(p.content), [lang]: v } })}
-                  readOnly={ro}
-                  language="markdown"
-                  wordWrap="on"
-                  minHeight={200}
-                  maxHeight={520}
-                  ariaLabel={tr('page {0} ({1})', [p.slug, lang])}
-                  placeholder={tr('# Markdown')}
-                />
-              </fieldset>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// the categories of the catalogue: the editorial axis of the discovery, a slug and a name per language
-function PortalCategories({ categories, onChange, lang, def, ro }) {
-  const update = (i, patch) => onChange(categories.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  const localized = (v) => (v && typeof v === 'object' ? v : v ? { [def]: v } : {});
-  return (
-    <div className="card">
-      <div className="card-head">
-        <h3 className="grow">{tr('Catalogue categories')}</h3>
-        {!ro && (
-          <button className="btn sm" onClick={() => onChange([...categories, { slug: `category-${categories.length + 1}`, name: { [def]: tr('New category') } }])}>
-            <Icon name="plus" /> {tr('Add a category')}
-          </button>
-        )}
-      </div>
-      <fieldset disabled={ro} className="ro-fieldset card-body col gap-8">
-        <p className="muted small">{tr('The categories the consumers browse the catalogue by; each api is placed in its own from its page, tab Catalogue.')}</p>
-        {!categories.length && <span className="faint small">{tr('No category yet: the catalogue is a single list.')}</span>}
-        {categories.map((c, i) => (
-          <div key={i} className="row">
-            <Input value={c.slug} onChange={(v) => update(i, { slug: v })} mono aria-label={tr('slug of category {0}', [i + 1])} />
-            <Input
-              value={localized(c.name)[lang] || ''}
-              onChange={(v) => update(i, { name: { ...localized(c.name), [lang]: v } })}
-              placeholder={lang !== def ? localized(c.name)[def] : ''}
-              aria-label={tr('name of category {0} ({1})', [i + 1, lang])}
-            />
-            {!ro && (
-              <button className="btn ghost sm icon" aria-label={tr('delete the category')} onClick={() => onChange(categories.filter((_, j) => j !== i))}>
-                <Icon name="trash" />
-              </button>
-            )}
-          </div>
-        ))}
-      </fieldset>
-    </div>
-  );
-}
-
-function Portal() {
-  const { wapi, ws, session, isAdmin } = useWs();
-  const ro = !isAdmin;
-  const toast = useToast();
-  const [p, setP] = useState(ws.portal || {});
-  const set = (k) => (v) => setP((x) => ({ ...x, [k]: v }));
-  const languages = p.languages?.length ? p.languages : ['en'];
-  const def = languages.includes(p.defaultLanguage) ? p.defaultLanguage : languages[0];
-  const [lang, setLang] = useState(def);
-  const current = languages.includes(lang) ? lang : def;
-  const [view, setView] = useState('write');
-  const text = (k) => asLocalized(p[k], def)[current] || '';
-  const setText = (k) => (v) => setP((x) => ({ ...x, [k]: { ...asLocalized(x[k], def), [current]: v } }));
-  const missing = (l) => ['title', 'tagline', 'homeMarkdown'].filter((k) => asLocalized(p[k], def)[def] && !asLocalized(p[k], def)[l]);
-  const save = async () => {
-    try {
-      // the texts are saved per language, the old plain strings with them
-      const portal = { ...p, title: asLocalized(p.title, def), tagline: asLocalized(p.tagline, def), homeMarkdown: asLocalized(p.homeMarkdown, def) };
-      await wapi.put('', { portal });
-      setP(portal);
-      toast(tr('Portal settings saved'));
-      session.reload();
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    }
-  };
-  return (
-    <div className="col gap-16">
-      {ro && <Callout kind="info">{tr('Read only: the administrators of the workspace change the portal.')}</Callout>}
-      <Callout kind="info">
-        <Tr text={'One portal per workspace, at {0}. Its exposure — by root path, by hostname, or at the root of a single-workspace installation — is an installation setting.'} args={[<a className="link mono" href={ws.portal_url} target="_blank" rel="noreferrer">
-          {ws.portal_url}
-        </a>]} />
-      </Callout>
-      <div className="card">
-        <div className="card-head">
-          <h3 className="grow">{tr('Content')}</h3>
-          <Seg
-            value={current}
-            onChange={setLang}
-            options={languages.map((l) => ({ value: l, label: `${l.toUpperCase()}${l === def ? ' · default' : ''}${missing(l).length ? ' · …' : ''}` }))}
-          />
-        </div>
-        <div className="card-body">
-          {current !== def && missing(current).length > 0 && (
-            <Callout kind="info"><Tr text={'Not written in {0} yet: {1} — the portal shows the {2} text meanwhile.'} args={[current.toUpperCase(), missing(current).map((k) => ({ title: tr('title'), tagline: tr('tagline'), homeMarkdown: tr('home page') })[k]).join(', '), def.toUpperCase()]} /></Callout>
-          )}
-          <Setting label={tr('Title ({0})', [current])} help={tr('the name of the portal, in its header and the browser tab')}>
-            <Input value={text('title')} onChange={setText('title')} placeholder={current !== def ? asLocalized(p.title, def)[def] : ''} disabled={ro} />
-          </Setting>
-          <Setting label={tr('Tagline ({0})', [current])} help={tr('below the title, on the home page')}>
-            <Input value={text('tagline')} onChange={setText('tagline')} placeholder={current !== def ? asLocalized(p.tagline, def)[def] : ''} disabled={ro} />
-          </Setting>
-          <Setting label={tr('Home page ({0})', [current])} help={tr('markdown, below the hero of the portal home')}>
-            <Seg
-              value={view}
-              onChange={setView}
-              options={[
-                { value: 'write', label: tr('Write') },
-                { value: 'preview', label: tr('Preview') },
-              ]}
-            />
-            {view === 'write' ? (
-              <CodeEditor key={current} value={text('homeMarkdown')} onChange={setText('homeMarkdown')} readOnly={ro} language="markdown" wordWrap="on" minHeight={260} maxHeight={640} ariaLabel={tr('home page ({0})', [current])} placeholder={tr('# Markdown')} />
-            ) : (
-              <div className="panel" style={{ background: 'var(--surface)' }}>
-                {text('homeMarkdown') ? <Markdown source={text('homeMarkdown')} /> : <span className="muted small">{tr('Nothing written yet.')}</span>}
-              </div>
-            )}
-          </Setting>
-        </div>
-      </div>
-      <PortalPages pages={p.pages || []} onChange={set('pages')} lang={current} def={def} ro={ro} />
-      <PortalCategories categories={p.categories || []} onChange={set('categories')} lang={current} def={def} ro={ro} />
-      <div className="card">
-        <div className="card-head">
-          <h3>{tr('Settings')}</h3>
-        </div>
-        <fieldset disabled={ro} className="ro-fieldset card-body">
-          <Setting label={tr('Languages')} help={tr('of the portal: its interface (English and French today) and its texts above; the documentation pages declare their own')}>
-            <TagsInput value={p.languages || []} onChange={set('languages')} />
-            <Select value={def} onChange={set('defaultLanguage')} options={languages.map((l) => ({ value: l, label: tr('default: {0}', [l]) }))} />
-          </Setting>
-          <Setting label={tr('Accent color')}>
-            <div className="row">
-              <input type="color" value={p.accentColor || '#0061bd'} onChange={(e) => set('accentColor')(e.target.value)} aria-label={tr('accent color')} />
-              <Input value={p.accentColor} onChange={set('accentColor')} mono />
-            </div>
-          </Setting>
-          <Setting label={tr('Logo url')}>
-            <Input value={p.logoUrl} onChange={set('logoUrl')} />
-          </Setting>
-          <Setting label={tr('Discovery')} help={tr('what the catalogue shows beside the categories: the reviews of the consumers who subscribed, and the real usage of each api (its subscribed applications, its calls of the last thirty days)')}>
-            <Switch checked={p.discovery?.reviews !== false} onChange={(v) => set('discovery')({ ...p.discovery, reviews: v })} label={tr('Consumer reviews')} />
-            <Switch checked={p.discovery?.usage !== false} onChange={(v) => set('discovery')({ ...p.discovery, usage: v })} label={tr('Real usage')} />
-          </Setting>
-          <Setting label={tr('Self signup')} help={tr('anyone can create an account and get a key on public plans')}>
-            <Switch checked={p.selfSignup} onChange={set('selfSignup')} />
-          </Setting>
-          <Setting label={tr('Identity provider')} help={tr('One IdP per portal: the people of this workspace sign in with it and join as consumers. Redirect uri: {0}/front/api/auth/oidc/callback', [String(ws.portal_url || '').replace(/\/$/, '')])}>
-            <Switch checked={p.oidc?.enabled} onChange={(v) => set('oidc')({ ...p.oidc, enabled: v })} label={tr('Sign in with an OpenID Connect provider')} />
-            {p.oidc?.enabled && (
-              <>
-                <Input value={p.oidc?.label} onChange={(v) => set('oidc')({ ...p.oidc, label: v })} placeholder={tr('button label, e.g. Corporate SSO')} />
-                <Input value={p.oidc?.issuer} onChange={(v) => set('oidc')({ ...p.oidc, issuer: v })} mono placeholder={tr('issuer')} />
-                <div className="row">
-                  <Input value={p.oidc?.clientId} onChange={(v) => set('oidc')({ ...p.oidc, clientId: v })} mono placeholder={tr('client id')} />
-                  <Input value={p.oidc?.clientSecret} onChange={(v) => set('oidc')({ ...p.oidc, clientSecret: v })} mono type="password" placeholder={tr('client secret')} />
-                </div>
-                <Switch checked={p.localLogin !== false} onChange={set('localLogin')} label={tr('Keep local accounts on this portal')} />
-              </>
-            )}
-          </Setting>
-        </fieldset>
-      </div>
-      {!ro && (
-        <div className="row">
-          <button className="btn primary" onClick={save}>
-            {tr('Save')}
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1110,7 +864,7 @@ export function WorkspaceSettingsPage({ tab }) {
   const { slug, ws, isAdmin } = useWs();
   const { navigate } = useRouter();
   // a producer reads the settings it may not change; catalogs and the export are an administrator's
-  const tabs = isAdmin ? ['general', 'portal', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'] : ['general', 'portal', 'members', 'teams', 'metadata', 'payments'];
+  const tabs = isAdmin ? ['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'] : ['general', 'members', 'teams', 'metadata', 'payments'];
   const allowed = tabs.includes(tab);
   return (
     <div className="page">
@@ -1118,12 +872,11 @@ export function WorkspaceSettingsPage({ tab }) {
       <div className="tabs mb-16">
         {tabs.map((t) => (
           <button key={t} className={tab === t ? 'on' : ''} onClick={() => navigate(`/ws/${slug}/settings/${t}`)}>
-            {t === 'portal' ? tr('Developer portal') : t === 'export' ? tr('Export / import') : tr(t[0].toUpperCase() + t.slice(1))}
+            {t === 'export' ? tr('Export / import') : tr(t[0].toUpperCase() + t.slice(1))}
           </button>
         ))}
       </div>
       {tab === 'general' && <General />}
-      {tab === 'portal' && <Portal />}
       {tab === 'members' && <Members />}
       {tab === 'teams' && <Teams />}
       {tab === 'metadata' && <MetadataSettings />}

@@ -169,7 +169,9 @@ describe('the design of a portal', () => {
     };
     expect(await ok('POST', ws('/portal/apply?publish=true&managed_by=catalog:design'), next)).toMatchObject({ action: 'updated', version: 3 });
     expect((await portal()).design).toMatchObject({ mode: 'templates', number: 3 });
-    expect((await call('POST', ws('/portal/apply'), { ...next, spec: { ...next.spec, css: { file: 'styles.css' } } })).status).toBe(400);
+    expect((await call('POST', ws('/portal/apply?managed_by=catalog:design'), { ...next, spec: { ...next.spec, css: { file: 'styles.css' } } })).status).toBe(400);
+    // a document without a source does not take the design from the one that owns it
+    expect((await call('POST', ws('/portal/apply'), next)).status).toBe(409);
     // owned by its source: the console does not edit it by hand
     const edit = await call('PUT', ws('/portal/design'), { texts: { title: { en: 'by hand' } } });
     expect(edit.status).toBe(409);
@@ -195,7 +197,11 @@ describe('the design of a portal', () => {
       await writeFile(join(dir, 'templates/home.en.md'), '# Built from a folder');
       const uploads = async () => (await ok('GET', ws('/audit?action=portal.asset.upload'))).total;
       const before = await uploads();
-      const pushed = await cli('portal', 'push', WS, dir, '--publish');
+      // the design is the catalog's: a push without a source is refused, unless it takes it over
+      const refused = await cli('portal', 'push', WS, dir);
+      expect(refused.code).not.toBe(0);
+      expect(refused.out).toContain('managed by catalog:design');
+      const pushed = await cli('portal', 'push', WS, dir, '--force', '--publish');
       expect(pushed.out).toMatch(new RegExp(`portal ${WS}: draft updated, version \\d+`));
       expect((await portal()).design.templates.home.en).toBe('# Built from a folder');
       // its assets were known: none was sent again

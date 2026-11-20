@@ -52,6 +52,7 @@ Last update: 2026-11-20.
   - The screens tour taken again (109 captures, `docs/screens.mdx`): the AsyncAPI tab and the events of the portal, the catalogue placement and the reviews, the threat protection of a plan, shared resources and dictionaries, the observability tops, the request log and a call, the security events, the analytics and the request log of the portal.
   - The demo feeds every dashboard (`scripts/demo-activity.js`, run by `mise run demo`): what the drift detection finds missing on the gateway is deployed again (the snapshot that ran) and provisioned again — the development gateway keeps nothing across a restart; an event-driven api with its AsyncAPI specification, a dictionary, a shared authorization server pinned behind its latest version, the categories and a review of the portal; calls through the gateway now, under the rate limits of the plans, and fourteen days of calls and security events fed to the ingester once.
   - The production image built and tried for the first time (`mise run image`, linux/amd64): the compiled executable on Debian slim, 297 MB (the former image, Bun and its `node_modules`, was 753 MB; git and what it pulls weigh most of the rest). Run beside the stack on databases of its own: migrations, bootstrap, healthcheck `healthy`, the gateway reached, the console (Monaco loaded on demand from the executable) and the portal served, the cli of the executable (`workspaces list`, `apply` reading a page file), `setup --dry-run` against the gateway.
+  - R-19 done, decided by the owner on 2026-11-20 (D-43 in the spec): a portal keeps the default template, is themed, or written as templates (Markdoc); a script only behind a flag off by default, its warning acknowledged; edited in the console, from a folder with the cli, from a catalog. Step C: the console page **Developer portal**, in the sidebar below Applications (the portal leaves the workspace settings; `/ws/<ws>/settings/portal` redirects) — its overview (the published version, the changes of the draft, publish, preview), settings (languages, signup, identity provider, categories), design (mode, texts, theme), home (markdown, blocks, or its template), pages, templates (with the tags and variables beside the editors), navigation, styles and scripts (allowing scripts behind the warning, ticked), assets (searched and paged, uploaded, the logo and favicon among them), versions (searched and paged on the server, restored), sync (the folder, the cli, the catalogs, portal.yaml to download); read only for producers, and for a design a source owns. A document without a source no longer takes the design from the source that owns it, unless forced (`apim portal push --force`).
   - R-19, step B: the portal **renders its design** — the accent in every mode; the colors (light and dark), font, radius, favicon, navigation and style sheet of a themed portal, its home made of blocks; the home, the overview of an api and the free pages of a portal written as templates in Markdoc (`@markdoc/markdoc`, MIT), the tags and variables declared in `web/shared/portal-tags.js` (catalogue, featured, categories, api-card, api-reference, plans, subscribe, button, callout, columns), no html, its links and images through the checks of the navigation, its errors shown in a preview only; the assets and pages of a design resolved in its markdown; a preview of the draft with its banner; the script loaded only where allowed. The page of the portal carries a **content security policy** (its own scripts, the inline ones by nonce, images and fonts of the web, no frame of another site, the web opened to scripts only where they are allowed), checked page by page in a browser: the reference (Scalar) only probes `Function` (zod) and falls back. Documented in `docs/portal-design.mdx`.
   - R-19, step D: the design of a portal **as a folder** — `portal.yaml` (`kind: Portal`) naming its home, pages and templates (`<name>.<lang>.md`), its `styles.css`, its `script.js` and its `assets/` —: `apim portal pull` writes it, `apim portal push [--publish] [--watch]` sends it into the draft (the assets the portal holds already named by their digest), and a remote catalog (git, S3, HTTP) reads the same folder, applies the design and publishes it unless it writes drafts only, then owns it (`test/portal-design.test.js`, `test/catalogs.test.js`).
   - R-19, step A: the **design of a portal** on the server — its mode (default, themed, templates), texts, theme (accent, logo, favicon, font, radius, light and dark colors), navigation, home (markdown, or blocks), pages, templates (home, api), css, script and assets —, a draft published by immutable versions (restored into the draft for a rollback), shown by the portal (the last published one; before any, the one its settings describe: nothing changes for a portal that has none); its assets kept by digest, served as images, fonts and style sheets only, an svg sandboxed, never a script; its script served only where the administrators allowed scripts, the warning acknowledged, in the audit trail; a preview link to the draft; its declarative document (`kind: Portal`) exported and applied, its assets inline, owned by its source (`test/portal-design.test.js`).
@@ -66,8 +67,7 @@ Last update: 2026-11-20.
 
 ## Next, in the proposed order
 
-1. **R-19** — portal templates, decided by the owner (2026-11-20): a portal keeps the default template, or is themed (N1), or written as templates (N2, Markdoc, the components of the portal as tags); a script only behind a flag off by default, with a loud warning; edited in the console, from files and the catalogs, a folder synchronised with the cli; a page of its own in the console. In four steps: A the design on the server ✅ · B the portal rendering it ✅ · C the page of the console · D the folder of the cli and the catalogs ✅.
-2. **R-54** — the event-driven apis (needs the event brokers extension on the gateway: a download).
+1. **R-54** — the event-driven apis (needs the event brokers extension on the gateway: a download).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -75,7 +75,7 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (5)**
+**Doable (4)**
 
 | # | Effort | What |
 |---|---|---|
@@ -83,7 +83,6 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
-| R-19 | L | Custom portal templates |
 
 
 **Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions).
@@ -94,7 +93,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
 
-**Total doable:** 3 M + 2 L ≈ 8 M. Without R-18, R-37 and R-21 (out of the MVP, or not a priority): 2 L ≈ 5 M (R-19, R-54).
+**Total doable:** 3 M + 1 L ≈ 5.5 M. Without R-18, R-37 and R-21 (out of the MVP, or not a priority): 1 L (R-54).
 
 ## Known issues
 
@@ -120,7 +119,6 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 
 ### Analytics and audit
@@ -207,7 +205,7 @@ waits for the data plane rather than working around it.
 
 | Topic | Status |
 |---|---|
-| Default portal template | ✅; customer templates: R-19 |
+| Default portal template | ✅; the design of a portal — a theme, templates in Markdoc, from the console, a folder or a catalog: ✅ (R-19, D-43) |
 | Analytics and reporting | ✅ attribution at ingestion, console and portal dashboards; one request id from the caller to the backends, found in the request log |
 | Lifecycle audit trail, changes and reads | ✅; webhook exporters ✅ (cursor, at least once, catch-up verified after an outage) |
 | The catalogue as a discovery system | ✅ editorial categories and featured apis, consumer reviews, real usage; filtered and sorted on them (`test/discovery.test.js`) |

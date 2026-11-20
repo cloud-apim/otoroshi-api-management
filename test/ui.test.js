@@ -168,7 +168,9 @@ describe.skipIf(!ready)('the console', () => {
       `${W}/observability?view=security`,
       `${W}/audit`,
       `${W}/notifications`,
-      ...['general', 'portal', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
+      `${W}/portal`,
+      ...['settings', 'design', 'home', 'pages', 'templates', 'navigation', 'styles', 'assets', 'versions', 'sync'].map((t) => `${W}/portal/${t}`),
+      ...['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
       ...['status', 'drift', 'connection', 'ingestion', 'setup'].map((t) => `/backoffice/gateway/${t}`),
       ...['workspaces', 'users', 'authentication', 'audit', 'tokens'].map((t) => `/backoffice/settings/${t}`),
     ];

@@ -1,8 +1,11 @@
 // The parts of Monaco the console uses: the editor and its contributions, json (with its worker),
-// yaml, markdown, and the xml / html colouring of response bodies. Generated from monaco-editor/esm/vs/editor/editor.main.js without the other languages
+// yaml, markdown, the colouring of css and javascript (the style sheet and the script of a portal),
+// and the xml / html colouring of response bodies. Generated from monaco-editor/esm/vs/editor/editor.main.js without the other languages
 // and the css / html / typescript services; regenerate it when upgrading monaco-editor.
 
+import '@monaco/languages/definitions/css/register.js';
 import '@monaco/languages/definitions/html/register.js';
+import '@monaco/languages/definitions/javascript/register.js';
 import '@monaco/languages/definitions/markdown/register.js';
 import '@monaco/languages/definitions/xml/register.js';
 import '@monaco/languages/definitions/yaml/register.js';

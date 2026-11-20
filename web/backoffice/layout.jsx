@@ -36,7 +36,9 @@ function SearchPalette({ onClose }) {
           { kind: 'page', name: tr('Observability'), to: `/ws/${ws}/observability` },
           { kind: 'page', name: tr('Audit'), to: `/ws/${ws}/audit` },
           { kind: 'page', name: tr('Workspace settings'), to: `/ws/${ws}/settings` },
-          { kind: 'page', name: tr('Developer portal settings'), to: `/ws/${ws}/settings/portal` },
+          { kind: 'page', name: tr('Developer portal'), to: `/ws/${ws}/portal` },
+          { kind: 'page', name: tr('Developer portal settings'), to: `/ws/${ws}/portal/settings` },
+          { kind: 'page', name: tr('Developer portal design'), to: `/ws/${ws}/portal/design` },
           { kind: 'page', name: tr('Notifications'), to: `/ws/${ws}/notifications` },
           { kind: 'page', name: tr('Gateway'), to: `/gateway` },
           { kind: 'page', name: tr('Global settings'), to: `/settings` },
@@ -371,6 +373,9 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}/applications`} icon="apps">
               {tr('Applications')}
             </NavLink>
+            <NavLink to={`/ws/${ws}/portal`} icon="globe">
+              {tr('Developer portal')}
+            </NavLink>
             <NavLink to={`/ws/${ws}/observability`} icon="chart">
               {tr('Observability')}
             </NavLink>
@@ -380,10 +385,6 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}/settings`} icon="settings">
               {tr('Workspace settings')}
             </NavLink>
-            <a className="navlink" href={workspace.portal_url} target="_blank" rel="noreferrer">
-              <Icon name="external" />
-              <span>{tr('Developer portal')}</span>
-            </a>
           </>
         )}
         <div className="sidebar-bottom">

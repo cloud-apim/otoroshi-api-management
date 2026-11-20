@@ -48,9 +48,10 @@ ${SETUP_HELP}
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
   portal pull <ws> [dir]               the design of the portal (its draft) into a folder: portal.yaml, its
                                        pages, templates, styles, script and assets beside (default ./portal)
-  portal push <ws> [dir] [--publish] [--comment c] [--watch]
+  portal push <ws> [dir] [--publish] [--comment c] [--watch] [--force]
                                        the folder into the draft of the design (and a version with --publish);
-                                       --watch pushes again on every change, and prints the preview link
+                                       --watch pushes again on every change, and prints the preview link;
+                                       --force takes over a design a catalog owns
   portal preview <ws>                  a link to the portal showing the draft, for an hour
   portal publish <ws> [--comment c]    a version of the design, from the draft
   portal versions <ws>
@@ -174,7 +175,7 @@ async function pullPortal(w, dir) {
 
 // a folder pushed into the draft of the design: its files inlined, the assets the portal already holds
 // named by their digest only
-async function pushPortal(w, dir, { publish = false, comment = '' } = {}) {
+async function pushPortal(w, dir, { publish = false, comment = '', force = false } = {}) {
   const file = join(dir, 'portal.yaml');
   if (!existsSync(file)) throw new Error(`no portal.yaml in ${dir}: apim portal pull ${w} ${dir} writes one`);
   const doc = YAML.parse(readFileSync(file, 'utf8'));
@@ -189,6 +190,7 @@ async function pushPortal(w, dir, { publish = false, comment = '' } = {}) {
   const q = new URLSearchParams();
   if (publish) q.set('publish', 'true');
   if (comment) q.set('comment', comment);
+  if (force) q.set('force', 'true');
   const res = await call('POST', `/workspaces/${w}/portal/apply?${q}`, doc);
   return `portal ${w}: draft ${res.action}${res.version ? `, version ${res.version}` : ''}`;
 }
@@ -342,8 +344,9 @@ async function main() {
       const dir = a2 && !String(a2).startsWith('-') ? a2 : 'portal';
       if (sub === 'pull') return console.log(await pullPortal(a1, dir));
       if (sub === 'push') {
-        const once = () => pushPortal(a1, dir, { publish: !!flags.publish, comment: flags.comment }).then(console.log, (e) => console.error(e.message));
-        if (!flags.watch) return console.log(await pushPortal(a1, dir, { publish: !!flags.publish, comment: flags.comment }));
+        const opts = { publish: !!flags.publish, comment: flags.comment, force: !!flags.force };
+        const once = () => pushPortal(a1, dir, opts).then(console.log, (e) => console.error(e.message));
+        if (!flags.watch) return console.log(await pushPortal(a1, dir, opts));
         await once();
         console.log(`preview: ${(await call('POST', `${ws(a1)}/portal/preview`)).url}`);
         console.log(`watching ${dir} — every change is pushed to the draft`);

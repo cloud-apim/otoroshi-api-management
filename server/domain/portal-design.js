@@ -22,6 +22,7 @@ import { config } from '../config.js';
 import { audit } from './audit.js';
 import { diff } from './diff.js';
 import { normalizePages } from './identity.js';
+import { likePattern } from '../http/paging.js';
 
 export const PORTAL_KIND = 'Portal';
 export const MODES = ['default', 'themed', 'templates'];
@@ -219,10 +220,21 @@ export async function publishedDesign(ws) {
 }
 
 export async function designState(ws) {
-  const [draft, published, versions] = await Promise.all([draftOf(ws), publishedDesign(ws), db`select count(*)::int as n from portal_versions where workspace_id = ${ws.id}`]);
+  const [draft, published, versions, last] = await Promise.all([
+    draftOf(ws),
+    publishedDesign(ws),
+    db`select count(*)::int as n from portal_versions where workspace_id = ${ws.id}`,
+    db`select v.published_at, v.comment, u.email as published_by_email from portal_versions v left join users u on u.id = v.published_by
+      where v.workspace_id = ${ws.id} order by v.number desc limit 1`,
+  ]);
+  // the assets of the draft, their type and size (not their bytes)
+  const hashes = [...new Set(Object.values(draft.assets))];
+  const rows = hashes.length ? await db`select hash, content_type, size from portal_assets where workspace_id = ${ws.id} and hash in ${db(hashes)}` : [];
+  const byHash = new Map(rows.map((r) => [r.hash, r]));
   return {
     draft,
-    published: { number: published.number, design: published.design },
+    assets: Object.entries(draft.assets).map(([path, hash]) => ({ path, hash, contentType: byHash.get(hash)?.content_type || null, size: byHash.get(hash)?.size ?? null })),
+    published: { number: published.number, design: published.design, ...(last[0] || {}) },
     changes: diff(published.design, draft).slice(0, 200),
     versions: versions[0].n,
     managedBy: ws.portal?.designManagedBy || null,
@@ -257,11 +269,14 @@ export async function publishDesign(ctx, ws, { comment = '' } = {}) {
   return { number: row.number, published_at: row.published_at, comment: row.comment };
 }
 
-export async function listVersions(workspaceId, { limit = 50, offset = 0 } = {}) {
+// searched by number, comment, mode and who published
+export async function listVersions(workspaceId, { limit = 50, offset = 0, q = '' } = {}) {
+  const pattern = q ? likePattern(q.replace(/^v/i, '')) : null;
+  const matches = db`(${pattern}::text is null or v.number::text ilike ${pattern} or v.comment ilike ${pattern} or v.design->>'mode' ilike ${pattern} or coalesce(u.email, '') ilike ${pattern})`;
   const [items, [{ total }]] = await Promise.all([
     db`select v.number, v.comment, v.published_at, u.email as published_by_email, v.design->>'mode' as mode
-      from portal_versions v left join users u on u.id = v.published_by where v.workspace_id = ${workspaceId} order by v.number desc limit ${limit} offset ${offset}`,
-    db`select count(*)::int as total from portal_versions where workspace_id = ${workspaceId}`,
+      from portal_versions v left join users u on u.id = v.published_by where v.workspace_id = ${workspaceId} and ${matches} order by v.number desc limit ${limit} offset ${offset}`,
+    db`select count(*)::int as total from portal_versions v left join users u on u.id = v.published_by where v.workspace_id = ${workspaceId} and ${matches}`,
   ]);
   return { items, total, limit, offset };
 }
@@ -402,10 +417,13 @@ export async function portalDocument(ws) {
 
 // a document applied: its assets stored (given inline) or found (given by digest), its draft written;
 // a file it names is the client's to inline (the cli, a remote catalog)
-export async function applyPortalDocument(ctx, ws, doc, { managedBy = null, publish = false, comment = '' } = {}) {
+export async function applyPortalDocument(ctx, ws, doc, { managedBy = null, publish = false, comment = '', force = false } = {}) {
   if (doc?.kind !== PORTAL_KIND) throw badRequest(`expected kind ${PORTAL_KIND}`);
   if (doc.metadata?.name && doc.metadata.name !== ws.slug) throw badRequest(`this document is the portal of ${doc.metadata.name}, not of ${ws.slug}`);
-  if (ws.portal?.designManagedBy && managedBy && ws.portal.designManagedBy !== managedBy) throw badRequest(`the design of this portal is managed by ${ws.portal.designManagedBy}, not ${managedBy}`);
+  const owner = ws.portal?.designManagedBy;
+  if (owner && managedBy && owner !== managedBy) throw badRequest(`the design of this portal is managed by ${owner}, not ${managedBy}`);
+  // a design a source owns is not taken from it by a document without a source, unless asked
+  if (owner && !managedBy && !force) throw conflict(`the design of this portal is managed by ${owner}: edit it at its source, or take it over (force)`, { managed_by: owner });
   const spec = isObject(doc.spec) ? doc.spec : {};
   const assets = {};
   for (const a of Array.isArray(spec.assets) ? spec.assets : []) {

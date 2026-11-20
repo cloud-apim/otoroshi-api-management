@@ -18,6 +18,7 @@ import { ObservabilityPage } from './pages/Observability.jsx';
 import { AuditPage } from './pages/Audit.jsx';
 import { NotificationsPage } from './pages/Notifications.jsx';
 import { WorkspaceSettingsPage } from './pages/WorkspaceSettings.jsx';
+import { PortalPage } from './pages/Portal.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
 import { SubscriptionsPage } from './pages/Subscriptions.jsx';
@@ -29,6 +30,15 @@ import { tr, Tr } from '../shared/i18n.jsx';
 initTheme();
 
 const LAST_WS = 'apim.workspace';
+
+// an address that moved, kept working
+function Redirect({ to }) {
+  const { navigate } = useRouter();
+  useEffect(() => {
+    navigate(to, { replace: true });
+  }, [to]);
+  return <Loading />;
+}
 
 // a consumer signed in to the console: its place is the developer portal of its workspaces
 function PortalsOnly({ user, portals, onSignedOut }) {
@@ -204,7 +214,10 @@ function App() {
             ['/ws/:ws/observability', () => <ObservabilityPage />],
             ['/ws/:ws/audit', () => <AuditPage />],
             ['/ws/:ws/notifications', () => <NotificationsPage />],
+            ['/ws/:ws/portal', () => <PortalPage section="overview" />],
+            ['/ws/:ws/portal/:section', (p) => <PortalPage section={p.section} />],
             ['/ws/:ws/settings', () => <WorkspaceSettingsPage tab="general" />],
+            ['/ws/:ws/settings/portal', (p) => <Redirect to={`/ws/${p.ws}/portal/settings`} />],
             ['/ws/:ws/settings/:tab', (p) => <WorkspaceSettingsPage tab={p.tab} />],
             ['/gateway', () => <GatewayPage tab="status" />],
             ['/gateway/:tab', (p) => <GatewayPage tab={p.tab} />],

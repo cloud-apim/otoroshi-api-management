@@ -442,7 +442,7 @@ r.get('/workspaces/:ws/portal/document', async ({ ctx, params }) => {
 });
 r.post('/workspaces/:ws/portal/apply', async ({ ctx, params, body, query }) => {
   const c = await ws(ctx, params, ['admin']);
-  return portalDesign.applyPortalDocument(c, c.workspace, body, { managedBy: query.get('managed_by') || null, publish: query.get('publish') === 'true', comment: query.get('comment') || '' });
+  return portalDesign.applyPortalDocument(c, c.workspace, body, { managedBy: query.get('managed_by') || null, publish: query.get('publish') === 'true', comment: query.get('comment') || '', force: query.get('force') === 'true' });
 });
 // scripts on the portal: off by default; allowing them acknowledges what they can do
 r.get('/workspaces/:ws/portal/scripts', async ({ ctx, params }) => {
