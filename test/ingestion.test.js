@@ -191,9 +191,48 @@ describe('the retention', () => {
     expect((await adb`select count(*)::int as n from raw_events where payload -> 'route' -> 'metadata' ->> 'Otoroshi-Api-Ref' = ${apiId} and at < ${new Date(Date.now() - 7 * DAY)}`)[0].n).toBe(0);
   });
 
+  test('past the hourly retention the rollups are compacted by the day: counts and histograms merged, nothing lost; the dashboards read whole days', async () => {
+    const [{ workspace_id: wsId }] = await adb`select workspace_id from calls where api_id = ${apiId} limit 1`;
+    const day = new Date(Math.floor((Date.now() - 120 * DAY) / DAY) * DAY);
+    const hourly = (h, calls, errors, durations) =>
+      adb`insert into call_rollups (hour, workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class, calls, errors, duration_sum, overhead_sum, bytes_in, bytes_out, durations)
+        values (${new Date(day.getTime() + h * 3600e3)}, ${wsId}, ${apiId}, '', '', '', 'GET', '/v1/compact', 200, ${calls}, ${errors}, ${calls * 10}, ${calls}, 100, 1000, ${durations})`;
+    await hourly(2, 3, 1, { 3: 2, 6: 1 });
+    await hourly(9, 5, 0, { 3: 5 });
+    await hourly(17, 2, 2, { 9: 2 });
+    // a range that starts at noon of that day: read from its first whole day, by the day
+    const filter = `/workspaces/${WS}/analytics?api=${apiId}&from=${new Date(day.getTime() + 12 * 3600e3).toISOString()}&to=${new Date(day.getTime() + 2 * DAY).toISOString()}`;
+    const before = await ok('GET', filter);
+    expect(before).toMatchObject({ source: 'rollups', daily: true, range: { step: DAY } });
+    expect(before.totals).toMatchObject({ calls: 10, errors: 3 });
+
+    await retention();
+    const rows = await adb`select * from call_rollups where api_id = ${apiId} and path = '/v1/compact'`;
+    expect(rows.length).toBe(1);
+    expect(new Date(rows[0].hour).getTime()).toBe(day.getTime());
+    expect([Number(rows[0].calls), Number(rows[0].errors), Number(rows[0].duration_sum)]).toEqual([10, 3, 100]);
+    expect(Object.fromEntries(Object.entries(rows[0].durations).map(([k, v]) => [k, Number(v)]))).toEqual({ 3: 7, 6: 1, 9: 2 });
+    // the dashboard says the same
+    const after = await ok('GET', filter);
+    expect(after.totals).toMatchObject({ calls: 10, errors: 3, p95_ms: before.totals.p95_ms });
+    expect(after.series.reduce((s, r) => s + r.calls, 0)).toBe(10);
+
+    // a late hourly row in that day is compacted at the next run, added to the day
+    await hourly(20, 4, 0, { 3: 4 });
+    await retention();
+    const again = await adb`select calls, durations from call_rollups where api_id = ${apiId} and path = '/v1/compact'`;
+    expect(again.length).toBe(1);
+    expect(Number(again[0].calls)).toBe(14);
+    expect(Number(again[0].durations['3'])).toBe(11);
+  });
+
   test('the settings are checked', async () => {
     const res = await fetch(`${ROOT}/api/settings/ingest`, { method: 'PUT', headers: { authorization: 'Bearer ingestion-test-token', 'content-type': 'application/json' }, body: JSON.stringify({ retention: { callsDays: 0 } }) });
     expect(res.status).toBe(400);
+    // the rollups are hourly at least as long as the calls are kept
+    const hourly = await fetch(`${ROOT}/api/settings/ingest`, { method: 'PUT', headers: { authorization: 'Bearer ingestion-test-token', 'content-type': 'application/json' }, body: JSON.stringify({ retention: { hourlyDays: 10 } }) });
+    expect(hourly.status).toBe(400);
+    expect((await hourly.json()).error).toContain('retention.hourlyDays');
   });
 });
 

@@ -159,10 +159,17 @@ export function Dashboard({ d, fixed = {}, loading = false }) {
       </div>
       {rollups && (
         <Callout kind="info">
-          <Tr
-            text={'Each call is kept {0} days: before {1}, this range is read from the hourly rollups — its counts are exact, its percentiles approximate, its paths templated.'}
-            args={[d.retention.callsDays, fmtDate(d.retention.from)]}
-          />
+          {d.daily ? (
+            <Tr
+              text={'Each call is kept {0} days: before {1}, this range is read from the rollups — by the hour for {2} days, by the day before, so the range starts with its first whole day — its counts are exact, its percentiles approximate, its paths templated.'}
+              args={[d.retention.callsDays, fmtDate(d.retention.from), d.retention.hourlyDays]}
+            />
+          ) : (
+            <Tr
+              text={'Each call is kept {0} days: before {1}, this range is read from the hourly rollups — its counts are exact, its percentiles approximate, its paths templated.'}
+              args={[d.retention.callsDays, fmtDate(d.retention.from)]}
+            />
+          )}
         </Callout>
       )}
       {!t.calls ? (

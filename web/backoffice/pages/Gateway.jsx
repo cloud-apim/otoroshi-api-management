@@ -383,12 +383,24 @@ function Ingestion() {
           {status.data?.ingest && (
             <div className="grid-4">
               <StatTile label={tr('Calls kept')} value={fmtNumber(status.data.ingest.calls)} hint={since(status.data.ingest.oldest_at, tr('{0} not rolled up yet', [fmtNumber(status.data.ingest.rollup_pending)]))} />
-              <StatTile label={tr('Hourly rollups')} value={fmtNumber(status.data.ingest.rollups)} hint={since(status.data.ingest.rollups_oldest_at, tr('the dashboards beyond the calls'))} />
+              <StatTile
+                label={tr('Rollups')}
+                value={fmtNumber(status.data.ingest.rollups)}
+                hint={since(status.data.ingest.rollups_oldest_at, status.data.ingest.daily_before ? tr('by the day before {0}, by the hour since', [fmtDate(status.data.ingest.daily_before)]) : tr('the dashboards beyond the calls'))}
+              />
               <StatTile label={tr('Raw events')} value={fmtNumber(status.data.ingest.raw)} hint={since(status.data.ingest.raw_oldest_at, current.storeRaw ? tr('{0} % of the requests, their errors always', [pct(current.raw.sampleRate)]) : tr('the raw path is off'))} />
               <StatTile
                 label={tr('Last run')}
                 value={status.data.ingest.last_run ? fmtRelative(status.data.ingest.last_run.at) : tr('never')}
-                hint={status.data.ingest.last_run ? tr('{0} rolled up, {1} deleted', [fmtNumber(status.data.ingest.last_run.rolled?.calls || 0), fmtNumber(Object.values(status.data.ingest.last_run.deleted || {}).reduce((a, b) => a + b, 0))]) : tr('every 5 minutes')}
+                hint={
+                  status.data.ingest.last_run
+                    ? tr('{0} rolled up, {1} deleted, {2} compacted', [
+                        fmtNumber(status.data.ingest.last_run.rolled?.calls || 0),
+                        fmtNumber(Object.values(status.data.ingest.last_run.deleted || {}).reduce((a, b) => a + b, 0)),
+                        fmtNumber(status.data.ingest.last_run.compacted?.before || 0),
+                      ])
+                    : tr('every 5 minutes')
+                }
               />
             </div>
           )}
@@ -471,7 +483,8 @@ function Ingestion() {
             <div className="card-body">
               {[
                 ['callsDays', tr('Calls'), tr('each call: the request log, the exact dashboards. Deleted once rolled up')],
-                ['rollupsDays', tr('Hourly rollups'), tr('the calls counted by hour, api, plan, subscription, application, path and status class: the dashboards beyond the calls')],
+                ['hourlyDays', tr('Hourly rollups'), tr('the calls counted by hour, api, plan, subscription, application, path and status class: the dashboards beyond the calls. Past it, the rollups are compacted by the day')],
+                ['rollupsDays', tr('Daily rollups, until'), tr('the rollups compacted by the day — their counts and their histograms merged, nothing lost but the hour —, kept until then: how far back the dashboards reach')],
                 ['aiDays', tr('AI and MCP usage'), tr('each audit of the AI gateway and of MCP; its tokens are rolled up by the hour too')],
                 ['rawDays', tr('Raw events'), tr('the path of the diagnosis')],
               ].map(([key, label, help]) => (

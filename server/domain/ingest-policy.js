@@ -23,7 +23,8 @@ export const DEFAULTS = {
   raw: { sampleRate: 1, keepErrors: true, headers: 'keep' },
   // by default, the least that still serves: an address cut to its network, a user as a pseudonym
   privacy: { ip: 'truncate', user: 'hash', userAgent: 'keep', paths: 'keep' },
-  retention: { callsDays: 30, rollupsDays: 400, aiDays: 90, rawDays: 7 },
+  // the rollups are hourly for hourlyDays, then daily until rollupsDays
+  retention: { callsDays: 30, hourlyDays: 90, rollupsDays: 400, aiDays: 90, rawDays: 7 },
 };
 
 const num = (v, min, max, name) => {
@@ -56,6 +57,8 @@ export function normalize(input = {}, current = {}) {
   s.privacy.paths = oneOf(s.privacy.paths, PATH_MODES, 'privacy.paths');
   s.retention.callsDays = num(s.retention.callsDays, 1, 3650, 'retention.callsDays');
   s.retention.rollupsDays = num(s.retention.rollupsDays, s.retention.callsDays, 3650, 'retention.rollupsDays');
+  // hourly at least as long as the calls are kept; as long as the rollups, they stay hourly
+  s.retention.hourlyDays = num(s.retention.hourlyDays, s.retention.callsDays, 3650, 'retention.hourlyDays');
   s.retention.aiDays = num(s.retention.aiDays, 1, 3650, 'retention.aiDays');
   s.retention.rawDays = num(s.retention.rawDays, 1, 3650, 'retention.rawDays');
   // the key of the hashes: made once, kept; a new one (rotateKey) breaks the link with the past

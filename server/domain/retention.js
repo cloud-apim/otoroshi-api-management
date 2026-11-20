@@ -2,7 +2,8 @@
 //  - the calls, and the AI usage, are rolled up by the hour, incrementally — by id, so that a late
 //    event is counted in its hour — then deleted past their retention, never before they are
 //    rolled up;
-//  - the rollups are kept for `rollupsDays`, the raw path for `rawDays`.
+//  - the rollups are hourly for `hourlyDays`, then compacted into one row per day — their counts and
+//    their histograms merged, a day of UTC —, and kept for `rollupsDays`; the raw path for `rawDays`.
 // Run by the ingester (one runner at a time: an advisory lock), and on demand.
 
 import { adb, db } from '../db/index.js';
@@ -154,6 +155,98 @@ export async function sweep(p, now = new Date()) {
   };
 }
 
+// ---------------------------------------------------------------- compaction
+
+const DAY = 86400e3;
+const startOfDay = (d) => new Date(Math.floor(new Date(d).getTime() / DAY) * DAY);
+// days compacted at most by a run: a first run on a long history catches up over a few runs
+const DAYS_PER_RUN = 31;
+
+// the start of the daily rollups: the days before it are compacted (the next runs catch up a late
+// event, or a long history). Null while the rollups stay hourly as long as they are kept
+export function dailyHorizon(p, now = new Date()) {
+  if (p.retention.hourlyDays >= p.retention.rollupsDays) return null;
+  return startOfDay(now.getTime() - p.retention.hourlyDays * DAY);
+}
+
+// the hourly rollups of a day merged into one row per key, at the start of the day, in one
+// transaction under the lock of the rollups: the counts summed, the histograms of the durations
+// merged bucket by bucket. Nothing is lost: a daily row says what its hours said
+async function compactDay(day) {
+  const next = new Date(day.getTime() + DAY);
+  return adb.begin(async (tx) => {
+    const [{ locked }] = await tx`select pg_try_advisory_xact_lock(${LOCK}) as locked`;
+    if (!locked) return null;
+    const [{ calls }] = await tx`select count(*)::int as calls from call_rollups where hour > ${day} and hour < ${next}`;
+    const [{ ai }] = await tx`select count(*)::int as ai from ai_rollups where hour > ${day} and hour < ${next}`;
+    const out = { before: 0, after: 0 };
+    if (calls) {
+      await tx`create temp table compacted_calls on commit drop as
+        select s.*, coalesce(h.durations, '{}'::jsonb) as durations from (
+          select workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class,
+            sum(calls) as calls, sum(errors) as errors, sum(duration_sum) as duration_sum, sum(overhead_sum) as overhead_sum,
+            sum(bytes_in) as bytes_in, sum(bytes_out) as bytes_out
+          from call_rollups where hour >= ${day} and hour < ${next}
+          group by workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class
+        ) s left join (
+          select workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class, jsonb_object_agg(b, n) as durations from (
+            select workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class, e.key as b, sum(e.value::bigint) as n
+            from call_rollups, jsonb_each_text(durations) e where hour >= ${day} and hour < ${next}
+            group by workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class, e.key
+          ) x group by workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class
+        ) h using (workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class)`;
+      const gone = await tx`delete from call_rollups where hour >= ${day} and hour < ${next}`;
+      const [{ n }] = await tx`with ins as (
+          insert into call_rollups (hour, workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class,
+            calls, errors, duration_sum, overhead_sum, bytes_in, bytes_out, durations)
+          select ${day}, workspace_id, api_id, plan_id, subscription_id, application_id, method, path, status_class,
+            calls, errors, duration_sum, overhead_sum, bytes_in, bytes_out, durations from compacted_calls returning 1
+        ) select count(*)::int as n from ins`;
+      out.before += gone.count;
+      out.after += n;
+    }
+    if (ai) {
+      await tx`create temp table compacted_ai on commit drop as
+        select workspace_id, api_id, subscription_id, type, provider, model, tool,
+          sum(events) as events, sum(input_tokens) as input_tokens, sum(output_tokens) as output_tokens, sum(cost_micro_usd) as cost_micro_usd
+        from ai_rollups where hour >= ${day} and hour < ${next} group by workspace_id, api_id, subscription_id, type, provider, model, tool`;
+      const gone = await tx`delete from ai_rollups where hour >= ${day} and hour < ${next}`;
+      const [{ n }] = await tx`with ins as (
+          insert into ai_rollups (hour, workspace_id, api_id, subscription_id, type, provider, model, tool, events, input_tokens, output_tokens, cost_micro_usd)
+          select ${day}, workspace_id, api_id, subscription_id, type, provider, model, tool, events, input_tokens, output_tokens, cost_micro_usd from compacted_ai returning 1
+        ) select count(*)::int as n from ins`;
+      out.before += gone.count;
+      out.after += n;
+    }
+    return out;
+  });
+}
+
+// the days before the daily horizon whose rollups are still hourly, compacted from the oldest: the
+// partial indexes of the hourly rows find it without reading the days already daily
+export async function compactRollups(p, now = new Date()) {
+  const horizon = dailyHorizon(p, now);
+  const out = { days: 0, before: 0, after: 0 };
+  if (!horizon) return out;
+  for (let i = 0; i < DAYS_PER_RUN; i++) {
+    const [{ hour }] = await adb`select least(
+        (select min(hour) from call_rollups where date_trunc('day', hour at time zone 'UTC') <> (hour at time zone 'UTC') and hour < ${horizon}),
+        (select min(hour) from ai_rollups where date_trunc('day', hour at time zone 'UTC') <> (hour at time zone 'UTC') and hour < ${horizon})) as hour`;
+    if (!hour) break;
+    const r = await compactDay(startOfDay(hour));
+    if (r === null) break;
+    out.days++;
+    out.before += r.before;
+    out.after += r.after;
+  }
+  return out;
+}
+
+// where the rollups become daily: before it, a dashboard reads whole days
+export async function dailyBefore() {
+  return dailyHorizon(await policy());
+}
+
 // a run: rolled up, then swept; its outcome kept for the console
 export async function runRetention({ now = new Date(), settleMs } = {}) {
   const p = await policy();
@@ -163,7 +256,8 @@ export async function runRetention({ now = new Date(), settleMs } = {}) {
   // the usage of the subscriptions with a usage price, pushed to the payment provider
   const usage = await pushUsage(settleMs === undefined ? {} : { settleMs }).catch((e) => ({ error: e.message }));
   const deleted = await sweep(p, now);
-  const run = { at: new Date().toISOString(), ms: Date.now() - started, rolled, usage, deleted };
+  const compacted = await compactRollups(p, now).catch((e) => ({ error: e.message }));
+  const run = { at: new Date().toISOString(), ms: Date.now() - started, rolled, usage, deleted, compacted };
   await db`insert into settings (key, value) values ('ingest.last_run', ${run}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   return run;
 }

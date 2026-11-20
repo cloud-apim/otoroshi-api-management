@@ -52,6 +52,7 @@ Last update: 2026-11-20.
   - The screens tour taken again (109 captures, `docs/screens.mdx`): the AsyncAPI tab and the events of the portal, the catalogue placement and the reviews, the threat protection of a plan, shared resources and dictionaries, the observability tops, the request log and a call, the security events, the analytics and the request log of the portal.
   - The demo feeds every dashboard (`scripts/demo-activity.js`, run by `mise run demo`): what the drift detection finds missing on the gateway is deployed again (the snapshot that ran) and provisioned again — the development gateway keeps nothing across a restart; an event-driven api with its AsyncAPI specification, a dictionary, a shared authorization server pinned behind its latest version, the categories and a review of the portal; calls through the gateway now, under the rate limits of the plans, and fourteen days of calls and security events fed to the ingester once.
   - The production image built and tried for the first time (`mise run image`, linux/amd64): the compiled executable on Debian slim, 297 MB (the former image, Bun and its `node_modules`, was 753 MB; git and what it pulls weigh most of the rest). Run beside the stack on databases of its own: migrations, bootstrap, healthcheck `healthy`, the gateway reached, the console (Monaco loaded on demand from the executable) and the portal served, the cli of the executable (`workspaces list`, `apply` reading a page file), `setup --dry-run` against the gateway.
+  - R-48: the rollups compacted by the day past `hourlyDays` (90 by default, a setting of Gateway › Ingestion): one row per key and per day of UTC, the counts summed and the histograms of the durations merged — nothing lost but the hour —, the calls and the AI usage alike, a month of days at most per run, from the oldest, found by partial indexes on the hourly rows (a late event in a compacted day is compacted at the next run). A range that reaches them is read by whole days. Measured on a year of a workspace of 30 subscriptions × 4 paths (1.9 million hourly rows): the twelve-month dashboard took 12.7 s; its queries now run in parallel (4.2 s), and compacted it holds 409 thousand rows and takes 0.9 s, its figures identical (`test/ingestion.test.js`). The dashboards on the calls run their queries in parallel too.
   - R-35 settled by the owner: monetisation is in the MVP as implemented, optional; the team holds the billing account; a connector after Stripe waits for a need (Lago first). A paid plan is now published only once the workspace has linked its Stripe account (or with payments on): the draft says why, the publication is refused (`test/payments.test.js`).
   - R-29 settled by the owner: publishing a shared policy group or a shared resource republishes no api — the snapshot stays the document that was tested —, with two aids so that a fix travels: the teams of the apis behind are notified (one notification per team, the apis listed, a link to the group or the resource), and **Upgrade the N behind** moves them to the latest version, each by its own draft and, on demand, its own snapshot and deployment where it runs; an api managed by a source, not managed by the caller, or whose draft holds other unpublished changes is reported, not forced (`POST …/upgrade`, `apim policy-groups|shared-resources upgrade`, `test/pins.test.js`). The remote catalogs keep their mode per catalog, and the defaults as they are.
   - R-28 settled by the owner: the declarative format becomes a contract, with four changes. The version is `spec.version`, as in a Kubernetes resource (`metadata.version` still read, the two differing refused). The policy groups and the shared resources a document pins are named — an id still accepted —, the export writes names, so a document moves between installations; a name is unique in a workspace. A document that lists its pages is their truth (a page it no longer lists is deleted; without `pages`, they are left alone). The content of a page can be a file beside the document, read by `apim apply` and by the remote catalogs (git, S3, HTTP), within the source (`test/declarative.test.js`, `test/catalogs.test.js`).
@@ -62,9 +63,8 @@ Last update: 2026-11-20.
 
 ## Next, in the proposed order
 
-1. **R-48** — compaction of old rollups (only if the volume calls for it).
-
-Then the large ones: R-19, and the event-driven apis (R-54).
+1. **R-19** — portal templates: an instruction first (what a template is, where it lives, how it stays isolated from the session of the consumers), for the owner to decide, then the code.
+2. **R-54** — the event-driven apis (needs the event brokers extension on the gateway: a download).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -72,12 +72,11 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (6)**
+**Doable (5)**
 
 | # | Effort | What |
 |---|---|---|
 | R-54 | L | Event-driven apis: the events of the event brokers extension (owner's request) |
-| R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 | R-18 | M | Token and AI budget plans (out of the MVP for now) |
@@ -92,7 +91,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
 
-**Total doable:** 1 S + 3 M + 2 L ≈ 8 M. Without R-18, R-37, R-21 and R-19 (out of the MVP, or not a priority): ≈ 3 M (R-54, R-48).
+**Total doable:** 3 M + 2 L ≈ 8 M. Without R-18, R-37 and R-21 (out of the MVP, or not a priority): 2 L ≈ 5 M (R-19, R-54).
 
 ## Known issues
 
@@ -126,12 +125,6 @@ waits for the data plane rather than working around it.
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-54 | D-32 | **Event-driven apis** (owner's request, 2026-11-20): take into account the events of the `otoroshi-event-brokers-extension` (Kafka, RabbitMQ, Pulsar, Redis, MQTT, Artemis behind routes: an HTTP ingester, HTTP/SSE/websocket consumers, webhooks), so that an api can be event-driven in time — its ingestion, its analytics, its plans. To instruct first: today the extension sends `EventBrokerConnectionEvent` and `EventBrokerWebhookDeliveryFailedAlert` only, nothing per event published or consumed — what a usage, a quota or a bill of an event api would count; to verify on a gateway running the extension, and to log as a gap if so | L | |
-
-### Monetisation
-
-| # | Spec | What is missing | Size | Upstream |
-|---|---|---|---|---|
-| R-48 | D-33 | A daily **compaction** of the hourly rollups past a few months, should their volume call for it | S | |
 
 ### Robustness and security
 
@@ -187,7 +180,7 @@ waits for the data plane rather than working around it.
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | one credential for several apis: R-12, waiting for G-23 |
 | D-32 MVP scope, captured events | ✅ | GatewayEvent, CloudApimSecurityEvent, LLMUsageAudit and McpAudit verified with real traffic (`test/ai-usage.test.js`, `test/threat-protection.test.js`); the events of the event brokers extension: R-54 |
-| D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19 |
+| D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19; the rollups hourly 90 days, then compacted by the day (R-48) |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot; its two points to instruct settled by the owner on 2026-11-20 (R-29): a shared policy group or resource published again republishes nothing — its teams are told, and upgrade the apis behind on demand, each by its own draft, snapshot and deployment —, and a remote catalog chooses its mode (draft by default, publish, deploy; a Kubernetes resource deploys by default) |
 | D-36 ready for monetisation | ✅ | in the MVP, optional (R-35); a paid plan is published only with a linked account; Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move through a Checkout ✅; usage billing ✅ (R-34); a connector after Stripe: out of the MVP, Lago first |
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |

@@ -737,4 +737,13 @@ create index security_events_at on security_events(at);
 alter table calls add column host text;
 `,
   },
+  {
+    version: '0005_rollups_hourly',
+    sql: `
+-- the rollups still hourly — not at midnight, UTC —, so that the compaction finds the oldest day to
+-- compact without reading the days already daily
+create index call_rollups_hourly on call_rollups (hour) where date_trunc('day', hour at time zone 'UTC') <> (hour at time zone 'UTC');
+create index ai_rollups_hourly on ai_rollups (hour) where date_trunc('day', hour at time zone 'UTC') <> (hour at time zone 'UTC');
+`,
+  },
 ];

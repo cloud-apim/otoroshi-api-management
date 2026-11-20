@@ -118,18 +118,30 @@ events are kept as long as the calls.
 
 The calls are kept **30 days**. Before they go, they are **rolled up by the hour**: one row per hour,
 workspace, API, plan, subscription, application, method, templated path and status class — calls,
-errors, durations (their sum and a histogram), gateway overhead, bytes. The rollups are kept
-**400 days**; the AI usage 90 days, its tokens rolled up by the hour too; the raw path **7 days**.
-Every duration is set in **Gateway → Ingestion › Retention**.
+errors, durations (their sum and a histogram), gateway overhead, bytes. They stay **hourly 90
+days**, then are **compacted by the day** — a day of UTC, one row per key, the counts summed and
+the histograms merged bucket by bucket: nothing is lost but the hour — and kept **400 days** in
+all. The AI usage is kept 90 days, its tokens rolled up and compacted the same way; the raw path
+**7 days**. Every duration is set in **Gateway → Ingestion › Retention**.
 
 The rollups are made by the ingester every five minutes (`APIM_INGEST_RETENTION_MS`), one ingester
 at a time, **by id, not by hour**: a late event is counted in its hour, and nothing is counted twice.
-A call is deleted only once rolled up. **Roll up and purge now** runs it at once.
+A call is deleted only once rolled up. **Roll up and purge now** runs it at once. The same run
+compacts the days past the hourly retention, from the oldest, a month of days at most each time; an
+event that arrives late in a compacted day adds an hourly row there, compacted at the next run.
 
 A dashboard whose range starts after the last purge reads the calls themselves, exactly. Before,
 it reads the rollups plus the calls not rolled up yet: its **counts are exact**, its buckets an hour
 at least, its percentiles read from the histograms (an approximation, marked `≈`), its paths
-templated. The request log is the calls: it goes back as far as they are kept.
+templated. A range that reaches the daily rollups is read **by whole days**: it starts with its
+first whole day, its buckets a day at least. The request log is the calls: it goes back as far as
+they are kept.
+
+Why the compaction: an hourly row per key and per hour makes the history heavy — a workspace of
+thirty subscriptions calling four paths gives two million rows over a year, and its twelve-month
+dashboard read them in about five seconds. Compacted past 90 days, the same year holds four hundred
+thousand rows, most of them the last two months, and the same dashboard takes under a second, its
+figures identical.
 
 ## Dashboards
 
