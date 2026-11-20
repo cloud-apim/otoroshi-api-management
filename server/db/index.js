@@ -2,8 +2,8 @@ import { SQL } from 'bun';
 import { config } from '../config.js';
 import { appMigrations, analyticsMigrations } from './migrations.js';
 
-export const db = new SQL(config.db.app, { max: 20 });
-export const adb = new SQL(config.db.analytics, { max: 10 });
+export const db = new SQL(config.db.app, { max: config.db.appPool, idleTimeout: config.db.idleTimeoutS });
+export const adb = new SQL(config.db.analytics, { max: config.db.analyticsPool, idleTimeout: config.db.idleTimeoutS });
 
 async function migrate(client, migrations, label) {
   await client.unsafe(

@@ -30,6 +30,11 @@ export const config = {
   db: {
     app: env.APIM_DATABASE_URL || 'postgres://apim:apim@localhost:5442/apim',
     analytics: env.APIM_ANALYTICS_DATABASE_URL || 'postgres://apim:apim@localhost:5442/apim_analytics',
+    // connections each instance may open to each database: several instances share the
+    // max_connections of the server; an idle connection is closed after idleTimeoutS
+    appPool: parseInt(env.APIM_DATABASE_POOL || '20', 10),
+    analyticsPool: parseInt(env.APIM_ANALYTICS_DATABASE_POOL || '10', 10),
+    idleTimeoutS: parseInt(env.APIM_DATABASE_IDLE_TIMEOUT_S || '30', 10),
   },
 
   // bootstrap administrators: in-memory identities that depend on nothing

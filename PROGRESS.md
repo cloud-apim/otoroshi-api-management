@@ -24,14 +24,15 @@ Last update: 2026-11-20.
   - A bug of the product, found on the way: a subscription made again on the gateway (gone from it) kept its old credential active beside the new one; it is revoked now.
   - A bug of the product, found on the way: the restriction paths are regexes, and `/v1/pets*` did not allow `/v1/pets/42`; they are `/v1/pets(/.*)?` now.
   - Found on the way, logged as **G-22** ([#2962](https://github.com/MAIF/otoroshi/issues/2962), open, also on 18.0.1): on an api with several plans, an extractor that does not identify the caller sends an error event for a call that then succeeds — the dashboards count it as a `400`.
+  - R-39: the "via Otoroshi" console login verified end to end, through a basic auth module of the gateway in front of the console route the setup makes.
+  - R-30: four instances on one database — two consoles with their workers, an ingester alone, a portal alone — each answers its roles and nothing else, a session made on one console is good on the other, sixty tasks run once each (`test/roles.test.js`). Found on the way: each instance kept up to 30 connections open, so a few instances exhausted PostgreSQL; the pools are set by instance now (`APIM_DATABASE_POOL`, `APIM_ANALYTICS_DATABASE_POOL`) and idle connections closed after 30 s.
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-30** — the roles split across instances, several instances of a role.
-2. **R-36** — secrets at rest.
-3. **R-13** — subscription expiry.
-4. **R-38** — UI tests.
+1. **R-36** — secrets at rest.
+2. **R-13** — subscription expiry.
+3. **R-38** — UI tests.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -41,11 +42,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (23)**
+**Doable (22)**
 
 | # | Effort | What |
 |---|---|---|
-| R-30 | S | Roles split across instances, several instances of a role |
 | R-13 | S | Subscription expiry at a date |
 | R-47 | S | Free → paid plan move through a Checkout |
 | R-27 | S | Remote catalogs from S3 |
@@ -127,7 +127,6 @@ waits for the data plane rather than working around it.
 | R-27 | D-28 | Remote catalogs from an **object store** (S3) — http and git exist | S | |
 | R-28 | Q-11 | The declarative format is implemented (one document per api-version, plans inside, pages beside) — **to validate by the owner** before it becomes a contract | — | |
 | R-29 | D-36 "to instruct" | Two answers implemented, **to validate by the owner**: publishing a shared policy group does not republish the apis (they pin a version); a remote catalog chooses per catalog whether it writes drafts, publishes or deploys | — | |
-| R-30 | §3 | Run the roles **split across instances** (ingester alone, portal alone…) and with several instances of a role — the task queue claims atomically, never tested | S | |
 
 ### Analytics and audit
 

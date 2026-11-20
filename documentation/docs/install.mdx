@@ -27,6 +27,13 @@ scheduler, the payments — run on instances carrying `api` or `backoffice`, unl
 `APIM_WORKERS_ENABLED=false`; the rollups and the retention of the analytics run on the instances
 carrying `ingester`, one at a time.
 
+Several instances of a role share the work: they hold no state of their own — a session made on one
+console instance is good on the others, and the workers of several instances share the projection
+queue, each task claimed by one of them. They also share the connections of PostgreSQL: each
+instance opens up to `APIM_DATABASE_POOL` + `APIM_ANALYTICS_DATABASE_POOL` connections (30 by
+default), and the sum over the instances has to stay under the `max_connections` of the server (100
+by default) — lower the pools of the instances that need few, a portal or an ingester.
+
 ## The executable
 
 The product compiles into **one executable**: the server and its roles, the console and the portal
@@ -140,6 +147,9 @@ console (*Gateway* and *Global settings*); stored values take precedence.
 | `APIM_INSTALLATION_NAME` | the host of `APIM_PUBLIC_URL` | the name of this installation — an environment: `recette`, `production`. A [promoted](./gitops/promotion.mdx) snapshot says where it comes from |
 | `APIM_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim` | application database |
 | `APIM_ANALYTICS_DATABASE_URL` | `postgres://apim:apim@localhost:5442/apim_analytics` | events and analytics database |
+| `APIM_DATABASE_POOL` | `20` | connections an instance may open to the application database |
+| `APIM_ANALYTICS_DATABASE_POOL` | `10` | connections an instance may open to the analytics database |
+| `APIM_DATABASE_IDLE_TIMEOUT_S` | `30` | an idle connection is closed after that many seconds |
 | `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |
 | `APIM_PROJECTION_INTERVAL_MS` | `2000` | how often the projection queue is polled |
 | `APIM_DRIFT_INTERVAL_MS` | `60000` | how often drift is detected |
