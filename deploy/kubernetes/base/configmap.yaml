@@ -17,3 +17,6 @@ data:
   APIM_PORTAL_EXPOSURE: path
   APIM_BOOTSTRAP_ADMINS: admin@example.com
   APIM_COOKIE_SECURE: "true"
+  # the connections each pod may open to each database: their sum stays under max_connections
+  APIM_DATABASE_POOL: "10"
+  APIM_ANALYTICS_DATABASE_POOL: "5"

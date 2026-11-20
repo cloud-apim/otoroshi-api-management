@@ -39,6 +39,11 @@ config:
     url: ""
   bootstrapAdmins: admin@example.com
   cookieSecure: true
+  # the connections each pod (the replicas and the controller) may open to each database: their sum
+  # stays under the max_connections of PostgreSQL
+  database:
+    pool: 10
+    analyticsPool: 5
   # any other variable
   extraEnv: {}
 

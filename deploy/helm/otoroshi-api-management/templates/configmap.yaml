@@ -24,6 +24,8 @@ data:
   {{- end }}
   APIM_BOOTSTRAP_ADMINS: {{ .Values.config.bootstrapAdmins | quote }}
   APIM_COOKIE_SECURE: {{ .Values.config.cookieSecure | quote }}
+  APIM_DATABASE_POOL: {{ .Values.config.database.pool | quote }}
+  APIM_ANALYTICS_DATABASE_POOL: {{ .Values.config.database.analyticsPool | quote }}
   APIM_KUBE_RESYNC_MS: {{ .Values.controller.resyncMs | quote }}
   {{- range $k, $v := .Values.config.extraEnv }}
   {{ $k }}: {{ $v | quote }}
