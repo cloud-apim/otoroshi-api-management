@@ -107,7 +107,7 @@ export async function updateApplication(ctx, app, patch) {
         cross join lateral (select coalesce(s.request->>'plan_name', s.plan_id) as name) p
       where s.application_id = ${app.id} and other.id <> ${app.id} and other.client_id = ${nextClientId}
         and s.auth_kind = any(${'{' + IDENTITY_KINDS.join(',') + '}'}::text[])
-        and s.status in ('pending', 'pending_payment', 'active', 'suspended') and o.status in ('pending', 'pending_payment', 'active', 'suspended')
+        and s.status in ('pending', 'pending_payment', 'active', 'suspended', 'expired') and o.status in ('pending', 'pending_payment', 'active', 'suspended', 'expired')
       limit 1`;
     if (taken.length) throw conflict(`another application subscribed to ${taken[0].name} with the client_id ${nextClientId}: the gateway serves one consumer per client id and plan`);
   }
@@ -121,7 +121,7 @@ export async function updateApplication(ctx, app, patch) {
   if (patch.certificates !== undefined || patch.name !== undefined) await syncCertificates(rows[0]);
   // the subscriptions to token and certificate plans carry the client id the application declares
   if ((rows[0].client_id || null) !== (app.client_id || null)) {
-    const subs = await db`select id from subscriptions where application_id = ${app.id} and status in ('active', 'suspended')
+    const subs = await db`select id from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'expired')
       and auth_kind = any(${'{' + IDENTITY_KINDS.join(',') + '}'}::text[])`;
     for (const s of subs) await enqueue('sync_subscription', { subscription_id: s.id }, { dedupeKey: `sub:${s.id}` });
   }
@@ -130,7 +130,7 @@ export async function updateApplication(ctx, app, patch) {
 
 export async function deleteApplication(ctx, app) {
   requireUnmanaged(ctx, app, 'application');
-  const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'pending', 'pending_payment')`;
+  const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'expired', 'pending', 'pending_payment')`;
   if (active[0].c > 0) throw badRequest('close the subscriptions of this application first');
   await db`delete from applications where id = ${app.id}`;
   await syncCertificates(app);

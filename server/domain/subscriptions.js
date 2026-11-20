@@ -18,7 +18,10 @@ import { requireUnmanaged } from './applications.js';
 import { config } from '../config.js';
 import { open, seal } from './secrets.js';
 
-export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended'];
+// expired: its end date passed — its keys disabled on the gateway, kept, until it is renewed or closed
+export const OPEN_STATUSES = ['pending', 'pending_payment', 'active', 'suspended', 'expired'];
+// the statuses a subscription is on the gateway in: active, the others with their keys disabled
+export const PROJECTED_STATUSES = ['active', 'suspended', 'expired'];
 
 export async function listSubscriptions(workspaceId, { apiId, applicationId, status, userId, planId } = {}) {
   return db`select s.*, a.name as api_name, a.version as api_version, a.slug as api_slug, app.name as application_name,
@@ -168,6 +171,8 @@ async function notifyProducers(sub, { kind, title, body = '', data = {} }) {
 
 export async function acceptSubscription(ctx, sub, { message = '' } = {}) {
   if (sub.status !== 'pending') throw badRequest(`a ${sub.status} subscription cannot be accepted`);
+  // an end date set while pending runs from the acceptance: past already, the subscription expires
+  if (sub.dates?.ending_at && new Date(sub.dates.ending_at).getTime() <= Date.now()) throw badRequest('its end date has passed: move it before accepting');
   const api = (await db`select * from apis where id = ${sub.api_id}`)[0];
   const { plan } = await findPlan(api, sub.plan_id);
   const paid = plan.pricing?.kind === 'paid';
@@ -202,6 +207,48 @@ export async function suspendSubscription(ctx, sub, { message = '' } = {}) {
 export async function resumeSubscription(ctx, sub) {
   if (sub.status !== 'suspended') throw badRequest(`a ${sub.status} subscription cannot be resumed`);
   return setStatus(ctx, sub, 'active', { datesPatch: { resumed_at: now() }, action: 'subscription.resume', summary: `subscription ${sub.id} resumed` });
+}
+
+// the end of a subscription, at a date a producer sets: past it, the subscription expires (its keys
+// disabled). Moving the date forward, or removing it, renews an expired subscription with its keys.
+export async function setEnding(ctx, sub, { at = null } = {}) {
+  requireUnmanaged(ctx, sub, 'subscription');
+  if (!['pending', 'active', 'suspended', 'expired'].includes(sub.status)) throw badRequest(`a ${sub.status} subscription has no end date to set`);
+  const api = (await db`select * from apis where id = ${sub.api_id}`)[0];
+  const { plan } = await findPlan(api, sub.plan_id).catch(() => ({ plan: null }));
+  if (isPaid(plan) || sub.payment?.provider_subscription)
+    throw badRequest('a paid subscription ends with its subscription at the payment provider: cancel it there, or close it');
+  const ending = at ? new Date(at) : null;
+  if (ending && isNaN(ending.getTime())) throw badRequest('the end date is not a date');
+  const datesPatch = { ending_at: ending ? ending.toISOString() : null };
+  const past = ending && ending.getTime() <= Date.now();
+  if (past && ['active', 'suspended'].includes(sub.status))
+    return setStatus(ctx, sub, 'expired', { datesPatch: { ...datesPatch, expired_at: now() }, action: 'subscription.expire', summary: `subscription ${sub.id} expired: it ended on ${ending.toISOString()}` });
+  if (!past && sub.status === 'expired')
+    return setStatus(ctx, sub, 'active', {
+      datesPatch: { ...datesPatch, renewed_at: now() },
+      action: 'subscription.renew',
+      summary: `subscription ${sub.id} renewed ${ending ? `until ${ending.toISOString()}` : 'without an end date'}`,
+    });
+  await db`update subscriptions set dates = ${{ ...sub.dates, ...datesPatch }}, updated_at = now() where id = ${sub.id}`;
+  await audit(ctx, { action: 'subscription.ending', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `subscription ${sub.id} ${ending ? `ends on ${ending.toISOString()}` : 'has no end date any more'}` });
+  await notifyConsumer(sub, { kind: 'subscription.ending', title: ending ? `${sub.request?.plan_name || 'Subscription'}: ends on ${ending.toISOString().slice(0, 10)}` : `${sub.request?.plan_name || 'Subscription'}: no end date any more` });
+  return (await db`select * from subscriptions where id = ${sub.id}`)[0];
+}
+
+// the subscriptions whose end date passed expire: run by the workers, every minute
+export async function expirySweep() {
+  const due = await db`select * from subscriptions where status in ('active', 'suspended')
+    and dates->>'ending_at' is not null and (dates->>'ending_at')::timestamptz <= now()`;
+  for (const sub of due) {
+    const ws = (await db`select * from workspaces where id = ${sub.workspace_id}`)[0];
+    await setStatus({ user: null, via: 'expiry', role: 'admin', workspace: ws, managedBy: sub.managed_by || null }, sub, 'expired', {
+      datesPatch: { expired_at: now() },
+      action: 'subscription.expire',
+      summary: `subscription ${sub.id} expired: it ended on ${sub.dates.ending_at}`,
+    });
+  }
+  return due.length;
 }
 
 export async function closeSubscription(ctx, sub) {
@@ -385,7 +432,7 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
   if (sub.auth_kind === 'mtls')
     await enqueue('sync_application_certificates', { application_id: sub.application_id, workspace_id: sub.workspace_id }, { dedupeKey: `appcerts:${sub.application_id}` });
   const app = (await db`select * from applications where id = ${sub.application_id}`)[0];
-  const wanted = ['active', 'suspended'].includes(sub.status);
+  const wanted = PROJECTED_STATUSES.includes(sub.status);
   const setProjection = (p) => db`update subscriptions set projection = ${p}, updated_at = now() where id = ${sub.id}`;
   try {
     const existing = await oto.getSubscription(sub.id);

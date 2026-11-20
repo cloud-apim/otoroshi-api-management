@@ -41,7 +41,7 @@ export function LifecycleBadge({ lifecycle }) {
   return null;
 }
 
-const SUB_KIND = { active: 'positive', pending: 'warning', pending_payment: 'warning', rejected: 'negative', suspended: 'warning', closed: '' };
+const SUB_KIND = { active: 'positive', pending: 'warning', pending_payment: 'warning', rejected: 'negative', suspended: 'warning', expired: 'warning', closed: '' };
 
 export function SubStatus({ status }) {
   const { t } = useI18n();

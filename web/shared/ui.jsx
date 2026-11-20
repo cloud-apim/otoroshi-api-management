@@ -396,6 +396,7 @@ const STATUS_KIND = {
   drifted: 'warning',
   deprecated: 'warning',
   suspended: 'warning',
+  expired: 'warning',
   unmanaged: 'info',
   rejected: 'negative',
   failed: 'negative',

@@ -434,7 +434,7 @@ function SubscriptionCard({ sub, app, onChange }) {
   const toast = useToast();
   const confirm = useConfirm();
   const creds = (sub.credentials || []).filter((c) => c.status === 'active');
-  const closable = ['active', 'pending', 'pending_payment', 'suspended'].includes(sub.status);
+  const closable = ['active', 'pending', 'pending_payment', 'suspended', 'expired'].includes(sub.status);
   const [pay, setPay] = useState(false);
   const [changing, setChanging] = useState(false);
   const rotate = async (c) => {
@@ -497,6 +497,8 @@ function SubscriptionCard({ sub, app, onChange }) {
           </Callout>
         )}
         {sub.status === 'pending' && <div className="muted small">{t('subs.noCreds.pending')}</div>}
+        {sub.status === 'expired' && <Callout kind="warning">{t('subs.expired', { date: fmtDate(sub.dates?.ending_at) })}</Callout>}
+        {sub.dates?.ending_at && ['active', 'suspended'].includes(sub.status) && <div className="muted small">{t('subs.ending', { date: fmtDate(sub.dates.ending_at) })}</div>}
         {sub.status === 'pending_payment' && (
           <div className="col gap-6">
             <div className="muted small">{t('subs.noCreds.payment')}</div>

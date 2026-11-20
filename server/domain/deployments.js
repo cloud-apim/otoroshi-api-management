@@ -192,7 +192,7 @@ registerTaskHandler('deploy_api', async ({ deployment_id }) => {
     };
     await db`update api_deployments set status = 'deployed', finished_at = now(), error = null, result = ${result} where id = ${dep.id}`;
     // subscriptions that waited for the api are projected now
-    const subs = await db`select id from subscriptions where api_id = ${api.id} and status in ('active', 'suspended')`;
+    const subs = await db`select id from subscriptions where api_id = ${api.id} and status in ('active', 'suspended', 'expired')`;
     for (const s of subs) await enqueue('sync_subscription', { subscription_id: s.id }, { dedupeKey: `sub:${s.id}`, runNow: false });
     return result;
   } catch (e) {

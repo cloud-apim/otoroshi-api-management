@@ -27,12 +27,12 @@ Last update: 2026-11-20.
   - R-39: the "via Otoroshi" console login verified end to end, through a basic auth module of the gateway in front of the console route the setup makes.
   - R-30: four instances on one database — two consoles with their workers, an ingester alone, a portal alone — each answers its roles and nothing else, a session made on one console is good on the other, sixty tasks run once each (`test/roles.test.js`). Found on the way: each instance kept up to 30 connections open, so a few instances exhausted PostgreSQL; the pools are set by instance now (`APIM_DATABASE_POOL`, `APIM_ANALYTICS_DATABASE_POOL`) and idle connections closed after 30 s.
   - R-36: the secrets the product keeps — credentials, the key of the gateway, the secrets of the identity providers and of the info token, the headers of the catalogs and of the audit exporters, the key of the pseudonyms — are sealed with AES-256-GCM and the key of the installation (`APIM_SECRETS_KEY`); a rotation lists the previous keys (`APIM_SECRETS_PREVIOUS_KEYS`), and every instance seals again at start what another key, or none, sealed. The setup check says when there is no key; a plan secret in clear is flagged (`secret_in_clear`): a vault reference keeps it out of the snapshots. Workspace exports leave the secret of the portal's identity provider out (`test/secrets.test.js`).
+  - R-13: a producer gives a subscription an end date (console, admin api, cli); from that day it expires — on the gateway, its keys disabled — and a later date, or none, renews it with the same keys; the workers expire what is due every minute; a paid subscription takes none (`test/expiry.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-13** — subscription expiry.
-2. **R-38** — UI tests.
+1. **R-38** — UI tests.
 
 Then the items that touch the projection: R-12, R-17, R-25, R-10.
 
@@ -42,11 +42,10 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (21)**
+**Doable (20)**
 
 | # | Effort | What |
 |---|---|---|
-| R-13 | S | Subscription expiry at a date |
 | R-47 | S | Free → paid plan move through a Checkout |
 | R-27 | S | Remote catalogs from S3 |
 | R-31 | S | LLM/MCP ingestion checked with real events (needs the LLM extension) |
@@ -97,7 +96,6 @@ waits for the data plane rather than working around it.
 | R-9 | D-15, Q-6 | The **object-by-object inventory** of Otoroshi entities: derived from the api description, or infrastructure consumed as is — a written table checked against the Otoroshi source | S | |
 | R-10 | D-16 | Named compositions, the two remaining ones: **resources** (an OAuth2 server, a token cache, a directory a policy consumes, referenced by the plan) and **dictionaries** (named value sets refreshed from an external source, injected in the expression language) | L | |
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | M | |
-| R-13 | §4 | Subscription **expiry** (`ending_at`): a subscription that ends at a date, keys disabled then | S | G-14 for a validity per key |
 | R-17 | §5 | **Adopt mode**, second half: take over the existing subscriptions and apikeys of an adopted Api, not only its description | M | |
 | R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
 

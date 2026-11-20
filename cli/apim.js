@@ -43,6 +43,7 @@ ${SETUP_HELP}
   apply <ws> -f <file.yaml|json> [--publish] [--deploy] [--managed-by <source>]
   subscriptions list <ws> [--status s] [--api id]
   subscriptions accept|reject|suspend|resume|close <ws> <id> [--message m]
+  subscriptions ending <ws> <id> <date|none>   the end date of a subscription (past: it expires; none: renewed)
   subscriptions transfer <ws> <id> --plan <plan> [--api <api>]
   applications list <ws>
   drift <ws>                            run drift detection and print the reports
@@ -148,7 +149,7 @@ function printPromotion(r) {
 const deployLabel = (a) => (!a.last_snapshot ? 'draft only' : a.deployment?.action === 'deploy' && a.deployment?.status === 'deployed' ? 'deployed' : a.deployment?.status || 'not deployed');
 
 async function main() {
-  const [cmd, sub, a1, a2] = args;
+  const [cmd, sub, a1, a2, a3] = args;
   if (!cmd || cmd === 'help' || flags.help) return console.log(HELP);
   if (!TOKEN) throw new Error('no token: set APIM_TOKEN or --token (create one in the console: user menu > API tokens)');
   const ws = (w) => `/workspaces/${need(w, '<ws>')}`;
@@ -257,6 +258,11 @@ async function main() {
       if (['accept', 'reject', 'suspend', 'resume', 'close', 'resync'].includes(sub)) {
         const r = await call('POST', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/${sub}`, { message: flags.message || '' });
         return console.log(`subscription ${r.id || a2}: ${r.status || 'done'}`);
+      }
+      if (sub === 'ending') {
+        const at = need(a3, '<date|none>');
+        const r = await call('POST', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/ending`, { at: at === 'none' ? null : at });
+        return console.log(`subscription ${r.id}: ${r.status}${r.dates?.ending_at ? `, ends on ${r.dates.ending_at}` : ', no end date'}`);
       }
       if (sub === 'transfer') {
         const r = await call('POST', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/transfer`, { plan_id: need(flags.plan, '--plan'), api_id: flags.api });

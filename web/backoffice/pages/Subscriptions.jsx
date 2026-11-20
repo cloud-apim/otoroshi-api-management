@@ -27,7 +27,7 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
           onChange={(v) => setParams({ status: v, subs_page: null })}
           options={[
             { value: '', label: tr('All statuses') },
-            ...['pending', 'pending_payment', 'active', 'suspended', 'rejected', 'closed'].map((s) => ({ value: s, label: tr(s.replace('_', ' ')) })),
+            ...['pending', 'pending_payment', 'active', 'suspended', 'expired', 'rejected', 'closed'].map((s) => ({ value: s, label: tr(s.replace('_', ' ')) })),
           ]}
           aria-label={tr('filter by status')}
           style={{ width: 200 }}
@@ -107,6 +107,34 @@ export function SubscriptionsTable({ query = '', showApi = true, showApp = true,
   );
 }
 
+// the end of a subscription: past it, its keys are disabled on the gateway; a later date, or none,
+// renews it with the same keys. A paid subscription ends with its subscription at the provider.
+function EndDate({ s, busy, act }) {
+  const [at, setAt] = useState(s.dates?.ending_at ? s.dates.ending_at.slice(0, 10) : '');
+  const editable = s.can_manage && !s.managed_by && !s.payment?.provider && ['pending', 'active', 'suspended', 'expired'].includes(s.status);
+  if (!editable && !s.dates?.ending_at) return null;
+  return (
+    <div className="col gap-6">
+      <div className="label">{tr('End date')}</div>
+      {s.status === 'expired' && <Callout kind="warning">{tr('Expired: its keys are disabled on the gateway. A later end date, or none, renews it with the same keys.')}</Callout>}
+      {editable && (
+        <div className="row">
+          <input type="date" className="input" value={at} onChange={(e) => setAt(e.target.value)} aria-label={tr('end date')} style={{ width: 180 }} />
+          <button className="btn sm" disabled={busy || !at} onClick={() => act('ending', { at: new Date(`${at}T00:00:00`).toISOString() }, tr('End date set'))}>
+            {tr('Set')}
+          </button>
+          {s.dates?.ending_at && (
+            <button className="btn sm ghost" disabled={busy} onClick={() => act('ending', { at: null }, tr('End date removed'))}>
+              {tr('No end date')}
+            </button>
+          )}
+        </div>
+      )}
+      <p className="hint">{tr('From that day on, the subscription expires: its keys are disabled on the gateway.')}</p>
+    </div>
+  );
+}
+
 export function SubscriptionDrawer({ id, onClose, onChanged }) {
   const { wapi, slug } = useWs();
   const toast = useToast();
@@ -174,6 +202,12 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                 <>
                   <dt>{tr('Suspended')}</dt>
                   <dd>{fmtDate(s.dates.suspended_at)}</dd>
+                </>
+              )}
+              {s.dates?.ending_at && (
+                <>
+                  <dt>{s.status === 'expired' ? tr('Expired') : tr('Ends')}</dt>
+                  <dd>{fmtDate(s.dates.ending_at)}</dd>
                 </>
               )}
               {s.review?.decision && (
@@ -340,6 +374,8 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               </Callout>
             )}
 
+            <EndDate s={s} busy={busy} act={act} />
+
             <hr />
             <fieldset disabled={!s.can_manage} className="ro-fieldset row wrap">
               {s.status === 'active' && (
@@ -362,7 +398,7 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
               </button>
               <span className="spacer" />
               {s.managed_by && <span className="faint small">{tr('Its plan and its closing belong to {0}.', [s.managed_by])}</span>}
-              {['pending', 'pending_payment', 'active', 'suspended'].includes(s.status) && !s.managed_by && (
+              {['pending', 'pending_payment', 'active', 'suspended', 'expired'].includes(s.status) && !s.managed_by && (
                 <button
                   className="btn danger"
                   disabled={busy}

@@ -25,7 +25,7 @@ import { GROUP, VERSION, kubeClient, kubeConfig } from './client.js';
 
 export const FINALIZER = `${GROUP}/cleanup`;
 export const ANNOTATIONS = { workspace: `${GROUP}/workspace`, mode: `${GROUP}/mode`, deletion: `${GROUP}/deletion-policy` };
-const OPEN = ['pending', 'pending_payment', 'active', 'suspended'];
+const OPEN = ['pending', 'pending_payment', 'active', 'suspended', 'expired'];
 
 export const markerOf = (plural, cr) => `kubernetes:${cr.metadata.namespace}/${plural}/${cr.metadata.name}`;
 

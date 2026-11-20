@@ -894,6 +894,8 @@ const subAction = (fn) => async ({ ctx, params, body }) => {
 r.post('/workspaces/:ws/subscriptions/:sub/accept', subAction((c, s, b) => subscriptions.acceptSubscription(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/reject', subAction((c, s, b) => subscriptions.rejectSubscription(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/suspend', subAction((c, s, b) => subscriptions.suspendSubscription(c, s, b)));
+// the end date of a subscription: { "at": "2027-01-31T00:00:00Z" }, or { "at": null } for none
+r.post('/workspaces/:ws/subscriptions/:sub/ending', subAction((c, s, b) => subscriptions.setEnding(c, s, b)));
 r.post('/workspaces/:ws/subscriptions/:sub/resume', subAction((c, s) => subscriptions.resumeSubscription(c, s)));
 r.post('/workspaces/:ws/subscriptions/:sub/close', subAction((c, s) => subscriptions.closeSubscription(c, s)));
 r.post('/workspaces/:ws/subscriptions/:sub/transfer', subAction((c, s, b) => subscriptions.transferSubscription(c, s, b, { initiator: 'producer' })));

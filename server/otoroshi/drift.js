@@ -48,7 +48,7 @@ export async function checkApi(api) {
 }
 
 export async function checkSubscription(sub) {
-  if (!['active', 'suspended'].includes(sub.status)) return null;
+  if (!['active', 'suspended', 'expired'].includes(sub.status)) return null;
   const actual = await oto.getSubscription(sub.id);
   const changes = [];
   if (actual) {
@@ -111,7 +111,7 @@ export async function runDriftDetection({ workspaceId = null } = {}) {
       results.errors.push({ api: api.id, error: e.message });
     }
   }
-  const subs = await db`select * from subscriptions where status in ('active', 'suspended') and (${workspaceId}::text is null or workspace_id = ${workspaceId})`;
+  const subs = await db`select * from subscriptions where status in ('active', 'suspended', 'expired') and (${workspaceId}::text is null or workspace_id = ${workspaceId})`;
   for (const s of subs) {
     try {
       const r = await checkSubscription(s);
@@ -139,7 +139,7 @@ export async function runDriftDetection({ workspaceId = null } = {}) {
   // the reports of objects that no longer exist, or no longer run, go with them
   await db`delete from drift_reports where entity_kind = 'api' and entity_id not in (select id from apis)`;
   await db`delete from drift_reports where entity_kind = 'subscription'
-    and entity_id not in (select id from subscriptions where status in ('active', 'suspended'))`;
+    and entity_id not in (select id from subscriptions where status in ('active', 'suspended', 'expired'))`;
   results.durationMs = Date.now() - started;
   await db`insert into settings (key, value) values ('drift.last_run', ${{ at: new Date().toISOString(), ...results }})
     on conflict (key) do update set value = excluded.value, updated_at = now()`;

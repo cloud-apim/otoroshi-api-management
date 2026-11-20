@@ -46,8 +46,14 @@ request ─────────┤                                          
                  ├── manual ─▶ pending ─▶ accepted ─────────┘             │
                  │                     └▶ rejected                        │
                  └── paid ───▶ pending_payment ─▶ payment confirmed ──▶ active
+                                       active, suspended ─ end date ─▶ expired ─ renewed ─▶ active
                                                     any open state ──▶ closed
 ```
+
+A producer can give a subscription an **end date**. From that day on it **expires**: it stays on the
+gateway, its keys disabled — the consumer's calls are refused. A later end date, or none, renews it
+with the same keys; closing it removes it. The workers expire what is due every minute. A paid
+subscription ends with its subscription at the payment provider: it takes no end date.
 
 The approval workflow belongs to the product: Otoroshi carries the plan's validation as a
 label only. At request time the product checks that the plan is published and subscribable, visible
