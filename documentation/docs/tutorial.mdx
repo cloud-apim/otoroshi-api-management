@@ -1,0 +1,229 @@
+---
+sidebar_position: 2.5
+title: 'Tutorial: expose and consume an API'
+description: End to end, a screen at each step — a producer exposes an API from the console, a consumer finds it on the developer portal, signs up, subscribes, gets a key and calls it through the gateway, with no one in between.
+---
+
+{/* the captures are made by scripts/tutorial.js — run `bun run screenshots:tutorial` to refresh them */}
+
+# Tutorial: expose and consume an API
+
+An API exposed by its producer, consumed by someone who never had to ask anyone, end to end:
+
+1. **the producer** describes the *Shipments* API in the console — its backend, its OpenAPI
+   contract, a free plan whose keys are issued at once — then publishes and deploys it;
+2. **a consumer** finds it on the developer portal, creates an account, subscribes from an
+   application of their own, gets a key and calls the API through the gateway;
+3. **both** see the traffic: the consumer their usage, the producer their subscriber and their API's
+   analytics.
+
+**What you need.** An installation whose gateway is [set up](./gateway/setup.mdx), the data exporter
+included — or the development stack of the [quickstart](./quickstart.mdx) (`mise run up`, then
+`mise run demo`, which installs the exporter). A workspace — here *Acme*, made from the workspace
+selector, **New workspace** — with a team to own the API — here *Logistics*, **Workspace settings ›
+Teams › Create team**. The contract of the API is in the repository:
+[`examples/shipments.openapi.yaml`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/examples/shipments.openapi.yaml).
+
+## Part 1 — The producer exposes the API
+
+### 1. Sign in to the console
+
+The console is at `/backoffice/`: a local account, or the identity provider of the installation
+([authentication](./authentication.mdx)).
+
+![The sign-in page of the console, filled](/img/tutorial/01-console-sign-in.jpg)
+
+### 2. Create the API
+
+**APIs → New API**: a name, a version, a description, the team that owns it, and where the gateway
+exposes it — a domain and a context path. Here, `shipments.oto.tools` and `/v1`: the API will be
+called at `http://shipments.oto.tools:8080/v1`.
+
+![The New API dialog: Shipments, 1.0.0, owned by Logistics, on shipments.oto.tools/v1](/img/tutorial/02-console-new-api.jpg)
+
+**Create draft** makes it a **draft**: one resource (every path, every method) towards a `default`
+backend, and a `Default` plan. *Draft only*: nothing of it is on the gateway yet. The overview already
+says how it will be called.
+
+![The API, a draft: how to call it, its plan, its resources](/img/tutorial/03-console-api-draft.jpg)
+
+### 3. Point it at its backend
+
+**Backends** holds where the calls go. The backends are infrastructure — targets, TLS, timeouts,
+load balancing — and belong to the route, never to the offer.
+
+![The Backends tab: the default backend, http://echo:8080](/img/tutorial/04-console-backends.jpg)
+
+The pencil opens it. In the development stack, `echo:8080` is a service that answers every request
+with the request itself; on your installation, give the host and the port of your service, and TLS
+if it speaks https.
+
+![The editor of a backend: targets, TLS, root path, retries, timeouts](/img/tutorial/05-console-backend.jpg)
+
+### 4. Give it its contract
+
+**OpenAPI → From a local file…** loads `shipments.openapi.yaml` into the draft — or **Import** from a
+URL, or paste it in the editor. The outline lists its operations. **Save draft**.
+
+![The OpenAPI tab: the specification in the editor, its outline: GET POST /shipments, GET /shipments/{id}](/img/tutorial/06-console-openapi.jpg)
+
+The specification never reaches the gateway: the portal shows it, its servers pointing at the
+gateway.
+
+### 5. Shape the plan
+
+The plan is what a consumer subscribes to: who may call, how much, on what terms. **Plans → Edit**
+on the `Default` plan. In **General**, a name the consumers will read — *Free* — and a description.
+
+![The plan editor, General: the plan named Free, its description](/img/tutorial/07-console-plan.jpg)
+
+In **Limits**, the plan keeps its rate limit (10 calls a second) and gets a quota of 1,000 calls a
+day. The limits are **per credential**: each application that subscribes has its own.
+
+![The plan editor, Limits: 10 calls per second, a daily quota of 1,000](/img/tutorial/08-console-plan-limits.jpg)
+
+In **Catalogue & approval**, what makes it **self-service**: the plan is public, subscribable, and its
+**approval is automatic** — the key is issued at once, no producer in between. With *Manual review*
+instead, each request waits in the console for a producer. The plan also asks the subscriber, in a
+word, what they plan to build. Nothing of this section reaches the gateway: it belongs to the portal.
+
+![The plan editor, Catalogue & approval: public, subscribable, automatic approval, a usage statement asked](/img/tutorial/09-console-plan-approval.jpg)
+
+**Apply to the draft**, then **Save draft**.
+
+### 6. Publish and deploy
+
+**Publish** freezes the draft into an immutable **snapshot** — plans, resources, documentation —, and
+*Deploy to the gateway right after* projects it on Otoroshi at once.
+
+![The Publish a snapshot dialog: first snapshot, a comment, deploy right after](/img/tutorial/10-console-publish.jpg)
+
+*Snapshot #1 runs on the gateway*: the API is served. A later change is a new draft, a new snapshot;
+going back is deploying an earlier one.
+
+![The API published: snapshot #1 runs on the gateway](/img/tutorial/11-console-deployed.jpg)
+
+## Part 2 — The consumer subscribes, alone
+
+### 7. Find the API on the portal
+
+The portal of the workspace is at `/acme/`. Anyone can browse it; subscribing takes an account.
+
+![The home of the Acme developer portal: find an API, subscribe, call it; the featured APIs](/img/tutorial/12-portal-home.jpg)
+
+**APIs**, the catalogue: every API published on the portal, searched and sorted.
+
+![The API catalogue: the Shipments card](/img/tutorial/13-portal-catalogue.jpg)
+
+The page of the API says where to call it and how.
+
+![The overview of Shipments on the portal: its base URL, how to call it, its endpoints, its plans](/img/tutorial/14-portal-api.jpg)
+
+**API reference** renders its contract — its operations, their parameters, their answers, examples in
+several languages — its server being the gateway.
+
+![The API reference: the three operations of Shipments, the server http://shipments.oto.tools:8080/v1](/img/tutorial/15-portal-reference.jpg)
+
+**Plans** lists what can be subscribed to, with its limits; *Instant access* says the key comes at
+once.
+
+![The plans of Shipments: Free, API key, 10 calls a second, 1,000 a day, instant access](/img/tutorial/16-portal-plans.jpg)
+
+### 8. Create an account
+
+**Sign in to subscribe**, then **Create account**: a name, an email, a password. Self sign-up is on
+by default; in the console, **Developer portal › Settings** turns it off, or lets the consumers sign
+in with an identity provider.
+
+![The Create your account page, filled](/img/tutorial/17-portal-sign-up.jpg)
+
+### 9. Subscribe
+
+Signed in, the consumer is back on the plan they chose. The credentials belong to an **application**:
+pick one, or create it now — here, *Parcel tracker* — and say what it is for.
+
+![The Subscribe to Free dialog: a new application, Parcel tracker, and its intended usage](/img/tutorial/18-portal-subscribe.jpg)
+
+**Subscribe**. The approval is automatic: the subscription is active, its credentials are ready — a
+client id and a client secret.
+
+![You are subscribed! The client id and the client secret](/img/tutorial/19-portal-subscribed.jpg)
+
+### 10. Find the credentials again
+
+**My apps** keeps them: the subscriptions of each application and their credentials, an example call,
+the live quotas; the secret can be rotated, the plan changed, the subscription closed.
+
+![My apps › Parcel tracker: the active subscription to Shipments, its client id and secret](/img/tutorial/20-portal-app.jpg)
+
+### 11. Call the API
+
+Through the gateway, with the credentials as HTTP basic authentication:
+
+```bash
+curl -i 'http://shipments.oto.tools:8080/v1/shipments?status=in_transit' \
+  -u "$CLIENT_ID:$CLIENT_SECRET"
+```
+
+```http
+HTTP/1.1 200 OK
+Otoroshi-Request-Id: 2123900287839110073
+Otoroshi-Daily-Calls-Remaining: 967
+Content-Type: application/json
+
+{
+  "path": "/shipments",
+  "method": "GET",
+  "headers": {
+    "host": "echo",
+    "otoroshi-request-id": "2123900287839110073",
+    …
+  },
+  …
+}
+```
+
+The development backend answers with the request it received. The gateway says what remains of the
+daily quota, and gives the call an id — the backend receives the same, and the request log finds the
+call by it. A new key is routable within a few seconds. Without credentials the gateway answers
+`401`; past 10 calls a second, `429`; past 1,000 calls in the day, too.
+
+```http
+HTTP/1.1 401 Unauthorized
+Otoroshi-Error: true
+
+{"Otoroshi-Error":"You're not authorized here !"}
+```
+
+## Part 3 — Both sides see the traffic
+
+### 12. The consumer: their usage
+
+**Usage** on the portal: the calls of the consumer's applications, as the gateway counted them —
+their number, errors, latency, over time —, and **Logs**, the calls one by one.
+
+![The Usage page of the portal: the calls of the consumer's applications, their latency, the responses over time](/img/tutorial/21-portal-usage.jpg)
+
+### 13. The producer: their subscriber, their traffic
+
+On the API, **Subscriptions**: *Parcel tracker*, of Dana, on the *Free* plan, active, and synced to the
+gateway — nobody had to approve it.
+
+![The Subscriptions tab of the API: Parcel tracker, Free, active, synced](/img/tutorial/22-console-subscriptions.jpg)
+
+**Analytics**: every call of the API, the refused one too, by plan, by application, by status.
+
+![The Analytics tab of the API: its calls, the refused one among them, the responses over time](/img/tutorial/23-console-analytics.jpg)
+
+## Next
+
+- **A plan for the bigger consumers**: **Plans → Add plan**, more quota and *Manual review* — the
+  requests wait in **Subscriptions** for a producer. Adding a tier is a catalogue operation, never an
+  infrastructure one ([plans](./concepts/plans.mdx)).
+- **A change**: edit the draft, publish snapshot #2; the **Deployment** tab redeploys any earlier
+  snapshot ([APIs and versions](./concepts/apis-and-versions.mdx)).
+- **The API as a file**: `otoroshi-apim apis get acme shipments -o yaml` gives the same API as a
+  [declarative document](./gitops/declarative-documents.mdx), to keep in git and apply from a CI
+  ([command line](./gitops/cli.mdx)).
+- **A paid plan**: [payments](./payments.mdx).
+- **The portal of the workspace in its colors**: [the design of a portal](./portal-design.mdx).

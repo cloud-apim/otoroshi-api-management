@@ -17,7 +17,8 @@
     "cli": "bun cli/apim.js",
     "infra:up": "docker compose -f docker/docker-compose.yml up -d",
     "infra:down": "docker compose -f docker/docker-compose.yml down",
-    "screenshots": "bun scripts/screenshots.js"
+    "screenshots": "bun scripts/screenshots.js",
+    "screenshots:tutorial": "bun scripts/tutorial.js"
   },
   "dependencies": {
     "@markdoc/markdoc": "^0.5.14",
