@@ -70,7 +70,14 @@ Last update: 2026-11-20.
 
 ## Next, in the proposed order
 
-1. **R-54** — the event-driven apis (needs the event brokers extension on the gateway: a download).
+The types of api (D-44, the owner's direction on 2026-11-20): an api has a type, which says how its
+route is set up — REST today; MCP and AI with the LLM extension; event-driven with the event
+brokers extension; GraphQL and gRPC later. Proposed order:
+
+1. **R-56** — the type in the model, REST the only one accepted, so the schema has it before the others.
+2. **R-54** — the event-driven type (needs the event brokers extension on the gateway: a download; its per-message events first, D-34).
+3. **R-57**, **R-58** — the MCP and AI types, once the LLM extension runs with the latest changes of the Otoroshi api (the owner's note). The AI and MCP usage the ingester already keeps can be shown before.
+4. **R-59**, **R-60** — GraphQL, gRPC.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -78,25 +85,29 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (4)**
+**Doable (6)**
 
 | # | Effort | What |
 |---|---|---|
-| R-54 | L | Event-driven apis: the events of the event brokers extension (owner's request) |
+| R-56 | M | The type of an api in the model (D-44), REST the only one accepted |
+| R-54 | L | The event-driven type: the events of the event brokers extension (owner's request) |
+| R-59 | M | The GraphQL type — later |
+| R-60 | L | The gRPC type — later |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
-| R-18 | M | Token and AI budget plans (out of the MVP for now) |
 
 
 **Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions).
+
+**Blocked on the LLM extension (2):** R-57 (MCP), R-58 (AI, with the token and budget plans of R-18) — the extension has to run with the latest changes of the Otoroshi api first.
 
 **Owner decisions:** none left open.
 
 **Waiting for a go:** nothing.
 
-**Out of the MVP by decision:** AI and MCP apis as product types, event-driven apis, api scoring.
+**Out of the MVP by decision:** the MCP, AI and event-driven types of api (D-44: the next steps), api scoring.
 
-**Total doable:** 3 M + 1 L ≈ 5.5 M. Without R-18, R-37 and R-21 (out of the MVP, or not a priority): 1 L (R-54).
+**Total doable:** 4 M + 2 L ≈ 9 M; then R-57 and R-58 (2 L) once the LLM extension is fixed. Without R-37 and R-21 (not a priority) and the later R-59, R-60: 1 M + 1 L (R-56, R-54).
 
 ## Known issues
 
@@ -111,24 +122,32 @@ topics not drafted yet. Items that depend on a
 fix in Otoroshi cite the gap (`G-n`, see [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md)): the product
 waits for the data plane rather than working around it.
 
+### The types of api (D-44)
+
+An api has a **type**, which says how its route is set up on the gateway, and what follows from it: the
+projection (the route, its backend, its plugins), the reference the portal renders, the units its
+plans may meter, the analytics shown, the try-it. The rest of the model is the same for every type.
+
+| # | Spec | What is missing | Size | Upstream |
+|---|---|---|---|---|
+| R-56 | D-44 | **The type in the model**: `type` in the draft, the snapshots and the declarative document, `http` (REST) by default and the only one accepted until the building block of another is there; shown in the console and the catalogue (a badge, a filter); the validation of a plan by its type (tokens and budget only on the AI type, D-41) | M | |
+| R-54 | D-34, D-44 | **The event-driven type** (owner's request, 2026-11-20): an api served by the `otoroshi-event-brokers-extension` (Kafka, RabbitMQ, Pulsar, Redis, MQTT, Artemis behind routes: an HTTP ingester, HTTP/SSE/websocket consumers, webhooks) — its projection, its AsyncAPI reference (R-55), its ingestion, its analytics, its plans in messages. To instruct first: today the extension sends `EventBrokerConnectionEvent` and `EventBrokerWebhookDeliveryFailedAlert` only, nothing per event published or consumed — what a usage, a quota or a bill of an event api would count; to verify on a gateway running the extension, and to log as a gap if so | L | per-message events (D-34) |
+| R-57 | D-44 | **The MCP type**: an MCP server exposed by the gateway (the SSE and streamable HTTP endpoints of the LLM extension, its MCP connectors); the portal lists its tools and tries one; the analytics of the tools called (`McpAudit`, already ingested) | L | the LLM extension on the latest Otoroshi api |
+| R-58 | D-41, D-44 | **The AI type**: a REST api whose backend is one or several AI providers (`OpenAiCompatProxy`), its models; plans in tokens and budget (`LlmTokensRateLimitingValidator`, `AiBudget` partitioned by key — was R-18); the analytics of the tokens and the cost per model (`LLMUsageAudit`, already ingested) | L | the LLM extension on the latest Otoroshi api |
+| R-59 | D-44 | Later. **The GraphQL type**: a GraphQL backend or a composition (`GraphQLProxy`, `GraphQLBackend` in Otoroshi); its schema rendered by the portal | M | |
+| R-60 | D-44 | Later. **The gRPC type**: a gRPC backend (`GrpcWebProxyPlugin` for gRPC-Web in Otoroshi; native gRPC to instruct); its proto files rendered by the portal | L | to instruct |
+
 ### Model and projection
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | — | G-23 |
-| R-18 | D-41 | **Token and budget plans**: project `LlmTokensRateLimitingValidator` and `AiBudget` (the schema is ready, the feature is out of the MVP, D-32) | M | ➖ |
 
 ### Developer portal
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
-
-### Analytics and audit
-
-| # | Spec | What is missing | Size | Upstream |
-|---|---|---|---|---|
-| R-54 | D-32 | **Event-driven apis** (owner's request, 2026-11-20): take into account the events of the `otoroshi-event-brokers-extension` (Kafka, RabbitMQ, Pulsar, Redis, MQTT, Artemis behind routes: an HTTP ingester, HTTP/SSE/websocket consumers, webhooks), so that an api can be event-driven in time — its ingestion, its analytics, its plans. To instruct first: today the extension sends `EventBrokerConnectionEvent` and `EventBrokerWebhookDeliveryFailedAlert` only, nothing per event published or consumed — what a usage, a quota or a bill of an event api would count; to verify on a gateway running the extension, and to log as a gap if so | L | |
 
 ### Robustness and security
 
@@ -140,8 +159,8 @@ waits for the data plane rather than working around it.
 
 | # | Spec | Item |
 |---|---|---|
-| — | D-32 | AI and MCP apis as product types (the events are captured from day one) |
-| — | D-32, D-34 | Event-driven apis — needs per-message events in the event-brokers extension first |
+| — | D-32, D-44 | AI and MCP apis as types of api — R-57, R-58, once the LLM extension is fixed (the events are captured from day one) |
+| — | D-32, D-34, D-44 | Event-driven apis — R-54, needs per-message events in the event-brokers extension first |
 | — | D-32, Q-7 | Api scoring, quality review before publication |
 | — | Q-12 | A payment connector after Stripe — Lago self-hosted first (flat and usage, sovereign, AGPL called as a service), when a need comes; the connector interface is there (Stripe, the fake one) |
 | — | Q-11 | Declarative kinds beyond `Api` (`PolicyGroup`, `SharedResource`, `Dictionary`), when the need comes: they live in the workspace export meanwhile |
@@ -190,8 +209,10 @@ waits for the data plane rather than working around it.
 | D-37 one installation, one cluster | ✅ | promotion to the next installation: a snapshot exported as a document (its digest, without what names the api locally), taken by the next installation as one of its own snapshots — dry run (diff with what runs, gateway changes, vault references resolved or not), deploy, draft replaced; the values of each environment are Otoroshi vault references — `test/promotion.test.js` between two installations |
 | D-38 projection marked as the product's | ✅ | the `Api` is managed as code (`created_by=external=otoroshi-api-management`): Otoroshi records each deployment, with the snapshot as its ref |
 | D-39 hand-written CSS | ✅ | chart palette validated |
-| D-41 unit of measure of a plan | ✅ | tokens / budget refused without an LLM backend; projection: R-18 |
+| D-41 unit of measure of a plan | ✅ | tokens / budget refused without an LLM backend; projection: R-58 (the AI type) |
 | D-42 Scalar bundled behind a proxy | ✅ | |
+| D-43 the design of a portal | ✅ | R-19: default, themed or templates, from the console, a folder or a catalog |
+| D-44 the type of an api | ⬜ | REST only today; the type in the model R-56, event-driven R-54, MCP R-57, AI R-58, GraphQL R-59, gRPC R-60 |
 | ➖ D-7, D-21, D-23 (replaced), D-13, D-34, D-40 | ➖ | |
 
 ## Synchronisation boundary rules (spec §5)
