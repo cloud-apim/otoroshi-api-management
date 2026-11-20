@@ -89,6 +89,7 @@ afterAll(async () => {
   invalidatePolicy();
   await adb`delete from calls where api_id = ${apiId}`;
   await adb`delete from security_events where otoroshi_api_id = ${apiId}`;
+  await adb`delete from ai_usage where api_id = ${apiId}`;
   await adb`delete from call_rollups where api_id = ${apiId}`;
   await adb`delete from raw_events where payload -> 'route' -> 'metadata' ->> 'Otoroshi-Api-Ref' = ${apiId}`;
   server?.stop(true);
@@ -255,6 +256,37 @@ describe('the dashboards', () => {
     expect(lines.find((l) => l.includes('/v1/dash/4'))).toContain(`,"'=HYPERLINK(""http://x"")-${RUN}",`);
     const trail = await ok('GET', `/workspaces/${WS}/audit?action=analytics.calls.export`);
     expect((trail.items || trail)[0].summary).toBe('request log exported: 4 calls');
+  });
+});
+
+describe('the AI audits', () => {
+  test('an LLM audit of the extension — a generic audit event — keeps its usage and its cost, never its content', async () => {
+    const received = await ingest([
+      {
+        '@type': 'AuditEvent',
+        '@id': `ai-${RUN}`,
+        '@timestamp': Date.now(),
+        audit: 'LLMUsageAudit',
+        provider_kind: 'openai',
+        model: 'gpt-4o-mini',
+        consumed_using: 'chat/completion/blocking',
+        request_id: `ai-req-${RUN}`,
+        usage: { prompt_tokens: 120, reasoning_tokens: 0, generation_tokens: 30 },
+        // the costs of the extension are in dollars
+        costs: { input_cost: 0.000018, output_cost: 0.000018, total_cost: 0.000036, currency: 'dollar' },
+        input_prompt: [{ role: 'user', content: 'my secret question' }],
+        output: { metadata: { usage: { prompt_tokens: 120, generation_tokens: 30 } }, generations: [{ message: { role: 'assistant', content: 'a private answer' } }] },
+        apikey: { clientId: `ai-key-${RUN}`, clientSecret: 'never-stored', clientName: 'k' },
+        client_ip: '203.0.113.42',
+        route: { id: `route_${RUN}`, name: 'r', metadata: { 'Otoroshi-Api-Ref': apiId } },
+      },
+    ]);
+    expect(received.ai).toBe(1);
+    const [row] = await adb`select * from ai_usage where client_id = ${`ai-key-${RUN}`}`;
+    expect(row).toMatchObject({ type: 'LLMUsageAudit', api_id: apiId, provider: 'openai', model: 'gpt-4o-mini' });
+    expect([Number(row.input_tokens), Number(row.output_tokens), Number(row.cost_micro_usd)]).toEqual([120, 30, 36]);
+    const kept = JSON.stringify(row.payload);
+    for (const word of ['my secret question', 'a private answer', 'never-stored', '203.0.113.42']) expect(kept).not.toContain(word);
   });
 });
 

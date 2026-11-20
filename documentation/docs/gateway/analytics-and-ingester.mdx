@@ -6,9 +6,9 @@ description: The two storage paths of the ingester, attribution to the catalogue
 
 # Analytics and the ingester
 
-The ingester receives the events Otoroshi exports — `GatewayEvent`, `LLMUsageAudit`, `McpAudit`
-and the `CloudApimSecurityEvent` of the Threat Protection Suite — and stores them twice, for two
-purposes. Install the exporter as described
+The ingester receives the events Otoroshi exports — `GatewayEvent`, the `CloudApimSecurityEvent` of
+the Threat Protection Suite, and the `LLMUsageAudit` and `McpAudit` audits of the LLM extension — and
+stores them twice, for two purposes. Install the exporter as described
 in [Install](../install.mdx#the-data-exporter).
 
 ## `/ingest`
@@ -39,10 +39,20 @@ On an API with several plans, a plan that does not identify the caller sends an 
 own for a call that then succeeds ([G-22](../otoroshi-gaps.mdx)): the dashboards count it as a
 call, and as an error.
 
-A quota consumed, an attribution, a token count are **counted, never sampled**. `LLMUsageAudit` and
-`McpAudit` go to an AI usage table (provider, model, tool, tokens, cost): collected from day one,
-even though AI and MCP products are not in this version — a feature can come later, uncollected data
-is lost.
+A quota consumed, an attribution, a token count are **counted, never sampled**.
+
+### AI audits
+
+The LLM extension audits every call of an LLM provider (`LLMUsageAudit`) and of an MCP server
+(`McpAudit`, when the MCP endpoint has `emit_audit_events`): they are generic Otoroshi audit events
+(`@type: AuditEvent`, the kind in `audit`). They go to an AI usage table, attributed like the calls —
+the API, the subscription and the application of the key that called (its `apiRef`) —, with the
+provider, the model, the tool an MCP call called, the tokens (prompt and generation), the cost (the
+extension counts it in dollars, kept in micro-dollars). Their **usage is kept, never their content**:
+neither the prompt nor the answer, neither the arguments nor the result of a tool, and the key is
+named, not copied (it would carry its secret); the address of the caller and the end user are
+pseudonymised like the calls'. Collected from day one, even though AI and MCP products are not in
+this version — a feature can come later, uncollected data is lost.
 
 ## The raw path — optional, sampled
 

@@ -186,7 +186,7 @@ export function exporterEntity(url) {
     enabled: true,
     id: EXPORTER_ID,
     name: 'otoroshi-api-management ingester',
-    desc: 'Exports GatewayEvent, LLMUsageAudit, McpAudit and CloudApimSecurityEvent to the otoroshi-api-management ingester',
+    desc: 'Exports GatewayEvent, CloudApimSecurityEvent and the LLMUsageAudit and McpAudit audits to the otoroshi-api-management ingester',
     metadata: marker('exporter'),
     tags: [],
     bufferSize: 5000,
@@ -195,7 +195,11 @@ export function exporterEntity(url) {
     groupSize: 50,
     groupDuration: 2000,
     projection: {},
-    filtering: { include: [{ '@type': { $in: ['GatewayEvent', 'LLMUsageAudit', 'McpAudit', 'CloudApimSecurityEvent'] } }], exclude: [] },
+    // the audits of the LLM extension are generic audit events, told apart by their `audit`
+    filtering: {
+      include: [{ '@type': { $in: ['GatewayEvent', 'CloudApimSecurityEvent'] } }, { '@type': 'AuditEvent', audit: { $in: ['LLMUsageAudit', 'McpAudit'] } }],
+      exclude: [],
+    },
     customFilter: null,
     customTransform: null,
     config: { type: 'webhook', url, headers: { Authorization: `Bearer ${config.ingest.token}` }, mtlsConfig: { mtls: false } },

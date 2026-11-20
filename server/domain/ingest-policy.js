@@ -234,6 +234,9 @@ export function pseudonymise(p, event) {
   // a signed-in user: its email, its name
   if (e.identity && e.identity.identityType && e.identity.identityType !== 'APIKEY') e.identity = { ...e.identity, identity: userOf(p, e.identity.identity), label: userOf(p, e.identity.label) };
   if (e.user && typeof e.user === 'object') e.user = { ...e.user, email: userOf(p, e.user.email), name: userOf(p, e.user.name) };
+  // the AI audits: the address of the caller, the end user a call is made for
+  if ('client_ip' in e) e.client_ip = ipOf(p, e.client_ip);
+  if (typeof e.end_user === 'string') e.end_user = userOf(p, e.end_user);
   // derived from the address and the agent: they go with them
   if (p.privacy.ip !== 'keep') delete e.geolocationInfo;
   if (p.privacy.userAgent === 'drop') delete e.userAgentInfo;
@@ -249,6 +252,6 @@ export function sampled(p, event) {
   const rate = p.raw.sampleRate;
   if (rate >= 1) return true;
   if (rate <= 0) return false;
-  const id = String(event.reqId || event['@id'] || Math.random());
+  const id = String(event.reqId || event.request_id || event['@id'] || Math.random());
   return parseInt(createHash('sha256').update(id).digest('hex').slice(0, 8), 16) / 0xffffffff < rate;
 }

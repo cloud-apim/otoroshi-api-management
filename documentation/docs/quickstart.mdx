@@ -96,7 +96,8 @@ take a few seconds to become routable.
 ## See the traffic
 
 In the console, **Gateway → Connection & events → Install / update the exporter** creates an
-Otoroshi data exporter that sends `GatewayEvent`, `LLMUsageAudit` and `McpAudit` to the ingester.
+Otoroshi data exporter that sends `GatewayEvent`, the security events of the Threat Protection Suite
+and the AI audits of the LLM extension to the ingester.
 From then on, **Observability** and the **Usage** page of the portal show calls attributed to the
 API, the plan, the subscription and the application.
 

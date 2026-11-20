@@ -45,14 +45,14 @@ Last update: 2026-11-20.
   - R-52: the request log as a view of its own (Observability › Logs) — the filters of the dashboards and its own (method, path, client id, a free search that reaches the host), the detail of a call (where its time went), a CSV export of the filtered calls (formulas quoted, 50,000 at most), both traced in the audit trail; every dashboard opens it with its filters (`test/ingestion.test.js`, `test/ui.test.js`).
   - R-53: the analytics and the logs of the consumer's applications on the portal — the same filters (timeframes, application, api, status class), the figures, the responses and the latency over time, the hits by api and application, the tops; the request log of its applications, filtered by method and path, with the detail of a call and a CSV export traced in the audit trail; each application links to both (`test/payments.test.js`, `test/ui.test.js`).
   - R-25 checked on a gateway running the Threat Protection Suite 1.0.0 and the LLM extension 0.0.90 (their latest releases, on the classpath of the development gateway: `OTOROSHI_EXTENSIONS`): a legitimate call served, an injection refused by the threat response, its security event attributed to the api, the plan, the subscription and the application (`test/threat-protection.test.js`, which runs either case). On the way: **G-24** confirmed (the global table of Threat Studio runs a second firewall on a plan already protected, the scores add up), **G-26** confirmed, **G-27** (every call scores a firewall match with the core rule set) and **G-28** (a firewall that blocks on its own sends no security event) found; **G-25** withdrawn — a challenge is for a person in a browser. G-24, G-26, G-27 and G-28 reported to the extension (cloud-apim/otoroshi-waf-extension#60 to #63); the threat protection is left aside for now (owner). Also found on the way, in the product: the ingester read its attribution cache every 15 seconds, so the first calls of an api or a key made meanwhile were unattributed — an unknown api, subscription or key now reads it again, once a second at most (`test/ingestion.test.js`).
+  - R-31: the AI audits checked with real calls on the gateway running the LLM extension — a chat completion through an api whose flow proxies a provider (a fake one, a route of the gateway answering as OpenAI), an MCP tool called through another api. What the real events showed: the audits are generic `AuditEvent`s (`audit: LLMUsageAudit | McpAudit`), so the exporter never sent them and the ingester did not know them — both fixed; the tokens are under `usage` (`generation_tokens`), the cost under `costs.total_cost` in dollars, the tool of an MCP call under `mcp_request_payload.params.name`; and an audit carries the prompt, the answer, the arguments and the result of a tool, and the whole key with its secret — the ingester now keeps the usage only, the key named, the address and the end user pseudonymised (`test/ai-usage.test.js`, `test/ingestion.test.js`).
   - The screens tour taken again (95 captures). The development gateway keeps nothing across a restart (its `/data` stays empty): after `mise run up`, `mise run demo` deploys the demo again.
 
 ## Next, in the proposed order
 
-1. **R-31** — the LLM and MCP ingestion checked with real events (the LLM extension runs on the development gateway).
-2. **R-48** — compaction of old rollups (only if the volume calls for it).
+1. **R-48** — compaction of old rollups (only if the volume calls for it).
 
-Then the large ones: R-10, R-19.
+Then the large ones: R-10, R-19, and the event-driven apis (R-54, with R-55).
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
 
@@ -60,11 +60,12 @@ The full list, grouped by area, is in [What remains to implement](#what-remains-
 
 Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
-**Doable (7)**
+**Doable (8)**
 
 | # | Effort | What |
 |---|---|---|
-| R-31 | S | LLM/MCP ingestion checked with real events (the LLM extension now runs on the development gateway) |
+| R-54 | L | Event-driven apis: the events of the event brokers extension (owner's request) |
+| R-55 | M | An AsyncAPI document exposed on the portal (owner's request) |
 | R-48 | S | Compaction of old rollups (only if the volume calls for it) |
 | R-37 | M | Accessibility audit of both faces — not a priority (owner) |
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
@@ -108,6 +109,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
+| R-55 | §8 | **An AsyncAPI document on the portal** (owner's request, 2026-11-20): the AsyncAPI specification of an event-driven api in its draft and its snapshots, beside the OpenAPI one, rendered on the portal (its channels, its messages, its servers pointing at the gateway) — goes with R-54 | M | |
 | R-19 | §8 | **Portal templates**: customer templates edited in the console or synchronised from files, beyond the default template and its theme settings | L | |
 | R-21 | §8 | Not a priority (owner). **Dynamic client registration** at the IdP when an application is created, with the security posture of the client type | M | |
 
@@ -128,7 +130,7 @@ waits for the data plane rather than working around it.
 
 | # | Spec | What is missing | Size | Upstream |
 |---|---|---|---|---|
-| R-31 | D-32 | Verify **LLMUsageAudit and McpAudit** ingestion with real events from the LLM extension (coded, never fed) | S | |
+| R-54 | D-32 | **Event-driven apis** (owner's request, 2026-11-20): take into account the events of the `otoroshi-event-brokers-extension` (Kafka, RabbitMQ, Pulsar, Redis, MQTT, Artemis behind routes: an HTTP ingester, HTTP/SSE/websocket consumers, webhooks), so that an api can be event-driven in time — its ingestion, its analytics, its plans. To instruct first: today the extension sends `EventBrokerConnectionEvent` and `EventBrokerWebhookDeliveryFailedAlert` only, nothing per event published or consumed — what a usage, a quota or a bill of an event api would count; to verify on a gateway running the extension, and to log as a gap if so | L | |
 
 ### Monetisation
 
@@ -188,7 +190,7 @@ waits for the data plane rather than working around it.
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
 | D-31 no aggregated quota | ✅ | one credential for several apis: R-12, waiting for G-23 |
-| D-32 MVP scope, captured events | 🟡 | GatewayEvent and CloudApimSecurityEvent verified with real traffic; LLMUsageAudit and McpAudit: R-31 |
+| D-32 MVP scope, captured events | ✅ | GatewayEvent, CloudApimSecurityEvent, LLMUsageAudit and McpAudit verified with real traffic (`test/ai-usage.test.js`, `test/threat-protection.test.js`); the events of the event brokers extension: R-54 |
 | D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19 |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot |
 | D-36 ready for monetisation | 🟡 | Stripe ✅ through Stripe Connect (a workspace links its own account, its id only): Checkout with the price of the plan, signed webhooks kept once and handled by the queue, past due within the grace of the plan then suspended, resumed once paid, closed when cancelled, reconciliation every hour, the customer portal, closing and moving cancel or change the price at Stripe; the team pays — `test/payments.test.js`, `test/stripe.test.js`; free → paid move through a Checkout ✅; usage billing: R-34 |

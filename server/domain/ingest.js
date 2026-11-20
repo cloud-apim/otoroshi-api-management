@@ -1,5 +1,6 @@
-// The ingester: receives GatewayEvent, LLMUsageAudit, McpAudit and the CloudApimSecurityEvent of the
-// Threat Protection Suite from an Otoroshi data exporter, and stores them twice:
+// The ingester: receives GatewayEvent, the CloudApimSecurityEvent of the Threat Protection Suite and
+// the LLMUsageAudit and McpAudit audits of the LLM extension (generic AuditEvents) from an Otoroshi
+// data exporter, and stores them twice:
 //  - computed (mandatory, exhaustive): attributed to the catalogue — api, plan, subscription,
 //    application — at ingestion time. A quota, an attribution, a token count are counted, not sampled.
 //  - raw (optional): where lightening and sampling belong.
@@ -38,7 +39,8 @@ function refsOf(e) {
   if (type === 'GatewayEvent')
     return { api: e.identity?.apiRef?.api || e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref, sub: e.identity?.apiRef?.sub, client: e.identity?.identityType === 'APIKEY' ? e.identity.identity : null };
   if (type === 'CloudApimSecurityEvent') return { api: e.otoroshi?.api_id, client: e.source?.apikey };
-  return { api: e?.route?.metadata?.['Otoroshi-Api-Ref'], client: e?.apikey?.clientId || e?.consumer?.apikey || e?.user?.apikey };
+  // the audits of the LLM extension
+  return { api: e?.apikey?.apiRef?.api || e?.route?.metadata?.['Otoroshi-Api-Ref'], sub: e?.apikey?.apiRef?.sub, client: e?.apikey?.clientId || e?.consumer?.apikey || e?.user?.apikey };
 }
 
 // an event of an api, a subscription or a key made since the cache was read: read it again, once a
@@ -97,6 +99,21 @@ function lighten(p, event, { headers = 'keep' } = {}) {
   return pseudonymise(p, out);
 }
 
+// an AI audit as it is kept: its usage, never its content — the prompt and the answer leave, and the
+// key and the provider are named, not copied (the key would carry its secret)
+function aiPayload(e) {
+  const { input_prompt, output, apikey, provider_details, mcp_request_payload, mcp_response, ...rest } = e;
+  return {
+    ...rest,
+    output: output && typeof output === 'object' ? { metadata: output.metadata || null } : null,
+    // an MCP call: its method and its tool, not its arguments nor its result
+    ...(mcp_request_payload !== undefined ? { mcp_request_payload: mcp_request_payload?.params?.name ? { params: { name: mcp_request_payload.params.name } } : null, mcp_response: null } : {}),
+    apikey: apikey ? { clientId: apikey.clientId, clientName: apikey.clientName, apiRef: apikey.apiRef || null } : null,
+    provider_details: provider_details ? { id: provider_details.id, name: provider_details.name, provider: provider_details.provider } : null,
+  };
+}
+const AI_TYPES = ['LLMUsageAudit', 'McpAudit'];
+
 export async function ingest(events) {
   await refreshCache();
   await knowEvery(events);
@@ -107,7 +124,8 @@ export async function ingest(events) {
   const raws = [];
   for (const e of events) {
     if (!e || typeof e !== 'object') continue;
-    const type = e['@type'];
+    // the audits of the LLM extension are generic audit events: their kind is their `audit`
+    const type = e['@type'] === 'AuditEvent' ? e.audit || 'AuditEvent' : e['@type'];
     const at = ts(e['@timestamp']);
     if (type === 'GatewayEvent') {
       const otoApiId = e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref || null;
@@ -150,10 +168,14 @@ export async function ingest(events) {
         from_ip: ipOf(p, e.from || null),
         user_agent: agentOf(p, (e.headers || []).find((h) => (h.key || '').toLowerCase() === 'user-agent')?.value || null),
       });
-    } else if (type === 'LLMUsageAudit' || type === 'McpAudit') {
+    } else if (AI_TYPES.includes(type)) {
+      // the key that called names its subscription (apiRef); the route its api
       const clientId = e.apikey?.clientId || e.consumer?.apikey || e.user?.apikey || null;
-      const attr = attribute(clientId, e.route?.metadata?.['Otoroshi-Api-Ref'] || null);
-      const usage = e.usage || e.output?.usage || {};
+      const apiRef = e.apikey?.apiRef?.api ? e.apikey.apiRef : null;
+      const attr = attribute(clientId, e.route?.metadata?.['Otoroshi-Api-Ref'] || null, apiRef);
+      const usage = e.usage || e.output?.metadata?.usage || e.output?.usage || {};
+      // the costs of the extension are in dollars
+      const cost = e.costs?.total_cost ?? null;
       ai.push({
         at,
         type,
@@ -163,11 +185,12 @@ export async function ingest(events) {
         subscription_id: attr.subscription_id,
         provider: e.provider_kind || e.provider || null,
         model: e.model || e.request?.model || null,
-        tool: e.tool_name || e.tool || null,
+        // the tool an MCP call called
+        tool: e.mcp_method === 'tools/call' ? e.mcp_request_payload?.params?.name || null : null,
         input_tokens: usage.prompt_tokens ?? usage.input_tokens ?? null,
         output_tokens: usage.generation_tokens ?? usage.completion_tokens ?? usage.output_tokens ?? null,
-        cost_micro_usd: e.cost?.micro_usd ?? null,
-        payload: lighten(p, e),
+        cost_micro_usd: cost === null || cost === undefined || !Number.isFinite(Number(cost)) ? null : Math.round(Number(cost) * 1e6),
+        payload: lighten(p, aiPayload(e)),
       });
     } else if (type === 'CloudApimSecurityEvent') {
       // the event names the api of the route; the plan comes from the key that called, when one did
@@ -199,7 +222,7 @@ export async function ingest(events) {
       });
     }
     // the raw path: a share of the requests, their errors always
-    if (p.storeRaw && sampled(p, e)) raws.push({ at, type: type || 'unknown', payload: lighten(p, e, { headers: p.raw.headers }) });
+    if (p.storeRaw && sampled(p, e)) raws.push({ at, type: type || 'unknown', payload: lighten(p, AI_TYPES.includes(type) ? aiPayload(e) : e, { headers: p.raw.headers }) });
   }
   if (calls.length) await adb`insert into calls ${adb(calls)}`;
   if (ai.length) await adb`insert into ai_usage ${adb(ai)}`;
