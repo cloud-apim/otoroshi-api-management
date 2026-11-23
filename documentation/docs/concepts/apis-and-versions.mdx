@@ -36,7 +36,7 @@ Three objects with three lifetimes:
 | the **deployment** — which snapshot runs on the gateway | — | it *is* the gateway state |
 
 **Publishing** validates the draft and freezes a complete copy — resources, plans, documentation,
-the pinned versions of the shared policy groups. Errors block it; warnings are shown, never
+the pinned versions of the shared policy groups and of the shared resources. Errors block it; warnings are shown, never
 silent. The console always shows the gap between what is described and what runs: *"snapshot #3
 runs on the gateway · latest snapshot #4 is not deployed · the draft has 2 unpublished changes"*.
 
@@ -47,9 +47,9 @@ writes the `Api` entity (see [projection](../gateway/projection.mdx)).
 **Rolling back** is deploying an earlier snapshot — not an inverse operation to compute.
 
 ```bash
-bun cli/apim.js apis changes default books          # what the draft changes since the last snapshot
-bun cli/apim.js apis publish default books --comment "new plan" --deploy
-bun cli/apim.js apis deploy default books --snapshot 2 --dry-run
+otoroshi-apim apis changes default books          # what the draft changes since the last snapshot
+otoroshi-apim apis publish default books --comment "new plan" --deploy
+otoroshi-apim apis deploy default books --snapshot 2 --dry-run
 ```
 
 ## Lifecycle
@@ -59,7 +59,7 @@ bun cli/apim.js apis deploy default books --snapshot 2 --dry-run
 | `created` | never published |
 | `published` | in the catalogue |
 | `deprecated` | still served, closed to new subscriptions; projected as a deprecated `Api` |
-| `archived` | removed from the gateway |
+| `archived` | undeployed: its `Api` stays on the gateway, disabled; it is not deployed again and takes no new subscription |
 
 ## Versions are new APIs
 

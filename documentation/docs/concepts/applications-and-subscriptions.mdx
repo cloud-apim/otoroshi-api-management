@@ -9,7 +9,7 @@ description: Applications group a consumer's identity; subscriptions bind an app
 ## Applications
 
 An application groups the subscriptions and the technical identity of a consumer: name,
-owning team, the **expected `client_id`** for `jwt`, `mtls` and `oauth2` plans, client certificates
+owning team, the **expected `client_id`** for `jwt`, `mtls` and `oauth2-remote` plans, client certificates
 and [metadata](./metadata.mdx).
 
 It groups **identity, never counters**: each credential keeps its own quotas.
@@ -75,7 +75,9 @@ for a producer or a payment is not on the gateway at all.
 - **Close** deletes the subscription from the gateway, and Otoroshi revokes its key with it.
 
 Every operation is projected asynchronously and replayed if the gateway is unreachable: the
-console shows the projection state (`synced`, `waiting`, `error`) and offers to replay it.
+console shows the projection state (`synced`, `waiting`, `error`) and offers to replay it. A
+secret rotation is the exception: it is written to the gateway at once, and fails while the gateway
+is unreachable.
 
 ## Transfer
 
@@ -104,11 +106,11 @@ The consent — who, when, for which reasons — is kept in the transfer history
 Both sides are notified in-app (the bells of the console and of the portal).
 
 ```bash
-bun cli/apim.js subscriptions transfer default sub_01a1… --plan plan_partner
+otoroshi-apim subscriptions transfer default sub_01a1… --plan plan_partner
 ```
 
-The command answers with the subscription: when `pending_transfer.status` is `awaiting_consent`,
-the move waits for the consumer.
+The command says whether the move is done, or waits — for the consumer's consent, or for a payment:
+the subscription then has a `pending_transfer` (`-o json`), whose `status` is `awaiting_consent`.
 
 ## Notifications
 
@@ -132,6 +134,6 @@ request (usage statement, terms acceptance, request form answers). A reviewer ac
 with a message; the decision is recorded on the subscription and in the audit trail.
 
 ```bash
-bun cli/apim.js subscriptions list default --status pending
-bun cli/apim.js subscriptions accept default sub_01a1… --message "welcome"
+otoroshi-apim subscriptions list default --status pending
+otoroshi-apim subscriptions accept default sub_01a1… --message "welcome"
 ```

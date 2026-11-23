@@ -91,7 +91,7 @@ them alone.
 
 The content of a page, in a language, is the text itself or **a file beside the document**:
 `{ file: docs/getting-started.fr.md }`, a path relative to the document that stays within its
-source — no absolute path, no `..`, 1 MB at most. Whoever holds the files reads them: `apim apply`
+source — no absolute path, no `..`, 1 MB at most. Whoever holds the files reads them: `otoroshi-apim apply`
 from the disk, a [remote catalog](./remote-catalogs.mdx) from its repository, its bucket or the
 origin of its url. Over HTTP the content is given inline: the admin API refuses a file it cannot
 read, and so does a Kubernetes resource.
@@ -99,9 +99,9 @@ read, and so does a Kubernetes resource.
 ## Applying
 
 ```bash
-bun cli/apim.js apply default -f petstore.yaml                      # writes the draft
-bun cli/apim.js apply default -f petstore.yaml --publish            # + freezes a snapshot if anything changed
-bun cli/apim.js apply default -f petstore.yaml --publish --deploy   # + projects it
+otoroshi-apim apply default -f petstore.yaml                      # writes the draft
+otoroshi-apim apply default -f petstore.yaml --publish            # + freezes a snapshot if anything changed
+otoroshi-apim apply default -f petstore.yaml --publish --deploy   # + projects it
 ```
 
 `apply` upserts by `(workspace, metadata.name, spec.version)` and writes the **draft**: publishing
@@ -119,5 +119,5 @@ Over HTTP: `POST /api/workspaces/<ws>/apply?publish=true&deploy=true` with one d
 
 The developer portal of a workspace has a declarative document too, `kind: Portal`: its
 [design](../portal-design.mdx#a-folder-a-catalog) — mode, texts, theme, navigation, home, pages,
-templates, style sheet, script and assets —, a folder that `apim portal pull` writes and
-`apim portal push` sends back, and that a remote catalog reads beside the `Api` documents.
+templates, style sheet, script and assets —, a folder that `otoroshi-apim portal pull` writes and
+`otoroshi-apim portal push` sends back, and that a remote catalog reads beside the `Api` documents.

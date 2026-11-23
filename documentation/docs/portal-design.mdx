@@ -285,11 +285,11 @@ spec:
 ```
 
 ```bash
-bun cli/apim.js portal pull showcase portal              # the draft into ./portal
-bun cli/apim.js portal push showcase portal --watch      # every change into the draft; the preview link printed
-bun cli/apim.js portal push showcase portal --publish    # the draft, then a version
-bun cli/apim.js portal preview showcase                  # a link to the draft, for an hour
-bun cli/apim.js portal versions showcase
+otoroshi-apim portal pull showcase portal              # the draft into ./portal
+otoroshi-apim portal push showcase portal --watch      # every change into the draft; the preview link printed
+otoroshi-apim portal push showcase portal --publish    # the draft, then a version
+otoroshi-apim portal preview showcase                  # a link to the draft, for an hour
+otoroshi-apim portal versions showcase
 ```
 
 `push` sends only the assets the portal does not hold yet; the others are named by their digest.
@@ -297,7 +297,7 @@ bun cli/apim.js portal versions showcase
 A [remote catalog](./gitops/remote-catalogs.mdx) — git, S3, HTTP — that holds the same folder applies
 the design at each sync and **publishes** it (unless the catalog writes drafts only), and then **owns**
 it: the console shows it read only, and a document without a source — a `push` — is refused, unless
-it takes the design over (`apim portal push … --force`, `POST …/portal/apply?force=true`). A design
+it takes the design over (`otoroshi-apim portal push … --force`, `POST …/portal/apply?force=true`). A design
 can be owned by one source at a time.
 
 ![A folder synchronised with the cli, or a catalog](/img/screens/console-portal-sync.png)

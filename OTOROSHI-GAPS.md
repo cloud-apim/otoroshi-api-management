@@ -46,7 +46,7 @@ yet.
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sent an error event** for a call that then succeeded, or was refused: the call was counted twice, once as a `400` | medium | ✅ | nothing: the dashboards count these events as errors |
-| G-23 | [#2963](https://github.com/MAIF/otoroshi/issues/2963) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
+| G-23 | [#2964](https://github.com/MAIF/otoroshi/issues/2964) (was [#2963](https://github.com/MAIF/otoroshi/issues/2963)) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
 | G-24 | [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60) | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
 | G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
 | G-26 | [waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61) | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
@@ -369,7 +369,13 @@ consumer identified on the call" and loses "no apikey detected in the http reque
 
 ## G-23 — a key cannot serve several subscriptions — medium — open
 
-Reported upstream: [#2963](https://github.com/MAIF/otoroshi/issues/2963). Found on 18.1.0-dev
+Reported upstream: [#2963](https://github.com/MAIF/otoroshi/issues/2963), closed on 2026-11-20 and
+split in two: the key of another subscription kept in the `token_refs` of a new one is fixed by
+[#2965](https://github.com/MAIF/otoroshi/issues/2965) (`d51df2c37` — a subscription lists, rebuilds and
+revokes only the keys it minted; nothing to change in the product, which lets each subscription mint
+its keys); one key for several `Api`s, each through a subscription of its own, is
+[#2964](https://github.com/MAIF/otoroshi/issues/2964), open, with another design than a list of
+`apiRef`s on the key: alias keys. Found on 18.1.0-dev
 while implementing R-12 (one credential for several subscriptions of a consumer, D-31: the identity
 grouped, the quotas never pooled), and reproduced on the development gateway.
 

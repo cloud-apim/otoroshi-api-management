@@ -43,7 +43,7 @@ const capabilities = [
   {
     kicker: 'GitOps',
     title: 'Everything is administrable by program',
-    body: 'The console is a client of the admin API, so every action replays from the CLI. APIs are declarative documents you can apply, and remote catalogs — HTTP or git — reconcile them on a schedule.',
+    body: 'The console is a client of the admin API, so every action replays from the CLI. APIs are declarative documents you can apply, and remote catalogs — HTTP, git or S3 — reconcile them on a schedule.',
   },
   {
     kicker: 'Open',
@@ -59,13 +59,11 @@ const layers = [
   { num: '04', name: 'Consume', desc: 'Consumers subscribe from the portal; accepted subscriptions become apikeys; every call is counted and attributed.' },
 ];
 
-const quickstart = `# the development stack: postgres, otoroshi 18, an echo backend, the product
-bun install && bun run build
-docker compose -f docker/docker-compose.yml --profile apim up -d
+const quickstart = `# the development stack: postgres, otoroshi 18.1, an echo backend, the product
+mise run install && mise run up && mise run demo
 
 # declare an api from a file, publish and deploy it
-export APIM_TOKEN=apim-admin-token
-bun cli/apim.js apply default -f examples/petstore.yaml --publish --deploy
+mise run cli apply default -f examples/petstore.yaml --publish --deploy
 
 # console:  http://localhost:9000/backoffice/   (admin@otoroshi.io / password)
 # portal:   http://localhost:9000/default/`;
@@ -91,6 +89,9 @@ function Hero() {
               </Link>
               <Link className={styles.buttonGhost} to="/docs/quickstart">
                 Quickstart
+              </Link>
+              <Link className={styles.buttonGhost} to="/docs/tutorial">
+                Tutorial
               </Link>
               <Link className={styles.buttonGhost} href="https://github.com/cloud-apim/otoroshi-api-management">
                 GitHub
@@ -165,8 +166,9 @@ function Start() {
           A running catalogue in a few commands
         </Heading>
         <p className={styles.sectionLede}>
-          The development stack brings an Otoroshi 18 gateway, PostgreSQL, a demo backend and the product. The quickstart
-          walks through the console, the portal and a call through the gateway.
+          The development stack brings an Otoroshi 18.1 gateway, PostgreSQL, a demo backend and the product. The
+          quickstart starts it; the tutorial walks through the console, the portal and a call through the gateway, a
+          screen at each step.
         </p>
         <div className={styles.snippet}>
           <CodeBlock language="bash">{quickstart}</CodeBlock>

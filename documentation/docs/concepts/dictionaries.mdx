@@ -53,7 +53,7 @@ dictionary is not projected and its page says why.
 ```bash
 curl -X POST $APIM_URL/api/workspaces/default/dictionaries -H "Authorization: Bearer $APIM_TOKEN" \
   -H 'Content-Type: application/json' -d '{"name": "partners", "entries": {"acme": "gold"}}'
-apim dictionaries set default partners -f partners.json
-apim dictionaries get default partners
-apim dictionaries refresh default capitals
+otoroshi-apim dictionaries set default partners -f partners.json
+otoroshi-apim dictionaries get default partners
+otoroshi-apim dictionaries refresh default capitals
 ```

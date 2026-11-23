@@ -5,11 +5,18 @@
   Describe your APIs as products, publish them, let consumers subscribe — without ever opening the gateway.
 </p>
 
-> **Status: first prototype**, running against a real Otoroshi 18.1.0-dev. An end-to-end test describes a
-> reference catalogue — 6 plans, 5 auth mechanisms, 4 approval modes, on one API and one set of
-> routes — projects it, reconciles it and detects its drift (`test/reference-catalogue.test.js`).
+> **Status: 0.1.0, a beta.** It drives Otoroshi 18.1 — until 18.1 is released, built from the
+> `master` branch of Otoroshi. An end-to-end test describes a reference catalogue — 6 plans, 5 auth
+> mechanisms, 4 approval modes, on one API and one set of routes — projects it, reconciles it and
+> detects its drift (`test/reference-catalogue.test.js`). What 0.1.0 does and does not do:
+> [`CHANGELOG.md`](./CHANGELOG.md).
 
-**Documentation:** <https://cloud-apim.github.io/otoroshi-api-management/> — sources in [`documentation/`](./documentation), built with Docusaurus and published to GitHub Pages by the `documentation` workflow on every push to `main`.
+**Documentation:** sources in [`documentation/`](./documentation), built with Docusaurus —
+`mise run docs:dev` reads them locally, every [release](https://github.com/cloud-apim/otoroshi-api-management/releases)
+attaches them as a static site (a zip), and the `documentation` workflow publishes them to
+<https://cloud-apim.github.io/otoroshi-api-management/> once GitHub Pages is enabled on the repository.
+Start with the **tutorial**: an API exposed from the console, then subscribed to and called by a
+consumer alone, a screen at each step.
 
 ## What it is
 
@@ -29,14 +36,15 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 
 ## Quick start
 
-Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar, 18.1
-or later — until it is released, built from the `master` branch of Otoroshi — (`../otoroshi.jar` by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`); its extensions,
-optional, from a directory (`OTOROSHI_EXTENSIONS`, see the install documentation).
+Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar,
+18.1 or later — until it is released, built from the `master` branch of Otoroshi: `../otoroshi.jar`
+by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`. Its extensions, optional, come from a directory
+(`OTOROSHI_EXTENSIONS`, see the install documentation).
 
 ```sh
 mise trust && mise install
 mise run install                   # dependencies of the product and of the documentation
-mise run up                        # builds the uis, starts postgres, otoroshi 18, the product… and waits
+mise run up                        # builds the uis, starts postgres, otoroshi, the product… and waits
 mise run demo                      # demo apis, a gitops workspace with its remote catalog, the data exporter
 mise run open                      # the urls and credentials
 ```
@@ -44,34 +52,43 @@ mise run open                      # the urls and credentials
 `mise tasks` lists everything else: `test`, `test:unit`, `test:e2e`, `ci`, `watch`, `logs`,
 `docs:dev`, `screenshots`, `cli`, `psql`, `image`, `reset`… Without mise, the same steps are
 `bun install`, `bun run build` and `docker compose -f docker/docker-compose.yml --profile apim up -d`.
+The stack runs the product with `DEV=true`: the values of the development stack below stand in for
+its configuration. Without it, the product starts for production and requires its configuration
+(documentation › Install › Configuration).
 
 - console: <http://localhost:9000/backoffice/> — `admin@otoroshi.io` / `password`
 - portal: <http://localhost:9000/default/>
 - admin api: `curl -H 'Authorization: Bearer apim-admin-token' localhost:9000/api/me`
 - otoroshi: <http://otoroshi.oto.tools:8080> — `admin@otoroshi.io` / `password`
 
-Running the product on the host (`DEV=true bun --watch server/main.js`, or `mise run dev`) works too, but the Otoroshi data
-exporter then has to reach the host; inside the compose stack it reaches `http://apim:9000/ingest`.
+Running the product on the host works too — `mise run stop:apim`, then `mise run dev` —, but the
+Otoroshi data exporter then has to reach the host; inside the compose stack it reaches `http://apim:9000/ingest`.
 Install the exporter from the console (Gateway → Connection & events) or
 `POST /api/gateway/exporter`.
 
 ## A tour in five commands
 
+The command line is the executable, `otoroshi-apim <command>`; from the clone, `mise run cli
+<command>` runs the same commands against the local product, its url and token already set.
+
 ```sh
-export APIM_TOKEN=apim-admin-token
-bun cli/apim.js apply default -f examples/petstore.yaml --publish --deploy
-bun cli/apim.js apis list default
-bun cli/apim.js apis deploy default petstore --dry-run   # the gateway diff, before acting
-bun cli/apim.js subscriptions list default --status pending
-bun cli/apim.js drift default
+mise run cli apply default -f examples/petstore.yaml --publish --deploy
+mise run cli apis list default
+mise run cli apis deploy default petstore --dry-run   # the gateway diff, before acting
+mise run cli subscriptions list default --status pending
+mise run cli drift default
 ```
 
 ## One executable
 
+The server, the console, the portal, the migrations and the command line are one program. Each
+[release](https://github.com/cloud-apim/otoroshi-api-management/releases) publishes it for linux and
+macOS, x64 and arm64, and as the image `ghcr.io/cloud-apim/otoroshi-api-management`.
+
 ```sh
-mise run build:binary            # dist/bin/otoroshi-apim: the server, the console, the portal and the command line
-dist/bin/otoroshi-apim           # the server, with the roles of APIM_ROLES
-dist/bin/otoroshi-apim apis list default
+mise run build:binary                        # dist/bin/otoroshi-apim, for this machine
+DEV=true APIM_PORT=9001 dist/bin/otoroshi-apim   # the server, with the roles of APIM_ROLES, beside the stack
+APIM_URL=http://localhost:9000 APIM_TOKEN=apim-admin-token dist/bin/otoroshi-apim apis list default
 ```
 
 ## Architecture
@@ -88,14 +105,15 @@ console (/backoffice) ─┐                     ┌─ portal (/<workspace>/, /
          Otoroshi (data plane) ── data exporter ──▶ ingester (/ingest) ──▶ analytics db
 ```
 
-One binary, started with a comma-separated list of roles (`APIM_ROLES`, default all four):
+One binary, started with a comma-separated list of roles (`APIM_ROLES`, by default the first four):
 
 | Role | Serves |
 |---|---|
 | `api` | `/api` — the admin api, bearer tokens |
 | `backoffice` | `/backoffice`, `/backoffice/api` — the console and the same admin api, with a session |
 | `portal` | `/<workspace>/` and `/<workspace>/front/api` (or `<workspace>.<domain>` in hostname mode) |
-| `ingester` | `/ingest` — GatewayEvent, LLMUsageAudit, McpAudit |
+| `ingester` | `/ingest` — GatewayEvent, CloudApimSecurityEvent, LLMUsageAudit, McpAudit |
+| `controller` | no route: the Kubernetes resources of the product (Api, Application, Subscription), reconciled |
 
 Two PostgreSQL databases: application data, and events + analytics.
 
@@ -129,7 +147,7 @@ Two PostgreSQL databases: application data, and events + analytics.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
 - **One credential for several APIs** — a consumer subscribed to several APIs calls them with one
-  key; waits for Otoroshi ([#2963](https://github.com/MAIF/otoroshi/issues/2963)).
+  key; waits for Otoroshi ([#2964](https://github.com/MAIF/otoroshi/issues/2964)).
 - **Notifications outside the product** — email and outgoing webhooks: a subscription to review or
   accepted, a key about to expire, a version deprecated, a quota nearly spent. Today they live in
   the console and the portal only.
@@ -150,10 +168,13 @@ to be fixed upstream — never worked around in the product's model.
 | `server/` | Bun server: config, http router, domain, Otoroshi client and projection, roles |
 | `web/shared/` | front kit: theme, router, components, charts |
 | `web/backoffice/`, `web/portal/` | the two React + Vite apps |
-| `cli/apim.js` | the command line |
-| `test/` | unit tests, and the reference catalogue test against the real stack |
+| `cli/` | the command line, and the setup of the gateway |
+| `test/` | unit tests, end-to-end tests against the real stack, the interface in a headless Chromium |
 | `docker/` | the development stack |
-| `examples/` | declarative api documents |
+| `deploy/` | the Helm chart and the Kubernetes manifests |
+| `documentation/` | the user documentation (Docusaurus) |
+| `scripts/` | the demo data, the screens tour and the tutorial captures, the executable's build, the checks |
+| `examples/` | declarative api documents, a remote catalog |
 
 ## Licence
 

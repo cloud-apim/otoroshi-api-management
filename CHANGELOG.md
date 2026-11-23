@@ -47,7 +47,7 @@ Otoroshi, one executable or one image, with its documentation.
 
 - **REST APIs only.** The other types — event-driven, MCP, AI, then GraphQL and gRPC — come next.
 - **One credential per subscription**: a key cannot serve the subscriptions of a consumer to
-  several APIs yet (Otoroshi, [#2963](https://github.com/MAIF/otoroshi/issues/2963)).
+  several APIs yet (Otoroshi, [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
 - **The extensions of the gateway** must be built for the same Otoroshi: the Threat Protection
   Suite and the LLM extension released so far do not run on Otoroshi `master`. Without them, a plan
   that asks for the threat protection is warned, and no AI or MCP audit comes in. With the

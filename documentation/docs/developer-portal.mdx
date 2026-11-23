@@ -31,7 +31,7 @@ guide, a contact page — in Markdown, in each language of the portal (the defau
 translation is missing), at `/pages/<slug>`. A page is in the navigation of the portal, in the order
 of the list, or reached by its link only. They are part of the [design](./portal-design.mdx) of the
 portal, written in **Developer portal › Pages** and published with it, from a folder with
-`apim portal push`, or by the admin API (`PUT …/workspaces/<ws>/portal/design` with `pages`: a slug made
+`otoroshi-apim portal push`, or by the admin API (`PUT …/workspaces/<ws>/portal/design` with `pages`: a slug made
 of lowercase letters, digits and dashes, unique; a title; a content per language; `nav`). In a portal
 written as templates, a page is a template, its tags and variables included.
 
@@ -49,8 +49,8 @@ Search covers names, descriptions and tags.
 Beyond a few dozen APIs a flat list is not enough. The catalogue is a discovery tool on three axes,
 each correcting the blind spots of the others:
 
-- **Editorial** — the portal declares its **categories** (**Settings → Portal**, a slug and a name per
-  language), and each API is placed in its own and possibly **featured** from its page, tab
+- **Editorial** — the portal declares its **categories** (**Developer portal › Settings**, a slug and a
+  name per language), and each API is placed in its own and possibly **featured** from its page, tab
   **Catalogue**. The placement covers all the versions of the API and applies at once: it is not part
   of the description, so it needs no snapshot and holds on an API a remote catalog manages. Featured
   APIs open the catalogue in a section of their own, and fill the home page.
@@ -63,7 +63,7 @@ each correcting the blind spots of the others:
 
 The catalogue filters by category and tag, and sorts by featured first (the default), most used,
 best rated, name or most recently published. A workspace keeps its reviews or its usage off the
-portal in **Settings → Portal → Discovery**.
+portal in **Developer portal › Settings › Discovery**.
 
 ## An API page
 
@@ -105,7 +105,8 @@ answer the usage statement and the request form, accept the terms. The result de
 
 - **automatic**: the credentials are shown at once;
 - **manual**: waiting for a producer's review;
-- **paid**: waiting for the payment — the prototype offers a clearly labelled *test payment* button.
+- **paid**: waiting for the payment — **Pay** opens a Stripe Checkout, and the key comes once it is
+  paid ([payments](./payments.mdx)).
 
 Plans that are not open to self-service are shown, marked as such, and cannot be requested from the
 portal.

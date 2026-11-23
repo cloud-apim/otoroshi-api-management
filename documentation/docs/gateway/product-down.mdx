@@ -64,9 +64,11 @@ else. What stays on the gateway:
 | the `ApiSubscription`s and their keys | `id_ref` (the application), `apim_subscription_id` | served, managed by hand |
 | the derived JWT verifiers, CA certificates, auth modules, application certificates | `created_by`, `apim_derived` | referenced by the plans: keep them |
 | the keys the gateway minted for the consumers of jwt, mtls, oauth2-remote and keyless plans | `created_by: apikey-extractor` | Otoroshi's own |
-| the data exporter `apim_ingester_exporter` | `apim_managed_by` | its ingester is gone: delete it |
+| the data exporter `apim_ingester_exporter` | `created_by: otoroshi-apim-setup` | its ingester is gone: delete it |
+| the routes of the console and the portals, `apim_setup_console`, `apim_setup_portals` | `created_by: otoroshi-apim-setup` | their backend is gone: delete them |
+| the key of the product, `apim_product_admin` | `created_by: otoroshi-apim-setup` | an admin key with every right: delete it |
 
 The markers left on the entities are inert: Otoroshi only reads `created_by` on an `Api`. To keep
 what only the product holds — documentation, snapshots, the catalogue, the applications — export
-each workspace before dropping the databases (`apim export <ws>`, see the [CLI](../gitops/cli.mdx),
+each workspace before dropping the databases (`otoroshi-apim export <ws>`, see the [CLI](../gitops/cli.mdx),
 or **Workspace settings → Export / import**): the export is importable into another installation.

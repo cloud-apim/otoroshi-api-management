@@ -100,7 +100,7 @@ kubectl get apis.otoroshi-apim.io,applications.otoroshi-apim.io,subscriptions.ot
 
 | Field | |
 |---|---|
-| `phase` | `Ready`, `Deploying`, `Pending`, `Active`, `Suspended`, `Rejected`, `Waiting` (for another resource), `Error` |
+| `phase` | `Ready`, `Deploying`, `Pending`, `Active`, `Suspended`, `Rejected`, `Closed`, `Waiting` (for another resource), `Error`; another status of a subscription (`expired`) as it is |
 | `message` | what to know, or why it failed |
 | `workspace` | the workspace of the resource |
 | `apiId`, `snapshot`, `deployed`, `url` | an Api: its id, its latest snapshot, the one deployed, its url |

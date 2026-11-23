@@ -18,8 +18,10 @@ otoroshi-apim setup --admin-client-id <id> --admin-client-secret <secret> \
 ```
 
 The same run is in the console — **Gateway › Setup** — and in the command line through the admin
-API — `apim gateway setup`, with the same flags. The binary runs it in process: it needs the
-databases of the product and the gateway, not a running product.
+API — `otoroshi-apim gateway setup`, with the same flags. The binary runs it in process —
+`otoroshi-apim setup` —, with the configuration of the product (the same variables as the server,
+checked the same way unless `DEV=true`): it needs the databases of the product and the gateway, not a
+running product.
 
 ## The parts
 

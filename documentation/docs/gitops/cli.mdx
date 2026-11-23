@@ -20,9 +20,9 @@ The same commands, three ways:
 
 | | |
 |---|---|
-| **The executable** — `otoroshi-apim <command>` | the one of the [releases](../install.mdx#releases), linux and macOS, x64 and arm64: the server and the command line are one program. The examples of this page use it |
+| **The executable** — `otoroshi-apim <command>` | the one of the [releases](../install.mdx#releases), linux and macOS, x64 and arm64: the server and the command line are one program. The examples of this documentation use it |
 | **The image** — `docker run --rm -e APIM_URL -e APIM_TOKEN ghcr.io/cloud-apim/otoroshi-api-management <command>` | the same executable, for a CI that runs containers; the files it reads (`apply -f`, `portal push`) mounted: `-v "$PWD:/work" -w /work` |
-| **From the repository** — `bun cli/apim.js <command>` | with Bun, in a clone of the repository: the form the other pages of this documentation write |
+| **From a clone of the repository** — `mise run cli <command>` | the url and the token of the local product of the development stack already set |
 
 | Flag | Environment | Default |
 |---|---|---|
@@ -36,6 +36,7 @@ The same commands, three ways:
 |---|---|
 | `whoami` | the user behind the token |
 | `gateway status` | gateway health, projection queue, last drift run, ingestion |
+| `gateway setup [--only key,exporter,console,portals,tls] [--dry-run] [--admin-client-id id --admin-client-secret s] [--product-url u] [--exporter-url u] [--console-host h] [--console-auth-module id] [--portal-host h] [--client-auth Want\|Need] [--rotate-key]` | the [setup of the gateway](../gateway/setup.mdx), through the admin API |
 | `workspaces list` | |
 | `apis list <ws>` | name, version, lifecycle, gateway state, snapshot, plans, subscriptions |
 | `apis get <ws> <api>` | the [declarative document](./declarative-documents.mdx) of an API-version |
@@ -49,21 +50,22 @@ The same commands, three ways:
 | `apply <ws> -f <file> [--publish] [--deploy] [--managed-by <source>] [--comment c]` | upsert declarative documents — the content of their pages given by a file is read beside the file |
 | `subscriptions list <ws> [--status s] [--api id]` | |
 | `subscriptions accept\|reject\|suspend\|resume\|close <ws> <id> [--message m]` | |
+| `subscriptions resync <ws> <id>` | project the subscription on the gateway again |
 | `portal pull <ws> [dir]` | the design of the portal (its draft) into a folder: `portal.yaml`, and its pages, templates, style sheet, script and assets beside it (`./portal` by default) |
-| `portal push <ws> [dir] [--publish] [--comment c] [--watch]` | the folder into the draft of the design — a version with `--publish`; `--watch` pushes again on every change and prints the preview link; the assets the portal holds already are named by their digest, not sent again |
-| `portal preview\|publish\|versions <ws>` | a link to the draft for an hour, a version from the draft, the versions |
+| `portal push <ws> [dir] [--publish] [--comment c] [--watch] [--force]` | the folder into the draft of the design — a version with `--publish`; `--watch` pushes again on every change and prints the preview link; the assets the portal holds already are named by their digest, not sent again |
+| `portal preview\|publish\|versions <ws> [--comment c]` | a link to the draft for an hour, a version from the draft (`--comment`), the versions |
 | `policy-groups list\|upgrade <ws> [<group>] [--publish] [--deploy]` | the shared policy groups, their APIs behind; `upgrade` moves those to the latest version — their drafts, and on demand their snapshots and deployments |
 | `shared-resources list\|upgrade <ws> [<resource>] [--publish] [--deploy]` | the same for the shared resources |
-| `dictionaries list\|get\|set\|refresh\|delete <ws> [<name>]` | the dictionaries of a workspace; `set -f values.json` writes a static one |
+| `dictionaries list\|get\|set\|refresh\|delete <ws> [<name>]` | the dictionaries of a workspace; `set -f values.json [--description d]` writes a static one |
 | `subscriptions ending <ws> <id> <date\|none>` | the end date of a subscription: past, it expires; `none` renews it |
 | `subscriptions usage <ws> <id>` | the usage billed: the batches of calls sent to the meter of the payment provider |
-| `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan |
+| `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan; a move that waits for the consumer's consent or a payment says so |
 | `applications list <ws>` | |
 | `drift <ws>` | run drift detection and print the reports |
-| `audit <ws> [--limit n]` | the audit trail |
+| `audit <ws> [--limit n] [--q text]` | the audit trail |
 | `apis export-snapshot <ws> <api> [--snapshot n]` | a snapshot as a [promotion](./promotion.mdx) document (default: the deployed one) |
 | `promote <ws> -f <file> [--dry-run] [--deploy] [--replace-draft]` | take a promoted snapshot on this installation |
-| `promote <ws> <api> --to <url> --to-token <t> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy]` | send a snapshot of this installation to the next one |
+| `promote <ws> <api> --to <url> --to-token <t> [--to-workspace ws] [--snapshot n] [--dry-run] [--deploy] [--replace-draft]` | send a snapshot of this installation to the next one |
 | `export <ws>` | the full export, re-importable |
 | `import <ws> -f <file>` | |
 

@@ -48,7 +48,7 @@ Deploying a snapshot writes one Otoroshi `Api` entity, whose id is the product's
   the marker. The product's tool id is `otoroshi-api-management`.
 - **The snapshot, on the gateway side**. `deployment_ref` names the snapshot deployed: Otoroshi
   gives it to the deployment it records as its `ref`, so `deployments[0].ref` says which snapshot is
-  live, and the console lists the gateway's deployments by snapshot (**Deployment › Technical
+  live, and the console lists the gateway's deployments by snapshot (**Settings › Technical
   details**). Otoroshi keeps the last five (`OTOROSHI_APIS_DEPLOYMENTS_HISTORY_SIZE`); the product
   keeps its whole history.
 - **Ownership**. The marker and `apim_api_id` are how the product recognises its own

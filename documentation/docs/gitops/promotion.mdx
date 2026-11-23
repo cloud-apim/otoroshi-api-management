@@ -13,9 +13,9 @@ immutable, so what runs in recette and what goes to production are the same docu
 ## How it goes
 
 1. On the recette, export a snapshot as a **promotion document**: **API → Deployment → Export for
-   promotion**, or `apim apis export-snapshot <ws> <api> [--snapshot n]` (by default the snapshot
+   promotion**, or `otoroshi-apim apis export-snapshot <ws> <api> [--snapshot n]` (by default the snapshot
    that runs there).
-2. On the production, **APIs → Promote a snapshot**, or `apim promote <ws> -f <file> --dry-run`:
+2. On the production, **APIs → Promote a snapshot**, or `otoroshi-apim promote <ws> -f <file> --dry-run`:
    a dry run says what would happen, and changes nothing.
 3. Promote it, and deploy it — at once (**Promote and deploy**, `--deploy`) or later, like any other
    snapshot.
@@ -24,7 +24,7 @@ From one installation to the next in one command, with a token of each:
 
 ```sh
 APIM_URL=https://apim.recette.example.com APIM_TOKEN=… \
-  apim promote default petstore --to https://apim.example.com --to-token … --dry-run
+  otoroshi-apim promote default petstore --to https://apim.example.com --to-token … --dry-run
 ```
 
 ## What the dry run says

@@ -93,7 +93,7 @@ APIM_ADMIN_TOKEN=…                       # the first admin token: change it
 APIM_BOOTSTRAP_ADMINS=you@example.com    # the first administrators of the console
 APIM_BOOTSTRAP_PASSWORD=…
 APIM_INGEST_TOKEN=…                      # what the data exporter of the gateway presents
-APIM_INGEST_URL=https://apim.example.com/ingest
+APIM_INGEST_URL=https://apim.example.com/ingest   # optional: /ingest as the gateway reaches it
 OTOROSHI_URL=https://otoroshi-api.example.com
 OTOROSHI_HOST=otoroshi-api.example.com
 OTOROSHI_CLIENT_ID=…                     # the admin key of the gateway
@@ -139,9 +139,10 @@ exposure — the public portal and the ingester do not have the same profile as 
 `/health` answers `{"status":"ok","roles":[…]}` on every instance.
 
 The background workers — the projection queue, the periodic drift detection, the remote catalog
-scheduler, the payments — run on instances carrying `api` or `backoffice`, unless
-`APIM_WORKERS_ENABLED=false`; the rollups and the retention of the analytics run on the instances
-carrying `ingester`, one at a time.
+scheduler, the payments, the expiry of the subscriptions, the refresh of the dictionaries, the
+export of the audit trail — run on instances carrying `api` or `backoffice`; the rollups and the
+retention of the analytics run on the instances carrying `ingester`, one at a time.
+`APIM_WORKERS_ENABLED=false` keeps an instance out of both.
 
 Several instances of a role share the work: they hold no state of their own — a session made on one
 console instance is good on the others, and the workers of several instances share the projection
@@ -165,7 +166,7 @@ mise run build:binaries        # dist/bin/otoroshi-apim-{linux,darwin}-{x64,arm6
 otoroshi-apim                  # the server, with the roles of APIM_ROLES — or: otoroshi-apim serve
 otoroshi-apim setup …          # what the product needs on the gateway, given an Otoroshi admin key
 otoroshi-apim version
-otoroshi-apim apis list default        # the command line: the same commands as bun cli/apim.js
+otoroshi-apim apis list default        # the command line
 ```
 
 Once the databases are reachable, `otoroshi-apim setup` with an Otoroshi admin key makes the
@@ -267,7 +268,7 @@ enc:v1:<key id>:<iv, tag and ciphertext>
 in clear before a key was set — is sealed again with the current one. Once every instance runs with
 the new key, the previous one can go.
 
-Without a key, secrets are stored in clear, and the [setup check](./gateway/setup.mdx) says so.
+With `DEV=true` and no key, secrets are stored in clear, and the [setup check](./gateway/setup.mdx) says so.
 
 The secrets a plan describes — the HMAC secret of a jwt plan, the client secret of an authorization
 server — are in its draft, in every snapshot and in their exports: give a **vault reference**
@@ -299,7 +300,7 @@ which fills it with the value of the development stack, given in parentheses.
 | `APIM_DATABASE_IDLE_TIMEOUT_S` | `30` | an idle connection is closed after that many seconds |
 | `APIM_SECRETS_KEY` | required (none: in clear) | the key the secrets kept by the product are sealed with ([secrets at rest](#secrets-at-rest)) |
 | `APIM_SECRETS_PREVIOUS_KEYS` | — | previous keys, comma-separated: still read, their secrets sealed again with the current key at start |
-| `APIM_WORKERS_ENABLED` | `true` | run the projection queue, drift detection and catalog scheduler |
+| `APIM_WORKERS_ENABLED` | `true` | run the background workers: projection queue, drift detection, catalogs, payments, expiry, dictionaries, audit export — and, on an `ingester`, the rollups and the retention |
 | `APIM_PROJECTION_INTERVAL_MS` | `2000` | how often the projection queue is polled |
 | `APIM_DRIFT_INTERVAL_MS` | `60000` | how often drift is detected |
 | `APIM_COOKIE_SECURE` | `true` when `APIM_PUBLIC_URL` is `https` | mark session cookies `Secure` |
@@ -336,7 +337,7 @@ AI and MCP audits it ingests. In the development stack, the gateway starts with 
 directory on its classpath, both extensions enabled:
 
 ```sh
-# the latest releases, in a directory of their own
+# releases built for the Otoroshi of the gateway (see below), in a directory of their own
 mkdir -p ~/otoroshi-extensions && cd ~/otoroshi-extensions
 gh release download -R cloud-apim/otoroshi-waf-extension -p 'otoroshi-waf-extension_3-*.jar*'
 gh release download -R cloud-apim/otoroshi-llm-extension -p 'otoroshi-llm-extension_3-*.jar*'
@@ -345,6 +346,14 @@ sha256sum -c *.sha256
 OTOROSHI_EXTENSIONS=~/otoroshi-extensions mise exec -- docker compose up -d otoroshi
 mise run demo   # the development gateway keeps nothing across a restart
 ```
+
+:::warning An extension is built for an Otoroshi
+An extension runs only on the Otoroshi it was built against. The releases published so far (Threat
+Protection Suite 1.0.0, LLM extension 0.0.90) are built against an earlier Otoroshi and do not
+start on the `master` of Otoroshi 18.1: take the releases built for 18.1 once they are out, or build
+the extensions against the same Otoroshi. Without them the product runs: a plan that
+asks for the threat protection is warned, and no AI or MCP audit comes in.
+:::
 
 ### Ingestion
 
@@ -386,8 +395,8 @@ See [Authentication](./authentication.mdx).
 
 ### Command line
 
-The command line is `bun cli/apim.js <command>` from the repository, or `otoroshi-apim <command>`
-with the executable.
+The [command line](./gitops/cli.mdx) is the executable, `otoroshi-apim <command>` — or, from a clone
+of the repository, `mise run cli <command>`.
 
 | Variable | Default | Meaning |
 |---|---|---|

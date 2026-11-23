@@ -10,7 +10,8 @@ description: Chains of Otoroshi plugins run by the resources of an API, or added
 
 A policy flow is a named chain of Otoroshi plugins. It belongs to the draft of the API, is frozen
 in its snapshots and projected as a flow of the Otoroshi `Api` entity: what you edit is what the
-gateway runs, the product adds nothing of its own.
+gateway runs. The product adds one plugin only, `OtoroshiHeadersIn` — the request id sent to the
+backends —, unless **Settings › Correlation** of the API is off.
 
 ## Where a flow runs
 

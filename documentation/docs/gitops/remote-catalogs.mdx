@@ -21,7 +21,7 @@ in the manner of Otoroshi's remote catalogs. Configure them in **Workspace setti
 An HTTP catalog can send a header (a token, for instance); an S3 catalog signs its requests with an
 access key id and its secret. Both are sealed at rest ([secrets at rest](../install.mdx#secrets-at-rest))
 and never shown again. A catalog reconciles the `Api` documents, and the `Portal` document of its
-workspace — the design of its portal, the same folder `apim portal pull` writes —, applied and
+workspace — the design of its portal, the same folder `otoroshi-apim portal pull` writes —, applied and
 published by a sync unless the catalog writes drafts only, then owned by the catalog. Documents of
 another kind are ignored and counted.
 
@@ -54,6 +54,7 @@ or on demand.
 | `conflict` | the API is managed by another source |
 | `orphaned` | managed by this catalog, gone from the source — kept |
 | `delete` | gone from the source, and the catalog prunes |
+| `error` | the document is refused, saying why |
 
 Over the admin API: `POST /api/workspaces/<ws>/catalogs/<id>/preview`, then `…/sync`.
 

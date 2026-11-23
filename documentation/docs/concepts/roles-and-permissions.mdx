@@ -35,6 +35,9 @@ of its teams. A team has **owners** — the person who creates it is one — and
 | APIs — create, adopt from the gateway | — | ✓ (for its teams) | ✓ | ✓ |
 | Shared policy groups — create, edit, publish | — | ✓ | ✓ | ✓ |
 | Shared policy groups — delete | — | — | ✓ | ✓ |
+| Shared resources — create, edit, publish, upgrade | — | ✓ | ✓ | ✓ |
+| Shared resources — delete | — | — | ✓ | ✓ |
+| Dictionaries — create, edit, refresh, delete | — | ✓ | ✓ | ✓ |
 | Subscriptions — list, open | — | ✓ | ✓ | ✓ |
 | Subscriptions — accept, reject, suspend, resume, close, transfer, metadata | — | team (of the API) | ✓ | ✓ |
 | Credentials of a subscription (the secret) | — | team (of the application) | ✓ | ✓ |
@@ -54,7 +57,7 @@ of its teams. A team has **owners** — the person who creates it is one — and
 | Workspace settings — Metadata fields | — | read | ✓ | ✓ |
 | Workspace settings — Payments: the linked Stripe account | — | read | ✓ | ✓ |
 | Workspace settings — Payments: link, unlink, the events, reconcile | — | — | ✓ | ✓ |
-| Workspace settings — Remote catalogs, Export / import | — | — | ✓ | ✓ |
+| Workspace settings — Catalogs, Export / import | — | — | ✓ | ✓ |
 | Gateway — status (does it answer), run the detection | — | ✓ | ✓ | ✓ |
 | Gateway — projection queue, drift reports, the counts of the gateway pill | — | its workspaces | its workspaces | all |
 | Gateway — its settings: Connection & events, Ingestion, Setup (the url of the gateway, the data exporter, the volumes of the installation) | — | — | — | ✓ |
@@ -67,9 +70,9 @@ of its teams. A team has **owners** — the person who creates it is one — and
 
 - **Every API is visible to every producer of the workspace**: a producer opens the APIs of the
   other teams read only — the console says so on the API and hides the actions.
-- **Declarative documents follow the same rule** (`POST …/apply`, `apim apply`): a producer creates
+- **Declarative documents follow the same rule** (`POST …/apply`, `otoroshi-apim apply`): a producer creates
   APIs for its own teams, and changes, publishes or deploys an existing API only if it manages it.
-  Remote catalogs are a workspace administrator's.
+  The remote catalogs (**Workspace settings › Catalogs**) are a workspace administrator's.
 - **Deciding on a subscription** belongs to who manages its API; **seeing its secret** belongs to
   the team of its application. Anyone else sees the secret masked. Every read of credentials, and
   every read of the request log, is written in the audit trail.
@@ -96,8 +99,8 @@ of its teams. A team has **owners** — the person who creates it is one — and
 The console follows the same rights in what it shows, so nobody meets a refusal it could have
 foreseen:
 
-- a producer sees the workspace settings it may read **read only** (General, Developer portal,
-  Members, Metadata), with the reason, and does not see Remote catalogs nor Export / import;
+- a producer sees the workspace settings it may read **read only** (General, Members, Teams,
+  Metadata, Payments), with the reason, and does not see Catalogs nor Export / import;
 - the members of a team are chosen in the console by its owners and the administrators only;
 - the subscription drawer disables the decisions for who does not manage the API, and shows the
   rotation of a secret to who may see it;

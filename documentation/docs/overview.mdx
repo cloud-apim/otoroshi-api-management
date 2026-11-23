@@ -34,8 +34,9 @@ released —, and the gaps it found in the gateway that are still open are liste
 | Admin API | `/api` | the only way to do anything in the product — the console uses the very same router |
 | Ingester | `/ingest` | receives Otoroshi events and stores them attributed to APIs, plans, subscriptions and applications |
 
-They are four **roles** of a single binary: a deployment can carry all of them or split them
-across instances. See [Install](./install.mdx).
+They are four **roles** of a single binary — a fifth, `controller`, reconciles the
+[Kubernetes resources](./gitops/kubernetes.mdx) of the product: a deployment can carry all of them or
+split them across instances. See [Install](./install.mdx).
 
 ## The principles
 
@@ -62,7 +63,7 @@ adopted without being overwritten.
 
 **Everything is administrable by program**. The console is a client of the admin API, so
 every action replays from the [CLI](./gitops/cli.mdx). APIs are [declarative documents](./gitops/declarative-documents.mdx),
-and [remote catalogs](./gitops/remote-catalogs.mdx) reconcile them from HTTP or git.
+and [remote catalogs](./gitops/remote-catalogs.mdx) reconcile them from HTTP, git or S3.
 
 **One installation drives one Otoroshi cluster**. Geography is carried by Otoroshi's own
 leader/worker cluster; each environment is its own installation.

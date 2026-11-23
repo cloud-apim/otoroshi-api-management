@@ -57,7 +57,7 @@ UI changes need `bun run build`.
 
 :::tip Why the product runs inside Docker
 The Otoroshi data exporter must reach the ingester. Inside the compose network it reaches
-`http://apim:9000/ingest`. Running the product on the host works too (`DEV=true bun --watch server/main.js`),
+`http://apim:9000/ingest`. Running the product on the host works too (`mise run stop:apim`, then `mise run dev`),
 but the gateway container then has to reach your host.
 :::
 
@@ -75,10 +75,12 @@ The banner of the API page now says that snapshot #1 runs on the gateway.
 ## Or declare it from a file
 
 ```bash
-export APIM_TOKEN=apim-admin-token
-bun cli/apim.js apply default -f examples/petstore.yaml --publish --deploy
-bun cli/apim.js apis list default
+mise run cli apply default -f examples/petstore.yaml --publish --deploy
+mise run cli apis list default
 ```
+
+`mise run cli` is the [command line](./gitops/cli.mdx) from the clone, the url and the token of the
+local product already set — the same commands as the executable, `otoroshi-apim <command>`.
 
 `examples/petstore.yaml` is a [declarative API document](./gitops/declarative-documents.mdx): two
 `apikey` plans, one limited to the `/pets` resource, an OpenAPI specification and a bilingual page.
