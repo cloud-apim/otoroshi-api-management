@@ -36,8 +36,10 @@ services:
       - /otoroshi/otoroshi.jar:/otoroshi/extensions/*
       - play.core.server.ProdServerStart
     environment:
+      # its state in a file of the otodata volume: kept across a restart, a new jar, `mise run down`;
+      # `mise run reset` wipes it
       APP_STORAGE: file
-      APP_DB_PATH: /data/otoroshi.json
+      OTOROSHI_FILEDB_PATH: /data/state.ndjson
       APP_DOMAIN: oto.tools
       OTOROSHI_INITIAL_ADMIN_LOGIN: admin@otoroshi.io
       OTOROSHI_INITIAL_ADMIN_PASSWORD: password

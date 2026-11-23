@@ -1,6 +1,7 @@
 // The demo, second half: what the screens have to show beyond the apis themselves, idempotently.
-//  - the gateway caught up: the development gateway keeps nothing across a restart, so what the drift
-//    detection finds missing is deployed again (the snapshot that ran) and provisioned again
+//  - the gateway caught up: a gateway that lost its state (a reset, another one) misses what was
+//    deployed, so what the drift detection finds missing is deployed again (the snapshot that ran)
+//    and provisioned again
 //  - an event-driven api with its AsyncAPI specification, a dictionary, a shared authorization server
 //  - the catalogue of the portal: categories, a featured api, a review
 //  - activity for every dashboard: calls through the gateway now (statuses mixed), and fourteen days

@@ -344,7 +344,7 @@ gh release download -R cloud-apim/otoroshi-llm-extension -p 'otoroshi-llm-extens
 sha256sum -c *.sha256
 # the gateway restarted with them (docker/extensions, empty, by default)
 OTOROSHI_EXTENSIONS=~/otoroshi-extensions mise exec -- docker compose up -d otoroshi
-mise run demo   # the development gateway keeps nothing across a restart
+mise run demo   # the demo again, if the gateway lost its state (mise run reset)
 ```
 
 :::warning An extension is built for an Otoroshi
