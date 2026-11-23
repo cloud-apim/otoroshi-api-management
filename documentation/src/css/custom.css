@@ -56,3 +56,29 @@
 .theme-admonition {
   margin-bottom: 1.4rem;
 }
+
+/* a value to type, with its copy button (src/components/Copy.js) */
+.copy-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+.copy-value button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--apim-muted);
+  cursor: pointer;
+}
+.copy-value button:hover,
+.copy-value button:focus-visible {
+  background: var(--apim-surface-alt);
+  color: var(--ifm-color-primary);
+}

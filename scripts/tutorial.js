@@ -8,22 +8,25 @@
 //
 // It starts by deleting the workspace `acme`, then makes it again. A person cannot be deleted: on a
 // second run the consumer of the tutorial exists already, so its sign-up form is filled and captured,
-// then it signs in instead.
+// then it signs in instead. The values it types are those of the tables of the tutorial; the
+// specification it loads is the one the tutorial gives to copy.
 // env: APIM_URL (http://localhost:9000), APIM_TOKEN (apim-admin-token), CHROMIUM (/usr/bin/chromium),
 //      OUT (documentation/static/img/tutorial)
 
 import puppeteer from 'puppeteer-core';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const BASE = process.env.APIM_URL || 'http://localhost:9000';
 const TOKEN = process.env.APIM_TOKEN || 'apim-admin-token';
 const OUT = process.env.OUT || join(import.meta.dir, '..', 'documentation', 'static', 'img', 'tutorial');
-const SPEC = join(import.meta.dir, '..', 'examples', 'shipments.openapi.yaml');
+const TUTORIAL = join(import.meta.dir, '..', 'documentation', 'docs', 'tutorial.mdx');
 const ADMIN = { email: process.env.APIM_ADMIN_EMAIL || 'admin@otoroshi.io', password: process.env.APIM_ADMIN_PASSWORD || 'password' };
 const CONSUMER = { name: 'Dana', email: 'dana@example.com', password: 'dana-tutorial-password' };
 const WS = 'acme';
 const API = { name: 'Shipments', domain: 'shipments.oto.tools', contextPath: '/v1' };
+const BACKEND = { host: 'request.otoroshi.io', port: '443' };
 const GATEWAY = process.env.GATEWAY_URL || 'http://shipments.oto.tools:8080';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -118,6 +121,28 @@ const until = (page, fn, timeout = 20000, ...args) => page.waitForFunction(fn, {
 
 // ------------------------------------------------------------------ the producer, in the console
 
+// the specification the tutorial gives to copy, written to a file
+async function specification() {
+  const doc = await readFile(TUTORIAL, 'utf8');
+  const block = /```yaml title="shipments\.openapi\.yaml"\n([\s\S]*?)\n```/.exec(doc);
+  if (!block) throw new Error('no shipments.openapi.yaml block in the tutorial');
+  const file = join(await mkdtemp(join(tmpdir(), 'tutorial-')), 'shipments.openapi.yaml');
+  await writeFile(file, `${block[1]}\n`);
+  return file;
+}
+
+// an input found by a selector, emptied and typed again
+async function retype(page, selector, value) {
+  const input = await page.$(selector);
+  if (!input) throw new Error(`no input ${selector}`);
+  await input.click();
+  await page.keyboard.down('Control');
+  await page.keyboard.press('a');
+  await page.keyboard.up('Control');
+  await page.keyboard.press('Backspace');
+  await input.type(value, { delay: 10 });
+}
+
 async function saveDraft(page) {
   await click(page, 'Save draft');
   await until(page, () => !document.body.innerText.includes('Saving…') && ![...document.querySelectorAll('button')].some((b) => b.innerText.trim() === 'Save draft' && !b.disabled && b.offsetParent));
@@ -149,17 +174,21 @@ async function producer(page) {
   await shot(page, 'console-api-draft');
   const W = `/backoffice/ws/${WS}/apis/${apiId}`;
 
-  // where the calls go
+  // where the calls go: a public service that answers with the request it received
   await go(page, `${W}/backends`);
   await shot(page, 'console-backends');
   await click(page, 'edit');
+  await page.waitForSelector('.modal', { timeout: 10000 });
+  await retype(page, '.modal input[value="echo"]', BACKEND.host);
+  await retype(page, '.modal input[value="8080"]', BACKEND.port);
+  await click(page, 'TLS', '.modal label.switch');
   await shot(page, 'console-backend');
-  await page.keyboard.press('Escape');
+  await click(page, 'Apply', '.modal button');
 
-  // its contract, from a file
-  await go(page, `${W}/openapi`);
+  // its contract: the specification of the tutorial, as a file
+  await click(page, 'OpenAPI', '[role=tab], a, button');
   const input = await page.$('input[type=file]');
-  await input.uploadFile(SPEC);
+  await input.uploadFile(await specification());
   await until(page, () => document.body.innerText.includes('/shipments/{id}'));
   await shot(page, 'console-openapi');
   await saveDraft(page);

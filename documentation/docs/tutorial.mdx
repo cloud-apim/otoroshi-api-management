@@ -4,7 +4,10 @@ title: 'Tutorial: expose and consume an API'
 description: End to end, a screen at each step — a producer exposes an API from the console, a consumer finds it on the developer portal, signs up, subscribes, gets a key and calls it through the gateway, with no one in between.
 ---
 
-{/* the captures are made by scripts/tutorial.js — run `bun run screenshots:tutorial` to refresh them */}
+{/* the captures are made by scripts/tutorial.js, with the values of the tables and the specification
+    below — run `bun run screenshots:tutorial` to refresh them */}
+
+import Copy from '@site/src/components/Copy';
 
 # Tutorial: expose and consume an API
 
@@ -17,12 +20,20 @@ An API exposed by its producer, consumed by someone who never had to ask anyone,
 3. **both** see the traffic: the consumer their usage, the producer their subscriber and their API's
    analytics.
 
+Every value to type is given with a copy button: <Copy>like this</Copy>.
+
 **What you need.** An installation whose gateway is [set up](./gateway/setup.mdx), the data exporter
 included — or the development stack of the [quickstart](./quickstart.mdx) (`mise run up`, then
-`mise run demo`, which installs the exporter). A workspace — here *Acme*, made from the workspace
-selector, **New workspace** — with a team to own the API — here *Logistics*, **Workspace settings ›
-Teams › Create team**. The contract of the API is in the repository:
-[`examples/shipments.openapi.yaml`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/examples/shipments.openapi.yaml).
+`mise run demo`, which installs the exporter). The gateway calls a public service as the backend of
+the API: it has to reach the internet.
+
+A workspace, and a team to own the API:
+
+| Where | Field | Value |
+|---|---|---|
+| the workspace selector › **New workspace** | Name | <Copy>Acme</Copy> |
+| | Slug | <Copy>acme</Copy> |
+| **Workspace settings › Teams › Create team** | Name | <Copy>Logistics</Copy> |
 
 ## Part 1 — The producer exposes the API
 
@@ -36,8 +47,20 @@ The console is at `/backoffice/`: a local account, or the identity provider of t
 ### 2. Create the API
 
 **APIs → New API**: a name, a version, a description, the team that owns it, and where the gateway
-exposes it — a domain and a context path. Here, `shipments.oto.tools` and `/v1`: the API will be
-called at `http://shipments.oto.tools:8080/v1`.
+exposes it — a domain and a context path.
+
+| Field | Value |
+|---|---|
+| Name | <Copy>Shipments</Copy> |
+| Version | <Copy>1.0.0</Copy> |
+| Description | <Copy>Follow the parcels you send</Copy> |
+| Owning team | *Logistics* |
+| Domain | <Copy>shipments.oto.tools</Copy> |
+| Context path | <Copy>/v1</Copy> |
+
+The API will be called at `http://shipments.oto.tools:8080/v1`: `*.oto.tools` resolves to your own
+machine, where the gateway of the development stack listens on `8080`. On your installation, take a
+domain that leads to your gateway.
 
 ![The New API dialog: Shipments, 1.0.0, owned by Logistics, on shipments.oto.tools/v1](/img/tutorial/02-console-new-api.jpg)
 
@@ -54,16 +77,118 @@ load balancing — and belong to the route, never to the offer.
 
 ![The Backends tab: the default backend, http://echo:8080](/img/tutorial/04-console-backends.jpg)
 
-The pencil opens it. In the development stack, `echo:8080` is a service that answers every request
-with the request itself; on your installation, give the host and the port of your service, and TLS
-if it speaks https.
+The pencil opens it. The API calls `request.otoroshi.io`, a public service that answers every request
+with the request it received, in JSON — a stand-in for your own service. In the target:
 
-![The editor of a backend: targets, TLS, root path, retries, timeouts](/img/tutorial/05-console-backend.jpg)
+| Field | Value |
+|---|---|
+| Host | <Copy>request.otoroshi.io</Copy> |
+| Port | <Copy>443</Copy> |
+| TLS | on |
+
+![The editor of a backend: the target request.otoroshi.io, 443, TLS on](/img/tutorial/05-console-backend.jpg)
+
+**Apply**.
 
 ### 4. Give it its contract
 
-**OpenAPI → From a local file…** loads `shipments.openapi.yaml` into the draft — or **Import** from a
-URL, or paste it in the editor. The outline lists its operations. **Save draft**.
+The contract of the API, in OpenAPI — copy it:
+
+```yaml title="shipments.openapi.yaml"
+openapi: 3.1.0
+info:
+  title: Shipments
+  version: 1.0.0
+  description: |
+    Follow the parcels you send: list your shipments, create one, read where it stands.
+
+    Every call carries the credentials of one of your applications — its client id and its secret,
+    as HTTP basic authentication.
+paths:
+  /shipments:
+    get:
+      summary: List your shipments
+      operationId: listShipments
+      parameters:
+        - name: status
+          in: query
+          description: only the shipments in this state
+          schema:
+            type: string
+            enum: [created, in_transit, delivered]
+      responses:
+        '200':
+          description: your shipments, the most recent first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shipment'
+    post:
+      summary: Create a shipment
+      operationId: createShipment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewShipment'
+      responses:
+        '201':
+          description: the shipment, created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+  /shipments/{id}:
+    get:
+      summary: Read a shipment
+      operationId: getShipment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: the shipment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shipment'
+        '404':
+          description: no such shipment
+components:
+  schemas:
+    NewShipment:
+      type: object
+      required: [recipient, address]
+      properties:
+        recipient:
+          type: string
+        address:
+          type: string
+        weight_kg:
+          type: number
+    Shipment:
+      allOf:
+        - $ref: '#/components/schemas/NewShipment'
+        - type: object
+          properties:
+            id:
+              type: string
+            status:
+              type: string
+              enum: [created, in_transit, delivered]
+            created_at:
+              type: string
+              format: date-time
+```
+
+**OpenAPI**: paste it in the editor — or save it as a file and **From a local file…**, or **Import**
+it from a URL. The outline lists its operations. **Save draft**.
 
 ![The OpenAPI tab: the specification in the editor, its outline: GET POST /shipments, GET /shipments/{id}](/img/tutorial/06-console-openapi.jpg)
 
@@ -73,12 +198,21 @@ gateway.
 ### 5. Shape the plan
 
 The plan is what a consumer subscribes to: who may call, how much, on what terms. **Plans → Edit**
-on the `Default` plan. In **General**, a name the consumers will read — *Free* — and a description.
+on the `Default` plan. In **General**, a name the consumers will read, and a description:
+
+| Field | Value |
+|---|---|
+| Name | <Copy>Free</Copy> |
+| Description | <Copy>A thousand calls a day, a key at once.</Copy> |
 
 ![The plan editor, General: the plan named Free, its description](/img/tutorial/07-console-plan.jpg)
 
 In **Limits**, the plan keeps its rate limit (10 calls a second) and gets a quota of 1,000 calls a
 day. The limits are **per credential**: each application that subscribes has its own.
+
+| Field | Value |
+|---|---|
+| Quotas › Daily | <Copy>1000</Copy> |
 
 ![The plan editor, Limits: 10 calls per second, a daily quota of 1,000](/img/tutorial/08-console-plan-limits.jpg)
 
@@ -86,6 +220,12 @@ In **Catalogue & approval**, what makes it **self-service**: the plan is public,
 **approval is automatic** — the key is issued at once, no producer in between. With *Manual review*
 instead, each request waits in the console for a producer. The plan also asks the subscriber, in a
 word, what they plan to build. Nothing of this section reaches the gateway: it belongs to the portal.
+
+| Field | Value |
+|---|---|
+| Visibility | *Public* (as it is) |
+| Approval | *Automatic* (as it is) |
+| Usage statement | **Ask for a usage statement** on — its question as it is |
 
 ![The plan editor, Catalogue & approval: public, subscribable, automatic approval, a usage statement asked](/img/tutorial/09-console-plan-approval.jpg)
 
@@ -95,6 +235,13 @@ word, what they plan to build. Nothing of this section reaches the gateway: it b
 
 **Publish** freezes the draft into an immutable **snapshot** — plans, resources, documentation —, and
 *Deploy to the gateway right after* projects it on Otoroshi at once.
+
+| Field | Value |
+|---|---|
+| Comment | <Copy>First version</Copy> |
+| Deploy to the gateway right after | on (as it is) |
+
+Then **Publish and deploy**.
 
 ![The Publish a snapshot dialog: first snapshot, a comment, deploy right after](/img/tutorial/10-console-publish.jpg)
 
@@ -131,8 +278,15 @@ once.
 
 ### 8. Create an account
 
-**Sign in to subscribe**, then **Create account**: a name, an email, a password. Self sign-up is on
-by default; in the console, **Developer portal › Settings** turns it off, or lets the consumers sign
+**Sign in to subscribe**, then **Create account**:
+
+| Field | Value |
+|---|---|
+| Name | <Copy>Dana</Copy> |
+| Email | <Copy>dana@example.com</Copy> |
+| Password | <Copy>dana-tutorial-password</Copy> — or any of 8 characters or more |
+
+Self sign-up is on by default; in the console, **Developer portal › Settings** turns it off, or lets the consumers sign
 in with an identity provider.
 
 ![The Create your account page, filled](/img/tutorial/17-portal-sign-up.jpg)
@@ -140,7 +294,13 @@ in with an identity provider.
 ### 9. Subscribe
 
 Signed in, the consumer is back on the plan they chose. The credentials belong to an **application**:
-pick one, or create it now — here, *Parcel tracker* — and say what it is for.
+pick one, or create it now, and say what it is for.
+
+| Field | Value |
+|---|---|
+| Application | *New application…* (as it is) |
+| Application name | <Copy>Parcel tracker</Copy> |
+| Intended usage | <Copy>A page where our customers follow their parcels</Copy> |
 
 ![The Subscribe to Free dialog: a new application, Parcel tracker, and its intended usage](/img/tutorial/18-portal-subscribe.jpg)
 
@@ -158,7 +318,15 @@ the live quotas; the secret can be rotated, the plan changed, the subscription c
 
 ### 11. Call the API
 
-Through the gateway, with the credentials as HTTP basic authentication:
+Through the gateway, with the credentials as HTTP basic authentication. Copy the client id and the
+client secret of the portal (their copy buttons) into two variables:
+
+```bash
+export CLIENT_ID='<the client id>'
+export CLIENT_SECRET='<the client secret>'
+```
+
+Then list the shipments in transit:
 
 ```bash
 curl -i 'http://shipments.oto.tools:8080/v1/shipments?status=in_transit' \
@@ -167,26 +335,43 @@ curl -i 'http://shipments.oto.tools:8080/v1/shipments?status=in_transit' \
 
 ```http
 HTTP/1.1 200 OK
-Otoroshi-Request-Id: 2123900287839110073
+Otoroshi-Request-Id: 2124781129239102165
 Otoroshi-Daily-Calls-Remaining: 967
 Content-Type: application/json
 
 {
-  "path": "/shipments",
   "method": "GET",
+  "path": "/shipments",
   "headers": {
-    "host": "echo",
-    "otoroshi-request-id": "2123900287839110073",
+    "host": "request.otoroshi.io",
+    "otoroshi-request-id": "2124781129239102165",
+    "otoroshi-proxied-host": "shipments.oto.tools:8080",
     …
   },
-  …
+  "body": null
 }
 ```
 
-The development backend answers with the request it received. The gateway says what remains of the
-daily quota, and gives the call an id — the backend receives the same, and the request log finds the
-call by it. A new key is routable within a few seconds. Without credentials the gateway answers
-`401`; past 10 calls a second, `429`; past 1,000 calls in the day, too.
+`request.otoroshi.io` answers with the request it received: the gateway called it on `/shipments`,
+the context path `/v1` left on its side. The gateway says what remains of the daily quota, and gives
+the call an id — the backend receives the same, and the request log finds the call by it. A new key
+is routable within a few seconds.
+
+Creating a shipment works the same:
+
+```bash
+curl -i -X POST 'http://shipments.oto.tools:8080/v1/shipments' \
+  -u "$CLIENT_ID:$CLIENT_SECRET" \
+  -H 'content-type: application/json' \
+  -d '{"recipient": "Ada", "address": "1 rue de la Paix"}'
+```
+
+Without credentials the gateway answers `401`; past 10 calls a second, `429`; past 1,000 calls in
+the day, too.
+
+```bash
+curl -i 'http://shipments.oto.tools:8080/v1/shipments'
+```
 
 ```http
 HTTP/1.1 401 Unauthorized
