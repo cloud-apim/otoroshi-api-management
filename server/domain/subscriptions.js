@@ -450,7 +450,13 @@ async function removeFromGateway(sub, existing) {
 
 registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
   const sub = (await db`select * from subscriptions where id = ${subscription_id}`)[0];
-  if (!sub) return { skipped: 'deleted' };
+  // gone from the product — its application deleted, its person deleted — before its closing was
+  // projected: gone from the gateway too, or its key would keep calling. Its id is the product's own
+  if (!sub) {
+    const existing = await oto.getSubscription(subscription_id);
+    if (existing) await oto.deleteSubscription(subscription_id);
+    return { removed: !!existing, deleted: true };
+  }
   // the client certificates of its application follow the subscriptions to mtls plans
   if (sub.auth_kind === 'mtls')
     await enqueue('sync_application_certificates', { application_id: sub.application_id, workspace_id: sub.workspace_id }, { dedupeKey: `appcerts:${sub.application_id}` });

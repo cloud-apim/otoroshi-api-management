@@ -13,7 +13,6 @@ config.workers.enabled = false;
 config.adminToken = 'permissions-test-token';
 
 const { start } = await import('../server/main.js');
-const { db } = await import('../server/db/index.js');
 
 const RUN = Date.now().toString(36);
 const WS = `perm-${RUN}`;
@@ -74,15 +73,8 @@ afterAll(async () => {
   try {
     for (const a of await ok('admin', 'GET', `/workspaces/${WS}/apis`)) await ok('admin', 'DELETE', `/workspaces/${WS}/apis/${a.id}`);
     await ok('admin', 'DELETE', `/workspaces/${WS}`);
-    // users are global and have no delete route: the test removes its own
-    const mine = await db`select id from users where email like ${`%-${RUN}@permissions.test`}`;
-    for (const u of mine) {
-      await db`delete from api_tokens where user_id = ${u.id}`;
-      await db`delete from sessions where user_id = ${u.id}`;
-      await db`delete from team_members where user_id = ${u.id}`;
-      await db`delete from workspace_members where user_id = ${u.id}`;
-      await db`delete from users where id = ${u.id}`;
-    }
+    // the people of the test, deleted as an administrator does
+    for (const who of ['alice', 'bob', 'carl']) if (ids[who]) await ok('admin', 'DELETE', `/users/${ids[who]}`);
   } catch (e) {
     console.error('cleanup', e.message);
   }

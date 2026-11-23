@@ -40,6 +40,24 @@ Users signing in with an identity provider are created on their first login, wit
 an administrator adds them, or the portal of a workspace makes them consumers (see
 [Authentication](../authentication.mdx)).
 
+### Deleting a person
+
+Someone leaves, or asks to be forgotten: an installation administrator deletes the person —
+**Global settings › Users**, the bin of their row; `DELETE /api/users/<id or email>`;
+`otoroshi-apim users delete <email>`. What goes with them:
+
+- their **personal applications** — the ones a consumer makes on a portal, in their personal team: the
+  subscriptions of those applications are **closed first**, and the gateway revokes their keys
+  (projected like any closing: replayed until the gateway answers), then the applications and the
+  personal team are deleted;
+- their sessions and API tokens — they are signed out everywhere at once —, their memberships of
+  workspaces and teams, their notifications, their reviews.
+
+What stays: the teams they shared with others, and what those teams own; the **audit trail**, the
+record of what was done, under their email. Nobody deletes themselves, and a bootstrap administrator
+is made again at every start: remove it from `APIM_BOOTSTRAP_ADMINS` first. An application or a
+subscription a source declares (a remote catalog, Kubernetes) is the source's: remove it there first.
+
 ## Teams
 
 A team belongs to a workspace and groups people. It owns **APIs** (its producers can edit them) and

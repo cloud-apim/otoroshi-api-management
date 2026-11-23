@@ -98,7 +98,8 @@ describe('roles split across instances', () => {
   });
 
   test('two instances with workers share the queue: every task runs once', async () => {
-    // tasks of a real kind that do nothing: the subscriptions they name do not exist
+    // tasks of a real kind that change nothing: the subscriptions they name exist neither in the product
+    // nor on the gateway
     const ids = [];
     for (let n = 0; n < 60; n++) {
       const id = `task_roles_${RUN}_${n}`;
@@ -112,6 +113,6 @@ describe('roles split across instances', () => {
     expect(tasks.every((t) => t.status === 'done')).toBe(true);
     // claimed by one worker each: never run twice
     expect(tasks.every((t) => t.attempts === 1)).toBe(true);
-    expect(tasks.every((t) => t.payload.result?.skipped === 'deleted')).toBe(true);
+    expect(tasks.every((t) => t.payload.result?.deleted === true && t.payload.result?.removed === false)).toBe(true);
   });
 });

@@ -39,6 +39,7 @@ import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
 import * as dictionaries from '../domain/dictionaries.js';
 import * as sharedResources from '../domain/resources.js';
+import { deleteUser, isBootstrapAdmin } from '../domain/people.js';
 import { usageOf } from '../payments/usage.js';
 
 const r = new Router();
@@ -354,7 +355,8 @@ r.get('/users', async ({ ctx, query }) => {
     db`select u.id, u.email, u.name, u.tags, u.is_admin, u.created_at from users u where ${visible} and ${matches} order by u.email limit ${limit} offset ${offset}`,
     db`select count(*)::int as total from users u where ${visible} and ${matches}`,
   ]);
-  return { items, total, limit, offset };
+  // a bootstrap administrator is made again at start: it is not deleted from here
+  return { items: items.map((u) => ({ ...u, bootstrap: isBootstrapAdmin(u) })), total, limit, offset };
 });
 
 r.post('/users', async ({ ctx, body }) => {
@@ -373,6 +375,14 @@ r.put('/users/:id', async ({ ctx, params, body }) => {
     password_hash = ${hash}, updated_at = now() where id = ${u.id} returning *`;
   await audit(ctx, { action: 'user.update', entityKind: 'user', entityId: u.id, summary: `user ${u.email} updated` });
   return identity.publicUser(rows[0]);
+});
+
+// a person deleted: their personal applications closed and deleted, their access gone (server/domain/people.js)
+r.delete('/users/:id', async ({ ctx, params }) => {
+  identity.requireAdmin(ctx);
+  const u = (await identity.findUser(params.id)) || (await identity.findUserByEmail(params.id));
+  if (!u) throw notFound('user not found');
+  return deleteUser(ctx, u);
 });
 
 // ---------------------------------------------------------------- workspaces

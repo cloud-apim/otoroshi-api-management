@@ -108,6 +108,25 @@ function Users() {
   const usersPage = usePaging({ prefix: 'users', size: 25 });
   const state = useLoad(() => api.get(`/users?${usersPage.query}`), [usersPage.key]);
   const toast = useToast();
+  const confirm = useConfirm();
+  const { user: me } = useSession();
+  // a person deleted: their personal applications go with them, their keys revoked (server/domain/people.js)
+  const remove = async (u) => {
+    const ok = await confirm({
+      title: tr('Delete {0}?', [u.email]),
+      danger: true,
+      confirmLabel: tr('Delete'),
+      message: tr('Their personal applications are deleted and the subscriptions of those applications closed — the gateway revokes their keys. Their sessions, API tokens, memberships, notifications and reviews go with them; the teams they share with others stay, and so does the audit trail. This cannot be undone.'),
+    });
+    if (!ok) return;
+    try {
+      const r = await api.del(`/users/${u.id}`);
+      toast(tr('{0} deleted: {1} application(s), {2} subscription(s) closed', [r.email, r.applications, r.subscriptions]));
+      state.reload();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
   const [f, setF] = useState({ email: '', name: '', password: '', is_admin: false });
   return (
     <div className="col gap-16">
@@ -158,6 +177,17 @@ function Users() {
                           ))}
                         </td>
                         <td className="muted small">{fmtRelative(u.created_at)}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="btn ghost sm icon"
+                            aria-label={tr('delete {0}', [u.email])}
+                            title={u.bootstrap ? tr('a bootstrap administrator: remove it from APIM_BOOTSTRAP_ADMINS first') : u.id === me.id ? tr('you cannot delete yourself') : tr('delete')}
+                            disabled={u.bootstrap || u.id === me.id}
+                            onClick={() => remove(u)}
+                          >
+                            <Icon name="trash" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

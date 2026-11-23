@@ -27,6 +27,8 @@ Global flags / env:
 
 Commands:
   whoami
+  users list [--q text]                the people of the installation (an installation administrator's)
+  users delete <email|id>              a person deleted: their personal applications closed and deleted, their access gone
   gateway status
   gateway setup                        what the product needs on the gateway, created or repaired:
 ${SETUP_HELP}
@@ -243,6 +245,16 @@ async function main() {
   switch (cmd) {
     case 'whoami':
       return print((await call('GET', '/me')).user);
+    case 'users': {
+      if (sub === 'delete') {
+        const r = await call('DELETE', `/users/${encodeURIComponent(need(a1, '<email|id>'))}`);
+        if (OUTPUT !== 'table') return print(r);
+        return console.log(`${r.email} deleted: ${r.applications} application(s), ${r.subscriptions} subscription(s) closed`);
+      }
+      if (sub && sub !== 'list') throw new Error(`unknown users subcommand ${sub}`);
+      const q = flags.q ? `?q=${encodeURIComponent(flags.q)}` : '';
+      return print((await call('GET', `/users${q}`)).items, [['email', 'email'], ['name', 'name'], ['admin', (u) => (u.is_admin ? (u.bootstrap ? 'bootstrap' : 'yes') : '')], ['id', 'id']]);
+    }
     case 'gateway': {
       if (sub !== 'setup') return print(await call('GET', '/gateway/status'));
       const report = await call('POST', '/gateway/setup', setupRequest(flags));

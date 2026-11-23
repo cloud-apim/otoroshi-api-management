@@ -1895,5 +1895,10 @@
   "· latest snapshot #{0} is not deployed": "· le dernier snapshot n°{0} n’est pas déployé",
   "· the draft has {0} unpublished change{1}": "· le brouillon a {0} modification{1} non publiée{1}",
   "· the drift detection found it missing {0}: deploy it again": "· la détection de drift l’a trouvé absent {0} : déployez-le à nouveau",
-  "⌘K": "⌘K"
+  "⌘K": "⌘K",
+  "Their personal applications are deleted and the subscriptions of those applications closed — the gateway revokes their keys. Their sessions, API tokens, memberships, notifications and reviews go with them; the teams they share with others stay, and so does the audit trail. This cannot be undone.": "Ses applications personnelles sont supprimées et leurs souscriptions fermées — la gateway révoque leurs clés. Ses sessions, jetons d’API, appartenances, notifications et avis partent avec elle ; les équipes partagées avec d’autres restent, de même que le journal d’audit. C’est irréversible.",
+  "{0} deleted: {1} application(s), {2} subscription(s) closed": "{0} supprimé·e : {1} application(s), {2} souscription(s) fermée(s)",
+  "delete {0}": "supprimer {0}",
+  "a bootstrap administrator: remove it from APIM_BOOTSTRAP_ADMINS first": "un administrateur de bootstrap : retirez-le d’abord de APIM_BOOTSTRAP_ADMINS",
+  "you cannot delete yourself": "vous ne pouvez pas vous supprimer vous-même"
 }

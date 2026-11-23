@@ -6,9 +6,8 @@
 //
 //   bun run screenshots:tutorial   (needs the dev stack, the data exporter installed, and a local chromium)
 //
-// It starts by deleting the workspace `acme`, then makes it again. A person cannot be deleted: on a
-// second run the consumer of the tutorial exists already, so its sign-up form is filled and captured,
-// then it signs in instead. The values it types are those of the tables of the tutorial; the
+// It starts by deleting the workspace `acme` and the consumer of the tutorial, then makes the workspace
+// again: the consumer signs up. The values it types are those of the tables of the tutorial; the
 // specification it loads is the one the tutorial gives to copy.
 // env: APIM_URL (http://localhost:9000), APIM_TOKEN (apim-admin-token), CHROMIUM (/usr/bin/chromium),
 //      OUT (documentation/static/img/tutorial)
@@ -47,12 +46,10 @@ async function reset() {
     for (const a of apis.items || apis) await call('DELETE', `/workspaces/${WS}/apis/${a.id}`);
     await call('DELETE', `/workspaces/${WS}`);
   }
+  const users = await call('GET', `/users?q=${encodeURIComponent(CONSUMER.email)}`);
+  for (const u of (users.items || users).filter((u) => u.email === CONSUMER.email)) await call('DELETE', `/users/${u.id}`);
   await call('POST', '/workspaces', { name: 'Acme', slug: WS });
   await call('POST', `/workspaces/${WS}/teams`, { name: 'Logistics' });
-  const users = await call('GET', `/users?q=${encodeURIComponent(CONSUMER.email)}`);
-  const known = (users.items || users).find((u) => u.email === CONSUMER.email);
-  if (known) await call('PUT', `/users/${known.id}`, { password: CONSUMER.password });
-  return { consumerExists: !!known };
 }
 
 // ------------------------------------------------------------------ the browser
@@ -223,7 +220,7 @@ async function producer(page) {
 
 // ------------------------------------------------------------------ the consumer, on the portal
 
-async function consumer(page, { apiId, consumerExists }) {
+async function consumer(page, { apiId }) {
   const P = `/${WS}`;
   await go(page, `${P}/`);
   await page.evaluate(() => {
@@ -254,14 +251,11 @@ async function consumer(page, { apiId, consumerExists }) {
   await page.type('input[type=email]', CONSUMER.email);
   await page.type('input[type=password]', CONSUMER.password);
   await shot(page, 'portal-sign-up');
-  if (!consumerExists) await page.evaluate(() => document.querySelector('form button[type=submit]').click());
-  else {
-    const next = await page.evaluate(() => new URLSearchParams(location.search).get('next'));
-    await page.evaluate(async (ws, c) => fetch(`/${ws}/front/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(c) }), WS, CONSUMER);
-    await go(page, `${P}${next}`);
-  }
+  await page.evaluate(() => document.querySelector('form button[type=submit]').click());
   // back on the plans, the subscription asked for
   await page.waitForSelector('.modal', { timeout: 20000 });
+  await until(page, () => document.querySelector('.modal')?.innerText.includes('Intended usage'));
+  await settle(page, 600);
   await fill(page, 'Application name', 'Parcel tracker', '.modal');
   await fill(page, 'Intended usage', 'A page where our customers follow their parcels', '.modal');
   await shot(page, 'portal-subscribe');
@@ -330,7 +324,7 @@ async function followUp(visitor, producerPage, { apiId }) {
 // ------------------------------------------------------------------ the run
 
 await mkdir(OUT, { recursive: true });
-const state = await reset();
+await reset();
 const browser = await puppeteer.launch({ executablePath: process.env.CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox'] });
 try {
   const context = await browser.createBrowserContext();
@@ -345,7 +339,7 @@ try {
   const visitor = await (await browser.createBrowserContext()).newPage();
   await visitor.setViewport({ width: 1440, height: 900 });
   visitor.on('pageerror', (e) => console.warn(`    ! ${e.message}`));
-  const creds = await consumer(visitor, { ...made, ...state });
+  const creds = await consumer(visitor, made);
   await calls(creds);
   await followUp(visitor, page, made);
 } catch (e) {
