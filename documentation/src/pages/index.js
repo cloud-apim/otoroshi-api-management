@@ -59,14 +59,18 @@ const layers = [
   { num: '04', name: 'Consume', desc: 'Consumers subscribe from the portal; accepted subscriptions become apikeys; every call is counted and attributed.' },
 ];
 
-const quickstart = `# the development stack: postgres, otoroshi 18.1, an echo backend, the product
-mise run install && mise run up && mise run demo
+const quickstart = `# PostgreSQL, Otoroshi 18.1 and the product, configured as in production
+docker run -d --name apim-postgres -p 5432:5432 -e POSTGRES_USER=apim \\
+  -e POSTGRES_PASSWORD=… -e POSTGRES_DB=apim postgres:17
+set -a; . ./otoroshi.env; set +a; java -jar otoroshi.jar
 
-# declare an api from a file, publish and deploy it
-mise run cli apply default -f examples/petstore.yaml --publish --deploy
+# the product: its setup on the gateway, then the server
+set -a; . ./apim.env; set +a
+./otoroshi-apim setup --only key,exporter --product-url http://localhost:9000
+./otoroshi-apim
 
-# console:  http://localhost:9000/backoffice/   (admin@otoroshi.io / password)
-# portal:   http://localhost:9000/default/`;
+# a first API, from a file
+./otoroshi-apim apply default -f hello.yaml --publish --deploy`;
 
 function Hero() {
   return (
@@ -163,12 +167,12 @@ function Start() {
       <div className="container">
         <div className={styles.sectionTag}>Get going</div>
         <Heading as="h2" className={styles.sectionTitle}>
-          A running catalogue in a few commands
+          An installation in a few commands
         </Heading>
         <p className={styles.sectionLede}>
-          The development stack brings an Otoroshi 18.1 gateway, PostgreSQL, a demo backend and the product. The
-          quickstart starts it; the tutorial walks through the console, the portal and a call through the gateway, a
-          screen at each step.
+          The quickstart makes an installation on your machine — PostgreSQL, Otoroshi 18.1 and the product, configured
+          as in production — and calls a first API through the gateway; the tutorial walks through the console and the
+          portal, a screen at each step.
         </p>
         <div className={styles.snippet}>
           <CodeBlock language="bash">{quickstart}</CodeBlock>

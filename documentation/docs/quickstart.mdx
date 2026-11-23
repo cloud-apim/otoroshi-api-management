@@ -1,127 +1,238 @@
 ---
 sidebar_position: 2
 title: Quickstart
-description: Run the development stack, create an API, subscribe from the portal and call it through Otoroshi.
+description: An installation on one machine — Otoroshi, PostgreSQL and the product, configured as in production — then a first API, subscribed to and called through the gateway.
 ---
 
 # Quickstart
 
-This walks through the development stack: an Otoroshi gateway (18.1 or later), PostgreSQL, a demo backend and
-the product, all in Docker.
+An installation on one machine: Otoroshi, PostgreSQL and the product, run as they would be in
+production — the executable of a release, a configuration of its own —, then a first API, subscribed
+to by a consumer and called through the gateway. Everything runs on your machine: the domains
+`*.oto.tools` resolve to `127.0.0.1`.
 
-:::tip
-The [tutorial](./tutorial.mdx) takes the same journey step by step, a screen at each step: an API
-exposed from the console, then subscribed to and called by a consumer alone.
-:::
+To work on the product itself — its development stack, its tests — see [Development](./development.mdx).
 
-## Requirements
+## What you need
 
-- [Bun](https://bun.sh) 1.3 and Docker
-- an Otoroshi jar, 18.1 or later: `../otoroshi.jar` relative to the repository by default, or
-  `OTOROSHI_JAR=/path/to/otoroshi.jar`. Until 18.1 is released, build it from the `master` branch of
-  Otoroshi — its interface first (`npm install && npm run build` in `otoroshi/javascript`), then
-  `sbt assembly` in `otoroshi/`: the jar is `otoroshi/target/scala-*/otoroshi.jar`
+| | |
+|---|---|
+| **Java 21** or later | to run Otoroshi |
+| **Docker** | to run PostgreSQL — or a PostgreSQL 14 or later of your own |
+| **Otoroshi 18.1** | its jar; until 18.1 is released, built from its `master` branch (below) |
+| **The product** | the executable of a [release](https://github.com/cloud-apim/otoroshi-api-management/releases), for linux or macOS, x64 or arm64 |
+| `openssl` | to make the secrets of the installation |
 
-## Start the stack
+## 1. A folder and its configuration
 
-With [mise](https://mise.jdx.dev/), which also installs Bun and Node:
-
-```bash
-mise trust && mise install
-mise run install               # dependencies of the product and of the documentation
-mise run up                    # builds the uis; starts postgres :5442, otoroshi :8080, echo backend,
-                               # dev OIDC provider, catalog source and the product :9000; waits for them
-mise run demo                  # demo apis, a gitops workspace with its remote catalog, the data exporter
-```
-
-`mise tasks` lists the other tasks (tests, ci, docs, logs, psql, cli…). Without mise:
+The installation lives in a folder: the configuration of Otoroshi and of the product, their secrets
+made once — keep the files, they hold them.
 
 ```bash
-bun install
-bun run build
-docker compose -f docker/docker-compose.yml --profile apim up -d
+mkdir apim && cd apim
+OTO_SECRET=$(openssl rand -hex 24)
+
+cat > otoroshi.env <<EOF
+OTOROSHI_INITIAL_ADMIN_LOGIN=admin@example.com
+OTOROSHI_INITIAL_ADMIN_PASSWORD=$(openssl rand -hex 12)
+OTOROSHI_ADMIN_API_CLIENT_ID=otoroshi-admin
+OTOROSHI_ADMIN_API_CLIENT_SECRET=$OTO_SECRET
+APP_STORAGE=file
+OTOROSHI_FILEDB_PATH=./otoroshi-state.ndjson
+EOF
+
+cat > apim.env <<EOF
+APIM_PUBLIC_URL=http://localhost:9000
+APIM_DATABASE_URL=postgres://apim:apim-db-password@localhost:5432/apim
+APIM_ANALYTICS_DATABASE_URL=postgres://apim:apim-db-password@localhost:5432/apim_analytics
+APIM_SECRETS_KEY=$(openssl rand -hex 32)
+APIM_ADMIN_TOKEN=$(openssl rand -hex 24)
+APIM_INGEST_TOKEN=$(openssl rand -hex 24)
+APIM_BOOTSTRAP_ADMINS=admin@example.com
+APIM_BOOTSTRAP_PASSWORD=$(openssl rand -hex 12)
+OTOROSHI_URL=http://localhost:8080
+OTOROSHI_HOST=otoroshi-api.oto.tools
+OTOROSHI_CLIENT_ID=otoroshi-admin
+OTOROSHI_CLIENT_SECRET=$OTO_SECRET
+OTOROSHI_PUBLIC_SCHEME=http
+OTOROSHI_PUBLIC_PORT=8080
+EOF
 ```
 
-The `apim` service runs your working copy with `bun --watch`: server changes reload by themselves,
-UI changes need `bun run build`.
+`apim.env` is the [configuration of the product](./install.mdx#configuration): a product missing
+one of these variables does not start, and says which.
 
-| What | Where | Credentials |
+## 2. PostgreSQL
+
+Two databases: the application data, and the events and analytics.
+
+```bash
+docker run -d --name apim-postgres -p 5432:5432 \
+  -e POSTGRES_USER=apim -e POSTGRES_PASSWORD=apim-db-password -e POSTGRES_DB=apim \
+  postgres:17
+# once it accepts connections, a few seconds later
+docker exec apim-postgres createdb -U apim apim_analytics
+```
+
+## 3. Otoroshi
+
+Until Otoroshi 18.1 is released, build its jar from its `master` branch — its interface first, then
+the jar:
+
+```bash
+git clone https://github.com/MAIF/otoroshi.git
+cd otoroshi/otoroshi/javascript && npm install && npm run build && cd ..
+sbt assembly          # the jar: otoroshi/otoroshi/target/scala-*/otoroshi.jar
+```
+
+Copy `otoroshi.jar` into the folder of the installation, and start it, in a terminal of its own:
+
+```bash
+set -a; . ./otoroshi.env; set +a
+java -jar otoroshi.jar
+```
+
+It listens on `8080`. Its admin API is `otoroshi-api.oto.tools`, with the key of `otoroshi.env`; its
+state is kept in `otoroshi-state.ndjson`. Its own console is at http://otoroshi.oto.tools:8080 —
+you will not need it.
+
+## 4. The product
+
+Download the executable of your system — `linux-x64`, `linux-arm64`, `darwin-x64` or
+`darwin-arm64` — and check it. During the beta the repository is private: `gh`, signed in with an
+account that has access, or the page of the release in a browser.
+
+```bash
+gh release download v0.1.0 -R cloud-apim/otoroshi-api-management \
+  -p 'otoroshi-apim-linux-x64' -p SHA256SUMS
+sha256sum --ignore-missing -c SHA256SUMS     # macOS: shasum -a 256 -c SHA256SUMS
+mv otoroshi-apim-linux-x64 otoroshi-apim && chmod +x otoroshi-apim
+```
+
+**Set the gateway up**: the product makes its own admin key on Otoroshi, and the data exporter that
+sends it the events of the gateway — run it first with `--dry-run` to see what it would change.
+
+```bash
+set -a; . ./apim.env; set +a
+./otoroshi-apim setup --only key,exporter --product-url http://localhost:9000 \
+  --admin-client-id "$OTOROSHI_CLIENT_ID" --admin-client-secret "$OTOROSHI_CLIENT_SECRET"
+```
+
+```text
+✓ key       changed
+    + Apikey apim_product_admin (otoroshi-api-management)
+✓ exporter  changed
+    + DataExporter apim_ingester_exporter (otoroshi-api-management ingester)
+    events go to http://localhost:9000/ingest: the gateway must reach it
+Checks
+✓ Otoroshi 18.1.0-dev, …
+✓ the product calls the gateway with its own key, apim_product_admin
+! no event reached the ingester for 15 minutes: …
+```
+
+The last line is expected: nothing has called the gateway yet. Then start the product, in a terminal
+of its own — it makes the tables of its databases at start:
+
+```bash
+set -a; . ./apim.env; set +a
+./otoroshi-apim
+```
+
+```text
+[apim] bootstrap admin created: admin@example.com
+[apim] bootstrap workspace created: default
+[apim] listening on http://localhost:9000/ with roles: ingester, api, backoffice, portal
+```
+
+## 5. Sign in
+
+| | | |
 |---|---|---|
-| Console | http://localhost:9000/backoffice/ | `admin@otoroshi.io` / `password` |
-| Developer portal | http://localhost:9000/default/ | self signup |
-| Admin API | http://localhost:9000/api | `Authorization: Bearer apim-admin-token` |
-| Otoroshi | http://otoroshi.oto.tools:8080 | `admin@otoroshi.io` / `password` |
+| The console | http://localhost:9000/backoffice/ | `admin@example.com`, and the password `grep APIM_BOOTSTRAP_PASSWORD apim.env` gives |
+| The developer portal of the workspace `default` | http://localhost:9000/default/ | anyone can create an account |
+| The admin API | http://localhost:9000/api | `Authorization: Bearer <APIM_ADMIN_TOKEN>` |
 
-`*.oto.tools` resolves to `127.0.0.1`, so the APIs you create are reachable as
-`http://<domain>:8080` on your machine.
+## 6. A first API
 
-:::tip Why the product runs inside Docker
-The Otoroshi data exporter must reach the ingester. Inside the compose network it reaches
-`http://apim:9000/ingest`. Running the product on the host works too (`mise run stop:apim`, then `mise run dev`),
-but the gateway container then has to reach your host.
-:::
+From the console, the [tutorial](./tutorial.mdx) shows it a screen at a time. From a file, here a
+[declarative document](./gitops/declarative-documents.mdx): an API that answers with the request it
+received, and a plan whose keys are issued at once.
 
-## Create an API in the console
-
-1. Sign in, then **APIs → New API**: a name (`Books`), a version (`1.0.0`), an owning team, a domain
-   (`books.oto.tools`) and a context path (`/v1`).
-2. The API is created as a **draft** with one resource (`/`, all methods) towards the `echo` backend,
-   a published `apikey` plan named *Default* and a *Getting started* page in English and French.
-3. Click **Publish**: the dialog shows the validation and the changes, and *Publish and deploy*
-   freezes snapshot #1 and projects it on the gateway.
-
-The banner of the API page now says that snapshot #1 runs on the gateway.
-
-## Or declare it from a file
-
-```bash
-mise run cli apply default -f examples/petstore.yaml --publish --deploy
-mise run cli apis list default
+```yaml title="hello.yaml"
+apiVersion: otoroshi-apim.io/v1
+kind: Api
+metadata:
+  name: hello
+spec:
+  name: Hello
+  version: 1.0.0
+  description: The request it received, sent back
+  draft:
+    entrypoint:
+      domain: hello.oto.tools
+      contextPath: /
+    backends:
+      - id: backend_request
+        name: request
+        targets:
+          - { hostname: request.otoroshi.io, port: 443, tls: true, weight: 1 }
+    resources:
+      - { id: res_all, name: Everything, path: /, methods: [], backendId: backend_request }
+    plans:
+      - id: plan_free
+        name: Free
+        description: A key at once, 10 calls a second.
+        status: published
+        auth: { kind: apikey }
+        rateLimit: { enabled: true, calls: 10, windowMs: 1000 }
+        validation: auto
 ```
 
-`mise run cli` is the [command line](./gitops/cli.mdx) from the clone, the url and the token of the
-local product already set — the same commands as the executable, `otoroshi-apim <command>`.
-
-`examples/petstore.yaml` is a [declarative API document](./gitops/declarative-documents.mdx): two
-`apikey` plans, one limited to the `/pets` resource, an OpenAPI specification and a bilingual page.
-
-## Subscribe from the portal
-
-1. Open http://localhost:9000/default/ and **sign up**.
-2. Open the API, **Plans → Subscribe**. Choose or create an application (it lands in your personal
-   team), answer the usage statement and accept the terms if the plan asks for them.
-3. On an automatic plan the subscription is active at once: **My apps** shows the client id and the
-   secret.
-
-## Call the API through the gateway
+The [command line](./gitops/cli.mdx) is the same executable:
 
 ```bash
-curl http://books.oto.tools:8080/v1/hello -u "$CLIENT_ID:$CLIENT_SECRET"
+export APIM_URL=http://localhost:9000 APIM_TOKEN=$APIM_ADMIN_TOKEN
+./otoroshi-apim apply default -f hello.yaml --publish --deploy
 ```
 
-Without credentials the gateway answers `401`; past the rate limit of the plan, `429`. A new key can
-take a few seconds to become routable.
+```text
+api hello 1.0.0 created, snapshot 1, deployed
+```
 
-## See the traffic
-
-In the console, **Gateway → Connection & events → Install / update the exporter** creates an
-Otoroshi data exporter that sends `GatewayEvent`, the security events of the Threat Protection Suite
-and the AI audits of the LLM extension to the ingester.
-From then on, **Observability** and the **Usage** page of the portal show calls attributed to the
-API, the plan, the subscription and the application.
-
-## Run the tests
+The gateway serves it, and wants a key:
 
 ```bash
-bun test test/model.test.js      # unit tests, no infrastructure
-mise run test                    # everything: the interfaces built, then every test against the real gateway
+curl -i http://hello.oto.tools:8080/
 ```
 
-The reference catalogue test (`test/reference-catalogue.test.js`) describes a catalogue — 6 plans,
-5 auth mechanisms, 4 approval modes on one API and one set of routes — and checks that it is
-projected, reconciled, and that its drift is detected and repaired.
+```http
+HTTP/1.1 401 Unauthorized
+Otoroshi-Error-Msg: You're not authorized here !
+```
 
-The interface test (`test/ui.test.js`) drives the console and the portal in a headless Chromium
-(`CHROMIUM`, `/usr/bin/chromium` by default; skipped without one): every page of the console opens
-without an error, a producer makes an API and a plan, the console speaks French, a consumer
-subscribes from the portal and gets its credentials.
+## 7. Subscribe, call, see the traffic
+
+On the portal, http://localhost:9000/default/: **Create account**, the API **Hello**, **Plans →
+Subscribe**, a new application. The plan approves at once: the client id and the client secret are
+shown. Then:
+
+```bash
+curl -i http://hello.oto.tools:8080/hello -u '<client id>:<client secret>'
+```
+
+`200`, and the request `request.otoroshi.io` received. A few seconds later, the call is in **Usage**
+on the portal, and in **Observability** in the console, attributed to the API, the plan and the
+application.
+
+## Next
+
+- **The console and the portals through the gateway**, with TLS: the `console` and `portals` parts of
+  the [setup](./gateway/setup.mdx).
+- **A production installation**: [Install](./install.mdx) — the roles split across instances, the
+  container image, Kubernetes and Helm, the secrets at rest.
+- **Sign in with your identity provider**: [Authentication](./authentication.mdx).
+- **The whole journey in the console and the portal**: the [tutorial](./tutorial.mdx).
+
+To stop: `Ctrl-C` in both terminals, and `docker stop apim-postgres`. Everything is kept — the
+databases in their container, the state of Otoroshi in `otoroshi-state.ndjson`: `docker start
+apim-postgres`, then Otoroshi and the product with the same commands as above.

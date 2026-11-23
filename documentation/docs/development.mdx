@@ -1,0 +1,130 @@
+---
+sidebar_position: 10
+title: Development
+description: Working on the product itself — the development stack of the repository, its demo data, the command line from a clone, the tests, the documentation and its captures, the executable, a release.
+---
+
+# Development
+
+Working on the product itself: a clone of the repository and its development stack — Otoroshi,
+PostgreSQL, a demo backend and the product, in Docker. To run the product, see the
+[quickstart](./quickstart.mdx).
+
+## What you need
+
+- [mise](https://mise.jdx.dev/), which installs Bun and Node, and Docker;
+- an Otoroshi jar, 18.1 or later — `../otoroshi.jar` beside the repository by default, or
+  `OTOROSHI_JAR=/path/to/otoroshi.jar`; until 18.1 is released, built from its `master` branch, as
+  the [quickstart](./quickstart.mdx#3-otoroshi) shows;
+- Chromium, for the interface tests and the captures of the documentation (`CHROMIUM`,
+  `/usr/bin/chromium` by default).
+
+## The development stack
+
+```bash
+mise trust && mise install
+mise run install    # the dependencies of the product and of the documentation
+mise run up         # builds the uis; starts postgres :5442, otoroshi :8080, an echo backend, a
+                    # development OIDC provider, a catalog source and the product :9000; waits for them
+mise run demo       # demo apis, the gitops and showcase workspaces, the data exporter, activity
+```
+
+`mise tasks` lists the others — `logs`, `ps`, `psql`, `open`, `watch`, `restart`, `down`, `reset`…
+Without mise: `bun install`, `bun run build`, then
+`docker compose -f docker/docker-compose.yml --profile apim up -d`.
+
+| What | Where | Credentials |
+|---|---|---|
+| Console | http://localhost:9000/backoffice/ | `admin@otoroshi.io` / `password` |
+| Developer portal | http://localhost:9000/default/ | self signup |
+| Admin API | http://localhost:9000/api | `Authorization: Bearer apim-admin-token` |
+| Otoroshi | http://otoroshi.oto.tools:8080 | `admin@otoroshi.io` / `password` |
+
+These are the values of the development stack: the product runs there with `DEV=true`, which
+fills its configuration with them — never set it elsewhere. `*.oto.tools` resolves to `127.0.0.1`:
+the APIs you create are reachable as `http://<domain>:8080`.
+
+- **Server changes reload by themselves**: the `apim` service runs the working copy with
+  `bun --watch`. The interfaces need `bun run build`, or `mise run watch` to rebuild them on change.
+- **The gateway keeps its state** in its Docker volume, across `mise run down` and a new jar;
+  `mise run reset` wipes the databases and the gateway state — `mise run demo` makes the demo again,
+  and catches up a gateway that lost what was deployed. A new jar or new extensions:
+  `OTOROSHI_JAR=… OTOROSHI_EXTENSIONS=… mise exec -- docker compose up -d otoroshi`.
+- **The extensions of the gateway** come from a directory: [Install › The Otoroshi cluster](./install.mdx#the-otoroshi-cluster).
+
+:::tip Why the product runs inside Docker
+The data exporter of Otoroshi must reach the ingester: inside the compose network it reaches
+`http://apim:9000/ingest`. Running the product on the host works too — `mise run stop:apim`, then
+`mise run dev` —, but the gateway container then has to reach your host.
+:::
+
+## The command line from the clone
+
+`mise run cli <command>` runs the [command line](./gitops/cli.mdx) against the local product, its url
+and token already set — the same commands as the executable:
+
+```bash
+mise run cli apply default -f examples/petstore.yaml --publish --deploy
+mise run cli apis list default
+```
+
+`examples/petstore.yaml` is a [declarative API document](./gitops/declarative-documents.mdx): two
+`apikey` plans, one limited to the `/pets` resource, an OpenAPI specification and a bilingual page.
+
+## The tests
+
+```bash
+mise run test:unit       # no infrastructure
+mise run test            # everything: the interfaces built, then every test against the stack
+mise run test:binary     # the compiled executable, started away from the repository
+mise run test:kubernetes # the resources, their controller, the manifests and the Helm chart, on k3s
+mise run ci              # what the repository checks: syntax, French texts, build, tests, docs
+```
+
+- The reference catalogue test (`test/reference-catalogue.test.js`) describes a catalogue — 6 plans,
+  5 auth mechanisms, 4 approval modes on one API and one set of routes — and checks that it is
+  projected, reconciled, and that its drift is detected and repaired.
+- The interface test (`test/ui.test.js`) drives the console and the portal in a headless Chromium:
+  every page of the console opens without an error, a producer makes an API and a plan, the console
+  speaks French, a consumer subscribes from the portal and gets its credentials.
+- The tests share the database of the stack, and run their own server on `:9117`.
+
+## The documentation
+
+```bash
+mise run docs:dev            # http://localhost:3000/otoroshi-api-management/
+mise run docs:build          # fails on a broken link
+bun run screenshots          # the screens tour, from the stack with its demo data
+bun run screenshots:tutorial # the tutorial played in a browser, a capture at each step
+python3 documentation/scripts/architecture.py   # the architecture diagram of the install page
+```
+
+## The executable and the image
+
+```bash
+mise run build:binary    # dist/bin/otoroshi-apim, for this machine
+mise run build:binaries  # linux and macOS, x64 and arm64
+mise run image           # the production image
+```
+
+## A release
+
+The version of `package.json`, its section in `CHANGELOG.md` written by hand, then a tag
+`v<version>`: the `release` workflow publishes the executables, the documentation as a zip and their
+checksums on the GitHub release — its notes are the section of `CHANGELOG.md`, a pre-release while
+in `0.x` —, and the image on the GitHub container registry. Run by hand, the workflow builds
+everything and publishes nothing.
+
+A migration that shipped in a release is never edited: a change is a new migration, so that an
+installation upgrades in place.
+
+## Conventions
+
+- **Every action is an admin API call** (`server/roles/admin-api.js`, served on `/api` and
+  `/backoffice/api`): a feature goes there first, then into the console, then into the command line.
+- **The texts of the console** go through `tr()` — the English text is the key —, their French in
+  `web/backoffice/fr.json`; `mise run i18n` lists the texts without French, `mise run check` fails
+  on them.
+- **Every list** of the console and of the portal is searched and paged (`web/shared/lists.jsx`).
+- **A gap of the data plane is fixed in Otoroshi**, never worked around in the product: logged in
+  `OTOROSHI-GAPS.md`, its open ones in the [known limitations](./otoroshi-gaps.mdx).

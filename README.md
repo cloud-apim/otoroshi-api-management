@@ -34,7 +34,17 @@ Two faces of one thing, plus the two services that carry them:
 **The product is never in the request path**: it projects policies into Otoroshi through its Admin
 API, and Otoroshi enforces them. If the product is down, traffic still flows.
 
-## Quick start
+## Run it
+
+The executable of a [release](https://github.com/cloud-apim/otoroshi-api-management/releases), beside
+Otoroshi 18.1 and PostgreSQL: the **quickstart** of the documentation (`documentation/docs/quickstart.mdx`)
+makes an installation on one machine, configured as in production, and calls a first API through the
+gateway; **Install** covers a production one — roles, the image, Kubernetes and Helm.
+
+## Develop it
+
+The development stack of the repository — the documentation's **Development** page
+(`documentation/docs/development.mdx`) says it all; in short:
 
 Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar,
 18.1 or later — until it is released, built from the `master` branch of Otoroshi: `../otoroshi.jar`

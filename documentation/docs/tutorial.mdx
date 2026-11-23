@@ -22,9 +22,9 @@ An API exposed by its producer, consumed by someone who never had to ask anyone,
 
 Every value to type is given with a copy button: <Copy>like this</Copy>.
 
-**What you need.** An installation whose gateway is [set up](./gateway/setup.mdx), the data exporter
-included — or the development stack of the [quickstart](./quickstart.mdx) (`mise run up`, then
-`mise run demo`, which installs the exporter). The gateway calls a public service as the backend of
+**What you need.** An installation whose gateway is [set up](./gateway/setup.mdx), its data
+exporter included — the [quickstart](./quickstart.mdx) makes one on your machine; the
+[development stack](./development.mdx) does too. The gateway calls a public service as the backend of
 the API: it has to reach the internet.
 
 A workspace, and a team to own the API:
@@ -59,7 +59,7 @@ exposes it — a domain and a context path.
 | Context path | <Copy>/v1</Copy> |
 
 The API will be called at `http://shipments.oto.tools:8080/v1`: `*.oto.tools` resolves to your own
-machine, where the gateway of the development stack listens on `8080`. On your installation, take a
+machine, where the gateway of the quickstart listens on `8080`. On your installation, take a
 domain that leads to your gateway.
 
 ![The New API dialog: Shipments, 1.0.0, owned by Logistics, on shipments.oto.tools/v1](/img/tutorial/02-console-new-api.jpg)
