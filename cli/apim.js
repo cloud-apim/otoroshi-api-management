@@ -13,12 +13,12 @@ import { dirname, join } from 'node:path';
 import { inlinePageFiles, inlinePortalFiles } from '../server/domain/page-files.js';
 import { SETUP_HELP, failed, formatSetup, setupRequest } from './setup.js';
 
-const HELP = `apim — otoroshi-api-management command line
+const HELP = `otoroshi-apim — the command line of otoroshi-api-management
 
-Usage: apim <command> [args] [--flags]
-       otoroshi-apim <command> [args] [--flags]   the compiled binary: the same commands, and
+Usage: otoroshi-apim <command> [args] [--flags]    the executable: the command line, and
        otoroshi-apim [serve]                      the server, with the roles of APIM_ROLES
        otoroshi-apim setup [flags]                the setup of the gateway, in process (no server needed)
+       mise run cli <command> [args] [--flags]    from a clone of the repository (bun cli/apim.js)
 
 Global flags / env:
   --url <url>        APIM_URL      (default http://localhost:9000)
@@ -68,6 +68,7 @@ ${SETUP_HELP}
   dictionaries delete <ws> <name>
   subscriptions list <ws> [--status s] [--api id]
   subscriptions accept|reject|suspend|resume|close <ws> <id> [--message m]
+  subscriptions resync <ws> <id>       project the subscription on the gateway again
   subscriptions ending <ws> <id> <date|none>   the end date of a subscription (past: it expires; none: renewed)
   subscriptions usage <ws> <id>        the usage billed: the batches of calls sent to the meter of the payment provider
   subscriptions transfer <ws> <id> --plan <plan> [--api <api>]
@@ -464,6 +465,9 @@ async function main() {
       }
       if (sub === 'transfer') {
         const r = await call('POST', `${ws(a1)}/subscriptions/${need(a2, '<id>')}/transfer`, { plan_id: need(flags.plan, '--plan'), api_id: flags.api });
+        if (OUTPUT !== 'table') return print(r);
+        // a move that waits — for the consumer's consent, or for a payment — has not happened yet
+        if (r.pending_transfer) return console.log(`subscription ${r.id}: the move to plan ${r.pending_transfer.to?.plan_id || flags.plan} waits (${r.pending_transfer.status}), still on plan ${r.plan_id}`);
         return console.log(`subscription ${r.id} is now on plan ${r.plan_id}`);
       }
       throw new Error(`unknown subscriptions subcommand ${sub}`);
