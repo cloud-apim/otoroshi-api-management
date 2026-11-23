@@ -103,6 +103,17 @@ describe('a producer', () => {
     expect((await as('alice', 'PUT', `/workspaces/${WS}/apis/${ids.alpha}/draft`, { draft: mine.draft })).status).toBe(200);
   });
 
+  test('makes an api for its own teams only, created or adopted from the gateway', async () => {
+    const other = { name: 'Gamma', version: '1.0.0', team_id: ids.teamA, domain: `gamma-${RUN}.oto.tools`, contextPath: '/' };
+    expect((await as('bob', 'POST', `/workspaces/${WS}/apis`, other)).status).toBe(403);
+    // refused before the gateway is even asked for the api
+    const adopt = await as('bob', 'POST', `/workspaces/${WS}/adopt`, { otoroshi_api_id: `nothing-${RUN}`, team_id: ids.teamA });
+    expect(adopt.status).toBe(403);
+    expect(adopt.body.error).toContain('not a member of this team');
+    // into its own team, the adoption goes on: here the gateway has no such api
+    expect((await as('bob', 'POST', `/workspaces/${WS}/adopt`, { otoroshi_api_id: `nothing-${RUN}`, team_id: ids.teamB })).status).toBe(404);
+  });
+
   test('cannot change another team’s api through a declarative document either', async () => {
     expect((await as('bob', 'POST', `/workspaces/${WS}/apply`, [doc('alpha', 'Team A')])).status).toBe(403);
     expect((await as('bob', 'POST', `/workspaces/${WS}/apply`, [doc('beta', 'Team A')])).status).toBe(403);

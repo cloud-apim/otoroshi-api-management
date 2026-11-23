@@ -560,10 +560,14 @@ r.get('/workspaces/:ws/apis', async ({ ctx, params, query }) => {
   return apis.listApis(c.workspace.id, { q: query.get('q'), teamId: query.get('team'), lifecycle: query.get('lifecycle') });
 });
 
+// a producer makes an api for one of its own teams only — created or adopted from the gateway
+async function requireOwnTeam(c, ctx, teamId) {
+  if (teamId && c.role === 'producer' && !(await identity.isTeamMember(teamId, ctx.user.id))) throw forbidden('you are not a member of this team');
+}
+
 r.post('/workspaces/:ws/apis', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
-  if (body.team_id && c.role === 'producer' && !(await identity.isTeamMember(body.team_id, ctx.user.id)))
-    throw forbidden('you are not a member of this team');
+  await requireOwnTeam(c, ctx, body.team_id);
   return apis.createApi(c, c.workspace.id, body);
 });
 
@@ -904,6 +908,7 @@ r.get('/workspaces/:ws/apis/:api/plans', async ({ ctx, params }) => {
 // adopt mode: take over an Otoroshi Api without overwriting it
 r.post('/workspaces/:ws/adopt', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
+  await requireOwnTeam(c, ctx, body.team_id);
   const entity = await oto.getApi(body.otoroshi_api_id);
   if (!entity) throw notFound('no such api on the gateway');
   if ((await db`select 1 from apis where id = ${entity.id}`).length) throw badRequest('this api is already managed');

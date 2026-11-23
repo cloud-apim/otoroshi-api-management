@@ -13,6 +13,7 @@ Last update: 2026-11-20.
 
 ## Now
 
+- **A producer adopts an api into its own teams only** (2026-11-23, found by the documentation review): `POST …/adopt` did not check the team as `POST …/apis` does, so a producer could adopt an api of the gateway into any team; both check it now (`test/permissions.test.js`).
 - **A tutorial, end to end** (`docs/tutorial.mdx`, 2026-11-20): a producer exposes an api from the console — its backend, its OpenAPI contract, a free plan approved automatically —, publishes and deploys it; a consumer finds it on the portal, creates an account, subscribes from a new application, gets a key and calls the api through the gateway; both sides see the traffic. 23 captures, made by playing it in a browser from a clean workspace (`bun run screenshots:tutorial`, `scripts/tutorial.js`). Every value to type has a copy button (`documentation/src/components/Copy.js`), and the OpenAPI contract is given to copy — the script loads that very block; the backend is `request.otoroshi.io`, which answers with the request it received. Found on the way: a person cannot be deleted (no `DELETE /users/:id`): the script signs the consumer in on a second run.
 - **Towards 0.1.0, a beta** (2026-11-20, the owner's request): the suite on it, 255 pass, 4 skip (the extensions), none failing. The values of the development stack are given only with `DEV=true` — mise, the compose stack and the tests set it. Without it the product starts for production and refuses an incomplete configuration: every variable missing for the roles of the instance named at once, and the secrets of the development stack (`apim-admin-token`, `password`, `ingest-secret`…) refused; `serve` and `setup` alike, a message and exit 1 (`test/config.test.js`, `test/binary.test.js`). The session cookies are `Secure` by default when the public url is https; without `OTOROSHI_BACKOFFICE_URL`, no link to the Otoroshi backoffice. The beta runs against Otoroshi built from its `master` branch until 18.1 is released (install, quickstart).
 - **The gateway of 2026-11-20, 17:56** (`18.1.0-dev`): G-22 fixed upstream (#2962) and followed — a call is one event, served or refused; checked on the ingester (6.4 % of ghost `400` events before, none after). A subscription no longer rebuilds, disables or deletes a key it did not mint: nothing to change, the product lets the subscription mint its keys. The suite on it: 247 pass, 4 skip (the extensions, not loaded: they have to be recompiled against this Otoroshi), 1 failure of the controller under the load of the whole suite, passing alone. The demo catches the showcase up too after a restart of the gateway.
@@ -113,7 +114,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 
 
-**Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions).
+**Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions: upstream [#2964](https://github.com/MAIF/otoroshi/issues/2964), alias keys, since #2963 was split on 2026-11-20).
 
 **Blocked on the LLM extension (2):** R-57 (MCP), R-58 (AI, with the token and budget plans of R-18) — the extension has to run with the latest changes of the Otoroshi api first.
 
