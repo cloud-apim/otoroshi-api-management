@@ -11,6 +11,14 @@ export async function notify({ workspaceId, teamId = null, userId = null, face =
     values (${newId('ntf')}, ${workspaceId}, ${teamId}, ${userId}, ${face}, ${kind}, ${title}, ${body}, ${link}, ${data})`;
 }
 
+// what there is to decide about an api goes to its team; an api of no team is decided by the
+// administrators of its workspace, each of them told
+export async function notifyApiTeam(teamId, note) {
+  if (teamId) return notify({ ...note, teamId });
+  const admins = await db`select user_id from workspace_members where workspace_id = ${note.workspaceId} and role = 'admin'`;
+  for (const a of admins) await notify({ ...note, userId: a.user_id });
+}
+
 // the notifications of a person in a workspace, with their own read and done marks.
 // filter: 'open' (not done, the default), 'unread', 'done', 'all'
 export async function searchFor(user, workspaceId, face, { filter = 'open', limit = 50, offset = 0, q = '' } = {}) {

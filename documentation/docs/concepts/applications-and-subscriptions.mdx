@@ -141,8 +141,9 @@ the subscription then has a `pending_transfer` (`-o json`), whose `status` is `a
 
 Consumers are notified of what happens to their subscriptions — accepted, rejected, suspended,
 resumed, closed, moved, a move to agree to — and producers of what they have to decide — a
-request waiting for review, a move asked by a consumer. Notifications are addressed to teams:
-every member sees them, and **each reads them and marks them done on their own** — one member
+request waiting for review, a move asked by a consumer. Notifications are addressed to teams — the
+team of the application, the team of the API; for an API of no team, the administrators of its
+workspace, who decide for it —: every member sees them, and **each reads them and marks them done on their own** — one member
 dealing with a request does not hide it from the others.
 
 In the console, the menu of the person signed in shows the unread ones (a dot on the avatar, their
@@ -157,6 +158,11 @@ unread, done, or all. The admin API serves the same: `GET …/notifications?filt
 The console lists subscriptions per API, per application and across the workspace, with the
 request (usage statement, terms acceptance, request form answers). A reviewer accepts or rejects
 with a message; the decision is recorded on the subscription and in the audit trail.
+
+The requests waiting for review lead to themselves: their count beside **APIs** in the sidebar, a
+notice above the list of APIs that opens them all (`/subscriptions?status=pending`), on the row of
+an API a *pending* badge that opens its own, and on the page of the API a notice on its overview and
+the count on its **Subscriptions** tab. The home of the workspace lists them too.
 
 ```bash
 otoroshi-apim subscriptions list default --status pending

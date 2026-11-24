@@ -10,24 +10,23 @@
 
 import { db } from '../db/index.js';
 import { audit } from './audit.js';
-import { notify } from './notifications.js';
+import { notifyApiTeam } from './notifications.js';
 import { normalizeDraft } from './model.js';
 
-// the teams of the apis behind, one notification each, listing their apis
+// the teams of the apis behind, one notification each, listing their apis; the apis of no team to
+// the administrators of the workspace
 export async function notifyBehind({ workspaceId, label, name, number, usage, link }) {
   const behind = usage.filter((u) => u.behind);
   if (!behind.length) return 0;
   const teams = await db`select id, team_id from apis where id in ${db(behind.map((u) => u.id))}`;
   const byTeam = new Map();
   for (const u of behind) {
-    const team = teams.find((t) => t.id === u.id)?.team_id;
-    if (!team) continue;
+    const team = teams.find((t) => t.id === u.id)?.team_id || null;
     byTeam.set(team, [...(byTeam.get(team) || []), u]);
   }
   for (const [teamId, apis] of byTeam)
-    await notify({
+    await notifyApiTeam(teamId, {
       workspaceId,
-      teamId,
       face: 'console',
       kind: 'pin.behind',
       title: `${label} ${name} v${number} published`,

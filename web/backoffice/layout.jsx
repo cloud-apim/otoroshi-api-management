@@ -6,14 +6,18 @@ import { fmtRelative } from '../shared/lib.js';
 import { api, useSession, wsApi } from './context.jsx';
 import { chooseLanguage, language, LANGUAGES, tr, Tr } from '../shared/i18n.jsx';
 
-function NavLink({ to, icon, children, exact = false, count, also = [] }) {
+function NavLink({ to, icon, children, exact = false, count, countTitle, also = [] }) {
   const { path } = useRouter();
   const on = exact ? path === to : [to, ...also].some((t) => path === t || path.startsWith(t + '/'));
   return (
     <Link to={to} className={`navlink ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined}>
       <Icon name={icon} />
       <span>{children}</span>
-      {count ? <span className="count">{count}</span> : null}
+      {count ? (
+        <span className="count" title={countTitle}>
+          {count}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -288,7 +292,7 @@ function GatewayPill() {
 export function Layout({ children }) {
   const { user, workspaces, workspace, me } = useSession();
   const single = me.installation?.tenancy === 'single';
-  const { navigate } = useRouter();
+  const { navigate, path } = useRouter();
   const [search, setSearch] = useState(false);
   const [pending, setPending] = useState(0);
   useEffect(() => {
@@ -307,7 +311,8 @@ export function Layout({ children }) {
       .get('/subscriptions?status=pending')
       .then((x) => setPending(x.length))
       .catch(() => {});
-  }, [workspace?.slug]);
+    // again on every page: a review made elsewhere takes it down
+  }, [workspace?.slug, path]);
   const ws = workspace?.slug;
   const logout = async () => {
     await api.post('/auth/logout').catch(() => {});
@@ -367,7 +372,7 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}`} icon="home" exact>
               {tr('Home')}
             </NavLink>
-            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} also={[`/ws/${ws}/policy-groups`, `/ws/${ws}/shared-resources`, `/ws/${ws}/dictionaries`]}>
+            <NavLink to={`/ws/${ws}/apis`} icon="api" count={pending} countTitle={tr('{0} subscription requests waiting for review', [pending])} also={[`/ws/${ws}/policy-groups`, `/ws/${ws}/shared-resources`, `/ws/${ws}/dictionaries`]}>
               {tr('APIs')}
             </NavLink>
             <NavLink to={`/ws/${ws}/applications`} icon="apps">

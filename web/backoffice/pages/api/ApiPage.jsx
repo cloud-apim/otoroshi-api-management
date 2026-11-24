@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useRouter } from '../../../shared/router.jsx';
+import { Link, useRouter } from '../../../shared/router.jsx';
 import { fmtRelative } from '../../../shared/lib.js';
 import { Badge, Callout, DiffView, Dropdown, Field, Icon, Input, Loader, MenuItem, Modal, StatusBadge, Switch, Tabs, errorMessage, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
@@ -133,7 +133,9 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'openapi', label: tr('OpenAPI') },
     { id: 'asyncapi', label: tr('AsyncAPI') },
     { id: 'catalogue', label: tr('Catalogue') },
-    { id: 'subscriptions', label: tr('Subscriptions') },
+    api.pending_subscriptions
+      ? { id: 'subscriptions', label: tr('Subscriptions'), count: api.pending_subscriptions, attention: true, title: tr('{0} waiting for review', [api.pending_subscriptions]) }
+      : { id: 'subscriptions', label: tr('Subscriptions') },
     { id: 'deployment', label: tr('Deployment') },
     { id: 'test', label: tr('Test') },
     { id: 'analytics', label: tr('Analytics') },
@@ -197,6 +199,13 @@ function ApiEditor({ api, tab, reload }) {
         </Callout>
       ) : (
         readOnly && <Callout kind="info">{tr('You can read this API but not change it: you are not a producer of its team.')}</Callout>
+      )}
+      {tab === 'overview' && api.pending_subscriptions > 0 && (
+        <Callout kind="warning" icon="inbox" title={api.pending_subscriptions === 1 ? tr('A subscription request is waiting for review') : tr('{0} subscription requests are waiting for review', [api.pending_subscriptions])}>
+          <Link className="link" to={`/ws/${slug}/apis/${api.id}/subscriptions?status=pending`}>
+            {tr('Review the requests')}
+          </Link>
+        </Callout>
       )}
       <div className="mb-16">
         <Tabs tabs={tabs} value={tab} onChange={go} />

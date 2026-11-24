@@ -63,6 +63,7 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await db`delete from tasks where payload->>'test_run' = ${RUN}`;
+    for (const a of [ids.teamApi, ids.loneApi].filter(Boolean)) await as('admin', 'DELETE', `/workspaces/${WS}/apis/${a.id}`);
     await ok('admin', 'DELETE', `/workspaces/${WS}`);
     const mine = await db`select id from users where email like ${`%-${RUN}@follow-up.test`}`;
     for (const u of mine) {
@@ -108,6 +109,34 @@ describe('notifications', () => {
     expect((await notes('ben', 'all')).items.map((n) => n.id)).not.toContain(own.id);
     await ok('ben', 'POST', `/workspaces/${WS}/notifications/done`, { ids: [own.id] });
     expect((await notes('ann', 'unread')).items.map((n) => n.id)).toContain(own.id);
+  });
+
+  // an api with a plan reviewed by hand, deployed: a request to it waits for its producers
+  async function reviewedApi(name, teamId) {
+    const api = await ok('admin', 'POST', `/workspaces/${WS}/apis`, { name: `${name} ${RUN}`, version: '1.0.0', domain: `${name}-${RUN}.oto.tools`, contextPath: '/', team_id: teamId });
+    const draft = api.draft;
+    draft.plans[0].validation = 'manual';
+    await ok('admin', 'PUT', `/workspaces/${WS}/apis/${api.id}/draft`, draft);
+    await ok('admin', 'POST', `/workspaces/${WS}/apis/${api.id}/publish`, { comment: 'reviewed', deploy: true });
+    return { id: api.id, plan: draft.plans[0].id };
+  }
+  const requests = async (who) => (await notes(who, 'all')).items.filter((n) => n.kind === 'subscription.request' && n.title.includes(RUN) && n.link.includes('/subscriptions?open=')).map((n) => n.data.subscription_id);
+
+  test('a request to review is told to the team of the api, or to the administrators of the workspace for an api of no team', async () => {
+    await ok('admin', 'POST', `/workspaces/${WS}/members`, { email: email('cat'), name: 'cat', password: PASSWORD, role: 'admin' });
+    tokens.cat = await tokenOf('cat');
+    const buyers = (await ok('admin', 'POST', `/workspaces/${WS}/teams`, { name: 'Buyers' })).id;
+    const app = (await ok('admin', 'POST', `/workspaces/${WS}/applications`, { name: 'Buyer app', team_id: buyers })).id;
+    ids.teamApi = await reviewedApi('stock', ids.team);
+    ids.loneApi = await reviewedApi('ledger', null);
+    const ask = async (api) => (await ok('admin', 'POST', `/workspaces/${WS}/subscriptions`, { api_id: api.id, plan_id: api.plan, application_id: app })).id;
+    const [toTeam, toAdmins] = [await ask(ids.teamApi), await ask(ids.loneApi)];
+    // its team, each member; not the administrators beside it
+    expect(await requests('ann')).toEqual([toTeam]);
+    expect(await requests('ben')).toEqual([toTeam]);
+    expect(await requests('cat')).toEqual([toAdmins]);
+    // the page of the api counts what waits for its review
+    expect((await ok('admin', 'GET', `/workspaces/${WS}/apis/${ids.teamApi.id}`)).pending_subscriptions).toBe(1);
   });
 });
 

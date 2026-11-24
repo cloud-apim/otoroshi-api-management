@@ -13,7 +13,7 @@ import { aclAllows, isTeamMember, userAclTags } from './identity.js';
 import { oto } from '../otoroshi/client.js';
 import { buildOtoroshiSubscription } from '../otoroshi/projection.js';
 import { checkValues } from './metadata.js';
-import { notify } from './notifications.js';
+import { notify, notifyApiTeam } from './notifications.js';
 import { requireUnmanaged } from './applications.js';
 import { config } from '../config.js';
 import { open, seal } from './secrets.js';
@@ -205,11 +205,12 @@ async function notifyConsumer(sub, { kind, title, body = '', data = {} }) {
   await notify({ workspaceId: sub.workspace_id, teamId: app.team_id, face: 'portal', kind, title: `${app.name} — ${title}`, body, link: `/apps/${sub.application_id}`, data: { subscription_id: sub.id, ...data } });
 }
 
-// the producers of the api see what they have to decide
+// the producers of the api see what they have to decide: its team, or the administrators of the
+// workspace for an api of no team
 async function notifyProducers(sub, { kind, title, body = '', data = {} }) {
   const api = (await db`select team_id, name, version from apis where id = ${sub.api_id}`)[0];
-  if (!api?.team_id) return;
-  await notify({ workspaceId: sub.workspace_id, teamId: api.team_id, face: 'console', kind, title: `${api.name} ${api.version} — ${title}`, body, link: `/subscriptions?open=${sub.id}`, data: { subscription_id: sub.id, ...data } });
+  if (!api) return;
+  await notifyApiTeam(api.team_id, { workspaceId: sub.workspace_id, face: 'console', kind, title: `${api.name} ${api.version} — ${title}`, body, link: `/subscriptions?open=${sub.id}`, data: { subscription_id: sub.id, ...data } });
 }
 
 export async function acceptSubscription(ctx, sub, { message = '' } = {}) {

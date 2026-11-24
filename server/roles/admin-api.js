@@ -600,6 +600,8 @@ r.get('/workspaces/:ws/apis/:api', async ({ ctx, params }) => {
     resolution_order: resolutionOrder(draft),
     versions,
     can_manage: await apis.canManageApi(c, api),
+    // what waits for its producers: the requests to review
+    pending_subscriptions: (await db`select count(*)::int as c from subscriptions where api_id = ${api.id} and status = 'pending'`)[0].c,
   };
 });
 

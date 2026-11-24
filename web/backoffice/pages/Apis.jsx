@@ -158,6 +158,7 @@ export function ApisPage() {
   const paging = usePaging({ size: 25 });
   const q = paging.q;
   const state = useLoad(() => wapi.get(`/apis${q ? `?q=${encodeURIComponent(q)}` : ''}`), [slug, q]);
+  const toReview = useLoad(() => wapi.get('/subscriptions?status=pending'), [slug]).data?.length || 0;
   const shown = (state.data || []).slice(paging.offset, paging.offset + paging.limit);
   const [creating, setCreating] = useState(false);
   const [adopting, setAdopting] = useState(false);
@@ -182,6 +183,15 @@ export function ApisPage() {
         }
       />
       <ApisTabs current="apis" />
+      {toReview > 0 && (
+        <div className="mb-16">
+          <Callout kind="warning" icon="inbox" title={toReview === 1 ? tr('A subscription request is waiting for review') : tr('{0} subscription requests are waiting for review', [toReview])}>
+            <Link className="link" to={`/ws/${slug}/subscriptions?status=pending`}>
+              {tr('Review the requests')}
+            </Link>
+          </Callout>
+        </div>
+      )}
       <ListToolbar paging={paging} placeholder={tr('search by name, description or tag')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
         {(apis) =>
@@ -232,9 +242,15 @@ export function ApisPage() {
                       <td className="right">
                         {a.active_subscriptions}
                         {a.pending_subscriptions > 0 && (
-                          <span className="badge warning" style={{ marginLeft: 6 }}>
+                          <Link
+                            to={`/ws/${slug}/apis/${a.id}/subscriptions?status=pending`}
+                            className="badge warning"
+                            style={{ marginLeft: 6 }}
+                            title={tr('Review the requests')}
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <Tr text={'{0} pending'} args={[a.pending_subscriptions]} />
-                          </span>
+                          </Link>
                         )}
                       </td>
                       <td className="muted small">{fmtRelative(a.draft_updated_at)}</td>

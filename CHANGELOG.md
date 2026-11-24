@@ -11,6 +11,10 @@ The notes of each release: the section of a version is the body of its GitHub re
   Kubernetes `Application`), for the subscriptions made from then on. Needs the Otoroshi `master`
   of 2026-11-24 or later (shared credentials,
   [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
+- **The subscription requests to review lead to themselves** in the console: a notice above the list
+  of APIs, the *pending* badge of an API opening its requests, a notice on the page of the API and a
+  count on its Subscriptions tab. A request to an API of no team is notified to the administrators
+  of its workspace — it was notified to nobody.
 - **A person can be deleted** by an installation administrator, with their personal applications.
 - **The quickstart runs the product** as in production; the development stack has a page of its own.
 - A subscription deleted from the product while the gateway was unreachable is removed from it once

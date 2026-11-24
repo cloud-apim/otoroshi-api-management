@@ -1909,5 +1909,10 @@
   "The key of the application: {0}, shared by {1} subscriptions — its secret is shown with each of them.": "La clé de l’application : {0}, partagée par {1} souscriptions — son secret est affiché avec chacune d’elles.",
   "key of the application": "clé de l’application",
   "The key of the application: the current secret stops working immediately on every API it calls ({0} subscriptions).": "La clé de l’application : le secret actuel cesse immédiatement de fonctionner sur toutes les API qu’elle appelle ({0} souscriptions).",
-  "The application calls every API with this key, {0} subscriptions in all: the gateway counts the calls of each one on its own plan.": "L’application appelle toutes ses API avec cette clé, {0} souscriptions en tout : la passerelle compte les appels de chacune sur son propre plan."
+  "The application calls every API with this key, {0} subscriptions in all: the gateway counts the calls of each one on its own plan.": "L’application appelle toutes ses API avec cette clé, {0} souscriptions en tout : la passerelle compte les appels de chacune sur son propre plan.",
+  "{0} waiting for review": "{0} à valider",
+  "A subscription request is waiting for review": "Une demande de souscription attend d’être validée",
+  "{0} subscription requests are waiting for review": "{0} demandes de souscription attendent d’être validées",
+  "Review the requests": "Examiner les demandes",
+  "{0} subscription requests waiting for review": "{0} demandes de souscription à valider"
 }
