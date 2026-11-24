@@ -5,9 +5,9 @@
   Describe your APIs as products, publish them, let consumers subscribe — without ever opening the gateway.
 </p>
 
-> **Status: 0.1.0, a beta.** It drives [Otoroshi 18.1](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0). An end-to-end test describes a reference catalogue — 6 plans, 5 auth
+> **Status: 0.1.1, a beta.** It drives [Otoroshi 18.1](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0). An end-to-end test describes a reference catalogue — 6 plans, 5 auth
 > mechanisms, 4 approval modes, on one API and one set of routes — projects it, reconciles it and
-> detects its drift (`test/reference-catalogue.test.js`). What 0.1.0 does and does not do:
+> detects its drift (`test/reference-catalogue.test.js`). What it does and does not do:
 > [`CHANGELOG.md`](./CHANGELOG.md).
 
 **Documentation:** sources in [`documentation/`](./documentation), built with Docusaurus —
@@ -145,7 +145,7 @@ Two PostgreSQL databases: application data, and events + analytics.
 
 ## Roadmap
 
-0.1.0 manages REST APIs on one Otoroshi cluster. Next:
+The beta manages REST APIs on one Otoroshi cluster. Next:
 
 - **LLM APIs** — an API in front of one or several AI providers, with budgets and plans counted in
   tokens (the LLM extension of Otoroshi).

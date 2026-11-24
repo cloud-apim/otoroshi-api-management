@@ -3,24 +3,60 @@
 The notes of each release: the section of a version is the body of its GitHub release
 (`.github/workflows/release.yaml`).
 
-## Unreleased
+## 0.1.1 — beta
 
-- **Otoroshi 18.1 is released**: the product runs on the jar of its
-  [release](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0), no longer a build of its `master`. The extensions released for it — the
-  Threat Protection Suite 1.1.0, the LLM extension 0.0.91 — run on it.
+The beta on the release of Otoroshi 18.1: one API key for every API of an application, the requests
+to review easier to reach, a person deleted on request, a quickstart and a tutorial played as written.
+
+### What it needs
+
+- **[Otoroshi 18.1](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0)** or later, the jar of its release — no longer a build of its
+  `master` — and an admin key with every right.
+- **PostgreSQL 14** or later, two databases, as for 0.1.0.
+- Its extensions, optional: the **Threat Protection Suite 1.1.0** and the **LLM extension 0.0.91**
+  or later, built for Otoroshi 18.1 — the earlier releases do not start on it.
+
+### What changes
+
 - **One API key for every API of an application**: its subscriptions to apikey plans share one
   client id and one secret, each with the quotas, the restrictions and the plugins of its own plan —
   nothing pooled. Chosen on the application (console, portal, admin API `shared_credential`, the
-  Kubernetes `Application`), for the subscriptions made from then on (shared credentials of
-  Otoroshi 18.1, [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
+  Kubernetes `Application`), for the subscriptions made from then on; a new secret is taken by
+  every API, suspending or closing a subscription cuts its API only.
 - **The subscription requests to review lead to themselves** in the console: a notice above the list
   of APIs, the *pending* badge of an API opening its requests, a notice on the page of the API and a
   count on its Subscriptions tab. A request to an API of no team is notified to the administrators
   of its workspace — it was notified to nobody.
-- **A person can be deleted** by an installation administrator, with their personal applications.
-- **The quickstart runs the product** as in production; the development stack has a page of its own.
-- A subscription deleted from the product while the gateway was unreachable is removed from it once
-  it answers: its key no longer keeps working.
+- **A person can be deleted** by an installation administrator — Global settings › Users,
+  `DELETE /api/users/<id or email>`, `otoroshi-apim users delete` —, with their personal
+  applications, whose keys the gateway revokes.
+- **The documentation**: a quickstart that makes an installation as in production, a tutorial end to
+  end — a producer exposes an API, a consumer subscribes and calls it —, a page for the development
+  of the product.
+
+### Fixed
+
+- A producer could adopt an API of the gateway into a team that is not theirs.
+- A subscription deleted from the product while the gateway was unreachable kept its key working on
+  the gateway: it is removed once the gateway answers.
+- `otoroshi-apim subscriptions transfer` announced the new plan of a move that waits for the
+  consumer's consent or for a payment: it says it waits.
+- The documentation checked the extensions with `sha256sum -c`, which cannot read their checksum
+  files (the digest alone): its commands build the line to check.
+
+### Known limitations
+
+- **REST APIs only.** The other types — event-driven, MCP, AI, then GraphQL and gRPC — come next.
+- **The Threat Protection Suite** has four gaps open
+  ([waf#60 to #63](https://github.com/cloud-apim/otoroshi-waf-extension/issues)): the known
+  limitations of the documentation say what the product does meanwhile.
+- The accessibility of the console and the portal has not been audited.
+
+### Upgrades
+
+From 0.1.0: the gateway on the release of Otoroshi 18.1, then the new executable or image — its
+migrations run at start, in place. The applications keep one key per subscription until they choose
+one key for every API.
 
 ## 0.1.0 — beta
 
