@@ -18,7 +18,7 @@ const capabilities = [
   {
     kicker: 'Subscriptions',
     title: 'An approval workflow that is yours',
-    body: 'Automatic or manual review, a usage statement, terms of use, a request form made of typed fields. A subscription becomes an Otoroshi apikey only once it is accepted, and moves to an equivalent plan without changing its key.',
+    body: 'Automatic or manual review, a usage statement, terms of use, a request form made of typed fields. A subscription becomes an Otoroshi apikey only once it is accepted, and moves to an equivalent plan without changing its key. An application can call every API it subscribes to with one key, each subscription keeping its own quotas.',
   },
   {
     kicker: 'Gateway',

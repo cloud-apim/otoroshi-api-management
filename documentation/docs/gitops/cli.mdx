@@ -62,7 +62,7 @@ The same commands, three ways:
 | `subscriptions ending <ws> <id> <date\|none>` | the end date of a subscription: past, it expires; `none` renews it |
 | `subscriptions usage <ws> <id>` | the usage billed: the batches of calls sent to the meter of the payment provider |
 | `subscriptions transfer <ws> <id> --plan <plan> [--api <api>]` | to an equivalent plan; a move that waits for the consumer's consent or a payment says so |
-| `applications list <ws>` | |
+| `applications list <ws>` | the applications, their team and their active subscriptions; their keys, one for every API or one per subscription |
 | `drift <ws>` | run drift detection and print the reports |
 | `audit <ws> [--limit n] [--q text]` | the audit trail |
 | `apis export-snapshot <ws> <api> [--snapshot n]` | a snapshot as a [promotion](./promotion.mdx) document (default: the deployed one) |

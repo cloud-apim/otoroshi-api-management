@@ -19,7 +19,8 @@ should run with what the gateway holds:
   methods, matching, backend, flow), backend (targets, root), flow (plugins and their configuration)
   and plan (status, kind, rate limits, restrictions).
 - **Subscriptions**: the `ApiSubscription` (status, plan, API) and each active key (present,
-  enabled, `apiRef.plan`, secret).
+  enabled, `apiRef.plan`, secret); for a subscription that shares the key of its application, that
+  key too (present, enabled, secret) and the sharing itself.
 
 Each object gets a report:
 
@@ -71,7 +72,9 @@ Its **subscriptions and their keys** are taken over too, as they are. Each owner
 `owner_ref`, and the client id on token and certificate plans — becomes an application of the
 product (or the one its keys already name with `id_ref`), in the team of the API or the one given
 (`application_team_id`); each `ApiSubscription` becomes a subscription of the product with the same
-id, active or suspended; each key a credential with the same client id and secret. The first
+id, active or suspended; each key a credential with the same client id and secret. A subscription
+that shares a credential of its owner keeps sharing it: the credential becomes its application's,
+which calls every API with [one key](./projection.mdx#one-key-for-every-api) from then on. The first
 deployment updates them in place: the consumers keep calling with the keys they have. Adopt the API
 alone with `"subscriptions": false`. The trusted CAs of an mtls plan are read from the certificates
 it names; the selection, the counter failure strategy, the circuit breaker, the issuer and the

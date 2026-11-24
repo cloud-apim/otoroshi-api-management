@@ -172,8 +172,10 @@ one, and the next plan gets the call. Deprecated plans are served, and count.
 - **Unit of measure**: calls. Tokens and AI budgets are in the model, and refused at
   validation until LLM backends are supported.
 
-Limits are **per credential**: nothing is pooled between the subscriptions of an application or
-between plans. On an Otoroshi leader/worker cluster the quota is global, within a few seconds
+Limits are **per subscription**, counted on its key: nothing is pooled between the subscriptions of
+an application or between plans — not even when the application calls every API with
+[one key](./applications-and-subscriptions.mdx#one-api-key-for-every-api), each of its subscriptions
+being counted on an alias of its own. On an Otoroshi leader/worker cluster the quota is global, within a few seconds
 of synchronisation.
 
 They are projected as the throttling strategy of the keys:

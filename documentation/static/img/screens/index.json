@@ -213,7 +213,7 @@
   },
   {
     "file": "console-application-identity.png",
-    "title": "An application — expected client_id, certificates, metadata"
+    "title": "An application — expected client_id, one API key for every API, certificates, metadata"
   },
   {
     "file": "console-subscriptions.png",
@@ -441,7 +441,7 @@
   },
   {
     "file": "portal-app.png",
-    "title": "Portal — an application: credentials, live quotas, transfer consent"
+    "title": "Portal — an application: credentials, live quotas, transfer consent, one API key for every API"
   },
   {
     "file": "portal-change-plan.png",

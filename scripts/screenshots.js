@@ -321,7 +321,7 @@ async function consoleTour(page) {
     await go(page, `${W}/applications/${app.id}`);
     await shot(page, 'console-application', 'An application and its subscriptions');
     await click(page, 'Identity', { selector: 'button' });
-    await shot(page, 'console-application-identity', 'An application — expected client_id, certificates, metadata');
+    await shot(page, 'console-application-identity', 'An application — expected client_id, one API key for every API, certificates, metadata');
   }
   await go(page, `${W}/subscriptions?status=pending`);
   await shot(page, 'console-subscriptions', 'Subscriptions waiting for review');
@@ -486,7 +486,7 @@ async function portalTour(page) {
   await shot(page, 'portal-apps', 'Portal — my applications');
   if (app) {
     await go(page, `${P}/apps/${app.id}`);
-    await shot(page, 'portal-app', 'Portal — an application: credentials, live quotas, transfer consent');
+    await shot(page, 'portal-app', 'Portal — an application: credentials, live quotas, transfer consent, one API key for every API');
     // answer the pending proposal, so that the subscription can ask for a move itself
     const sub = (await api(page, `${P}/front/api/applications/${app.id}`)).subscriptions?.find((s) => s.pending_transfer?.status === 'awaiting_consent');
     if (sub) await api(page, `${P}/front/api/subscriptions/${sub.id}/transfer/consent`, 'POST', { accept: false });

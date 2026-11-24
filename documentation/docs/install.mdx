@@ -49,7 +49,7 @@ installations of their own, a snapshot [promoted](./gitops/promotion.mdx) from o
 
 | | Required | |
 |---|---|---|
-| **Otoroshi 18.1** or later — until it is released, built from the `master` branch of Otoroshi | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
+| **Otoroshi 18.1** or later — until it is released, built from the `master` branch of Otoroshi, of 2026-11-24 or later for [one API key for every API](./concepts/applications-and-subscriptions.mdx#one-api-key-for-every-api) | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
 | **PostgreSQL 14** or later | yes | **two databases**, created beforehand: the application data, and the events and analytics — two connection URLs, one server is enough; a user that owns them (the product creates its tables, the migrations run at startup) |
 | **The product** | yes | the executable (linux and macOS, x64 and arm64) or the image `ghcr.io/cloud-apim/otoroshi-api-management`; one instance or several, listening on one port (`9000`) |
 | A key for the secrets | yes | `APIM_SECRETS_KEY`: the secrets it keeps — of the credentials, of its key to the gateway, of the identity providers — are sealed with it ([secrets at rest](#secrets-at-rest)) |

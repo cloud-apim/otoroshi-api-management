@@ -31,7 +31,10 @@ backend duration, bytes in and out, error flag, caller IP and user agent.
 
 A `GatewayEvent` names the api, the plan and the subscription of the key that called — its
 `identity.apiRef`, as the key said it at the time of the call — and the ingester attributes the
-call from it: the api, the plan, and the subscription with its application. A consumer a `keyless`
+call from it: the api, the plan, and the subscription with its application. A call made with the
+[key an application shares](./projection.mdx#one-key-for-every-api) between its APIs comes through
+the alias of its subscription: it is attributed to that subscription, under the client id the
+consumer called with, the shared credential's (`apiRef.credential`). A consumer a `keyless`
 plan identified has a plan and no subscription. An event without `apiRef` (an AI audit) is
 attributed from the client id of a credential the product holds.
 

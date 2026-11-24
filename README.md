@@ -25,8 +25,8 @@ Two faces of one thing, plus the two services that carry them:
 - **an API management console** (`/backoffice`) — producers describe APIs, plans, documentation;
   publish immutable snapshots and deploy them; review subscriptions; watch usage;
 - **a developer portal** per workspace (`/<workspace>/`) — consumers browse the catalogue, read the
-  documentation, try the API (Scalar), subscribe from their applications, get their credentials and
-  follow their consumption;
+  documentation, try the API (Scalar), subscribe from their applications, get their credentials —
+  a key per subscription, or one for every API of an application — and follow their consumption;
 - **an admin API** (`/api`) — the only way to do anything; the console uses the very same router;
 - **an ingester** (`/ingest`) — receives Otoroshi events and stores them computed (attributed to
   api, plan, subscription, application) and, optionally, raw.
@@ -133,7 +133,7 @@ Two PostgreSQL databases: application data, and events + analytics.
 |---|---|
 | Draft → immutable snapshot → deployment | `server/domain/apis.js`, `deployments.js` |
 | Projection: `Api` written as code | `server/otoroshi/projection.js`, `client.js` |
-| A subscription is an apikey with `apiRef`, the application an `id_ref` | `server/domain/subscriptions.js` |
+| A subscription is an apikey with `apiRef`, the application an `id_ref`; one key for every API, a shared credential and an alias per subscription | `server/domain/subscriptions.js` |
 | Selective sync: docs, terms, usage statements, pricing never projected | `projection.js` |
 | Async and replayable operations | `server/domain/tasks.js` |
 | Drift detection, adopt mode | `server/otoroshi/drift.js` |
