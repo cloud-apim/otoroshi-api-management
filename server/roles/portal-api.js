@@ -394,7 +394,7 @@ r.get('/apis/:api/my-subscriptions', async ({ ctx, params }) => {
     .map((s) => ({ id: s.id, plan_name: s.plan_name || s.plan_id, application_name: apps.find((a) => a.id === s.application_id)?.name }));
 });
 
-// the composer of the portal, for the apis without an OpenAPI specification (D-17: one composer for
+// the composer of the portal, for the apis without an OpenAPI specification (one composer for
 // both faces): the request goes through the gateway — its routing, its plans, its quotas — with the
 // credentials of one of the consumer's own subscriptions, or none
 r.post('/apis/:api/test', async ({ ctx, params, body }) => {

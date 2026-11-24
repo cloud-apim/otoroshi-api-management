@@ -1,4 +1,4 @@
-// Shared resources (the resources of D-16, not the endpoints of an api): a dependency a plan consumes, named once for the workspace and referenced by the plans
+// Shared resources (not the resources of an api, its endpoints): a dependency a plan consumes, named once for the workspace and referenced by the plans
 // rather than described again on each — an authorization server: its issuer, its keys, its
 // endpoints, the client the gateway uses with it. Like a shared policy group, it creates no gateway
 // capability: a plan pins a published version, the snapshot freezes it, and the projection derives

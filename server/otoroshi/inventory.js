@@ -1,4 +1,4 @@
-// The inventory of the Otoroshi entities (D-15): what is not API management is derived from the
+// The inventory of the Otoroshi entities: what is not API management is derived from the
 // description of the apis, or consumed as the infrastructure it is — the product never becomes a
 // second administration console. The criterion: does the entity follow from the description of an
 // api? Then the product derives it, marks it as its own and reconciles it. Otherwise it is

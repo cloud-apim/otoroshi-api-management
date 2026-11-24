@@ -114,7 +114,7 @@ The Threat Protection Suite sends one normalised event per decision, `CloudApimS
 ingester keeps it in a table of its own, attributed like the calls: the API from the event, and the
 plan, the subscription and the application from the key that called. A keyless caller, or one
 refused before it was identified, has the API only: the event does not carry the plan
-([G-26](../otoroshi-gaps.mdx)). The address of the caller is pseudonymised like the calls'; the
+([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)). The address of the caller is pseudonymised like the calls'; the
 events are kept as long as the calls.
 
 ## Rollups and retention

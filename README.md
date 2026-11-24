@@ -165,8 +165,9 @@ Two PostgreSQL databases: application data, and events + analytics.
 
 ## Otoroshi gaps
 
-Every data-plane gap hit while building this is logged in [`OTOROSHI-GAPS.md`](./OTOROSHI-GAPS.md),
-to be fixed upstream — never worked around in the product's model.
+A data-plane gap is fixed upstream, in Otoroshi or one of its extensions — never worked around in
+the product's model. The ones still open are the documentation's **known limitations**
+(`documentation/docs/otoroshi-gaps.mdx`).
 
 ## Repository layout
 

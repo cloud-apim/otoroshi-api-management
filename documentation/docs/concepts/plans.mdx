@@ -233,7 +233,7 @@ A gateway without the extension ignores a plugin it does not know, and the calls
 **unprotected**: the draft and the deployment say it (`threat_protection_unavailable`), and the tab
 says it before you start. The events of the suite are in **Observability → Security**, attributed to
 the API, and to the plan and the subscription of the key that called; a caller not identified — a
-keyless plan, a refusal before identification — is the API's only ([G-26](../otoroshi-gaps.mdx)).
+keyless plan, a refusal before identification — is the API's only ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)).
 
 The extension works best as a fabric: the firewall **reports** (a configuration that does not block)
 and the **threat response decides**, from the score of the call — a policy that refuses at 90, the
@@ -243,12 +243,12 @@ A threat policy can also **challenge** a caller: a challenge is a page, for a pe
 :::caution What the extension does not do yet
 - The global table of Threat Studio does not see the preset of a plan: a second firewall runs on the
   calls of that plan, the scores add up and the policy of the table decides
-  ([G-24](../otoroshi-gaps.mdx)). Keep the global table off the APIs the product protects per plan.
+  ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)). Keep the global table off the APIs the product protects per plan.
 - With the core rule set, every call scores a firewall match (45): its initialization rules count as
-  matches ([G-27](../otoroshi-gaps.mdx)). A policy that refuses below 90 refuses legitimate calls.
+  matches ([waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62)). A policy that refuses below 90 refuses legitimate calls.
 - A firewall that blocks on its own sends no security event, only its trail
-  ([G-28](../otoroshi-gaps.mdx)): its blocks do not reach **Observability → Security**.
-- A security event names the API, not the plan ([G-26](../otoroshi-gaps.mdx)): the product finds
+  ([waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63)): its blocks do not reach **Observability → Security**.
+- A security event names the API, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)): the product finds
   the plan from the key that called, when there is one.
 :::
 

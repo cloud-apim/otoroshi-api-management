@@ -66,7 +66,7 @@ beforeAll(async () => {
     // (from the templates of the extension, the fields that matter set)
     const policy = await otoroshi('GET', `${GROUP}/threat-policies/_template`);
     // a refusal at 90 — the weight of a block of the firewall — and nothing below: every call of a
-    // ruleset with the core rule set scores a match already (G-27)
+    // ruleset with the core rule set scores a match already (waf#62)
     const tier = { ...policy.tiers[0], min_score: 90, action: 'deny', status: 403 };
     await otoroshi('POST', `${GROUP}/threat-policies/${POLICY}`, { ...policy, id: POLICY, name: 'Strict', dry_run: false, waf_block_decisive: true, tiers: [tier] });
     const waf = await otoroshi('GET', `${GROUP}/waf-configs/_template`);

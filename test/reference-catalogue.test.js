@@ -452,7 +452,7 @@ describe('reference catalogue', () => {
     expect((await oto.getApi(state.apiId)).enabled).toBe(true);
     expect((await gatewayCall('/documents/2026-0042', { headers: partner, expect: (r) => r.status === 200 })).status).toBe(200);
     expect((await oto.getApikey(cred.client_id)).clientSecret).toBe(cred.client_secret);
-    // a disabled Api takes a few seconds to leave the proxy state, and more to come back (G-11)
+    // a disabled Api takes a few seconds to leave the proxy state, and more to come back (its proxy state)
   }, 90000);
 
   test('deleting the api removes it from the gateway, with its subscriptions and the keys of its consumers', async () => {

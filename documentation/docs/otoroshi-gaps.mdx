@@ -12,13 +12,11 @@ Meanwhile, the product says what really applies rather than promising what the g
 
 This page lists what still limits the product: the gaps **open**, reported upstream, with what the
 product does meanwhile. The gaps already fixed are not here: the product requires Otoroshi 18.1,
-which holds their fixes. The full history — every gap found, its source references, its fix — is
-kept in
-[`OTOROSHI-GAPS.md`](https://github.com/cloud-apim/otoroshi-api-management/blob/main/OTOROSHI-GAPS.md).
+which holds their fixes.
 
-| # | Gap | Severity | Status | What the product does |
-|---|---|---|---|---|
-| G-24 | Threat Protection Suite: the global table of Threat Studio does not see the plan plugins: a second firewall runs on a plan already protected, the scores add up and the policy of the table decides ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)) | high | ⬜ open | keep the global table off the apis protected per plan |
-| G-26 | Threat Protection Suite: a security event names the api, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)) | low | ⬜ open | the plan from the key that called; the api only otherwise |
-| G-27 | Threat Protection Suite: with the core rule set, every call scores a firewall match — its initialization rules count as matches ([waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62)) | medium | ⬜ open | a policy that refuses at 90 |
-| G-28 | Threat Protection Suite: a firewall that blocks on its own sends no security event, only its trail ([waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63)) | medium | ⬜ open | the firewall reports, the threat response decides |
+| Gap | Severity | Status | What the product does |
+|---|---|---|---|
+| Threat Protection Suite: the global table of Threat Studio does not see the plan plugins: a second firewall runs on a plan already protected, the scores add up and the policy of the table decides ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)) | high | ⬜ open | keep the global table off the apis protected per plan |
+| Threat Protection Suite: a security event names the api, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)) | low | ⬜ open | the plan from the key that called; the api only otherwise |
+| Threat Protection Suite: with the core rule set, every call scores a firewall match — its initialization rules count as matches ([waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62)) | medium | ⬜ open | a policy that refuses at 90 |
+| Threat Protection Suite: a firewall that blocks on its own sends no security event, only its trail ([waf#63](https://github.com/cloud-apim/otoroshi-waf-extension/issues/63)) | medium | ⬜ open | the firewall reports, the threat response decides |

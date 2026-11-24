@@ -1,8 +1,9 @@
 # CLAUDE.md
 
-Prototype of an API management console + developer portal driving Otoroshi 18. Product decisions
-are kept in the separate `../otoroshi-api-management-specs` repository: read it before changing
-behaviour, and do not reopen settled decisions.
+Prototype of an API management console + developer portal driving Otoroshi 18. Product decisions,
+the progress (`PROGRESS.md`) and the gaps found in Otoroshi (`OTOROSHI-GAPS.md`) are kept in the
+separate `../otoroshi-api-management-specs` repository: read it before changing behaviour, and do
+not reopen settled decisions.
 
 ## Commands
 
@@ -45,8 +46,9 @@ ingester when the product runs inside the compose stack (`http://apim:9000/inges
 - **The admin api writes the audit trail** (`audit()` in every write, and reads of credentials
   and request logs).
 - **A data-plane gap is fixed in Otoroshi, never worked around in the model.** When you hit one,
-  verify it in `../otoroshi` source and log it in `OTOROSHI-GAPS.md` (G-n, severity, source line,
-  what the product does meanwhile, proposed fix).
+  verify it in `../otoroshi` source and log it in the specs' `OTOROSHI-GAPS.md` (G-n, severity, source
+  line, what the product does meanwhile, proposed fix); its open ones go to the known limitations of
+  the documentation, by their upstream issue.
 - One installation drives **one** Otoroshi cluster: no cluster object, no multi-gateway.
 - The tenant is called **workspace** everywhere; one portal per workspace, resolved from the URL.
 - CSS is hand-written: no framework, no component library. Charts follow the dataviz method

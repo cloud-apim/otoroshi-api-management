@@ -1,4 +1,4 @@
-// One API key for every API of an application (R-12, D-31): its subscriptions to apikey plans share
+// One API key for every API of an application: its subscriptions to apikey plans share
 // the credential of the application — one client id, one secret — each through an alias key of its
 // own on the gateway, with the quotas of its own plan. The identity is grouped, the counters never.
 //

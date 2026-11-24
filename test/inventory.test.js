@@ -1,4 +1,4 @@
-// The inventory of the Otoroshi entities (D-15) against the gateway of the stack: every kind it
+// The inventory of the Otoroshi entities against the gateway of the stack: every kind it
 // declares is in the inventory, with a treatment, and in the documentation.
 //
 // Needs the docker stack (mise run up).
