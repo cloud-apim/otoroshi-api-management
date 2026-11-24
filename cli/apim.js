@@ -490,6 +490,7 @@ async function main() {
         ['name', 'name'],
         ['team', 'team_name'],
         ['client_id', 'client_id'],
+        ['keys', (r) => (r.shared_credential ? 'one for every api' : 'one per subscription')],
         ['subs', 'active_subscriptions'],
       ]);
     case 'drift': {

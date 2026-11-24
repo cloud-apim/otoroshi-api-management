@@ -7,6 +7,7 @@ import { config } from '../config.js';
 import { badRequest, conflict, forbidden, notFound, unauthorized } from '../http/router.js';
 import { audit } from './audit.js';
 import { normalizeCategories } from './discovery.js';
+import { enqueue } from './tasks.js';
 
 export function publicUser(u) {
   if (!u) return null;
@@ -198,7 +199,11 @@ export async function updateWorkspace(ctx, ws, patch) {
 
 export async function deleteWorkspace(ctx, ws) {
   if (config.tenancy === 'single') throw badRequest('the single workspace of this installation cannot be deleted (APIM_TENANCY=single)');
+  // the credentials of its applications leave the gateway with them
+  const shared = await db`select c.client_id, c.application_id from credentials c join applications a on a.id = c.application_id
+    where a.workspace_id = ${ws.id} and c.shared and c.status = 'active'`;
   await db`delete from workspaces where id = ${ws.id}`;
+  for (const c of shared) await enqueue('delete_shared_credential', { client_id: c.client_id, application_id: c.application_id }, { dedupeKey: `sharedcred:${c.client_id}` });
   await audit(ctx, { action: 'workspace.delete', workspaceId: null, entityKind: 'workspace', entityId: ws.id, summary: `workspace ${ws.name} deleted` });
 }
 

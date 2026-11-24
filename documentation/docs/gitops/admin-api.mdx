@@ -93,7 +93,7 @@ B=http://localhost:9000/api/workspaces/default
 curl -s -H "$H" -H "$J" -X POST $B/apis \
   -d '{"name": "Books", "version": "1.0.0", "domain": "books.oto.tools", "contextPath": "/v1"}'
 curl -s -H "$H" -H "$J" -X POST $B/apis/books/publish -d '{"comment": "first", "deploy": true}'
-curl -s -H "$H" -H "$J" -X POST $B/applications -d '{"name": "My app", "team_id": "<team id>"}'
+curl -s -H "$H" -H "$J" -X POST $B/applications -d '{"name": "My app", "team_id": "<team id>", "shared_credential": true}'
 curl -s -H "$H" -H "$J" -X POST $B/subscriptions \
   -d '{"api_id": "<api id>", "plan_id": "<plan id>", "application_id": "<app id>"}'
 curl -s -H "$H" $B/subscriptions/<sub id>          # the credentials

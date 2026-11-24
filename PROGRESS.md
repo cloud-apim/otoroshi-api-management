@@ -7,12 +7,13 @@ stands, decision by decision, and **what remains to implement against the spec**
 Legend: ✅ done and verified · 🟡 partial · ⬜ to do · ➖ not applicable / out of the MVP
 Sizes: **S** a few hours · **M** one or two days · **L** several days.
 
-Last update: 2026-11-20.
+Last update: 2026-11-24.
 
 ---
 
 ## Now
 
+- **R-12, one API key for every API of an application** (2026-11-24, after G-23 was fixed upstream — [#2968](https://github.com/MAIF/otoroshi/pull/2968), shared credentials and alias keys — on the owner's request): an application chooses it (`shared_credential`: console, portal, admin api, the Kubernetes `Application`, export and import), and its subscriptions to `apikey` plans made from then on share the credential of the application — one client id, one secret — each through an alias of its own on the gateway, with the rate limit, the quotas, the restrictions and the plugins of its own plan: the identity grouped, the counters never (D-31). The subscriptions show the key of the application, marked as such, with how many share it; a new secret is taken by every api at once; suspending, expiring or closing a subscription cuts its api only; a second subscription of the application to the same api has a key of its own (the credential names one subscription per api); a transfer to another version makes the subscription again there, sharing the same credential (refused, `409`, onto an api the application already calls with it); the credential outlives its last subscription and leaves the gateway with the application. The ingester keeps the client id of the credential the consumer called with (`apiRef.credential`), the quotas of a subscription are read on its alias, the drift detection watches the credential (enabled, secret) and a resync repairs it — an alias lost with its credential is made again; adopt mode takes over a credential an owner shares. `oauth2-local` subscriptions keep a key of their own: upstream did not test the client credentials flow with a credential authorized on nothing. Checked live on the gateway, through the product: one key calls two apis, each alias counts its own calls, the calls are attributed to each subscription under the credential's client id (`test/shared-credential.test.js`, 9 tests; `test/ingestion.test.js`). G-23 followed in `OTOROSHI-GAPS.md`, off the known limitations. Found on the way: the `test:e2e` task named a test file removed long ago.
 - **The quickstart runs the product, the development has its page** (2026-11-23, the owner's request): the quickstart makes an installation on one machine as in production — a folder and its configuration with secrets made once, PostgreSQL, Otoroshi from its jar, the executable of a release, its setup (its own key, the data exporter), then a first API from a file, a subscription from the portal and a call through the gateway —, played as written on a clean machine (the development stack stopped): 401 without a key, 200 with it, the calls ingested and attributed, a restart with the same commands. The development stack, the tests, the documentation and its captures, the executable and a release moved to `docs/development.mdx`; the README, the overview, the tutorial and the landing page point to one or the other.
 - **A person can be deleted** (2026-11-23): an installation administrator's act — **Global settings › Users**, `DELETE /api/users/<id or email>`, `otoroshi-apim users delete <email>` (and `users list`). The personal applications of the person go with them, the subscriptions of those applications closed first — the gateway revokes their keys —; their sessions, api tokens, memberships, notifications and reviews too; the teams shared with others and the audit trail stay. Nobody deletes themselves; a bootstrap administrator, made again at start, is refused; so is what a source declares (`server/domain/people.js`, `test/people.test.js`). Found on the way: a subscription gone from the product before its closing reached the gateway — its application deleted while the gateway did not answer — was skipped by the projection, its key left working; it is removed from the gateway now (`sync_subscription`), checked with the gateway made unreachable. The tests and the tutorial delete their people instead of working around it.
 - **The development gateway keeps its state** (2026-11-23): the stack gave it `APP_DB_PATH`, which Otoroshi does not read, so it wrote its state inside its container and lost it at every recreation; `OTOROSHI_FILEDB_PATH` puts it in the `otodata` volume — kept across a restart, a new jar, `mise run down`; `mise run reset` wipes it. `mise run demo` still catches a gateway up that lost its state.
@@ -118,7 +119,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 
 
-**Blocked on Otoroshi (1):** R-12 (G-23, a key serving several subscriptions: upstream [#2964](https://github.com/MAIF/otoroshi/issues/2964), alias keys, since #2963 was split on 2026-11-20).
+**Blocked on Otoroshi:** nothing — R-12 done once G-23 was fixed (2026-11-24).
 
 **Blocked on the LLM extension (2):** R-57 (MCP), R-58 (AI, with the token and budget plans of R-18) — the extension has to run with the latest changes of the Otoroshi api first.
 
@@ -157,12 +158,6 @@ plans may meter, the analytics shown, the try-it. The rest of the model is the s
 | R-58 | D-41, D-44 | **The AI type**: a REST api whose backend is one or several AI providers (`OpenAiCompatProxy`), its models; plans in tokens and budget (`LlmTokensRateLimitingValidator`, `AiBudget` partitioned by key — was R-18); the analytics of the tokens and the cost per model (`LLMUsageAudit`, already ingested) | L | the LLM extension on the latest Otoroshi api |
 | R-59 | D-44 | Later. **The GraphQL type**: a GraphQL backend or a composition (`GraphQLProxy`, `GraphQLBackend` in Otoroshi); its schema rendered by the portal | M | |
 | R-60 | D-44 | Later. **The gRPC type**: a gRPC backend (`GrpcWebProxyPlugin` for gRPC-Web in Otoroshi; native gRPC to instruct); its proto files rendered by the portal | L | to instruct |
-
-### Model and projection
-
-| # | Spec | What is missing | Size | Upstream |
-|---|---|---|---|---|
-| R-12 | §4, D-31 | A **credential covering several subscriptions** (one key for several apis of the same consumer, `authorizedEntities` on several apis) — the model's "parent / child" credential; quotas stay per credential | — | G-23 |
 
 ### Developer portal
 
@@ -222,7 +217,7 @@ plans may meter, the analytics shown, the try-it. The rest of the model is the s
 | D-28 administrable by program | ✅ | admin API ✅, CLI ✅, remote catalogs http/git/s3 ✅, Kubernetes ✅: CRDs Api / Application / Subscription and their controller (role `controller`, credentials in a Secret, ownership, finalizers, status), kustomize manifests and the Helm chart (linted, rendered) validated by a k3s api server — `test/kubernetes.test.js` |
 | D-29 a version is a new api | ✅ | |
 | D-30 transfer to an equivalent plan | ✅ | same key, same history; a degrading move waits for the consumer's consent; a consumer asks, the producer applies; in-app notifications, read and marked done by each person (a page lists them all) — `test/queue-and-notifications.test.js` |
-| D-31 no aggregated quota | ✅ | one credential for several apis: R-12, waiting for G-23 |
+| D-31 no aggregated quota | ✅ | one credential for several apis (R-12): an application calls every api with one key, each subscription through an alias with the quotas of its own plan — `test/shared-credential.test.js` |
 | D-32 MVP scope, captured events | ✅ | GatewayEvent, CloudApimSecurityEvent, LLMUsageAudit and McpAudit verified with real traffic (`test/ai-usage.test.js`, `test/threat-protection.test.js`); the events of the event brokers extension: R-54 |
 | D-33 two storage paths | ✅ | computed (exhaustive) + raw (optional): the raw path sampled by request, its errors kept, its headers optionally left out; personal data pseudonymised before anything is stored, in both paths — the address truncated (the default), hashed (HMAC, a key the product keeps) or left out, the signed-in user hashed (the default) or left out, the user agent, the paths templated; the calls rolled up by the hour (by id: late events counted, nothing twice), each path kept for its days; the dashboards read the rollups past the last purge, with exact counts — `test/ingestion.test.js`, `test/ingest-policy.test.js`; the exporters themselves: G-19; the rollups hourly 90 days, then compacted by the day (R-48) |
 | D-35 draft → immutable snapshot | ✅ | rollback = redeploying a snapshot; its two points to instruct settled by the owner on 2026-11-20 (R-29): a shared policy group or resource published again republishes nothing — its teams are told, and upgrade the apis behind on demand, each by its own draft, snapshot and deployment —, and a remote catalog chooses its mode (draft by default, publish, deploy; a Kubernetes resource deploys by default) |

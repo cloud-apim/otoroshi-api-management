@@ -26,8 +26,9 @@ export const PROJECTED_STATUSES = ['active', 'suspended', 'expired'];
 export async function listSubscriptions(workspaceId, { apiId, applicationId, status, userId, planId } = {}) {
   return db`select s.*, a.name as api_name, a.version as api_version, a.slug as api_slug, app.name as application_name,
       app.team_id as application_team_id, t.name as team_name, u.email as requested_by_email,
-      (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'client_id', c.client_id, 'kind', c.kind, 'status', c.status)), '[]')
-         from credentials c where c.subscription_id = s.id) as credentials_summary
+      (select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'client_id', c.client_id, 'kind', c.kind, 'status', c.status, 'shared', c.shared)), '[]')
+         from credentials c where (c.subscription_id = s.id and c.kind <> 'alias')
+           or (s.shares_credential and c.shared and c.application_id = s.application_id and c.status = 'active' and s.status in ('active', 'suspended', 'expired'))) as credentials_summary
     from subscriptions s join apis a on a.id = s.api_id join applications app on app.id = s.application_id
       join teams t on t.id = app.team_id left join users u on u.id = s.requested_by
     where s.workspace_id = ${workspaceId}
@@ -50,8 +51,47 @@ export async function getSubscription(workspaceId, id) {
 // the secret of a credential is sealed at rest
 const openCredential = (c) => c && { ...c, client_secret: open(c.client_secret) };
 
+// the plans whose subscriptions can share the credential of their application: one client id and one
+// secret for every API, each subscription calling through an alias key of its own on the gateway
+export const SHARED_CREDENTIAL_KINDS = ['apikey'];
+
+// the credentials a consumer calls a subscription with: its own keys, or, while it is on the gateway,
+// the credential of its application it shares. Never its alias, which has no secret
 export async function credentialsOf(subscriptionId) {
-  return (await db`select * from credentials where subscription_id = ${subscriptionId} order by created_at`).map(openCredential);
+  const rows = await db`select c.*, case when c.shared then (select count(*)::int from subscriptions o
+        where o.application_id = c.application_id and o.shares_credential and o.status = any(${'{' + PROJECTED_STATUSES.join(',') + '}'}::text[])) end as shared_with
+    from credentials c, subscriptions s
+    where s.id = ${subscriptionId}
+      and ((c.subscription_id = s.id and c.kind <> 'alias')
+        or (s.shares_credential and c.shared and c.application_id = s.application_id and s.status = any(${'{' + PROJECTED_STATUSES.join(',') + '}'}::text[])))
+    order by c.created_at`;
+  return rows.map(openCredential);
+}
+
+// the key the gateway counts the calls of a credential on: the alias of the subscription for the
+// credential of its application, the credential itself otherwise
+export async function countedKeyOf(sub, cred) {
+  if (!cred.shared) return cred.client_id;
+  return (await db`select client_id from credentials where subscription_id = ${sub.id} and kind = 'alias' and status = 'active' order by created_at desc limit 1`)[0]?.client_id || null;
+}
+
+// the credential of an application, as the gateway holds it: one active at most, its secret sealed
+export async function recordSharedCredential(applicationId, key) {
+  const info = { enabled: key.enabled, sharedCredential: key.sharedCredential || null };
+  await db`update credentials set status = 'revoked', revoked_at = now()
+    where application_id = ${applicationId} and shared and status = 'active' and client_id <> ${key.clientId}`;
+  const found = (await db`select id from credentials where application_id = ${applicationId} and shared and client_id = ${key.clientId}`)[0];
+  if (found) await db`update credentials set client_secret = ${seal(key.clientSecret)}, status = 'active', otoroshi = ${info}, revoked_at = null where id = ${found.id}`;
+  else
+    await db`insert into credentials (id, subscription_id, application_id, kind, client_id, client_secret, otoroshi, shared)
+      values (${newId('cred')}, ${null}, ${applicationId}, 'apikey', ${key.clientId}, ${seal(key.clientSecret)}, ${info}, true)`;
+}
+
+// the subscriptions of an application that share its credential on an api: one at most, the
+// credential naming one alias per api
+async function sharesOn(applicationId, apiId, exceptId = null) {
+  return (await db`select id from subscriptions where application_id = ${applicationId} and api_id = ${apiId} and shares_credential
+    and status = any(${'{' + OPEN_STATUSES.join(',') + '}'}::text[]) and id <> ${exceptId || ''}`).length > 0;
 }
 
 // the plans a consumer can subscribe to are those of the snapshot running on the gateway
@@ -117,6 +157,9 @@ export async function requestSubscription(ctx, workspaceId, input) {
   if (paid && (config.payments.provider === 'off' || !(await db`select payments from workspaces where id = ${workspaceId}`)[0]?.payments?.account?.id))
     throw badRequest(`${plan.name} is a paid plan, and this portal does not sell its plans yet: its administrators link a Stripe account first`);
   let status = plan.validation === 'manual' ? 'pending' : paid ? 'pending_payment' : 'active';
+  // the application calls every api with its credential: this subscription shares it, unless another
+  // one of the application already does on this api — it then gets a key of its own
+  const shares = !!app.shared_credential && SHARED_CREDENTIAL_KINDS.includes(plan.auth.kind) && !(await sharesOn(app.id, api.id));
   const id = newId('sub');
   const dates = { created_at: now(), ...(status === 'active' ? { processed_at: now(), started_at: now() } : {}) };
   const request = {
@@ -127,10 +170,10 @@ export async function requestSubscription(ctx, workspaceId, input) {
     plan_name: plan.name,
   };
   const rows = await db`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, dates,
-      payment, projection, requested_by, metadata)
+      payment, projection, requested_by, metadata, shares_credential)
     values (${id}, ${workspaceId}, ${api.id}, ${plan.id}, ${app.id}, ${plan.auth.kind}, ${status}, ${request}, ${dates},
       ${paid ? { status: 'awaiting_payment', provider: plan.pricing.provider } : {}}, ${{ status: status === 'active' ? 'pending' : 'none' }},
-      ${ctx.user?.id || null}, ${metadata}) returning *`;
+      ${ctx.user?.id || null}, ${metadata}, ${shares}) returning *`;
   await audit(ctx, {
     action: 'subscription.request',
     workspaceId,
@@ -321,6 +364,9 @@ async function resolveTransfer(sub, { plan_id, api_id }) {
   if (!plansAreEquivalent(fromPlan, toPlan))
     throw badRequest(`plans are not equivalent: ${fromPlan.auth.kind} -> ${toPlan.auth.kind}. Changing the auth mechanism changes the credential: that is a new subscription, not a transfer`);
   if (toPlan.status !== 'published') throw badRequest(`target plan is ${toPlan.status}`);
+  // the credential of the application names one subscription per api
+  if (sub.shares_credential && toApi.id !== sub.api_id && (await sharesOn(sub.application_id, toApi.id, sub.id)))
+    throw conflict(`the application already calls ${toApi.name} ${toApi.version} with its key, through another subscription: close that one first`);
   // from a free plan to a paid one: the move waits for its payment, through a Checkout, on the plan it leaves
   const needsPayment = isPaid(toPlan) && !isPaid(fromPlan);
   if (needsPayment && (config.payments.provider === 'off' || !(await db`select payments from workspaces where id = ${sub.workspace_id}`)[0]?.payments?.account?.id))
@@ -427,19 +473,47 @@ export async function answerTransfer(ctx, sub, { accept }, { side }) {
   return proceed(ctx, { ...sub, pending_transfer: { ...pt, consent } }, t, consent);
 }
 
+// a new secret for a key of the subscription, or for the credential of its application it shares:
+// every api the application calls with it takes the new one
 export async function rotateCredential(ctx, sub, credentialId) {
-  const cred = (await db`select * from credentials where id = ${credentialId} and subscription_id = ${sub.id}`)[0];
+  const cred = (await credentialsOf(sub.id)).find((c) => c.id === credentialId);
   if (!cred) throw notFound('credential not found');
   const key = await oto.getApikey(cred.client_id);
   if (!key) throw badRequest('the key does not exist on the gateway yet');
   const secret = [...crypto.getRandomValues(new Uint8Array(40))].map((b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
   await oto.updateApikey({ ...key, clientSecret: secret });
   await db`update credentials set client_secret = ${seal(secret)}, rotated_at = now() where id = ${cred.id}`;
-  await audit(ctx, { action: 'credential.rotate', workspaceId: sub.workspace_id, entityKind: 'subscription', entityId: sub.id, summary: `secret of ${cred.client_id} rotated` });
+  await audit(ctx, {
+    action: 'credential.rotate',
+    workspaceId: sub.workspace_id,
+    entityKind: cred.shared ? 'application' : 'subscription',
+    entityId: cred.shared ? sub.application_id : sub.id,
+    summary: cred.shared ? `secret of ${cred.client_id}, the key of the application, rotated: every api it calls takes the new one` : `secret of ${cred.client_id} rotated`,
+  });
   return openCredential((await db`select * from credentials where id = ${cred.id}`)[0]);
 }
 
 // ---------------------------------------------------------------- projection (idempotent)
+
+// a subscription that shares a credential is served while the credential is one and its alias
+// names it: deleting the credential deletes its aliases
+async function sharingServes(existing) {
+  const refs = existing.token_refs || [];
+  const shared = refs.find((r) => r.shared && r.apikey);
+  const alias = refs.find((r) => !r.shared && r.apikey);
+  if (!shared || !alias) return false;
+  const [credential, key] = [await oto.getApikey(shared.apikey), await oto.getApikey(alias.apikey)];
+  return !!credential?.sharedCredential && key?.apiRef?.credential === shared.apikey;
+}
+
+// the credential of a deleted application: no subscription takes it with it, not even the last one
+registerTaskHandler('delete_shared_credential', async ({ client_id, application_id }) => {
+  const key = await oto.getApikey(client_id);
+  if (!key) return { deleted: false };
+  if (key.sharedCredential?.owner !== application_id) throw new PermanentError(`${client_id} is not the credential of ${application_id} on the gateway: left alone`);
+  await oto.deleteApikey(client_id);
+  return { deleted: true };
+});
 
 // Otoroshi revokes the keys of a subscription with it: deleted on apikey and oauth2-local plans,
 // disabled on the others (the plan would mint them again at the next call)
@@ -476,14 +550,23 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
       throw new Error('api not deployed');
     }
     const entity = buildOtoroshiSubscription(sub, { application: app });
+    // a subscription that shares the credential of its application asks for it at its creation: the
+    // gateway makes it with the first one, then names it, and mints the alias of the subscription
+    const fresh = sub.shares_credential ? [{ shared: true }] : [];
     let written;
     if (!existing) {
-      written = await oto.createSubscription({ ...entity, token_refs: [] });
+      written = await oto.createSubscription({ ...entity, token_refs: fresh });
     } else if ((existing.client_id || null) !== (entity.client_id || null)) {
       // the client id of a subscription never changes on the gateway: it is made again, the key of
       // the previous client id left disabled
       await oto.deleteSubscription(sub.id);
-      written = await oto.createSubscription({ ...entity, token_refs: [], dates: { ...entity.dates, created_at: existing.dates?.created_at || entity.dates.created_at } });
+      written = await oto.createSubscription({ ...entity, token_refs: fresh, dates: { ...entity.dates, created_at: existing.dates?.created_at || entity.dates.created_at } });
+    } else if (sub.shares_credential && (existing.api_ref !== entity.api_ref || !(await sharingServes(existing)))) {
+      // nor does the api of a subscription that shares a credential, moved to another version; an
+      // alias gone with its credential is made again the same way: the consumer keeps calling with
+      // the credential of its application
+      await oto.deleteSubscription(sub.id);
+      written = await oto.createSubscription({ ...entity, token_refs: fresh, dates: { ...entity.dates, created_at: existing.dates?.created_at || entity.dates.created_at } });
     } else {
       entity.token_refs = existing.token_refs || [];
       entity.dates.created_at = existing.dates?.created_at || entity.dates.created_at;
@@ -492,21 +575,31 @@ registerTaskHandler('sync_subscription', async ({ subscription_id }) => {
     const tokenRefs = written?.token_refs || entity.token_refs || [];
     if (CREDENTIAL_KINDS.includes(sub.auth_kind)) {
       // a subscription made again on the gateway (missing there) has new keys: the previous ones are gone
-      const live = tokenRefs.map((r) => r.apikey).filter(Boolean);
+      const live = tokenRefs.filter((r) => !r.shared).map((r) => r.apikey).filter(Boolean);
       await db`update credentials set status = 'revoked', revoked_at = now()
         where subscription_id = ${sub.id} and status = 'active' and not (client_id = any(${'{' + live.map((x) => `"${x}"`).join(',') + '}'}::text[]))`;
       for (const ref of tokenRefs) {
         if (!ref.apikey) continue;
         const key = await oto.getApikey(ref.apikey);
         if (!key) continue;
+        // the credential of the application, the same for each of its subscriptions that share it
+        if (ref.shared) {
+          // the product never disables it: its aliases follow their subscriptions
+          if (key.enabled === false) await oto.updateApikey({ ...key, enabled: true });
+          await recordSharedCredential(sub.application_id, { ...key, enabled: true });
+          continue;
+        }
+        // the alias the gateway identifies the calls of the credential as, on this api: no secret of its own
+        const alias = !!key.apiRef?.credential;
         const found = (await db`select id from credentials where subscription_id = ${sub.id} and client_id = ${key.clientId}`)[0];
         const otoInfo = { enabled: key.enabled, apiRef: key.apiRef, authorizations: key.authorizations };
+        const secret = alias ? null : seal(key.clientSecret);
         if (found) {
-          await db`update credentials set client_secret = ${seal(key.clientSecret)}, status = 'active', otoroshi = ${otoInfo}, revoked_at = null where id = ${found.id}`;
+          await db`update credentials set client_secret = ${secret}, status = 'active', otoroshi = ${otoInfo}, revoked_at = null where id = ${found.id}`;
         } else {
           await db`insert into credentials (id, subscription_id, application_id, kind, client_id, client_secret, otoroshi)
-            values (${newId('cred')}, ${sub.id}, ${sub.application_id}, ${sub.auth_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'},
-              ${key.clientId}, ${seal(key.clientSecret)}, ${otoInfo})`;
+            values (${newId('cred')}, ${sub.id}, ${sub.application_id}, ${alias ? 'alias' : sub.auth_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'},
+              ${key.clientId}, ${secret}, ${otoInfo})`;
         }
       }
     }

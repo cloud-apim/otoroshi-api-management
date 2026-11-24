@@ -156,8 +156,6 @@ Two PostgreSQL databases: application data, and events + analytics.
 - **A European payment provider**, beside Stripe Connect, for the paid plans.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
-- **One credential for several APIs** — a consumer subscribed to several APIs calls them with one
-  key; waits for Otoroshi ([#2964](https://github.com/MAIF/otoroshi/issues/2964)).
 - **Notifications outside the product** — email and outgoing webhooks: a subscription to review or
   accepted, a key about to expire, a version deprecated, a quota nearly spent. Today they live in
   the console and the portal only.

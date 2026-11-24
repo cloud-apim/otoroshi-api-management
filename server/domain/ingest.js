@@ -129,7 +129,9 @@ export async function ingest(events) {
     const at = ts(e['@timestamp']);
     if (type === 'GatewayEvent') {
       const otoApiId = e.route?.metadata?.['Otoroshi-Api-Ref'] || e.route?.api_ref || null;
-      const clientId = e.identity?.identityType === 'APIKEY' ? e.identity.identity : null;
+      // a call made with the credential of an application is identified as the alias of its
+      // subscription on this api: the client id kept is the one the consumer called with
+      const clientId = e.identity?.identityType === 'APIKEY' ? e.identity.apiRef?.credential || e.identity.identity : null;
       const attr = attribute(clientId, otoApiId, e.identity?.apiRef);
       // a subscription the product no longer knows: the key still names its application (id_ref)
       const md = e.identity?.metadata || {};
@@ -170,7 +172,7 @@ export async function ingest(events) {
       });
     } else if (AI_TYPES.includes(type)) {
       // the key that called names its subscription (apiRef); the route its api
-      const clientId = e.apikey?.clientId || e.consumer?.apikey || e.user?.apikey || null;
+      const clientId = e.apikey?.apiRef?.credential || e.apikey?.clientId || e.consumer?.apikey || e.user?.apikey || null;
       const apiRef = e.apikey?.apiRef?.api ? e.apikey.apiRef : null;
       const attr = attribute(clientId, e.route?.metadata?.['Otoroshi-Api-Ref'] || null, apiRef);
       const usage = e.usage || e.output?.metadata?.usage || e.output?.usage || {};

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
 import { fmtRelative } from '../../shared/lib.js';
-import { Callout, Empty, Field, Icon, Input, Loader, Modal, Select, Setting, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Callout, Empty, Field, Icon, Input, Loader, Modal, Select, Setting, Switch, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useWs, useMetadataFields } from '../context.jsx';
 import { CertificateList } from '../../shared/certificates.jsx';
 import { MetadataForm } from '../../shared/metadata.jsx';
@@ -15,7 +15,7 @@ function CreateAppModal({ onClose, onCreated }) {
   const { wapi, slug } = useWs();
   const toast = useToast();
   const teams = useLoad(() => wapi.get('/teams'), [slug]);
-  const [form, setForm] = useState({ name: '', description: '', team_id: '', client_id: '' });
+  const [form, setForm] = useState({ name: '', description: '', team_id: '', client_id: '', shared_credential: false });
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <Modal
@@ -54,6 +54,9 @@ function CreateAppModal({ onClose, onCreated }) {
       </Field>
       <Field label={tr('Expected client_id')} hint={tr('for jwt, oauth2 and mtls plans: the gateway serves this client id once the application subscribes')}>
         <Input value={form.client_id} onChange={set('client_id')} mono />
+      </Field>
+      <Field hint={tr('its subscriptions to apikey plans share one client id and one secret, each with the quotas of its own plan')}>
+        <Switch checked={form.shared_credential} onChange={set('shared_credential')} label={tr('One API key for every API')} />
       </Field>
     </Modal>
   );
@@ -96,7 +99,9 @@ export function ApplicationsPage() {
                   {page.items.map((a) => (
                     <tr key={a.id} className="clickable" onClick={() => navigate(`/ws/${slug}/applications/${a.id}`)}>
                       <td>
-                        <div className="bold">{a.name}</div>
+                        <div className="bold">
+                          {a.name} {a.shared_credential && <span className="tag">{tr('one key')}</span>}
+                        </div>
                         <div className="faint tiny">{a.description}</div>
                       </td>
                       <td className="small">
@@ -182,6 +187,17 @@ export function ApplicationPage({ id }) {
                     </Setting>
                     <Setting label={tr('Expected client_id')} help={tr('On jwt, oauth2 and mtls plans the gateway identifies the consumer by the client_id of the token or the certificate, and serves only the client ids of subscribed applications. Changing it moves the subscriptions of the application to the new one.')}>
                       <Input value={f.client_id || ''} onChange={set('client_id')} mono />
+                    </Setting>
+                    <Setting
+                      label={tr('API keys')}
+                      help={tr('One key for every API: the subscriptions to apikey plans share one client id and one secret, the gateway counting the calls of each one on its own plan. The choice holds for the subscriptions made from then on; the others keep the key they were made with.')}
+                    >
+                      <Switch checked={!!f.shared_credential} onChange={set('shared_credential')} label={tr('One API key for every API')} />
+                      {app.shared_key && (
+                        <div className="faint small mt-8">
+                          <Tr text={'The key of the application: {0}, shared by {1} subscriptions — its secret is shown with each of them.'} args={[<code key="k">{app.shared_key.client_id}</code>, app.shared_key.shared_with]} />
+                        </div>
+                      )}
                     </Setting>
                     {metaFields.length > 0 && (
                       <Setting label={tr('Metadata')} help={tr("typed fields of the workspace's applications; the ones marked for the portal are filled by the consumer")}>

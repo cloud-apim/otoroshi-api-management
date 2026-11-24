@@ -8,6 +8,7 @@ import { diff } from '../domain/diff.js';
 import { normalizeDraft, defaultPlan } from '../domain/model.js';
 import { META, OWNER_MARKER, oto } from './client.js';
 import { open, seal } from '../domain/secrets.js';
+import { recordSharedCredential } from '../domain/subscriptions.js';
 import { CORRELATION_PLUGIN, THREAT_PRESET, threatFromPreset, IDENTITY_KINDS, buildOtoroshiApi, buildOtoroshiSubscription, comparableApi, comparableDerived, derivedEntities } from './projection.js';
 
 async function saveReport(r) {
@@ -77,9 +78,25 @@ export async function checkSubscription(sub) {
           changes.push({ op: 'change', path: `apikey[${c.client_id}].enabled`, before: sub.status === 'active', after: key.enabled });
         if (key.apiRef?.plan && key.apiRef.plan !== sub.plan_id)
           changes.push({ op: 'change', path: `apikey[${c.client_id}].apiRef.plan`, before: sub.plan_id, after: key.apiRef.plan });
-        if (key.clientSecret !== open(c.client_secret))
+        // an alias has no secret the consumer calls with
+        if (c.kind !== 'alias' && key.clientSecret !== open(c.client_secret))
           changes.push({ op: 'change', path: `apikey[${c.client_id}].clientSecret`, before: '(product secret)', after: '(changed on the gateway)' });
       }
+    }
+    // the credential of its application it shares: enabled, its secret the product's, its aliases with it
+    if (sub.shares_credential) {
+      const shared = (await db`select * from credentials where application_id = ${sub.application_id} and shared and status = 'active'`)[0];
+      const ref = (actual.token_refs || []).find((r) => r.shared);
+      if (shared && ref?.apikey && ref.apikey !== shared.client_id)
+        changes.push({ op: 'change', path: 'token_refs.shared', before: shared.client_id, after: ref.apikey });
+      const key = shared ? await oto.getApikey(shared.client_id) : null;
+      if (shared && !key) changes.push({ op: 'remove', path: `apikey[${shared.client_id}]`, before: 'present' });
+      else if (key) {
+        if (key.enabled !== true) changes.push({ op: 'change', path: `apikey[${shared.client_id}].enabled`, before: true, after: key.enabled });
+        if (key.clientSecret !== open(shared.client_secret))
+          changes.push({ op: 'change', path: `apikey[${shared.client_id}].clientSecret`, before: '(product secret)', after: '(changed on the gateway)' });
+      }
+      if (!ref) changes.push({ op: 'remove', path: 'token_refs.shared', before: shared?.client_id || 'the credential of the application' });
     }
   }
   const report = {
@@ -278,7 +295,11 @@ export async function adoptSubscriptions(ctx, workspaceId, entity, { teamId }) {
       continue;
     }
     const keys = [];
-    for (const ref of s.token_refs || []) if (ref.apikey) keys.push(await oto.getApikey(ref.apikey));
+    const refs = [];
+    for (const ref of s.token_refs || []) if (ref.apikey) refs.push({ ref, key: await oto.getApikey(ref.apikey) });
+    // the credential it shares belongs to its owner, not to it: the application's
+    for (const { ref, key } of refs) if (!ref.shared) keys.push(key);
+    const sharedKey = refs.find((r) => r.ref.shared)?.key || null;
     const clientId = IDENTITY_KINDS.includes(s.subscription_kind) ? s.client_id || null : null;
     // the application: the one the keys name, or one per owner and client id
     const named = keys.map((k) => k?.metadata?.[META.application]).find(Boolean);
@@ -295,18 +316,25 @@ export async function adoptSubscriptions(ctx, workspaceId, entity, { teamId }) {
     const status = s.status === 'enabled' ? 'active' : 'suspended';
     const dates = { created_at: ms(s.dates?.created_at), processed_at: ms(s.dates?.processed_at), started_at: ms(s.dates?.started_at), adopted_at: new Date().toISOString() };
     const tokenRefs = s.token_refs || [];
-    await db`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, dates, payment, projection, requested_by, metadata)
+    await db`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, dates, payment, projection, requested_by, metadata, shares_credential)
       values (${s.id}, ${workspaceId}, ${entity.id}, ${s.plan_ref}, ${appId}, ${s.subscription_kind}, ${status},
         ${{ plan_name: plans.get(s.plan_ref)?.name || s.plan_ref, adopted: true }}, ${dates}, ${{}},
-        ${{ status: 'synced', otoroshi_subscription_id: s.id, token_refs: tokenRefs, synced_at: new Date().toISOString() }}, ${ctx.user?.id || null}, ${{}})`;
+        ${{ status: 'synced', otoroshi_subscription_id: s.id, token_refs: tokenRefs, synced_at: new Date().toISOString() }}, ${ctx.user?.id || null}, ${{}}, ${!!sharedKey})`;
     out.subscriptions++;
-    // the keys a consumer holds: the client id and the secret it calls with, unchanged
+    // the credential its owner calls every api with: the application's, which calls with it from now on
+    if (sharedKey) {
+      if (!(await db`select 1 from credentials where application_id = ${appId} and shared and client_id = ${sharedKey.clientId} and status = 'active'`).length) out.credentials++;
+      await recordSharedCredential(appId, sharedKey);
+      await db`update applications set shared_credential = true where id = ${appId}`;
+    }
+    // the keys a consumer holds: the client id and the secret it calls with, unchanged; an alias has none
     if (['apikey', 'oauth2-local'].includes(s.subscription_kind))
       for (const k of keys.filter(Boolean)) {
+        const alias = !!k.apiRef?.credential;
         await db`insert into credentials (id, subscription_id, application_id, kind, client_id, client_secret, otoroshi)
-          values (${newId('cred')}, ${s.id}, ${appId}, ${s.subscription_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'}, ${k.clientId}, ${seal(k.clientSecret)},
+          values (${newId('cred')}, ${s.id}, ${appId}, ${alias ? 'alias' : s.subscription_kind === 'oauth2-local' ? 'client_credentials' : 'apikey'}, ${k.clientId}, ${alias ? null : seal(k.clientSecret)},
             ${{ enabled: k.enabled, apiRef: k.apiRef, authorizations: k.authorizations }})`;
-        out.credentials++;
+        if (!alias) out.credentials++;
       }
   }
   return out;

@@ -171,6 +171,7 @@ export function createController(kube) {
       client_id: spec.clientId || null,
       certificates: spec.certificates || [],
       metadata: spec.metadata || {},
+      shared_credential: !!spec.sharedCredential,
     };
     let app = owned;
     if (!app) {

@@ -117,6 +117,11 @@ The consumer's applications: their subscriptions with their status, the credenti
 **rotate**), the live quotas of each key as the gateway counts them, the expected `client_id`, and
 **close** a subscription. Whoever can see an application can see its credentials.
 
+An application can call every API with **one API key** — chosen when it is created, or in its
+settings, for the subscriptions made from then on: each subscription shows that key, marked as the
+key of the application, with the quotas of its own plan; a new secret is taken by every API
+([Applications and subscriptions](./concepts/applications-and-subscriptions.mdx#one-api-key-for-every-api)).
+
 ## Usage
 
 The calls of the visitor's own applications — never anyone else's — in two views that share their

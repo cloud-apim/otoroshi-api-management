@@ -406,12 +406,17 @@ describe('the attribution', () => {
       consumer(`attr-${RUN}-sub`, { api: apiId, plan: planId, sub: sub.id }),
       // a consumer a keyless plan identified: no subscription, the plan still
       consumer(`attr-${RUN}-open`, { api: apiId, plan: 'plan_open', sub: '' }),
+      // the credential of an application, identified as the alias of the subscription: the client id
+      // kept is the one the consumer called with
+      consumer(`attr-${RUN}-shared`, { api: apiId, plan: planId, sub: sub.id, credential: `credential-${RUN}` }),
     ]);
-    const rows = await adb`select req_id, plan_id, subscription_id, application_id, workspace_id from calls where api_id = ${apiId} and req_id like ${`attr-${RUN}-%`} order by req_id`;
+    const rows = await adb`select req_id, plan_id, subscription_id, application_id, workspace_id, client_id from calls where api_id = ${apiId} and req_id like ${`attr-${RUN}-%`} order by req_id`;
     expect(rows.map((r) => [r.req_id, r.plan_id, r.subscription_id, r.application_id])).toEqual([
       [`attr-${RUN}-open`, 'plan_open', null, null],
+      [`attr-${RUN}-shared`, planId, sub.id, app.id],
       [`attr-${RUN}-sub`, planId, sub.id, app.id],
     ]);
+    expect(rows.map((r) => r.client_id)).toEqual([`key-attr-${RUN}-open`, `credential-${RUN}`, `key-attr-${RUN}-sub`]);
     expect(rows[1].workspace_id).toBe(api.workspace_id);
     // the request id a caller quotes finds its call in the request log
     const { searchCalls } = await import('../server/domain/analytics.js');

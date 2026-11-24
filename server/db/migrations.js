@@ -612,6 +612,22 @@ create table portal_assets (
 );
 `,
   },
+  {
+    version: '0020_shared_credentials',
+    sql: `
+-- one API key for every API of an application: its subscriptions to apikey plans share the
+-- credential of the application, each through an alias key of its own on the gateway, with the quotas
+-- of its own plan. The choice is the application's, and a subscription keeps the one it was made with
+alter table applications add column shared_credential boolean not null default false;
+alter table subscriptions add column shares_credential boolean not null default false;
+
+-- the credential of an application belongs to no subscription; an alias (kind 'alias') is the key of
+-- a subscription the consumer never calls with: it has no secret
+alter table credentials alter column subscription_id drop not null;
+alter table credentials add column shared boolean not null default false;
+create unique index credentials_shared_of_application on credentials(application_id) where shared and status = 'active';
+`,
+  },
 ];
 
 export const analyticsMigrations = [

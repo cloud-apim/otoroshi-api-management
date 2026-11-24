@@ -30,6 +30,17 @@ export async function getApplication(workspaceId, id) {
   return rows[0];
 }
 
+// the credential an application calls every api with, when its subscriptions share one: its client id
+// and how many of its subscriptions on the gateway share it — the secret is read with a subscription
+export async function sharedCredentialOf(applicationId) {
+  return (
+    (await db`select c.client_id, c.created_at, c.rotated_at,
+        (select count(*)::int from subscriptions s where s.application_id = c.application_id and s.shares_credential
+          and s.status in ('active', 'suspended', 'expired')) as shared_with
+      from credentials c where c.application_id = ${applicationId} and c.shared and c.status = 'active'`)[0] || null
+  );
+}
+
 export async function canSeeApplication(ctx, app) {
   if (ctx.user?.is_admin || ctx.role === 'admin') return true;
   if (!ctx.user) return false;
@@ -84,9 +95,9 @@ export async function createApplication(ctx, workspaceId, input) {
   // a consumer only fills the fields the portal shows; the producer side fills the others later
   const metadata = await checkValues(workspaceId, 'application', input.metadata || {}, { only: ctx.via === 'portal' ? (f) => f.portal : null, requireAll: ctx.via === 'portal' });
   const id = newId('app');
-  const rows = await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by)
+  const rows = await db`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, created_by, shared_credential)
     values (${id}, ${workspaceId}, ${team.id}, ${input.name}, ${input.description || ''}, ${input.client_id || null},
-      ${normalizeCertificates(input.certificates)}, ${metadata}, ${ctx.user?.id || null}) returning *`;
+      ${normalizeCertificates(input.certificates)}, ${metadata}, ${ctx.user?.id || null}, ${!!input.shared_credential}) returning *`;
   await audit(ctx, { action: 'application.create', workspaceId, entityKind: 'application', entityId: id, summary: `application ${input.name} created` });
   return rows[0];
 }
@@ -115,9 +126,13 @@ export async function updateApplication(ctx, app, patch) {
     patch = { ...patch, metadata: await checkValues(app.workspace_id, 'application', { ...app.metadata, ...patch.metadata }, { only: ctx.via === 'portal' ? (f) => f.portal : null }) };
   const rows = await db`update applications set name = ${patch.name ?? app.name}, description = ${patch.description ?? app.description},
       client_id = ${patch.client_id !== undefined ? patch.client_id || null : app.client_id},
-      certificates = ${patch.certificates !== undefined ? normalizeCertificates(patch.certificates) : app.certificates}, metadata = ${patch.metadata ?? app.metadata}, updated_at = now()
+      certificates = ${patch.certificates !== undefined ? normalizeCertificates(patch.certificates) : app.certificates}, metadata = ${patch.metadata ?? app.metadata},
+      shared_credential = ${patch.shared_credential !== undefined ? !!patch.shared_credential : app.shared_credential}, updated_at = now()
     where id = ${app.id} returning *`;
-  await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated` });
+  // one key for every api, or one per subscription: for the subscriptions made from now on, the
+  // others keep the key they were made with
+  const sharing = rows[0].shared_credential !== app.shared_credential ? (rows[0].shared_credential ? ', one key for every api from now on' : ', one key per subscription from now on') : '';
+  await audit(ctx, { action: 'application.update', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${rows[0].name} updated${sharing}` });
   if (patch.certificates !== undefined || patch.name !== undefined) await syncCertificates(rows[0]);
   // the subscriptions to token and certificate plans carry the client id the application declares
   if ((rows[0].client_id || null) !== (app.client_id || null)) {
@@ -132,7 +147,10 @@ export async function deleteApplication(ctx, app) {
   requireUnmanaged(ctx, app, 'application');
   const active = await db`select count(*)::int as c from subscriptions where application_id = ${app.id} and status in ('active', 'suspended', 'expired', 'pending', 'pending_payment')`;
   if (active[0].c > 0) throw badRequest('close the subscriptions of this application first');
+  // its credential leaves the gateway with it: a subscription never takes it, not even the last one
+  const shared = await db`select client_id from credentials where application_id = ${app.id} and shared and status = 'active'`;
   await db`delete from applications where id = ${app.id}`;
+  for (const c of shared) await enqueue('delete_shared_credential', { client_id: c.client_id, application_id: app.id }, { dedupeKey: `sharedcred:${c.client_id}` });
   await syncCertificates(app);
   await audit(ctx, { action: 'application.delete', workspaceId: app.workspace_id, entityKind: 'application', entityId: app.id, summary: `application ${app.name} deleted` });
 }

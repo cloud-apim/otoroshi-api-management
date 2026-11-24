@@ -107,6 +107,26 @@ or disabled by hand, is reported as drift.
 A suspended subscription is projected `disabled`; a pending or rejected one is not projected at all;
 closing deletes the subscription, and Otoroshi revokes its keys.
 
+### One key for every API
+
+The subscriptions of an application that calls every API with [one key](../concepts/applications-and-subscriptions.mdx#one-api-key-for-every-api)
+share the **credential of the application**: an Otoroshi apikey authorized on nothing by itself,
+whose `sharedCredential.owner` is the application (`owner_ref`). Each one asks for it at its
+creation — `token_refs: [{"shared": true}]` —, the first one making it; Otoroshi then names it, and
+mints the subscription an **alias**, built from its plan, whose `apiRef.credential` is the credential:
+
+```json
+"token_refs": [{ "apikey": "<credential>", "shared": true }, { "apikey": "<alias>" }]
+```
+
+A call made with the credential is identified, on each API, as the alias of its subscription: its
+quotas, restrictions and plugins, its `apiRef` in the events. The gateway never moves such a
+subscription to another API, so a transfer to another version makes it again there, sharing the
+same credential; an alias lost with its credential is made again the same way at the next resync.
+The credential is never updated, disabled or deleted with a subscription — it leaves the gateway
+with the application. A credential disabled or with another secret on the gateway is reported as
+drift, and a resync enables it again.
+
 ## Asynchronous and replayable
 
 Every projection goes through a task queue. A task is idempotent — it computes the wanted

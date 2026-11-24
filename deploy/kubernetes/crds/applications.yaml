@@ -44,6 +44,9 @@ spec:
                 clientId:
                   type: string
                   description: the client id the application calls with on jwt, mtls and oauth2-remote plans
+                sharedCredential:
+                  type: boolean
+                  description: one API key for every API of the application — its subscriptions to apikey plans made from then on share it, each with the quotas of its own plan
                 certificates:
                   type: array
                   description: its client certificates (PEM), never a private key

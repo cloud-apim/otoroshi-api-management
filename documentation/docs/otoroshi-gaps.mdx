@@ -18,7 +18,6 @@ kept in
 
 | # | Gap | Severity | Status | What the product does |
 |---|---|---|---|---|
-| G-23 | A key cannot serve several subscriptions: a key is its subscription's own, one api, one plan ([#2964](https://github.com/MAIF/otoroshi/issues/2964)) | medium | ⬜ open | one key per subscription; a credential for several subscriptions waits for it |
 | G-24 | Threat Protection Suite: the global table of Threat Studio does not see the plan plugins: a second firewall runs on a plan already protected, the scores add up and the policy of the table decides ([waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60)) | high | ⬜ open | keep the global table off the apis protected per plan |
 | G-26 | Threat Protection Suite: a security event names the api, not the plan ([waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61)) | low | ⬜ open | the plan from the key that called; the api only otherwise |
 | G-27 | Threat Protection Suite: with the core rule set, every call scores a firewall match — its initialization rules count as matches ([waf#62](https://github.com/cloud-apim/otoroshi-waf-extension/issues/62)) | medium | ⬜ open | a policy that refuses at 90 |

@@ -40,8 +40,8 @@ export async function exportWorkspace(ws) {
       snapshots,
     });
   }
-  const applications = await db`select id, team_id, name, description, client_id, certificates, metadata from applications where workspace_id = ${ws.id}`;
-  const subscriptions = await db`select id, api_id, plan_id, application_id, auth_kind, status, request, review, payment, dates, history, metadata
+  const applications = await db`select id, team_id, name, description, client_id, certificates, metadata, shared_credential from applications where workspace_id = ${ws.id}`;
+  const subscriptions = await db`select id, api_id, plan_id, application_id, auth_kind, status, request, review, payment, dates, history, metadata, shares_credential
     from subscriptions where workspace_id = ${ws.id}`;
   return {
     kind: EXPORT_KIND,
@@ -87,15 +87,15 @@ export async function importWorkspace(ctx, ws, doc) {
       }
     }
     for (const app of doc.applications || []) {
-      await tx`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata)
-        values (${app.id}, ${ws.id}, ${app.team_id}, ${app.name}, ${app.description || ''}, ${app.client_id || null}, ${app.certificates || []}, ${app.metadata || {}})
-        on conflict (id) do update set name = excluded.name, description = excluded.description, client_id = excluded.client_id`;
+      await tx`insert into applications (id, workspace_id, team_id, name, description, client_id, certificates, metadata, shared_credential)
+        values (${app.id}, ${ws.id}, ${app.team_id}, ${app.name}, ${app.description || ''}, ${app.client_id || null}, ${app.certificates || []}, ${app.metadata || {}}, ${!!app.shared_credential})
+        on conflict (id) do update set name = excluded.name, description = excluded.description, client_id = excluded.client_id, shared_credential = excluded.shared_credential`;
       stats.applications++;
     }
     for (const s of doc.subscriptions || []) {
-      await tx`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, review, payment, dates, history, metadata, projection)
+      await tx`insert into subscriptions (id, workspace_id, api_id, plan_id, application_id, auth_kind, status, request, review, payment, dates, history, metadata, projection, shares_credential)
         values (${s.id}, ${ws.id}, ${s.api_id}, ${s.plan_id}, ${s.application_id}, ${s.auth_kind}, ${s.status}, ${s.request || {}}, ${s.review || {}},
-          ${s.payment || {}}, ${s.dates || {}}, ${s.history || []}, ${s.metadata || {}}, ${{ status: 'none' }})
+          ${s.payment || {}}, ${s.dates || {}}, ${s.history || []}, ${s.metadata || {}}, ${{ status: 'none' }}, ${!!s.shares_credential})
         on conflict (id) do nothing`;
       stats.subscriptions++;
     }

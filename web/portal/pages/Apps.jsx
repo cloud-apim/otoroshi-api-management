@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useRouter } from '../../shared/router.jsx';
-import { Callout, Code, Empty, Field, Icon, Input, Loader, Modal, Secret, Select, TextArea, errorMessage, useConfirm, useLoad, useToast, Badge } from '../../shared/ui.jsx';
+import { Callout, Code, Empty, Field, Icon, Input, Loader, Modal, Secret, Select, Switch, TextArea, errorMessage, useConfirm, useLoad, useToast, Badge } from '../../shared/ui.jsx';
 import { fmtDate, fmtNumber } from '../../shared/lib.js';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { api } from '../context.jsx';
@@ -22,7 +22,7 @@ export function Apps() {
 function NewAppModal({ onClose, onCreated }) {
   const { t } = useI18n();
   const teams = useLoad(() => api.get('/teams'), []);
-  const [form, setForm] = useState({ name: '', description: '', team_id: '' });
+  const [form, setForm] = useState({ name: '', description: '', team_id: '', shared_credential: false });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
@@ -69,6 +69,9 @@ function NewAppModal({ onClose, onCreated }) {
             />
           </Field>
         )}
+        <Field hint={t('apps.sharedKey.help')}>
+          <Switch checked={form.shared_credential} onChange={(v) => setForm({ ...form, shared_credential: v })} label={t('apps.sharedKey')} />
+        </Field>
         {error && <Callout kind="negative">{errorMessage(error)}</Callout>}
       </form>
     </Modal>
@@ -192,7 +195,7 @@ function AppDetailView({ id }) {
   // back from the Checkout of Stripe
   const checkout = new URLSearchParams(window.location.search).get('checkout');
   useEffect(() => {
-    if (state.data) setForm({ name: state.data.name, description: state.data.description, client_id: state.data.client_id || '', certificates: state.data.certificates || [] });
+    if (state.data) setForm({ name: state.data.name, description: state.data.description, client_id: state.data.client_id || '', certificates: state.data.certificates || [], shared_credential: !!state.data.shared_credential });
   }, [state.data]);
   const save = async () => {
     try {
@@ -275,6 +278,10 @@ function AppDetailView({ id }) {
                       </Field>
                       <Field label={t('apps.description')}>
                         <TextArea value={form.description} onChange={(v) => setForm({ ...form, description: v })} rows={3} aria-label={t('apps.description')} />
+                      </Field>
+                      <Field hint={t('apps.sharedKey.help')}>
+                        <Switch checked={form.shared_credential} onChange={(v) => setForm({ ...form, shared_credential: v })} label={t('apps.sharedKey')} />
+                        {app.shared_key && <div className="faint tiny mt-8">{t('apps.sharedKey.current', { id: app.shared_key.client_id, n: app.shared_key.shared_with })}</div>}
                       </Field>
                       <Field label={t('apps.clientId')} hint={t('apps.clientId.help')}>
                         <Input value={form.client_id} onChange={(v) => setForm({ ...form, client_id: v })} mono aria-label={t('apps.clientId')} />
@@ -554,7 +561,7 @@ function SubscriptionCard({ sub, app, onChange }) {
   const [pay, setPay] = useState(false);
   const [changing, setChanging] = useState(false);
   const rotate = async (c) => {
-    if (!(await confirm({ title: t('subs.rotate'), message: t('subs.rotate.confirm', { id: c.client_id }), confirmLabel: t('subs.rotate') }))) return;
+    if (!(await confirm({ title: t('subs.rotate'), message: t(c.shared ? 'subs.rotate.confirmShared' : 'subs.rotate.confirm', { id: c.client_id }), confirmLabel: t('subs.rotate') }))) return;
     try {
       await api.post(`/subscriptions/${sub.id}/credentials/${c.id}/rotate`);
       toast(t('subs.rotated'));
@@ -638,6 +645,7 @@ function SubscriptionCard({ sub, app, onChange }) {
         {credsPage.q && !credsPage.items.length && <div className="muted small">{t('subs.creds.nomatch')}</div>}
         {credsPage.items.map((c) => (
           <div key={c.id} className="col gap-16">
+            {c.shared && <div className="muted small">{t('subs.sharedKey')}</div>}
             <dl className="kv">
               <dt>{t('subs.clientId')}</dt>
               <dd>

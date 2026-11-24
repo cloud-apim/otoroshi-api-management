@@ -16,7 +16,7 @@ dropped its workarounds rather than keeping them for 18.0: nothing depends on th
 On 2026-11-20 the product **followed** every fix: its workarounds and warnings are gone, the items
 they blocked are done (R-14, R-15, R-16, R-24, R-33), and the end-to-end tests check the new
 contract on the gateway. Found on the way: G-22 and G-23, reported upstream — G-22 fixed and followed
-the same day; G-24, G-26, G-27 and
+the same day, G-23 on 2026-11-24 (shared credentials, [#2968](https://github.com/MAIF/otoroshi/pull/2968)); G-24, G-26, G-27 and
 G-28 in the Threat Protection Suite, checked on a gateway running its release 1.0.0 and reported to
 it (G-25 is not a gap). Status: ✅ **followed** — the
 product relies on the fix; ➖ **not fixed**, by decision; ⬜ **open**, reported upstream, not fixed
@@ -46,7 +46,7 @@ yet.
 | G-20 | [#2957](https://github.com/MAIF/otoroshi/issues/2957) | An admin key narrowed by `otoroshi-access-rights` **read the secret of every admin key** of its teams | high | ✅ | nothing to change: its key stays super admin, for the global configuration (G-21) |
 | G-21 | [#2958](https://github.com/MAIF/otoroshi/issues/2958) | The **global configuration** is readable by super admins only — by design | — | ➖ | the product's key keeps every right |
 | G-22 | [#2962](https://github.com/MAIF/otoroshi/issues/2962) | An extractor that does not identify the caller **sent an error event** for a call that then succeeded, or was refused: the call was counted twice, once as a `400` | medium | ✅ | nothing: the dashboards count these events as errors |
-| G-23 | [#2964](https://github.com/MAIF/otoroshi/issues/2964) (was [#2963](https://github.com/MAIF/otoroshi/issues/2963)) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ⬜ | nothing: one key per subscription; R-12 waits for it |
+| G-23 | [#2964](https://github.com/MAIF/otoroshi/issues/2964) (was [#2963](https://github.com/MAIF/otoroshi/issues/2963)) | A key cannot serve **several subscriptions**: a key is its subscription's own, one api, one plan | medium | ✅ | an application calls every api with one key: its subscriptions share the credential of the application, each through an alias with the quotas of its plan (R-12) |
 | G-24 | [waf#60](https://github.com/cloud-apim/otoroshi-waf-extension/issues/60) | Threat Protection Suite: the global table of Threat Studio does not see the **plan plugins**: a second firewall runs on a plan already protected, the scores add up, and the policy of the table decides | high | ⬜ | nothing: the docs ask an operator to keep the global table off the apis protected per plan |
 | G-25 | — | ~~Threat Protection Suite: a challenge answers a page, status 200~~ | — | ➖ | not a gap, by decision: a challenge is for a person in a browser |
 | G-26 | [waf#61](https://github.com/cloud-apim/otoroshi-waf-extension/issues/61) | Threat Protection Suite: a security event names the **api, not the plan** | low | ⬜ | the plan, the subscription and the application from the key that called; the api only for a caller not identified |
@@ -367,7 +367,7 @@ the consumer enforcer stops overwriting that reason: its `error` helper writes
 consumer identified on the call" and loses "no apikey detected in the http request". Its own key
 (`consumer_rejection_reason`), or leaving an existing reason untouched, keeps both.
 
-## G-23 — a key cannot serve several subscriptions — medium — open
+## G-23 — a key cannot serve several subscriptions — medium — followed
 
 Reported upstream: [#2963](https://github.com/MAIF/otoroshi/issues/2963), closed on 2026-11-20 and
 split in two: the key of another subscription kept in the `token_refs` of a new one is fixed by
@@ -390,13 +390,33 @@ is refused (`401`). Writing the first subscription again, or deleting the second
 as it was. So one key cannot carry the subscriptions of a consumer to several apis — what
 `authorizedEntities` allows for a classic apikey.
 
-**The product.** One key per subscription. R-12 waits for this.
-
 **Fix proposed upstream.** An opt-in sharing (`{"apikey": "<client id>", "shared": true}` in the
 `token_refs` of a subscription of the same owner): the key knows the subscriptions it serves, each
 call is enforced with the plan of the subscription of the api called — counters per key and plan,
 no pooled quota —, the `apiRef` of the event is that subscription's, and the key goes with the
 last of them; a foreign key without the flag is refused, or dropped from the `token_refs`.
+
+**Fixed upstream** on 2026-11-24 ([#2968](https://github.com/MAIF/otoroshi/pull/2968), merged as
+`3b5ba24bd`), with another design than the one proposed: a **shared credential**, an apikey of its
+own that belongs to an owner (`sharedCredential.owner`, the `owner_ref`) and to no subscription,
+authorized on nothing. A subscription shares it with `token_refs: [{"shared": true}]` at its
+creation — the first one of the owner makes it — and gets an **alias** built from its plan
+(`apiRef.credential`); a call made with the credential is looked up in the proxy state, never in the
+datastore, and identified as the alias of the api called. The api and the owner of such a
+subscription never change (`400`), one subscription per api shares a credential, and the credential
+is never updated or deleted with a subscription. Checked live on 18.1.0-dev: one credential calls
+two apis, each alias counts its own calls, an alias called with its own id and a wrong secret are
+refused, a suspended subscription cuts its api only, the credential outlives its subscriptions and
+takes its aliases with it.
+
+**The product** (R-12). An application chooses one key for every api (`shared_credential`): its
+subscriptions to `apikey` plans made from then on share the credential of the application
+(`owner_ref` is the application). A transfer to another api makes the subscription again there,
+sharing the same credential; a resync makes again an alias lost with its credential; the credential
+leaves the gateway with the application. The ingester keeps the client id of the credential
+(`apiRef.credential`), the quotas are read on the alias. `oauth2-local` subscriptions keep a key of
+their own: the client credentials flow with a credential authorized on nothing is not tested
+upstream yet (`test/shared-credential.test.js`).
 
 ## G-24 — the global table of Threat Studio does not see the plan plugins — high — open
 

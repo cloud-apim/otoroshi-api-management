@@ -353,12 +353,16 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                     <div className="row">
                       <Badge kind="accent">{c.kind}</Badge>
                       <StatusBadge status={c.status} />
+                      {c.shared && <Badge>{tr('key of the application')}</Badge>}
                       <span className="spacer" />
                       {c.status === 'active' && s.can_see_credentials && (
                         <button
                           className="btn xs"
                           onClick={async () => {
-                            if (!(await confirm({ title: tr('Rotate the secret?'), message: tr('The current secret stops working immediately on the gateway.'), confirmLabel: tr('Rotate') }))) return;
+                            const message = c.shared
+                              ? tr('The key of the application: the current secret stops working immediately on every API it calls ({0} subscriptions).', [c.shared_with])
+                              : tr('The current secret stops working immediately on the gateway.');
+                            if (!(await confirm({ title: tr('Rotate the secret?'), message, confirmLabel: tr('Rotate') }))) return;
                             try {
                               await wapi.post(`/subscriptions/${id}/credentials/${c.id}/rotate`);
                               toast(tr('Secret rotated'));
@@ -380,6 +384,11 @@ export function SubscriptionDrawer({ id, onClose, onChanged }) {
                         <Secret value={c.client_secret} />
                       </dd>
                     </dl>
+                    {c.shared && (
+                      <p className="faint small">
+                        {tr('The application calls every API with this key, {0} subscriptions in all: the gateway counts the calls of each one on its own plan.', [c.shared_with])}
+                      </p>
+                    )}
                   </div>
                 ))
               ) : (

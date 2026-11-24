@@ -337,7 +337,7 @@ r.get('/applications/:app', async ({ ctx, params }) => {
   const subs = await subscriptions.listSubscriptions(ctx.workspace.id, { applicationId: app.id });
   const withCreds = await Promise.all(subs.map(async (s) => ({ ...s, credentials: await subscriptions.credentialsOf(s.id) })));
   await audit(ctx, { action: 'credential.read', entityKind: 'application', entityId: app.id, summary: `credentials of ${app.name} read from the portal`, via: 'portal' });
-  return { ...app, subscriptions: withCreds };
+  return { ...app, subscriptions: withCreds, shared_key: await applications.sharedCredentialOf(app.id) };
 });
 
 // reads a client certificate a consumer pastes for its application
@@ -354,7 +354,7 @@ r.put('/applications/:app', async ({ ctx, params, body }) => {
   requireUser(ctx);
   const app = await applications.getApplication(ctx.workspace.id, params.app);
   await applications.requireSeeApplication(ctx, app);
-  return applications.updateApplication(ctx, app, { name: body.name, description: body.description, client_id: body.client_id, certificates: body.certificates, metadata: body.metadata });
+  return applications.updateApplication(ctx, app, { name: body.name, description: body.description, client_id: body.client_id, certificates: body.certificates, metadata: body.metadata, shared_credential: body.shared_credential });
 });
 
 r.delete('/applications/:app', async ({ ctx, params }) => {
@@ -491,7 +491,10 @@ r.get('/subscriptions/:sub/quotas', async ({ ctx, params }) => {
   const out = [];
   for (const c of creds.filter((c) => c.status === 'active')) {
     try {
-      out.push({ client_id: c.client_id, quotas: await oto.apikeyQuotas(c.client_id) });
+      // the credential of the application is counted on the alias of this subscription
+      const counted = await subscriptions.countedKeyOf(sub, c);
+      if (!counted) continue;
+      out.push({ client_id: c.client_id, quotas: await oto.apikeyQuotas(counted) });
     } catch (e) {
       out.push({ client_id: c.client_id, error: 'the gateway is unreachable' });
     }

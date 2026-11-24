@@ -3,6 +3,19 @@
 The notes of each release: the section of a version is the body of its GitHub release
 (`.github/workflows/release.yaml`).
 
+## Unreleased
+
+- **One API key for every API of an application**: its subscriptions to apikey plans share one
+  client id and one secret, each with the quotas, the restrictions and the plugins of its own plan —
+  nothing pooled. Chosen on the application (console, portal, admin API `shared_credential`, the
+  Kubernetes `Application`), for the subscriptions made from then on. Needs the Otoroshi `master`
+  of 2026-11-24 or later (shared credentials,
+  [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
+- **A person can be deleted** by an installation administrator, with their personal applications.
+- **The quickstart runs the product** as in production; the development stack has a page of its own.
+- A subscription deleted from the product while the gateway was unreachable is removed from it once
+  it answers: its key no longer keeps working.
+
 ## 0.1.0 — beta
 
 The first release, for beta testers: the API management console and the developer portal of

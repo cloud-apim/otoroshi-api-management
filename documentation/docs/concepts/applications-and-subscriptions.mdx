@@ -14,6 +14,28 @@ and [metadata](./metadata.mdx).
 
 It groups **identity, never counters**: each credential keeps its own quotas.
 
+### One API key for every API
+
+An application can call every API with **one key** — one client id, one secret — instead of one key
+per subscription: **One API key for every API** on the application (console, portal, admin API
+`shared_credential`, Kubernetes `sharedCredential`).
+
+- Its subscriptions to `apikey` plans then **share the credential of the application**. The gateway
+  makes it with the first of them; each subscription gets an **alias** of its own on the gateway,
+  built from its plan, that the calls of the credential to its API are identified as.
+- **The quotas stay per subscription**: the rate limit, the quotas, the restrictions and the plugins
+  of each plan apply to the calls of its API, counted apart. Nothing is pooled.
+- The calls are attributed to each subscription, and kept under the client id the consumer called
+  with — the credential's — in the analytics and the request log.
+- **A new secret** for the credential — *Rotate secret* on any of its subscriptions — is taken by
+  every API at once. Suspending, expiring or closing a subscription cuts its API only.
+- The choice holds for the subscriptions made from then on: the ones made before keep the key they
+  were made with. A second subscription of the application to the **same API** (another plan) has a
+  key of its own: the credential names one subscription per API.
+- The credential stays when the last subscription is closed — it calls nothing, and the next
+  subscription shares it again —, and leaves the gateway with the application.
+- Only `apikey` plans share it for now; `oauth2-local` subscriptions keep a key of their own.
+
 ### Client certificates
 
 An application lists the certificates it presents on `mtls` plans — the certificate only, never
@@ -83,7 +105,10 @@ is unreachable.
 
 A subscription can be **transferred to an equivalent plan** — same auth mechanism — on the
 same API or on another version of it. The key does not change, the subscription keeps its identity
-and its history, and Otoroshi applies the target plan's limits to the existing key.
+and its history, and Otoroshi applies the target plan's limits to the existing key. A subscription
+that shares the key of its application keeps calling with it on the other version — its alias is
+made again there —, unless the application already calls that version with it through another
+subscription (`409`).
 
 That single operation covers a tier upgrade, the replacement of a badly designed plan, a
 renegotiated contract, demoting an abusive consumer instead of cutting it off, and moving to a new

@@ -1900,5 +1900,14 @@
   "{0} deleted: {1} application(s), {2} subscription(s) closed": "{0} supprimé·e : {1} application(s), {2} souscription(s) fermée(s)",
   "delete {0}": "supprimer {0}",
   "a bootstrap administrator: remove it from APIM_BOOTSTRAP_ADMINS first": "un administrateur de bootstrap : retirez-le d’abord de APIM_BOOTSTRAP_ADMINS",
-  "you cannot delete yourself": "vous ne pouvez pas vous supprimer vous-même"
+  "you cannot delete yourself": "vous ne pouvez pas vous supprimer vous-même",
+  "its subscriptions to apikey plans share one client id and one secret, each with the quotas of its own plan": "ses souscriptions aux plans apikey partagent un client id et un secret, chacune avec les quotas de son plan",
+  "One API key for every API": "Une seule clé d’API pour toutes les API",
+  "one key": "une clé",
+  "API keys": "Clés d’API",
+  "One key for every API: the subscriptions to apikey plans share one client id and one secret, the gateway counting the calls of each one on its own plan. The choice holds for the subscriptions made from then on; the others keep the key they were made with.": "Une seule clé pour toutes les API : les souscriptions aux plans apikey partagent un client id et un secret, la passerelle comptant les appels de chacune sur son propre plan. Le choix vaut pour les souscriptions faites ensuite ; les autres gardent la clé avec laquelle elles ont été faites.",
+  "The key of the application: {0}, shared by {1} subscriptions — its secret is shown with each of them.": "La clé de l’application : {0}, partagée par {1} souscriptions — son secret est affiché avec chacune d’elles.",
+  "key of the application": "clé de l’application",
+  "The key of the application: the current secret stops working immediately on every API it calls ({0} subscriptions).": "La clé de l’application : le secret actuel cesse immédiatement de fonctionner sur toutes les API qu’elle appelle ({0} souscriptions).",
+  "The application calls every API with this key, {0} subscriptions in all: the gateway counts the calls of each one on its own plan.": "L’application appelle toutes ses API avec cette clé, {0} souscriptions en tout : la passerelle compte les appels de chacune sur son propre plan."
 }

@@ -968,7 +968,13 @@ r.get('/workspaces/:ws/applications/:app', async ({ ctx, params }) => {
   const subs = await subscriptions.listSubscriptions(c.workspace.id, { applicationId: app.id });
   // its certificates are on the gateway while it has an active subscription to an mtls plan
   const certificatesOnGateway = (app.certificates || []).length > 0 && subs.some((s) => s.status === 'active' && s.auth_kind === 'mtls');
-  return { ...app, subscriptions: subs, can_see_credentials: await applications.canSeeApplication(c, app), certificates_on_gateway: certificatesOnGateway };
+  return {
+    ...app,
+    subscriptions: subs,
+    can_see_credentials: await applications.canSeeApplication(c, app),
+    certificates_on_gateway: certificatesOnGateway,
+    shared_key: await applications.sharedCredentialOf(app.id),
+  };
 });
 r.put('/workspaces/:ws/applications/:app', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
@@ -1220,8 +1226,11 @@ r.get('/workspaces/:ws/search', async ({ ctx, params, query }) => {
     from apis a, jsonb_array_elements(a.draft->'plans') p where a.workspace_id = ${wsId} and lower(p->>'name') like ${q} limit 8`;
   // a credential found by its client id
   const creds = await db`select c.client_id, c.subscription_id as id, 'credential' as kind from credentials c
-    join subscriptions s on s.id = c.subscription_id where s.workspace_id = ${wsId} and lower(c.client_id) like ${q} limit 5`;
-  return [...a, ...plans, ...apps, ...subs, ...teams, ...creds];
+    join subscriptions s on s.id = c.subscription_id where s.workspace_id = ${wsId} and c.kind <> 'alias' and lower(c.client_id) like ${q} limit 5`;
+  // the credential of an application, which every api of the application is called with
+  const shared = await db`select app.id, app.name, 'application' as kind from credentials c join applications app on app.id = c.application_id
+    where app.workspace_id = ${wsId} and c.shared and c.status = 'active' and lower(c.client_id) like ${q} limit 5`;
+  return [...a, ...plans, ...apps, ...subs, ...teams, ...creds, ...shared.filter((x) => !apps.some((y) => y.id === x.id))];
 });
 
 r.get('/workspaces/:ws/home', async ({ ctx, params }) => {

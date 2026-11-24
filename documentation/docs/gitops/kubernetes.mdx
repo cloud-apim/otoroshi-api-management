@@ -66,7 +66,7 @@ workspace has to exist in the product; when it does not, the resource says so in
 | Resource | Its spec | What the controller does |
 |---|---|---|
 | `Api` | the `spec` of the declarative document, plus `version` (and `slug`, the name of the resource by default) | applies it, publishes a snapshot when it changes, and deploys it |
-| `Application` | `team` (name or id), `name`, `description`, `clientId`, `certificates`, `metadata` | creates or updates the application |
+| `Application` | `team` (name or id), `name`, `description`, `clientId`, `certificates`, `metadata`, `sharedCredential` (one API key for every API) | creates or updates the application |
 | `Subscription` | `api` (slug or id), `version`, `plan` (its id), `application` (an Application of the namespace) or `applicationId`, `usage`, `termsAccepted`, `metadata`, `credentialsSecret` | requests the subscription, through the approval of the plan, and writes its credentials to a `Secret` |
 
 **An Api** is deployed by default. The annotation `otoroshi-apim.io/mode` chooses, as for a remote
