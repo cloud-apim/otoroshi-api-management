@@ -19,7 +19,7 @@ To work on the product itself — its development stack, its tests — see [Deve
 |---|---|
 | **Java 21** or later | to run Otoroshi |
 | **Docker** | to run PostgreSQL — or a PostgreSQL 14 or later of your own |
-| **Otoroshi 18.1** | its jar; until 18.1 is released, built from its `master` branch (below) |
+| **Otoroshi 18.1** | the jar of its [release](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0) (below) |
 | **The product** | the executable of a [release](https://github.com/cloud-apim/otoroshi-api-management/releases), for linux or macOS, x64 or arm64 |
 | `openssl` | to make the secrets of the installation |
 
@@ -76,16 +76,16 @@ docker exec apim-postgres createdb -U apim apim_analytics
 
 ## 3. Otoroshi
 
-Until Otoroshi 18.1 is released, build its jar from its `master` branch — its interface first, then
-the jar:
+Download the jar of its [release](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0) into the
+folder of the installation, and check it — its checksum file holds the digest alone:
 
 ```bash
-git clone https://github.com/MAIF/otoroshi.git
-cd otoroshi/otoroshi/javascript && npm install && npm run build && cd ..
-sbt assembly          # the jar: otoroshi/otoroshi/target/scala-*/otoroshi.jar
+curl -fLO https://github.com/MAIF/otoroshi/releases/download/v18.1.0/otoroshi.jar
+curl -fLO https://github.com/MAIF/otoroshi/releases/download/v18.1.0/otoroshi.jar.sha256
+echo "$(cat otoroshi.jar.sha256)  otoroshi.jar" | sha256sum -c -   # macOS: shasum -a 256 -c -
 ```
 
-Copy `otoroshi.jar` into the folder of the installation, and start it, in a terminal of its own:
+Start it, in a terminal of its own:
 
 ```bash
 set -a; . ./otoroshi.env; set +a
@@ -125,7 +125,7 @@ set -a; . ./apim.env; set +a
     + DataExporter apim_ingester_exporter (otoroshi-api-management ingester)
     events go to http://localhost:9000/ingest: the gateway must reach it
 Checks
-✓ Otoroshi 18.1.0-dev, …
+✓ Otoroshi 18.1.0, …
 ✓ the product calls the gateway with its own key, apim_product_admin
 ! no event reached the ingester for 15 minutes: …
 ```

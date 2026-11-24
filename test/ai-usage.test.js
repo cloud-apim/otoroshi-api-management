@@ -153,7 +153,8 @@ describe('the AI usage of an api', () => {
     // its usage is kept, never its content: neither the prompt nor the answer, nor the secret of the key
     const kept = JSON.stringify(row.payload);
     expect(row.payload.input_prompt).toBeUndefined();
-    expect(row.payload.output).toEqual({ metadata: expect.objectContaining({ usage: { prompt_tokens: 12, reasoning_tokens: 0, generation_tokens: 5 } }) });
+    // the usage the extension reports, whatever it adds to it (the cache tokens since 0.0.91)
+    expect(row.payload.output).toEqual({ metadata: expect.objectContaining({ usage: expect.objectContaining({ prompt_tokens: 12, reasoning_tokens: 0, generation_tokens: 5 }) }) });
     expect(kept).not.toContain('What is the answer?');
     expect(kept).not.toContain('The answer is 42.');
     expect(kept).not.toContain(state.key.client_secret);

@@ -5,8 +5,7 @@
   Describe your APIs as products, publish them, let consumers subscribe — without ever opening the gateway.
 </p>
 
-> **Status: 0.1.0, a beta.** It drives Otoroshi 18.1 — until 18.1 is released, built from the
-> `master` branch of Otoroshi. An end-to-end test describes a reference catalogue — 6 plans, 5 auth
+> **Status: 0.1.0, a beta.** It drives [Otoroshi 18.1](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0). An end-to-end test describes a reference catalogue — 6 plans, 5 auth
 > mechanisms, 4 approval modes, on one API and one set of routes — projects it, reconciles it and
 > detects its drift (`test/reference-catalogue.test.js`). What 0.1.0 does and does not do:
 > [`CHANGELOG.md`](./CHANGELOG.md).
@@ -47,8 +46,8 @@ The development stack of the repository — the documentation's **Development** 
 (`documentation/docs/development.mdx`) says it all; in short:
 
 Requirements: [mise](https://mise.jdx.dev/) (it installs Bun and Node), Docker, and an Otoroshi jar,
-18.1 or later — until it is released, built from the `master` branch of Otoroshi: `../otoroshi.jar`
-by default, or `OTOROSHI_JAR=/path/to/otoroshi.jar`. Its extensions, optional, come from a directory
+18.1 or later — the jar of its [release](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0): `../otoroshi.jar` by default, or
+`OTOROSHI_JAR=/path/to/otoroshi.jar`. Its extensions, optional, come from a directory
 (`OTOROSHI_EXTENSIONS`, see the install documentation).
 
 ```sh

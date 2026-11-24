@@ -9,6 +9,11 @@ Found on Otoroshi `18.0.1`, source lines from the `18.1.0-dev` checkout in `../o
 
 ## Where we are
 
+**Otoroshi 18.1.0 is released** (2026-11-24, [v18.1.0](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0)) with every fix below — G-1 to G-23
+but G-11, G-19 and G-21, not fixed by decision. The product runs on its release jar, and the
+extensions released for it (Threat Protection Suite 1.1.0, LLM extension 0.0.91) on the same
+gateway. The gaps of the Threat Protection Suite (G-24, G-26 to G-28) are still open in its 1.1.0.
+
 G-1 to G-21 were fixed upstream on 2026-11-19, in `18.1.0-dev`, but three that are not by decision
 of the owner (G-11, G-19, G-21). The product requires Otoroshi 18.1 (the setup check says so) and
 dropped its workarounds rather than keeping them for 18.0: nothing depends on the product with 18.0.

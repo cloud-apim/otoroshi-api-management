@@ -49,7 +49,7 @@ installations of their own, a snapshot [promoted](./gitops/promotion.mdx) from o
 
 | | Required | |
 |---|---|---|
-| **Otoroshi 18.1** or later — until it is released, built from the `master` branch of Otoroshi, of 2026-11-24 or later for [one API key for every API](./concepts/applications-and-subscriptions.mdx#one-api-key-for-every-api) | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
+| **[Otoroshi 18.1](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0)** or later | yes | a cluster (one node is a cluster); an **admin API key with every right** — super admin, for its global configuration (the [dictionaries](./concepts/dictionaries.mdx), the TLS settings) |
 | **PostgreSQL 14** or later | yes | **two databases**, created beforehand: the application data, and the events and analytics — two connection URLs, one server is enough; a user that owns them (the product creates its tables, the migrations run at startup) |
 | **The product** | yes | the executable (linux and macOS, x64 and arm64) or the image `ghcr.io/cloud-apim/otoroshi-api-management`; one instance or several, listening on one port (`9000`) |
 | A key for the secrets | yes | `APIM_SECRETS_KEY`: the secrets it keeps — of the credentials, of its key to the gateway, of the identity providers — are sealed with it ([secrets at rest](#secrets-at-rest)) |
@@ -337,22 +337,22 @@ AI and MCP audits it ingests. In the development stack, the gateway starts with 
 directory on its classpath, both extensions enabled:
 
 ```sh
-# releases built for the Otoroshi of the gateway (see below), in a directory of their own
+# the latest releases, built for Otoroshi 18.1 (see below), in a directory of their own
 mkdir -p ~/otoroshi-extensions && cd ~/otoroshi-extensions
 gh release download -R cloud-apim/otoroshi-waf-extension -p 'otoroshi-waf-extension_3-*.jar*'
 gh release download -R cloud-apim/otoroshi-llm-extension -p 'otoroshi-llm-extension_3-*.jar*'
-sha256sum -c *.sha256
+# each checksum file holds the digest alone
+for f in *.jar; do echo "$(cat $f.sha256)  $f"; done | sha256sum -c -
 # the gateway restarted with them (docker/extensions, empty, by default)
 OTOROSHI_EXTENSIONS=~/otoroshi-extensions mise exec -- docker compose up -d otoroshi
 mise run demo   # the demo again, if the gateway lost its state (mise run reset)
 ```
 
 :::warning An extension is built for an Otoroshi
-An extension runs only on the Otoroshi it was built against. The releases published so far (Threat
-Protection Suite 1.0.0, LLM extension 0.0.90) are built against an earlier Otoroshi and do not
-start on the `master` of Otoroshi 18.1: take the releases built for 18.1 once they are out, or build
-the extensions against the same Otoroshi. Without them the product runs: a plan that
-asks for the threat protection is warned, and no AI or MCP audit comes in.
+An extension runs only on the Otoroshi it was built against: on Otoroshi 18.1, the Threat Protection
+Suite 1.1.0 and the LLM extension 0.0.91 or later — the earlier releases, built for 18.0, do not
+start. Without them the product runs: a plan that asks for the threat protection is warned, and no
+AI or MCP audit comes in.
 :::
 
 ### Ingestion

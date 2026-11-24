@@ -13,6 +13,7 @@ Last update: 2026-11-24.
 
 ## Now
 
+- **Otoroshi 18.1.0 is released** (2026-11-24): the product runs on the jar of its release, no longer a build of `master` — the README, the overview, the install page, the development page and the quickstart say so; the quickstart downloads the jar and checks it (its checksum file holds the digest alone, and so do those of the extensions: the install page checked them with `sha256sum -c`, which cannot read them). The extensions released for it, the Threat Protection Suite 1.1.0 and the LLM extension 0.0.91, run on the development gateway: the whole suite on them, 272 pass, 1 skip (the test that runs without the threat protection), none failing — `test/ai-usage.test.js` no longer expects the usage of the extension to the letter, 0.0.91 adds its cache tokens. The Threat Protection Suite gaps (G-24, G-26 to G-28) are still open in 1.1.0.
 - **The requests to review lead to themselves** (2026-11-24, the owner's remark): the sidebar counted them beside APIs, the list of APIs showed a *pending* badge, and nothing led to them from there. Now a notice above the list of APIs opens them all (`/subscriptions?status=pending`), the badge of an API opens its own (its Subscriptions tab filtered), the page of an API says it on its overview and counts them on its tab (`pending_subscriptions` on `GET …/apis/<api>`), and the count of the sidebar follows the reviews made. A request to an API of no team was notified to nobody: it goes to the administrators of the workspace, as the publication of a shared group to the APIs behind (`notifyApiTeam`, `test/queue-and-notifications.test.js`). The request of the demo that showed nothing predates the notifications.
 - **R-12, one API key for every API of an application** (2026-11-24, after G-23 was fixed upstream — [#2968](https://github.com/MAIF/otoroshi/pull/2968), shared credentials and alias keys — on the owner's request): an application chooses it (`shared_credential`: console, portal, admin api, the Kubernetes `Application`, export and import), and its subscriptions to `apikey` plans made from then on share the credential of the application — one client id, one secret — each through an alias of its own on the gateway, with the rate limit, the quotas, the restrictions and the plugins of its own plan: the identity grouped, the counters never (D-31). The subscriptions show the key of the application, marked as such, with how many share it; a new secret is taken by every api at once; suspending, expiring or closing a subscription cuts its api only; a second subscription of the application to the same api has a key of its own (the credential names one subscription per api); a transfer to another version makes the subscription again there, sharing the same credential (refused, `409`, onto an api the application already calls with it); the credential outlives its last subscription and leaves the gateway with the application. The ingester keeps the client id of the credential the consumer called with (`apiRef.credential`), the quotas of a subscription are read on its alias, the drift detection watches the credential (enabled, secret) and a resync repairs it — an alias lost with its credential is made again; adopt mode takes over a credential an owner shares. `oauth2-local` subscriptions keep a key of their own: upstream did not test the client credentials flow with a credential authorized on nothing. Checked live on the gateway, through the product: one key calls two apis, each alias counts its own calls, the calls are attributed to each subscription under the credential's client id (`test/shared-credential.test.js`, 10 tests; `test/ingestion.test.js`). G-23 followed in `OTOROSHI-GAPS.md`, off the known limitations. The screens tour taken again (125 screens): the identity of an application in the console and an application of the portal show the choice. The pages written for one key per subscription reviewed: the limits of a plan counted per subscription, the attribution of a call through an alias, drift and adopt, the Otoroshi `master` it needs, the CLI, the README and the landing page. Found on the way: the `test:e2e` task named a test file removed long ago.
 - **The quickstart runs the product, the development has its page** (2026-11-23, the owner's request): the quickstart makes an installation on one machine as in production — a folder and its configuration with secrets made once, PostgreSQL, Otoroshi from its jar, the executable of a release, its setup (its own key, the data exporter), then a first API from a file, a subscription from the portal and a call through the gateway —, played as written on a clean machine (the development stack stopped): 401 without a key, 200 with it, the calls ingested and attributed, a restart with the same commands. The development stack, the tests, the documentation and its captures, the executable and a release moved to `docs/development.mdx`; the README, the overview, the tutorial and the landing page point to one or the other.
@@ -99,7 +100,7 @@ brokers extension; GraphQL and gRPC later. Proposed order:
 
 1. **R-56** — the type in the model, REST the only one accepted, so the schema has it before the others.
 2. **R-54** — the event-driven type (needs the event brokers extension on the gateway: a download; its per-message events first, D-34).
-3. **R-57**, **R-58** — the MCP and AI types, once the LLM extension runs with the latest changes of the Otoroshi api (the owner's note). The AI and MCP usage the ingester already keeps can be shown before.
+3. **R-57**, **R-58** — the MCP and AI types, now that the LLM extension runs on Otoroshi 18.1 (its 0.0.91, 2026-11-24). The AI and MCP usage the ingester already keeps can be shown before.
 4. **R-59**, **R-60** — GraphQL, gRPC.
 
 The full list, grouped by area, is in [What remains to implement](#what-remains-to-implement).
@@ -120,9 +121,9 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 | R-21 | M | Dynamic client registration at the IdP — not a priority (owner) |
 
 
-**Blocked on Otoroshi:** nothing — R-12 done once G-23 was fixed (2026-11-24).
+**Blocked on Otoroshi:** nothing — R-12 done once G-23 was fixed (2026-11-24); Otoroshi 18.1.0 released the same day.
 
-**Blocked on the LLM extension (2):** R-57 (MCP), R-58 (AI, with the token and budget plans of R-18) — the extension has to run with the latest changes of the Otoroshi api first.
+**Blocked on the LLM extension:** nothing since its 0.0.91, built for Otoroshi 18.1 (2026-11-24) — R-57 (MCP) and R-58 (AI, with the token and budget plans of R-18) can start: its audits of a chat completion and of an MCP tool call reach the ingester again (`test/ai-usage.test.js`).
 
 **Owner decisions:** none left open.
 
@@ -130,7 +131,7 @@ Effort: **S** ≈ R-49 or R-50, **M** ≈ R-8 or R-41, **L** ≈ R-7.
 
 **Out of the MVP by decision:** the MCP, AI and event-driven types of api (D-44: the next steps), api scoring.
 
-**Total doable:** 4 M + 2 L ≈ 9 M; then R-57 and R-58 (2 L) once the LLM extension is fixed. Without R-37 and R-21 (not a priority) and the later R-59, R-60: 1 M + 1 L (R-56, R-54).
+**Total doable:** 4 M + 2 L ≈ 9 M; then R-57 and R-58 (2 L), the LLM extension running on Otoroshi 18.1 since its 0.0.91. Without R-37 and R-21 (not a priority) and the later R-59, R-60: 1 M + 1 L (R-56, R-54).
 
 ## Known issues
 
@@ -176,7 +177,7 @@ plans may meter, the analytics shown, the try-it. The rest of the model is the s
 
 | # | Spec | Item |
 |---|---|---|
-| — | D-32, D-44 | AI and MCP apis as types of api — R-57, R-58, once the LLM extension is fixed (the events are captured from day one) |
+| — | D-32, D-44 | AI and MCP apis as types of api — R-57, R-58, the LLM extension running on Otoroshi 18.1 since its 0.0.91 (the events are captured from day one) |
 | — | D-32, D-34, D-44 | Event-driven apis — R-54, needs per-message events in the event-brokers extension first |
 | — | D-32, Q-7 | Api scoring, quality review before publication |
 | — | Q-12 | A payment connector after Stripe — Lago self-hosted first (flat and usage, sovereign, AGPL called as a service), when a need comes; the connector interface is there (Stripe, the fake one) |

@@ -5,12 +5,14 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Otoroshi 18.1 is released**: the product runs on the jar of its
+  [release](https://github.com/MAIF/otoroshi/releases/tag/v18.1.0), no longer a build of its `master`. The extensions released for it — the
+  Threat Protection Suite 1.1.0, the LLM extension 0.0.91 — run on it.
 - **One API key for every API of an application**: its subscriptions to apikey plans share one
   client id and one secret, each with the quotas, the restrictions and the plugins of its own plan —
   nothing pooled. Chosen on the application (console, portal, admin API `shared_credential`, the
-  Kubernetes `Application`), for the subscriptions made from then on. Needs the Otoroshi `master`
-  of 2026-11-24 or later (shared credentials,
-  [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
+  Kubernetes `Application`), for the subscriptions made from then on (shared credentials of
+  Otoroshi 18.1, [#2964](https://github.com/MAIF/otoroshi/issues/2964)).
 - **The subscription requests to review lead to themselves** in the console: a notice above the list
   of APIs, the *pending* badge of an API opening its requests, a notice on the page of the API and a
   count on its Subscriptions tab. A request to an API of no team is notified to the administrators
