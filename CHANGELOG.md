@@ -49,6 +49,11 @@ The notes of each release: the section of a version is the body of its GitHub re
   rollups). In the console, the dashboards and the request log filtered by an endpoint of the API —
   a method and a templated path —, from the calls and from the rollups.
 
+### Fixed
+
+- Instances started at once on an empty database — the replicas of a Kubernetes deployment, at
+  their first install — failed their migrations but one, and restarted: they migrate one at a time.
+
 ## 0.1.1 — beta
 
 The beta on the release of Otoroshi 18.1: one API key for every API of an application, the requests
