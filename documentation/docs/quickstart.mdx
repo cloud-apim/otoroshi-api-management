@@ -99,12 +99,12 @@ you will not need it.
 ## 4. The product
 
 Download the executable of your system — `linux-x64`, `linux-arm64`, `darwin-x64` or
-`darwin-arm64` — and check it. During the beta the repository is private: `gh`, signed in with an
-account that has access, or the page of the release in a browser.
+`darwin-arm64` — from the [release](https://github.com/cloud-apim/otoroshi-api-management/releases/tag/v0.1.1),
+and check it:
 
 ```bash
-gh release download v0.1.1 -R cloud-apim/otoroshi-api-management \
-  -p 'otoroshi-apim-linux-x64' -p SHA256SUMS
+curl -fLO https://github.com/cloud-apim/otoroshi-api-management/releases/download/v0.1.1/otoroshi-apim-linux-x64
+curl -fLO https://github.com/cloud-apim/otoroshi-api-management/releases/download/v0.1.1/SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS     # macOS: shasum -a 256 -c SHA256SUMS
 mv otoroshi-apim-linux-x64 otoroshi-apim && chmod +x otoroshi-apim
 ```
