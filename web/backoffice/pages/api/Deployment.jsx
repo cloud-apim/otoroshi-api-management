@@ -1,32 +1,78 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { Link } from '../../../shared/router.jsx';
 import { fmtDate, fmtRelative } from '../../../shared/lib.js';
-import { Badge, Callout, DiffView, Icon, Loader, Modal, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Icon, Loader, StatusBadge, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { CodeView } from '../../../shared/code-editor.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../../shared/lists.jsx';
 import { tr, Tr } from '../../../shared/i18n.jsx';
 
-function SnapshotView({ api, number, onClose }) {
-  const { wapi } = useWs();
-  const state = useLoad(() => wapi.get(`/apis/${api.id}/snapshots/${number}`), [number]);
+// a snapshot on a page of its own, in the tab: what was published, immutable; exported for the next
+// installation, deployed or rolled back to from here
+function SnapshotPage({ api, number, readOnly, onDeploy }) {
+  const { wapi, slug } = useWs();
+  const toast = useToast();
+  const state = useLoad(() => wapi.get(`/apis/${api.id}/snapshots/${number}`), [api.id, number]);
+  const current = api.deployment.current;
   return (
-    <Modal title={tr('Snapshot #{0}', [number])} size="xwide" onClose={onClose}>
+    <div className="col gap-16">
+      <Link to={`/ws/${slug}/apis/${api.id}/deployment`} className="link small row gap-4" style={{ display: 'inline-flex' }}>
+        <Icon name="arrowLeft" size={14} />
+        {tr('Deployment')}
+      </Link>
       <Loader state={state}>
         {(s) => (
-          <>
-            <p className="muted small">
-              <Tr text={'Published {0} {1}. Immutable: it can be redeployed, never edited.'} args={[fmtDate(s.published_at), s.comment ? `— ${s.comment}` : '']} />
-            </p>
-            <CodeView value={s.content} maxHeight={620} ariaLabel={tr('snapshot {0}', [number])} />
-          </>
+          <div className="card">
+            <div className="card-head">
+              <Icon name="layers" />
+              <h3>{tr('Snapshot #{0}', [s.number])}</h3>
+              {s.origin && (
+                <Badge kind="info" title={tr('snapshot #{0} of {1}, {2}', [s.origin.number, s.origin.installation, s.origin.digest])}>
+                  {tr('promoted')}
+                </Badge>
+              )}
+              {current?.snapshot_id === s.id && <StatusBadge status="deployed" label={tr('running')} />}
+              <span className="spacer" />
+              {!readOnly && (
+                <button className="btn sm ghost" title={tr('the snapshot as a document for the next installation')} onClick={() => exportSnapshot(wapi, api, s).catch((e) => toast(errorMessage(e), 'error'))}>
+                  {tr('Export for promotion')}
+                </button>
+              )}
+              {!readOnly && current?.snapshot_id !== s.id && (
+                <button className="btn sm" onClick={() => onDeploy(s.id)}>
+                  {current && s.number < current.snapshot_number ? tr('Roll back to it') : tr('Deploy')}
+                </button>
+              )}
+            </div>
+            <div className="card-body col gap-8">
+              <p className="muted small" style={{ margin: 0 }}>
+                <Tr text={'Published {0} {1}. Immutable: it can be redeployed, never edited.'} args={[`${fmtDate(s.published_at)}${s.published_by_email ? ` · ${s.published_by_email}` : ''}`, s.comment ? `— ${s.comment}` : '']} />
+              </p>
+              <CodeView value={s.content} maxHeight={900} ariaLabel={tr('snapshot {0}', [s.number])} />
+            </div>
+          </div>
         )}
       </Loader>
-    </Modal>
+    </div>
   );
 }
 
-export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
-  const { wapi } = useWs();
+// the snapshot as a promotion document, for the next installation
+async function exportSnapshot(wapi, api, s) {
+  const doc = await wapi.get(`/apis/${api.id}/snapshots/${s.number}/promotion`);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }));
+  a.download = `${api.slug}-${api.version}-snapshot-${s.number}.json`;
+  a.click();
+}
+
+export function DeploymentTab(props) {
+  if (props.item) return <SnapshotPage key={props.item} api={props.api} number={props.item} readOnly={props.readOnly} onDeploy={props.onDeploy} />;
+  return <Deployments {...props} />;
+}
+
+function Deployments({ api, readOnly, onDeploy, reload }) {
+  const { wapi, slug } = useWs();
   const toast = useToast();
   const confirm = useConfirm();
   const snaps = useLoad(() => wapi.get(`/apis/${api.id}/snapshots`), [api.id]);
@@ -35,20 +81,7 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
   const deps = useLoad(() => wapi.get(`/apis/${api.id}/deployments?${depPage.query}`), [api.id, depPage.key]);
   const projection = useLoad(() => wapi.get(`/apis/${api.id}/projection`), [api.id]);
   const snapPage = useLocalPaging(snaps.data, { prefix: 'snaps', size: 10, text: (s) => `#${s.number} ${s.comment || ''} ${s.published_by_email || ''}` });
-  const [viewing, setViewing] = useState(null);
   const current = api.deployment.current;
-  // the snapshot as a promotion document, for the next installation
-  const exportSnapshot = async (s) => {
-    try {
-      const doc = await wapi.get(`/apis/${api.id}/snapshots/${s.number}/promotion`);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }));
-      a.download = `${api.slug}-${api.version}-snapshot-${s.number}.json`;
-      a.click();
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    }
-  };
   const recheck = async () => {
     try {
       await wapi.post('/drift');
@@ -166,11 +199,11 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
                         </td>
                         <td>{current?.snapshot_id === s.id && <StatusBadge status="deployed" label={tr('running')} />}</td>
                         <td className="actions">
-                          <button className="btn sm ghost" onClick={() => setViewing(s.number)}>
+                          <Link to={`/ws/${slug}/apis/${api.id}/deployment/snapshots/${s.number}`} className="btn sm ghost">
                             {tr('View')}
-                          </button>
+                          </Link>
                           {!readOnly && (
-                            <button className="btn sm ghost" title={tr('the snapshot as a document for the next installation')} onClick={() => exportSnapshot(s)}>
+                            <button className="btn sm ghost" title={tr('the snapshot as a document for the next installation')} onClick={() => exportSnapshot(wapi, api, s).catch((e) => toast(errorMessage(e), 'error'))}>
                               {tr('Export for promotion')}
                             </button>
                           )}
@@ -228,7 +261,6 @@ export function DeploymentTab({ api, readOnly, onDeploy, reload }) {
           )}
         </Loader>
       </div>
-      {viewing && <SnapshotView api={api} number={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

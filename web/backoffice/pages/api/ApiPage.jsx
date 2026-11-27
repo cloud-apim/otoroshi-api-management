@@ -250,7 +250,7 @@ function ApiEditor({ api, tab, item, reload }) {
       {tab === 'catalogue' && <CatalogueTab api={api} readOnly={!api.can_manage} />}
       {tab === 'announcements' && <AnnouncementsTab api={api} readOnly={!api.can_manage} item={item} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
-      {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
+      {tab === 'deployment' && <DeploymentTab {...ctx} item={item} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
       {tab === 'test' && <TestTab api={api} draft={draft} />}
       {tab === 'analytics' && (
         <div className="col gap-24">

@@ -179,6 +179,7 @@ describe.skipIf(!ready)('the console', () => {
       `${W}/settings/webhooks/${state.hookId}`,
       `${W}/apis/${state.apiId}/announcements/${state.annId}`,
       `${W}/apis/${state.apiId}/announcements/new`,
+      `${W}/apis/${state.apiId}/deployment/snapshots/1`,
       ...['status', 'drift', 'connection', 'ingestion', 'setup'].map((t) => `/backoffice/gateway/${t}`),
       ...['workspaces', 'users', 'authentication', 'audit', 'tokens'].map((t) => `/backoffice/settings/${t}`),
     ];

@@ -10,6 +10,8 @@ The notes of each release: the section of a version is the body of its GitHub re
   shown once.
   An announcement of an API too, in the console: on its page, written in Markdown — Edit, Preview —
   (`GET …/announcements/<id>`, `otoroshi-apim announcements show`).
+  A snapshot of an API, at `…/deployment/snapshots/<n>`: exported, deployed or rolled back to from
+  there.
 
 - **The page of an API on two levels of tabs**: its groups — Overview, Design, Documentation, Portal,
   Subscriptions, Operate, Settings —, then the pages of the group shown; no scroll whatever the screen.

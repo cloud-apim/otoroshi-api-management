@@ -45,6 +45,9 @@ the one about to be pushed, and the gateway changes against what Otoroshi actual
 writes the `Api` entity (see [projection](../gateway/projection.mdx)).
 
 **Rolling back** is deploying an earlier snapshot — not an inverse operation to compute.
+**Operate › Deployment** lists the snapshots of the API; each one has a page of its own
+(`…/deployment/snapshots/<n>`), a link to share: what was published, exported for promotion,
+deployed or rolled back to from there.
 
 ```bash
 otoroshi-apim apis changes default books          # what the draft changes since the last snapshot

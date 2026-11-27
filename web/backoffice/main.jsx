@@ -205,6 +205,7 @@ function App() {
             ['/ws/:ws/apis/:api', (p) => <ApiPage id={p.api} tab="overview" />],
             ['/ws/:ws/apis/:api/:tab', (p) => <ApiPage id={p.api} tab={p.tab} />],
             ['/ws/:ws/apis/:api/announcements/:item', (p) => <ApiPage id={p.api} tab="announcements" item={p.item} />],
+            ['/ws/:ws/apis/:api/deployment/snapshots/:item', (p) => <ApiPage id={p.api} tab="deployment" item={p.item} />],
             ['/ws/:ws/policy-groups', () => <PolicyGroupsPage />],
             ['/ws/:ws/policy-groups/:pg', (p) => <PolicyGroupPage id={p.pg} />],
             ['/ws/:ws/shared-resources', () => <SharedResourcesPage />],

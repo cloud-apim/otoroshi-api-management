@@ -276,7 +276,7 @@ async function consoleTour(page) {
   await shot(page, 'console-api-deployment', 'API — deployed state, gateway drift, snapshots (rollback), history');
   await click(page, 'View');
   await editors(page);
-  await shot(page, 'console-snapshot', 'An immutable snapshot, read-only', { full: false });
+  await shot(page, 'console-snapshot', 'A snapshot on its page — immutable, read only, exported, deployed or rolled back to', { full: false });
   await go(page, A);
   await click(page, 'Deploy');
   await shot(page, 'console-deploy-dry-run', 'Deploy — the diff is always shown first', { full: false });

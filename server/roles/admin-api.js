@@ -924,7 +924,9 @@ r.get('/workspaces/:ws/apis/:api/snapshots', async ({ ctx, params }) => {
 });
 r.get('/workspaces/:ws/apis/:api/snapshots/:snap', async ({ ctx, params }) => {
   const c = await ws(ctx, params);
-  return apis.getSnapshot((await apiOf(c, params)).id, params.snap);
+  const snap = await apis.getSnapshot((await apiOf(c, params)).id, params.snap);
+  const by = snap.published_by ? (await db`select email from users where id = ${snap.published_by}`)[0] : null;
+  return { ...snap, published_by_email: by?.email || null };
 });
 
 // payments: the Stripe account a workspace sells its paid plans with (Stripe Connect), its events
