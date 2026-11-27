@@ -276,6 +276,10 @@
     "title": "Workspace settings — payments: the Stripe account the paid plans are sold with, and what Stripe said"
   },
   {
+    "file": "console-ws-email.png",
+    "title": "Workspace settings — email: the notifications sent by email, to the people of the portal and to the producers, kind by kind"
+  },
+  {
     "file": "console-ws-export.png",
     "title": "Workspace settings — export and import"
   },
@@ -362,6 +366,10 @@
   {
     "file": "console-global-auth.png",
     "title": "Global settings — authentication"
+  },
+  {
+    "file": "console-global-email.png",
+    "title": "Global settings — email: the transport of the installation, a test, the emails sent"
   },
   {
     "file": "console-global-audit-export.png",
