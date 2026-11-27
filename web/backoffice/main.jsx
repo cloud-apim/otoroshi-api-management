@@ -17,7 +17,7 @@ import { ApplicationsPage, ApplicationPage } from './pages/Applications.jsx';
 import { ObservabilityPage } from './pages/Observability.jsx';
 import { AuditPage } from './pages/Audit.jsx';
 import { NotificationsPage } from './pages/Notifications.jsx';
-import { TeamPage, WorkspaceSettingsPage } from './pages/WorkspaceSettings.jsx';
+import { CatalogPage, TeamPage, WorkspaceSettingsPage } from './pages/WorkspaceSettings.jsx';
 import { WebhookPage } from './pages/Webhooks.jsx';
 import { PortalPage } from './pages/Portal.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
@@ -227,6 +227,7 @@ function App() {
             ['/ws/:ws/settings/portal', (p) => <Redirect to={`/ws/${p.ws}/portal/settings`} />],
             ['/ws/:ws/settings/webhooks/:hook', (p) => <WebhookPage id={p.hook} />],
             ['/ws/:ws/settings/teams/:team', (p) => <TeamPage id={p.team} />],
+            ['/ws/:ws/settings/catalogs/:cat', (p) => <CatalogPage id={p.cat} />],
             ['/ws/:ws/settings/:tab', (p) => <WorkspaceSettingsPage tab={p.tab} />],
             ['/gateway', () => <GatewayPage tab="status" />],
             ['/gateway/:tab', (p) => <GatewayPage tab={p.tab} />],

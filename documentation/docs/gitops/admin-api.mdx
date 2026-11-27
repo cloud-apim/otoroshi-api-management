@@ -52,7 +52,7 @@ addressed by id or slug.
 | subscriptions | `GET POST …/subscriptions`, `GET …/subscriptions/<sub>`, `POST …/{accept,reject,suspend,resume,close,transfer,resync}`, `POST …/transfer/decision`, `POST …/ending` (`{"at": "2027-01-31T00:00:00Z"}`, or `null`), `PUT …/metadata`, `POST …/credentials/<cred>/rotate`, `GET …/usage` (the usage billed) |
 | composition | `GET POST …/policy-groups`, `GET PUT DELETE …/policy-groups/<pg>`, `POST …/publish`, `POST …/upgrade` (`{publish, deploy, apis}`: the APIs behind moved to the latest version) · the same for `…/shared-resources` |
 | metadata | `GET PUT …/metadata-fields` |
-| GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
+| GitOps | `POST …/apply`, `GET …/export`, `POST …/import`, `GET POST …/catalogs`, `GET PUT DELETE …/catalogs/<cat>`, `POST …/preview`, `POST …/sync`, `POST …/adopt` |
 | observability | `GET …/analytics` (and `GET …/analytics/endpoints`, what it filters on with `?endpoint=GET /books/{id}`), `GET …/analytics/calls`, `GET …/analytics/calls/export`, `GET …/analytics/security`, `GET …/audit`, `GET POST …/drift`, `GET …/search`, `GET …/home` |
 | notifications | `GET …/notifications`, `POST …/notifications/{read,done}` |
 | payments | `GET DELETE …/payments` (the Stripe account of the workspace), `POST …/payments/connect`, `GET …/payments/events`, `POST …/payments/reconcile` |

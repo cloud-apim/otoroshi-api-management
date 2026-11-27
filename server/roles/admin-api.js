@@ -1498,6 +1498,10 @@ r.post('/workspaces/:ws/catalogs', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   return hideHeaders(await catalogs.createCatalog(c, c.workspace.id, body));
 });
+r.get('/workspaces/:ws/catalogs/:cat', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return hideHeaders(await catalogs.getCatalog(c.workspace.id, params.cat));
+});
 r.put('/workspaces/:ws/catalogs/:cat', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params, ['admin']);
   const cat = await catalogs.getCatalog(c.workspace.id, params.cat);

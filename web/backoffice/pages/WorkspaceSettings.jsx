@@ -590,33 +590,11 @@ function MetadataSettings() {
 }
 
 // remote catalogs — an external source of truth for a set of apis
-function CatalogModal({ value, onClose, onSaved }) {
-  const { wapi } = useWs();
-  const toast = useToast();
-  const [c, setC] = useState(value);
-  const set = (k) => (v) => setC((x) => ({ ...x, [k]: v }));
+const NEW_CATALOG = { name: '', kind: 'git', url: '', ref: 'main', path: '', mode: 'draft', interval_seconds: 300, enabled: true, prune: false, headers: {} };
+
+function CatalogFields({ c, set }) {
   return (
-    <Modal
-      title={value.id ? tr('Catalog {0}', [value.name]) : tr('New remote catalog')}
-      size="wide"
-      onClose={onClose}
-      footer={
-        <button
-          className="btn primary"
-          disabled={!c.url}
-          onClick={async () => {
-            try {
-              const saved = c.id ? await wapi.put(`/catalogs/${c.id}`, c) : await wapi.post('/catalogs', c);
-              onSaved(saved);
-            } catch (e) {
-              toast(errorMessage(e), 'error');
-            }
-          }}
-        >
-          {tr('Save')}
-        </button>
-      }
-    >
+    <>
       <div className="grid-2">
         <Field label={tr('Name')}>
           <Input value={c.name} onChange={set('name')} />
@@ -706,31 +684,36 @@ function CatalogModal({ value, onClose, onSaved }) {
         <Switch checked={c.enabled} onChange={set('enabled')} label={tr('Scheduled sync')} />
         <Switch checked={c.prune} onChange={set('prune')} label={tr('Delete the apis that leave the source')} />
       </div>
-    </Modal>
+    </>
   );
 }
 
-function PreviewModal({ cat, onClose, onSynced }) {
+// the dry run of a sync, asked on demand — it reads the source —, then the sync itself
+function CatalogPreview({ cat, onSynced }) {
   const { wapi } = useWs();
   const toast = useToast();
-  const plan = useLoad(() => wapi.post(`/catalogs/${cat.id}/preview`), [cat.id]);
-  const page = useLocalPaging(plan.data?.items, { local: true, size: 10, text: (i) => `${i.slug} ${i.version} ${i.action} ${i.reason || ''}` });
+  const [asked, setAsked] = useState(0);
+  const plan = useLoad(() => (asked ? wapi.post(`/catalogs/${cat.id}/preview`) : Promise.resolve(null)), [cat.id, asked]);
+  const page = useLocalPaging(plan.data?.items, { prefix: 'plan', size: 10, text: (i) => `${i.slug} ${i.version} ${i.action} ${i.reason || ''}` });
   const [busy, setBusy] = useState(false);
   const kind = { create: 'positive', update: 'warning', delete: 'negative', conflict: 'negative', orphaned: 'info', unchanged: '' };
   return (
-    <Modal
-      title={tr('Preview — {0}', [cat.name])}
-      size="wide"
-      onClose={onClose}
-      footer={
+    <div className="card">
+      <div className="card-head">
+        <Icon name="eye" />
+        <h3 className="grow">{tr('Preview & sync')}</h3>
+        <button className="btn sm" disabled={plan.loading} onClick={() => setAsked((n) => n + 1)}>
+          <Icon name="refresh" /> {asked ? tr('Preview again') : tr('Preview a sync')}
+        </button>
         <button
-          className="btn primary"
-          disabled={busy || plan.loading || !!plan.error}
+          className="btn sm primary"
+          disabled={busy || !plan.data || plan.loading || !!plan.error}
           onClick={async () => {
             setBusy(true);
             try {
               const r = await wapi.post(`/catalogs/${cat.id}/sync`);
               toast(r.ok ? tr('Catalog synchronised') : tr('Sync finished with errors'), r.ok ? 'info' : 'error');
+              setAsked(0);
               onSynced();
             } catch (e) {
               toast(errorMessage(e), 'error');
@@ -741,54 +724,213 @@ function PreviewModal({ cat, onClose, onSynced }) {
         >
           <Tr text={'Sync now ({0})'} args={[cat.mode]} />
         </button>
-      }
-    >
-      <p className="muted small"><Tr text={'A dry run: nothing is written. {0}'} args={[cat.mode === 'deploy' ? tr('This sync deploys: every change below reaches the gateway.') : '']} /></p>
-      <Loader state={plan}>
-        {(p) => (
-          <>
-            {p.revision && <div className="small muted"><Tr text={'revision {0}{1}'} args={[<span className="mono">{String(p.revision).slice(0, 12)}</span>, p.ignored ? tr(' · {0} non-api document(s) ignored', [p.ignored]) : '']} /></div>}
-            {p.items.length > 0 && <ListToolbar paging={page} placeholder={tr('search apis, versions, actions')} />}
-            {page.items.map((i) => (
-              <div key={`${i.slug}@${i.version}`} className="panel col gap-6">
-                <div className="row">
-                  <Badge kind={kind[i.action]}>{i.action}</Badge>
-                  <span className="bold">
-                    {i.slug} <span className="faint">{i.version}</span>
-                  </span>
-                  {i.adopt && <span className="badge info">{tr('will take over an api edited by hand')}</span>}
-                  {i.reason && <span className="small muted">{i.reason}</span>}
-                </div>
-                {i.changes?.length > 0 && <DiffView changes={i.changes} />}
-              </div>
-            ))}
-            {p.items.length > 0 && !page.items.length && <p className="muted small">{tr('No api document matches.')}</p>}
-            {p.items.length > 0 && <Pager paging={page} total={page.total} />}
-            {!p.items.length && <p className="muted small">{tr('The source carries no api document.')}</p>}
-          </>
+      </div>
+      <div className="card-body col gap-8">
+        {!asked ? (
+          <p className="muted small" style={{ margin: 0 }}>
+            {tr('A dry run reads the source and says what a sync would create, update, orphan or delete; nothing is written. The sync is offered after it.')}
+          </p>
+        ) : (
+          <Loader state={plan}>
+            {(p) =>
+              p && (
+                <>
+                  <p className="muted small" style={{ margin: 0 }}><Tr text={'A dry run: nothing is written. {0}'} args={[cat.mode === 'deploy' ? tr('This sync deploys: every change below reaches the gateway.') : '']} /></p>
+                  {p.revision && <div className="small muted"><Tr text={'revision {0}{1}'} args={[<span className="mono">{String(p.revision).slice(0, 12)}</span>, p.ignored ? tr(' · {0} non-api document(s) ignored', [p.ignored]) : '']} /></div>}
+                  {p.items.length > 0 && <ListToolbar paging={page} placeholder={tr('search apis, versions, actions')} />}
+                  {page.items.map((i) => (
+                    <div key={`${i.slug}@${i.version}`} className="panel col gap-6">
+                      <div className="row">
+                        <Badge kind={kind[i.action]}>{i.action}</Badge>
+                        <span className="bold">
+                          {i.slug} <span className="faint">{i.version}</span>
+                        </span>
+                        {i.adopt && <span className="badge info">{tr('will take over an api edited by hand')}</span>}
+                        {i.reason && <span className="small muted">{i.reason}</span>}
+                      </div>
+                      {i.changes?.length > 0 && <DiffView changes={i.changes} />}
+                    </div>
+                  ))}
+                  {p.items.length > 0 && !page.items.length && <p className="muted small">{tr('No api document matches.')}</p>}
+                  {p.items.length > 0 && <Pager paging={page} total={page.total} />}
+                  {!p.items.length && <p className="muted small">{tr('The source carries no api document.')}</p>}
+                </>
+              )
+            }
+          </Loader>
         )}
+      </div>
+    </div>
+  );
+}
+
+// a remote catalog on a page of its own: its settings, its last sync, the APIs it manages, a sync
+// previewed then run; a new one at …/catalogs/new
+export function CatalogPage({ id }) {
+  const { wapi, slug } = useWs();
+  const { navigate } = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const isNew = id === 'new';
+  const state = useLoad(() => (isNew ? Promise.resolve(NEW_CATALOG) : wapi.get(`/catalogs/${id}`)), [id]);
+  const managed = useLoad(() => (isNew ? Promise.resolve([]) : wapi.get('/apis')), [id]);
+  const list = `/ws/${slug}/settings/catalogs`;
+  const [form, setForm] = useState(null);
+  return (
+    <div className="page">
+      <Loader state={state}>
+        {(cat) => {
+          const c = form || cat;
+          const set = (k) => (v) => setForm((x) => ({ ...(x || cat), [k]: v }));
+          const save = async () => {
+            try {
+              const saved = isNew ? await wapi.post('/catalogs', c) : await wapi.put(`/catalogs/${cat.id}`, c);
+              toast(tr('Catalog saved'));
+              setForm(null);
+              if (isNew) navigate(`${list}/${saved.id}`, { replace: true });
+              else state.reload();
+            } catch (e) {
+              toast(errorMessage(e), 'error');
+            }
+          };
+          const remove = async () => {
+            if (!(await confirm({ title: tr('Delete {0}?', [cat.name]), message: tr('Its apis stay, and become editable by hand again.'), danger: true, confirmLabel: tr('Delete') }))) return;
+            try {
+              await wapi.del(`/catalogs/${cat.id}`);
+              toast(tr('Catalog deleted'));
+              navigate(list);
+            } catch (e) {
+              toast(errorMessage(e), 'error');
+            }
+          };
+          const apis = (managed.data || []).filter((a) => a.managed_by === `catalog:${cat.id}`);
+          return (
+            <>
+              <PageHead
+                crumbs={[{ label: tr('Workspace settings'), to: `/ws/${slug}/settings` }, { label: tr('Catalogs'), to: list }, { label: isNew ? tr('New remote catalog') : cat.name }]}
+                title={isNew ? tr('New remote catalog') : cat.name}
+                sub={
+                  !isNew && (
+                    <span className="row wrap gap-6">
+                      <Badge>{cat.kind}</Badge>
+                      <Badge kind="accent">{cat.mode}</Badge>
+                      {!cat.enabled && <Badge>{tr('manual')}</Badge>}
+                      <span className="mono small faint">
+                        {cat.url}
+                        {cat.ref ? ` @ ${cat.ref}` : ''}
+                        {cat.path ? ` / ${cat.path}` : ''}
+                      </span>
+                    </span>
+                  )
+                }
+                actions={
+                  !isNew && (
+                    <button className="btn ghost danger" onClick={remove}>
+                      <Icon name="trash" /> {tr('Delete')}
+                    </button>
+                  )
+                }
+              />
+              <div className="col gap-16">
+                <div className="grid-2" style={{ alignItems: 'start' }}>
+                  <div className="card">
+                    <div className="card-head">
+                      <Icon name="settings" />
+                      <h3>{tr('Settings')}</h3>
+                    </div>
+                    <div className="card-body col gap-12">
+                      <CatalogFields c={c} set={set} />
+                      <div className="row">
+                        <span className="spacer" />
+                        {form && !isNew && (
+                          <button className="btn" onClick={() => setForm(null)}>
+                            {tr('Cancel')}
+                          </button>
+                        )}
+                        <button className="btn primary" disabled={!c.url || (!isNew && !form)} onClick={save}>
+                          {isNew ? tr('Create') : tr('Save')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  {!isNew && (
+                    <div className="col gap-16">
+                      <div className="card">
+                        <div className="card-head">
+                          <Icon name="refresh" />
+                          <h3>{tr('Last sync')}</h3>
+                        </div>
+                        <div className="card-body col gap-6">
+                          {cat.last_sync ? (
+                            <>
+                              <div className="row wrap gap-6">
+                                <StatusBadge status={cat.last_sync.ok ? 'synced' : 'error'} />
+                                <span className="small muted">{fmtRelative(cat.last_sync_at)}</span>
+                              </div>
+                              {cat.last_sync.error && <div className="negative-text small">{cat.last_sync.error}</div>}
+                              {cat.last_sync.items?.length > 0 && <div className="small muted">{cat.last_sync.items.map((i) => `${i.slug} ${i.action}`).join(', ')}</div>}
+                            </>
+                          ) : (
+                            <p className="faint small" style={{ margin: 0 }}>
+                              {cat.enabled ? tr('Not synchronised yet: the first sync comes within its interval.') : tr('Not synchronised yet: its syncs are run by hand.')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="card">
+                        <div className="card-head">
+                          <Icon name="api" />
+                          <h3>{tr('The APIs it manages')}</h3>
+                        </div>
+                        <div className="card-body">
+                          <Loader state={managed}>
+                            {() =>
+                              apis.length ? (
+                                <div>
+                                  {apis.map((a) => (
+                                    <Link key={a.id} to={`/ws/${slug}/apis/${a.id}`} className="list-item clickable" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                                      <span className="grow">
+                                        {a.name} <span className="faint">{a.version}</span>
+                                      </span>
+                                      <StatusBadge status={a.lifecycle} />
+                                    </Link>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="faint small" style={{ margin: 0 }}>
+                                  {tr('None yet: a sync writes the APIs of the source.')}
+                                </p>
+                              )
+                            }
+                          </Loader>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {!isNew && <CatalogPreview cat={cat} onSynced={() => (state.reload(), managed.reload())} />}
+              </div>
+            </>
+          );
+        }}
       </Loader>
-    </Modal>
+    </div>
   );
 }
 
 function Catalogs() {
   const { wapi, slug } = useWs();
-  const toast = useToast();
-  const confirm = useConfirm();
   const state = useLoad(() => wapi.get('/catalogs'), [slug]);
   const page = useLocalPaging(state.data, { prefix: 'catalogs', size: 25, text: (c) => `${c.name} ${c.kind} ${c.mode} ${c.url} ${c.ref || ''} ${c.path || ''} ${c.last_sync?.error || ''}` });
-  const [editing, setEditing] = useState(null);
-  const [previewing, setPreviewing] = useState(null);
   return (
     <div className="col gap-16">
       <div className="row">
         <p className="muted small grow">
           {tr('A remote catalog — an http file or a git repository of declarative api documents — becomes the source of truth of the apis it carries. They are marked as managed by it, and the console refuses to edit them. Every sync can be previewed first.')}
         </p>
-        <button className="btn primary" onClick={() => setEditing({ name: '', kind: 'git', url: '', ref: 'main', path: '', mode: 'draft', interval_seconds: 300, enabled: true, prune: false, headers: {} })}>
+        <Link to={`/ws/${slug}/settings/catalogs/new`} className="btn primary">
           <Icon name="plus" /> {tr('Add catalog')}
-        </button>
+        </Link>
       </div>
       <ListToolbar paging={page} placeholder={tr('search catalogs, urls, kinds, modes')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
@@ -796,7 +938,7 @@ function Catalogs() {
           page.items.length ? (
             <div className="card">
               {page.items.map((c) => (
-                <div key={c.id} className="list-item" style={{ alignItems: 'flex-start' }}>
+                <Link key={c.id} to={`/ws/${slug}/settings/catalogs/${c.id}`} className="list-item clickable" style={{ alignItems: 'flex-start' }}>
                   <Icon name="git" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="bold">
@@ -820,24 +962,8 @@ function Catalogs() {
                       </div>
                     )}
                   </div>
-                  <button className="btn sm" onClick={() => setPreviewing(c)}>
-                    {tr('Preview & sync')}
-                  </button>
-                  <button className="btn ghost sm icon" onClick={() => setEditing(c)} aria-label={tr('edit')}>
-                    <Icon name="edit" />
-                  </button>
-                  <button
-                    className="btn ghost sm icon"
-                    aria-label={tr('delete')}
-                    onClick={async () => {
-                      if (!(await confirm({ title: tr('Delete {0}?', [c.name]), message: tr('Its apis stay, and become editable by hand again.'), danger: true, confirmLabel: tr('Delete') }))) return;
-                      await wapi.del(`/catalogs/${c.id}`);
-                      state.reload();
-                    }}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
+                  <Icon name="chevronRight" size={14} />
+                </Link>
               ))}
               <Pager paging={page} total={page.total} />
             </div>
@@ -848,27 +974,6 @@ function Catalogs() {
           )
         }
       </Loader>
-      {editing && (
-        <CatalogModal
-          value={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            toast(tr('Catalog saved'));
-            state.reload();
-          }}
-        />
-      )}
-      {previewing && (
-        <PreviewModal
-          cat={previewing}
-          onClose={() => setPreviewing(null)}
-          onSynced={() => {
-            setPreviewing(null);
-            state.reload();
-          }}
-        />
-      )}
     </div>
   );
 }

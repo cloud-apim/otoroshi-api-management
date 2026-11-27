@@ -179,6 +179,7 @@ describe.skipIf(!ready)('the console', () => {
       ...['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
       `${W}/settings/webhooks/${state.hookId}`,
       `${W}/settings/teams/${state.teamId}`,
+      `${W}/settings/catalogs/new`,
       `${W}/apis/${state.apiId}/announcements/${state.annId}`,
       `${W}/apis/${state.apiId}/announcements/new`,
       `${W}/apis/${state.apiId}/deployment/snapshots/1`,

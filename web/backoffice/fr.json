@@ -2108,5 +2108,14 @@
   "No API is owned by this team.": "Cette équipe ne possède aucune API.",
   "search applications": "chercher des applications",
   "No application matches.": "Aucune application ne correspond.",
-  "No application belongs to this team.": "Aucune application n’appartient à cette équipe."
+  "No application belongs to this team.": "Aucune application n’appartient à cette équipe.",
+  "Preview again": "Prévisualiser à nouveau",
+  "Preview a sync": "Prévisualiser une synchro",
+  "A dry run reads the source and says what a sync would create, update, orphan or delete; nothing is written. The sync is offered after it.": "Une simulation lit la source et dit ce qu’une synchro créerait, modifierait, laisserait orphelin ou supprimerait ; rien n’est écrit. La synchro est proposée ensuite.",
+  "Catalog deleted": "Catalogue supprimé",
+  "Last sync": "Dernière synchro",
+  "Not synchronised yet: the first sync comes within its interval.": "Pas encore synchronisé : la première synchro vient dans son intervalle.",
+  "Not synchronised yet: its syncs are run by hand.": "Pas encore synchronisé : ses synchros se lancent à la main.",
+  "The APIs it manages": "Les API qu’il gère",
+  "None yet: a sync writes the APIs of the source.": "Aucune pour l’instant : une synchro écrit les API de la source."
 }

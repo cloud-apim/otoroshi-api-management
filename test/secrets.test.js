@@ -159,6 +159,8 @@ describe('at rest, end to end', () => {
       });
       expect(cat.headers).toEqual({ access_key_id: '••••••', secret_access_key: '••••••' });
       expect(cat.options).toEqual({ endpoint: `http://127.0.0.1:${store.port}`, region: 'us-east-1' });
+      // read again, on its page: its secrets masked the same
+      expect((await call('GET', `/workspaces/${WS}/catalogs/${cat.id}`)).headers).toEqual({ access_key_id: '••••••', secret_access_key: '••••••' });
       const row = (await db`select headers from remote_catalogs where id = ${cat.id}`)[0];
       expect(isSealed(row.headers.secret_access_key)).toBe(true);
       const preview = await call('POST', `/workspaces/${WS}/catalogs/${cat.id}/preview`);
