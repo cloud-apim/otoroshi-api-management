@@ -12,6 +12,7 @@ import { Catalogue } from './pages/Catalogue.jsx';
 import { ApiPage } from './pages/ApiPage.jsx';
 import { SignIn, SignUp } from './pages/Auth.jsx';
 import { Apps, AppDetail } from './pages/Apps.jsx';
+import { Messages } from './pages/Messages.jsx';
 import { Usage } from './pages/Usage.jsx';
 import { Teams } from './pages/Teams.jsx';
 import { Page } from './pages/Page.jsx';
@@ -125,6 +126,22 @@ function NotificationList({ data, page }) {
   );
 }
 
+// the conversations the workspace answered since they were read: a count beside Messages, read again
+// on every page and every minute
+function UnreadMessages() {
+  const { path } = useRouter();
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const load = () => api.get('/conversations/unread').then((x) => setN(x.count)).catch(() => {});
+    load();
+    const timer = setInterval(load, 60000);
+    // a conversation read, or written to: counted again at once
+    window.addEventListener('apim:messages', load);
+    return () => (clearInterval(timer), window.removeEventListener('apim:messages', load));
+  }, [path]);
+  return n ? <span className="count" style={{ marginLeft: 6 }}>{n}</span> : null;
+}
+
 // what happened to my subscriptions (systematic notification)
 function NotificationsMenu() {
   const { t } = useI18n();
@@ -200,6 +217,9 @@ function UserMenu() {
       <MenuItem icon="chart" onClick={() => navigate('/usage')}>
         {t('nav.usage')}
       </MenuItem>
+      <MenuItem icon="inbox" onClick={() => navigate('/messages')}>
+        {t('nav.messages')}
+      </MenuItem>
       <MenuItem icon="users" onClick={() => navigate('/teams')}>
         {t('nav.teams')}
       </MenuItem>
@@ -273,6 +293,10 @@ function Shell() {
                 <NavLink to="/usage" onClick={close}>
                   {t('nav.usage')}
                 </NavLink>
+                <NavLink to="/messages" onClick={close}>
+                  {t('nav.messages')}
+                  <UnreadMessages />
+                </NavLink>
               </>
             )}
           </nav>
@@ -306,6 +330,8 @@ function Shell() {
             ['/signin', () => <SignIn />],
             ['/signup', () => <SignUp />],
             ['/apps', () => <Apps />],
+            ['/messages', () => <Messages />],
+            ['/messages/:id', (p) => <Messages id={p.id} />],
             ['/apps/:app', (p) => <AppDetail id={p.app} />],
             ['/usage', () => <Usage />],
             ['/teams', () => <Teams />],

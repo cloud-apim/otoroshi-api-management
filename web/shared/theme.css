@@ -339,3 +339,12 @@ table.table { width: 100%; border-collapse: collapse; }
 .md table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 .md th, .md td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
 .md img { max-width: 100%; }
+
+/* a conversation: the messages of the person on one side, the ones of the workspace on the other */
+.thread { display: flex; flex-direction: column; gap: 10px; }
+.thread-msg { max-width: 82%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); align-self: flex-start; }
+.thread-msg.workspace { align-self: flex-end; background: var(--accent-subtle); border-color: transparent; }
+.thread-msg .md > :first-child { margin-top: 4px; }
+.thread-msg .md > :last-child { margin-bottom: 0; }
+.unread-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; }
+.thread-msg.mine { align-self: flex-end; background: var(--accent-subtle); border-color: transparent; }

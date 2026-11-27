@@ -33,7 +33,7 @@ const capabilities = [
   {
     kicker: 'Portal',
     title: 'One developer portal per workspace',
-    body: 'A themable catalogue with multilingual documentation, an OpenAPI reference rendered by Scalar with a try-it that uses the consumer\'s own credentials, the announcements of each API, applications, credentials, live quotas and usage, key by key.',
+    body: 'A themable catalogue with multilingual documentation, an OpenAPI reference rendered by Scalar with a try-it that uses the consumer\'s own credentials, the announcements of each API, applications, credentials, live quotas and usage, key by key, and a conversation with the workspace — the team of the API answering.',
   },
   {
     kicker: 'Analytics',

@@ -22,6 +22,7 @@ import { PortalPage } from './pages/Portal.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
 import { SubscriptionsPage } from './pages/Subscriptions.jsx';
+import { ConversationPage, MessagesPage } from './pages/Messages.jsx';
 import { PolicyGroupsPage, PolicyGroupPage } from './pages/PolicyGroups.jsx';
 import { DictionariesPage, DictionaryPage } from './pages/Dictionaries.jsx';
 import { SharedResourcesPage, SharedResourcePage } from './pages/SharedResources.jsx';
@@ -211,6 +212,8 @@ function App() {
             ['/ws/:ws/applications', () => <ApplicationsPage />],
             ['/ws/:ws/applications/:app', (p) => <ApplicationPage id={p.app} />],
             ['/ws/:ws/subscriptions', () => <SubscriptionsPage />],
+            ['/ws/:ws/messages', () => <MessagesPage />],
+            ['/ws/:ws/messages/:conversation', (p) => <ConversationPage id={p.conversation} />],
             ['/ws/:ws/observability', () => <ObservabilityPage />],
             ['/ws/:ws/audit', () => <AuditPage />],
             ['/ws/:ws/notifications', () => <NotificationsPage />],

@@ -37,6 +37,10 @@ Commands:
   webhooks deliveries <ws> <id> [--status pending|succeeded|failed] [--q text]
   webhooks redeliver <ws> <id> <delivery>   one delivery again, its same id
   webhooks recover <ws> <id> --since <date> the failed since a date, replayed
+  messages list <ws> [--status open|closed] [--q text]   the conversations of the portal one answers
+  messages show <ws> <id>              a conversation and its messages
+  messages reply <ws> <id> (--text t | -f text.md)
+  messages close|reopen <ws> <id>
   gateway status
   gateway setup                        what the product needs on the gateway, created or repaired:
 ${SETUP_HELP}
@@ -425,6 +429,28 @@ async function main() {
         ]);
       }
       throw new Error(`${cmd} list|upgrade`);
+    }
+    case 'messages': {
+      const base = `${ws(a1)}/conversations`;
+      const id = () => need(a2, '<id>');
+      if (sub === 'list') {
+        const q = new URLSearchParams({ limit: flags.limit || '50', ...(flags.status ? { status: flags.status } : {}), ...(flags.q ? { q: flags.q } : {}) });
+        return print((await call('GET', `${base}?${q}`)).items, [['id', 'id'], ['title', 'title'], ['person', 'person_email'], ['about', (c) => c.subject_label || ''], ['team', (c) => c.team_name || 'administrators'], ['status', 'status'], ['unread', (c) => (c.unread ? 'yes' : '')], ['last', (c) => new Date(c.last_message_at).toISOString().slice(0, 16).replace('T', ' ')]]);
+      }
+      if (sub === 'show') {
+        const c = await call('GET', `${base}/${id()}`);
+        if (OUTPUT !== 'table') return print(c);
+        console.log(`${c.title} — ${c.person_email}${c.subject_label ? `, about ${c.subject_label}` : ''} (${c.status})\n`);
+        for (const m of c.messages) console.log(`[${new Date(m.created_at).toISOString().slice(0, 16).replace('T', ' ')}] ${m.side === 'person' ? m.author_email : `${m.author_name || m.author_email} (workspace)`}\n${m.body}\n`);
+        return;
+      }
+      if (sub === 'reply') {
+        const body = flags.file ? readFileSync(flags.file, 'utf8') : need(flags.text, '--text <text> or -f <file>');
+        await call('POST', `${base}/${id()}/messages`, { body });
+        return console.log('answer sent');
+      }
+      if (sub === 'close' || sub === 'reopen') return console.log(`conversation ${(await call('POST', `${base}/${id()}/${sub}`)).status}`);
+      throw new Error('messages list|show|reply|close|reopen');
     }
     case 'webhooks': {
       const base = `${ws(a1)}/webhooks`;

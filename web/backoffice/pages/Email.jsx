@@ -40,6 +40,8 @@ export const KIND_LABELS = () => ({
   'pin.behind': tr('a shared group or resource published, an API behind'),
   'webhook.failing': tr('a webhook failing'),
   'webhook.disabled': tr('a webhook turned off'),
+  'message.reply': tr('an answer to a message'),
+  'message.received': tr('a message from a person of the portal'),
 });
 
 // ---------------------------------------------------------------- the transport of the installation

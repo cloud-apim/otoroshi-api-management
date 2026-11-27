@@ -331,6 +331,13 @@ async function consoleTour(page) {
     await go(page, `${W}/subscriptions?status=pending&open=${pendingSub.id}`);
     await shot(page, 'console-review', 'Reviewing a request: usage statement, request form, terms', { full: false });
   }
+  await go(page, `${W}/messages?status=all`);
+  await shot(page, 'console-messages', 'Messages — the conversations of the people of the portal, routed to the team that answers');
+  const convs = await api(page, `/backoffice/api/workspaces/${WS}/conversations`);
+  if (convs?.items?.[0]) {
+    await go(page, `${W}/messages/${convs.items[0].id}`);
+    await shot(page, 'console-conversation', 'A conversation — its messages, an answer, closed or reopened');
+  }
   await go(page, `${W}/observability?range=7d`);
   await page.setViewport({ width: 1440, height: 1500 });
   await shot(page, 'console-observability', 'Observability — the figures, responses and latency over time, hits by application and api', { full: false });
@@ -516,6 +523,15 @@ async function portalTour(page) {
   await shot(page, 'portal-logs', 'Portal — the request log of my applications, exported as CSV', { full: false });
   await go(page, `${P}/teams`);
   await shot(page, 'portal-teams', 'Portal — my teams');
+  await go(page, `${P}/messages`);
+  await shot(page, 'portal-messages', 'Portal — messages: the conversations of a person with the workspace');
+  const mine = await api(page, `${P}/front/api/conversations`);
+  if (mine?.items?.[0]) {
+    await go(page, `${P}/messages/${mine.items[0].id}`);
+    await shot(page, 'portal-conversation', 'Portal — a conversation, about an API, answered');
+  }
+  await go(page, `${P}/messages/new?about=api:books`);
+  await shot(page, 'portal-conversation-new', 'Portal — a new conversation, about an API: what routes it');
   await go(page, `${P}/apps`);
   await click(page, 'Notifications');
   await shot(page, 'portal-notifications', 'Portal — notifications', { full: false });

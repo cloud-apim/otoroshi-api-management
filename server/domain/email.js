@@ -43,8 +43,9 @@ export const EMAIL_KINDS = {
     'api.announcement',
     'api.deprecated',
     'api.archived',
+    'message.reply',
   ],
-  console: ['subscription.request', 'subscription.transfer.request', 'subscription.transfer.decline', 'pin.behind', 'webhook.failing', 'webhook.disabled'],
+  console: ['subscription.request', 'subscription.transfer.request', 'subscription.transfer.decline', 'pin.behind', 'webhook.failing', 'webhook.disabled', 'message.received'],
 };
 
 const env = process.env;

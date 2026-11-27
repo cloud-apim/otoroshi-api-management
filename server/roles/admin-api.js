@@ -29,6 +29,7 @@ import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as email from '../domain/email.js';
 import * as webhooks from '../domain/webhooks.js';
+import * as messages from '../domain/messages.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
 import { readCertificate, issuerPatterns } from '../domain/pki.js';
@@ -525,6 +526,44 @@ r.put('/workspaces/:ws/email', async ({ ctx, params, body }) => {
   const said = (f) => (next[f].enabled ? `on${Object.keys(next[f].kinds).length ? `, ${Object.keys(next[f].kinds).length} kind(s) off` : ''}` : 'off');
   await audit(c, { action: 'workspace.email.update', workspaceId: c.workspace.id, entityKind: 'workspace', entityId: c.workspace.id, summary: `email to the people of the portal ${said('portal')}, to the producers ${said('console')}`, data: { before, after: next } });
   return next;
+});
+
+// the conversations of the people of the portal with the workspace: the ones one answers — all of them
+// for its administrators, the ones routed to their teams for its producers
+const conversationOf = async (c, params) => {
+  const conv = await messages.getConversation(c.workspace.id, params.conversation);
+  if (!(await messages.canAnswer(c, conv))) throw forbidden('this conversation is routed to another team');
+  return conv;
+};
+
+r.get('/workspaces/:ws/conversations', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return messages.listForWorkspace(c, { ...pageParams(query, { defaultLimit: 25, max: 100 }), status: query.get('status') || null });
+});
+
+r.get('/workspaces/:ws/conversations/unread', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return { count: await messages.unreadForWorkspace(c) };
+});
+
+r.get('/workspaces/:ws/conversations/:conversation', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return messages.thread(await conversationOf(c, params), c.user);
+});
+
+r.post('/workspaces/:ws/conversations/:conversation/messages', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return messages.addMessage(c, await conversationOf(c, params), 'workspace', body?.body);
+});
+
+r.post('/workspaces/:ws/conversations/:conversation/close', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return messages.setStatus(c, await conversationOf(c, params), 'closed');
+});
+
+r.post('/workspaces/:ws/conversations/:conversation/reopen', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin', 'producer']);
+  return messages.setStatus(c, await conversationOf(c, params), 'open');
 });
 
 // the outgoing webhooks of a workspace: its events sent to endpoints, signed, retried, replayed — an

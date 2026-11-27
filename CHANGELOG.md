@@ -5,6 +5,11 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Messages.** A person of a portal writes to the workspace — **Messages**, **Ask a question** on an
+  API, **Ask about it** on a subscription —, the subject routing the conversation to the team that
+  answers (the administrators otherwise), answered from **Messages** in the console or with
+  `otoroshi-apim messages`; each side told, by email too when the workspace sends it.
+
 - **Webhooks.** The events of a workspace — what its audit trail records — sent to the endpoints its
   administrators declare, each one taking the types it names (**Workspace settings › Webhooks**, the
   admin API, `otoroshi-apim webhooks`): signed as Standard Webhooks, tried again at 5 s, 5 min, 30 min,

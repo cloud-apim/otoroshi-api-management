@@ -295,6 +295,9 @@ export function Layout({ children }) {
   const { navigate, path } = useRouter();
   const [search, setSearch] = useState(false);
   const [pending, setPending] = useState(0);
+  const [unread, setUnread] = useState(0);
+  // the people of the workspace who answer the conversations of its portal
+  const answers = ['admin', 'producer'].includes(workspace?.role) || user.is_admin;
   useEffect(() => {
     const on = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -311,6 +314,16 @@ export function Layout({ children }) {
       .get('/subscriptions?status=pending')
       .then((x) => setPending(x.length))
       .catch(() => {});
+    const unreadNow = () =>
+      answers &&
+      wsApi(workspace.slug)
+        .get('/conversations/unread')
+        .then((x) => setUnread(x.count))
+        .catch(() => {});
+    unreadNow();
+    // a conversation read, or answered: counted again at once
+    window.addEventListener('apim:messages', unreadNow);
+    return () => window.removeEventListener('apim:messages', unreadNow);
     // again on every page: a review made elsewhere takes it down
   }, [workspace?.slug, path]);
   const ws = workspace?.slug;
@@ -378,6 +391,11 @@ export function Layout({ children }) {
             <NavLink to={`/ws/${ws}/applications`} icon="apps">
               {tr('Applications')}
             </NavLink>
+            {answers && (
+              <NavLink to={`/ws/${ws}/messages`} icon="inbox" count={unread} countTitle={tr('{0} conversation(s) waiting for an answer', [unread])}>
+                {tr('Messages')}
+              </NavLink>
+            )}
             <NavLink to={`/ws/${ws}/portal`} icon="globe">
               {tr('Developer portal')}
             </NavLink>

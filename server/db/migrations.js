@@ -724,6 +724,49 @@ create index webhook_deliveries_due on webhook_deliveries(next_at) where status 
 create index webhook_deliveries_of on webhook_deliveries(endpoint_id, created_at desc);
 `,
   },
+  {
+    version: '0024_messages',
+    sql: `
+-- messages: a conversation between a person of a portal and its workspace, with an optional subject —
+-- an API, a subscription — that routes it to the team that answers: the team of the API; the
+-- administrators of the workspace otherwise
+create table conversations (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  title text not null,
+  subject_kind text,
+  subject_id text,
+  subject_label text,
+  team_id text references teams(id) on delete set null,
+  status text not null default 'open',
+  last_message_at timestamptz not null default now(),
+  last_from text not null default 'person',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index conversations_of_workspace on conversations(workspace_id, last_message_at desc);
+create index conversations_of_person on conversations(user_id, last_message_at desc);
+
+create table conversation_messages (
+  id text primary key,
+  conversation_id text not null references conversations(id) on delete cascade,
+  author_id text references users(id) on delete set null,
+  side text not null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index conversation_messages_of on conversation_messages(conversation_id, created_at);
+
+-- how far each person read a conversation: theirs, whoever else read it
+create table conversation_reads (
+  conversation_id text not null references conversations(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  primary key (conversation_id, user_id)
+);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

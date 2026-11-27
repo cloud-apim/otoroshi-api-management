@@ -26,8 +26,8 @@ Two faces of one thing, plus the two services that carry them:
   usage, by API, plan, application or endpoint;
 - **a developer portal** per workspace (`/<workspace>/`) — consumers browse the catalogue, read the
   documentation and the announcements, try the API (Scalar), subscribe from their applications, get
-  their credentials — a key per subscription, or one for every API of an application — and follow
-  their consumption, key by key;
+  their credentials — a key per subscription, or one for every API of an application —, follow
+  their consumption, key by key, and write to the workspace, the team of the API answering;
 - **an admin API** (`/api`) — the only way to do anything; the console uses the very same router;
 - **an ingester** (`/ingest`) — receives Otoroshi events and stores them computed (attributed to
   api, plan, subscription, application) and, optionally, raw.
@@ -161,8 +161,6 @@ The beta manages REST APIs on one Otoroshi cluster. Next:
 - **A European payment provider**, beside Stripe Connect, for the paid plans.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
-- **Messages** — a conversation between a person of the portal and the workspace, about an API or a
-  subscription, an inbox in the product.
 - **More to tell** — a key about to expire, a quota nearly spent.
 - **The product's own metrics** — its projection queue, drift, ingestion and errors, for
   Prometheus or OpenTelemetry; today a health check and `gateway status`.

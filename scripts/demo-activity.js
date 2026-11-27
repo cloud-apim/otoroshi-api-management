@@ -225,6 +225,22 @@ if (Array.isArray(hooks) && !hooks.some((h) => h.name === 'Echo')) {
   await call('POST', `${W}/webhooks`, { name: 'Echo', url: 'http://echo:8080/webhooks', types: ['subscription.*', 'api.announcement.publish'] });
   console.log('default   a webhook, its subscriptions and announcements posted to the echo backend');
 }
+// a conversation of its consumer about books, answered by the workspace: once
+if (login.ok && cookie) {
+  const mine = await (await fetch(`${URL}/default/front/api/conversations`, { headers: { cookie } })).json().catch(() => null);
+  if (mine && !mine.total) {
+    const res = await fetch(`${URL}/default/front/api/conversations`, {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ title: 'A filter by year of publication?', subject: { kind: 'api', id: 'books' }, body: 'The search by author is coming, thanks! Could \`/books\` also filter by **year of publication**? We list the new books of a year.' }),
+    });
+    const conv = await res.json().catch(() => null);
+    if (conv?.id) {
+      await call('POST', `${W}/conversations/${conv.id}/messages`, { body: 'Not yet: it is on our list for the summer. Meanwhile, \`?sort=published\` gives the most recent first.' });
+      console.log('default   a conversation of its consumer about books, answered');
+    }
+  }
+}
 // an announcement of books, its subscribers told: once
 const announced = await call('GET', `${W}/apis/books/announcements`).catch(() => []);
 if (Array.isArray(announced) && !announced.length) {

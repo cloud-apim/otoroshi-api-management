@@ -1,0 +1,52 @@
+---
+sidebar_position: 6.6
+title: Messages
+description: Conversations between the people of a portal and the workspace — about an API or a subscription, routed to the team that answers.
+---
+
+# Messages
+
+A person of a portal writes to the workspace from **Messages**: a conversation, asynchronous, an inbox
+on each side. Its **subject** — an API, one of the person's subscriptions, or nothing in particular —
+routes it to the team that answers:
+
+| Subject | Answered by |
+|---|---|
+| an API | the team of the API |
+| a subscription of the person | the team of its API |
+| nothing in particular | the administrators of the workspace |
+
+The administrators of the workspace see every conversation; a producer, the ones routed to their
+teams. The text of a message is Markdown.
+
+## In the portal
+
+**Messages**, in the header — the count beside it says the conversations the workspace answered since
+they were read —: the conversations of the person, searched and paged, open or closed. **New
+conversation** asks for its subject, a title and a first message. An API page offers **Ask a
+question**, and each subscription of *My apps* **Ask about it**: the subject already chosen. In a
+conversation, the person's own messages are on the right; **Close the conversation** when it is
+settled — writing again reopens it.
+
+## In the console
+
+**Messages**, in the sidebar — the count beside it says the conversations waiting for an answer —:
+the conversations one answers, open first, searched by title, subject or person. A conversation
+opens on a page of its own: its messages in order, the ones of the workspace on the right, an answer
+written below; **Close** or **Reopen** it.
+
+## Told
+
+Each side is told of the other's message in its notifications — `message.received` to the team that
+answers (the administrators of the workspace when there is none), `message.reply` to the person —,
+and by [email](./concepts/applications-and-subscriptions.mdx#by-email) when the workspace sends those
+kinds so. Each person reads a conversation on their own: one producer reading it does not read it
+for another.
+
+The conversations are in the audit trail — opened, a message, closed, reopened, never their text —,
+and so reach the [webhooks](./webhooks.mdx) of the workspace (`conversation.*`).
+
+```bash
+otoroshi-apim messages list default --status open
+otoroshi-apim messages reply default conv_01a2… --text "Yes: the Gold plan takes 20k calls a day."
+```

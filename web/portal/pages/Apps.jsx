@@ -694,6 +694,11 @@ function SubscriptionCard({ sub, app, onChange }) {
                 <Icon name="chart" /> {t('subs.keyUsage')}
               </Link>
             )}
+            {used && (
+              <Link to={`/messages/new?about=subscription:${sub.id}`} className="btn sm">
+                <Icon name="inbox" /> {t('messages.askSub')}
+              </Link>
+            )}
             {['active', 'suspended'].includes(sub.status) && !sub.pending_transfer && (
               <button className="btn sm" onClick={() => setChanging(true)}>
                 <Icon name="swap" /> {t('transfer.change')}

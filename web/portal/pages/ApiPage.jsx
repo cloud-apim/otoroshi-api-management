@@ -41,6 +41,7 @@ export function ApiPage({ id, tab, page }) {
 function ApiView({ a, tab, page }) {
   const { t } = useI18n();
   const { navigate } = useRouter();
+  const { user } = usePortal();
   const base = `/apis/${a.id}`;
   const suffix = tab === 'overview' ? '' : `/${tab}`;
   const tabs = [
@@ -105,6 +106,11 @@ function ApiView({ a, tab, page }) {
                   </option>
                 ))}
               </select>
+              {user && (
+                <Link to={`/messages/new?about=api:${a.slug}`} className="btn">
+                  <Icon name="inbox" /> {t('messages.ask')}
+                </Link>
+              )}
               <Link to={`${base}/plans`} className="btn primary">
                 {t('api.seePlans')}
               </Link>

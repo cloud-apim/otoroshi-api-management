@@ -21,6 +21,7 @@ import { resolveLocal } from '../otoroshi/vault-refs.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
 import * as announcements from '../domain/announcements.js';
+import * as messages from '../domain/messages.js';
 import { usageOf } from '../payments/usage.js';
 import { portalUrl } from '../portal-exposure.js';
 
@@ -610,6 +611,38 @@ r.get('/analytics', async ({ ctx, query }) => {
     to: query.get('to'),
   });
 });
+
+// ---------------------------------------------------------------- messages
+
+// the conversations of the person with the workspace: an inbox, about an api or a subscription of theirs
+r.get('/conversations', async ({ ctx, query }) => {
+  requireUser(ctx);
+  return messages.listForPerson(ctx.user, ctx.workspace.id, { ...pageParams(query, { defaultLimit: 25, max: 100 }), status: query.get('status') || null });
+});
+
+r.get('/conversations/unread', async ({ ctx }) => {
+  requireUser(ctx);
+  return { count: await messages.unreadForPerson(ctx.user, ctx.workspace.id) };
+});
+
+r.post('/conversations', async ({ ctx, body }) => {
+  requireUser(ctx);
+  const subject = body?.subject?.kind === 'api' ? { kind: 'api', id: (await findEntry(ctx, body.subject.id)).row.id } : body?.subject || null;
+  return messages.openConversation(ctx, ctx.workspace.id, { title: body?.title, body: body?.body, subject });
+});
+
+const myConversation = async (ctx, id) => {
+  requireUser(ctx);
+  const conv = await messages.getConversation(ctx.workspace.id, id);
+  if (conv.user_id !== ctx.user.id) throw notFound('conversation not found');
+  return conv;
+};
+
+r.get('/conversations/:conversation', async ({ ctx, params }) => messages.thread(await myConversation(ctx, params.conversation), ctx.user));
+
+r.post('/conversations/:conversation/messages', async ({ ctx, params, body }) => messages.addMessage(ctx, await myConversation(ctx, params.conversation), 'person', body?.body));
+
+r.post('/conversations/:conversation/close', async ({ ctx, params }) => messages.setStatus(ctx, await myConversation(ctx, params.conversation), 'closed'));
 
 export const portalRouter = r;
 
