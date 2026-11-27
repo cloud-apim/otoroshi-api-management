@@ -59,6 +59,9 @@ fieldset.ro-fieldset.card-body { padding: 18px 20px; }
 .savebar .btn:not(.primary) { background: transparent; color: var(--pre-ink); border-color: #ffffff33; }
 .list-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .list-item:last-child { border-bottom: 0; }
+a.list-item { color: inherit; text-decoration: none; }
+.list-item.clickable { cursor: pointer; }
+.list-item.clickable:hover { background: var(--hover); }
 .plan-card { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
 .plan-card .plan-kind { font-size: 11.5px; font-weight: 600; color: var(--accent-text); }
 .split { display: grid; grid-template-columns: 260px 1fr; gap: 16px; min-height: 420px; }

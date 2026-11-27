@@ -2098,5 +2098,15 @@
   "Send": "Envoyer",
   "closed": "close",
   "Portal": "Portail",
-  "Operate": "Exploitation"
+  "Operate": "Exploitation",
+  "member": "membre",
+  "owner": "propriétaire",
+  "role in the team": "rôle dans l’équipe",
+  "role of {0}": "rôle de {0}",
+  "search apis": "chercher des API",
+  "No API matches.": "Aucune API ne correspond.",
+  "No API is owned by this team.": "Cette équipe ne possède aucune API.",
+  "search applications": "chercher des applications",
+  "No application matches.": "Aucune application ne correspond.",
+  "No application belongs to this team.": "Aucune application n’appartient à cette équipe."
 }

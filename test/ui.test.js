@@ -104,6 +104,7 @@ beforeAll(async () => {
   // a workspace with an api deployed, an application and its subscription, and a consumer
   await call('POST', '/workspaces', { name: `Interface ${RUN}`, slug: WS });
   const team = await call('POST', ws('/teams'), { name: 'Readers' });
+  state.teamId = team.id;
   const api = await call('POST', ws('/apis'), { name: 'Library', version: '1.0.0', domain: `ui-${RUN}.oto.tools`, contextPath: '/' });
   state.apiId = api.id;
   await call('POST', ws(`/apis/${api.id}/publish`), { comment: 'interface', deploy: true });
@@ -177,6 +178,7 @@ describe.skipIf(!ready)('the console', () => {
       ...['settings', 'design', 'home', 'pages', 'templates', 'navigation', 'styles', 'assets', 'versions', 'sync'].map((t) => `${W}/portal/${t}`),
       ...['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
       `${W}/settings/webhooks/${state.hookId}`,
+      `${W}/settings/teams/${state.teamId}`,
       `${W}/apis/${state.apiId}/announcements/${state.annId}`,
       `${W}/apis/${state.apiId}/announcements/new`,
       `${W}/apis/${state.apiId}/deployment/snapshots/1`,

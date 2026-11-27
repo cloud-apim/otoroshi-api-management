@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useRouter } from '../../shared/router.jsx';
+import { Link, useRouter } from '../../shared/router.jsx';
 import { Badge, Callout, DiffView, Empty, Field, FileButton, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { CodeEditor } from '../../shared/code-editor.jsx';
 import { fmtRelative } from '../../shared/lib.js';
@@ -178,7 +178,6 @@ function Teams() {
   const state = useLoad(() => wapi.get('/teams'), [slug]);
   const page = useLocalPaging(state.data, { prefix: 'teams', size: 25, text: (t) => `${t.name} ${t.id}` });
   const [name, setName] = useState('');
-  const [open, setOpen] = useState(null);
   return (
     <div className="col gap-16">
       <div className="card">
@@ -207,7 +206,7 @@ function Teams() {
           <div className="card">
             {!page.items.length && <Empty title={page.q ? tr('No team matches') : tr('No team')} icon="users" />}
             {page.items.map((t) => (
-              <div key={t.id} className="list-item">
+              <Link key={t.id} to={`/ws/${slug}/settings/teams/${t.id}`} className="list-item clickable">
                 <Icon name="users" />
                 <div className="grow">
                   <div className="bold">
@@ -216,90 +215,173 @@ function Teams() {
                   <div className="faint tiny mono"><Tr text={'team:{0}'} args={[t.id]} /></div>
                 </div>
                 <span className="muted small"><Tr text={'{0} member(s)'} args={[t.members_count]} /></span>
-                <button className="btn sm" onClick={() => setOpen(t.id)}>
-                  {tr('Members')}
-                </button>
-              </div>
+                <Icon name="chevronRight" size={14} />
+              </Link>
             ))}
             <Pager paging={page} total={page.total} />
           </div>
         )}
       </Loader>
-      {open && <TeamMembers id={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-function TeamMembers({ id, onClose }) {
-  const { wapi, isAdmin, session } = useWs();
+// a team on a page of its own: its members — added, removed, owners or members — by its owners and the
+// administrators of the workspace; the APIs and the applications it owns, read here
+export function TeamPage({ id }) {
+  const { wapi, slug, isAdmin, session } = useWs();
   const toast = useToast();
   const state = useLoad(() => wapi.get(`/teams/${id}`), [id]);
-  const page = useLocalPaging(state.data?.members, { local: true, size: 10, text: (m) => `${m.name} ${m.email} ${m.role}` });
+  const apis = useLoad(() => wapi.get(`/apis?team=${encodeURIComponent(id)}`), [id]);
+  const apps = useLoad(() => wapi.get(`/applications?team=${encodeURIComponent(id)}`), [id]);
+  const members = useLocalPaging(state.data?.members, { prefix: 'members', size: 10, text: (m) => `${m.name} ${m.email} ${m.role}` });
+  const apisPage = useLocalPaging(apis.data, { prefix: 'apis', size: 10, text: (a) => `${a.name} ${a.version} ${a.lifecycle}` });
+  const appsPage = useLocalPaging(apps.data, { prefix: 'apps', size: 10, text: (a) => `${a.name} ${a.description || ''}` });
   const [email, setEmail] = useState('');
+  const [role, setRole] = useState('member');
+  const roles = [
+    { value: 'member', label: tr('member') },
+    { value: 'owner', label: tr('owner') },
+  ];
+  const change = async (fn) => {
+    try {
+      await fn();
+      state.reload();
+      return true;
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+      return false;
+    }
+  };
   return (
-    <Modal title={tr('Team members')} onClose={onClose}>
+    <div className="page">
       <Loader state={state}>
         {(t) => {
           const manages = isAdmin || t.members.some((m) => m.id === session.user.id && m.role === 'owner');
           return (
-          <>
-            {!manages && <Callout kind="info">{tr('The owners of the team and the administrators of the workspace choose its members.')}</Callout>}
-            {manages && (
-            <div className="row">
-              <Input value={email} onChange={setEmail} placeholder={tr('email of a workspace member')} />
-              <button
-                className="btn"
-                onClick={async () => {
-                  try {
-                    await wapi.post(`/teams/${id}/members`, { email });
-                    setEmail('');
-                    state.reload();
-                  } catch (e) {
-                    toast(errorMessage(e), 'error');
-                  }
-                }}
-              >
-                {tr('Add')}
-              </button>
-            </div>
-            )}
-            <div>
-              <ListToolbar paging={page} placeholder={tr('search members, emails, roles')} />
-              <div className="card">
-                {page.items.length ? (
-                  <>
-                    {page.items.map((m) => (
-                      <div key={m.id} className="list-item">
-                        <span className="grow">
-                          {m.name} <span className="faint small">{m.email}</span>
-                        </span>
-                        <Badge>{m.role}</Badge>
-                        {manages && (
-                        <button
-                          className="btn ghost sm icon"
-                          aria-label={tr('remove')}
-                          onClick={async () => {
-                            await wapi.del(`/teams/${id}/members/${m.id}`);
-                            state.reload();
-                          }}
-                        >
-                          <Icon name="trash" />
+            <>
+              <PageHead
+                crumbs={[{ label: tr('Workspace settings'), to: `/ws/${slug}/settings` }, { label: tr('Teams'), to: `/ws/${slug}/settings/teams` }, { label: t.name }]}
+                title={t.name}
+                sub={
+                  <span className="row wrap gap-6">
+                    {t.personal && <Badge>{tr('personal')}</Badge>}
+                    <span className="faint mono small">
+                      <Tr text={'team:{0}'} args={[t.id]} />
+                    </span>
+                    <span className="faint">·</span>
+                    <span>
+                      <Tr text={'{0} member(s)'} args={[t.members.length]} />
+                    </span>
+                  </span>
+                }
+              />
+              <div className="grid-2" style={{ alignItems: 'start' }}>
+                <div className="card">
+                  <div className="card-head">
+                    <Icon name="users" />
+                    <h3>{tr('Members')}</h3>
+                  </div>
+                  <div className="card-body col gap-12">
+                    {!manages && <Callout kind="info">{tr('The owners of the team and the administrators of the workspace choose its members.')}</Callout>}
+                    {manages && (
+                      <div className="row">
+                        <Input value={email} onChange={setEmail} placeholder={tr('email of a workspace member')} aria-label={tr('email of a workspace member')} />
+                        <Select value={role} onChange={setRole} options={roles} style={{ width: 130 }} aria-label={tr('role in the team')} />
+                        <button className="btn" disabled={!email.trim()} onClick={async () => (await change(() => wapi.post(`/teams/${id}/members`, { email: email.trim(), role }))) && setEmail('')}>
+                          {tr('Add')}
                         </button>
-                        )}
                       </div>
-                    ))}
-                    <Pager paging={page} total={page.total} />
-                  </>
-                ) : (
-                  <Empty title={page.q ? tr('No member matches') : tr('No member')} icon="users" />
-                )}
+                    )}
+                    <ListToolbar paging={members} placeholder={tr('search members, emails, roles')} />
+                    {members.items.length ? (
+                      <div>
+                        {members.items.map((m) => (
+                          <div key={m.id} className="list-item" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                            <span className="grow">
+                              {m.name} <span className="faint small">{m.email}</span>
+                            </span>
+                            {manages ? (
+                              <Select value={m.role} onChange={(v) => change(() => wapi.post(`/teams/${id}/members`, { user_id: m.id, role: v }))} options={roles} style={{ width: 120 }} aria-label={tr('role of {0}', [m.email])} />
+                            ) : (
+                              <Badge>{tr(m.role)}</Badge>
+                            )}
+                            {manages && (
+                              <button className="btn ghost sm icon" aria-label={tr('remove')} onClick={() => change(() => wapi.del(`/teams/${id}/members/${m.id}`))}>
+                                <Icon name="trash" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <Empty title={members.q ? tr('No member matches') : tr('No member')} icon="users" />
+                    )}
+                    <Pager paging={members} total={members.total} />
+                  </div>
+                </div>
+                <div className="col gap-16">
+                  <div className="card">
+                    <div className="card-head">
+                      <Icon name="api" />
+                      <h3>{tr('APIs')}</h3>
+                    </div>
+                    <div className="card-body col gap-8">
+                      <ListToolbar paging={apisPage} placeholder={tr('search apis')} />
+                      <Loader state={apis}>
+                        {() =>
+                          apisPage.items.length ? (
+                            <div>
+                              {apisPage.items.map((a) => (
+                                <Link key={a.id} to={`/ws/${slug}/apis/${a.id}`} className="list-item clickable" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                                  <span className="grow">
+                                    {a.name} <span className="faint">{a.version}</span>
+                                  </span>
+                                  <StatusBadge status={a.lifecycle} />
+                                </Link>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="faint small">{apisPage.q ? tr('No API matches.') : tr('No API is owned by this team.')}</p>
+                          )
+                        }
+                      </Loader>
+                      <Pager paging={apisPage} total={apisPage.total} />
+                    </div>
+                  </div>
+                  <div className="card">
+                    <div className="card-head">
+                      <Icon name="apps" />
+                      <h3>{tr('Applications')}</h3>
+                    </div>
+                    <div className="card-body col gap-8">
+                      <ListToolbar paging={appsPage} placeholder={tr('search applications')} />
+                      <Loader state={apps}>
+                        {() =>
+                          appsPage.items.length ? (
+                            <div>
+                              {appsPage.items.map((a) => (
+                                <Link key={a.id} to={`/ws/${slug}/applications/${a.id}`} className="list-item clickable" style={{ paddingLeft: 0, paddingRight: 0 }}>
+                                  <span className="grow">{a.name}</span>
+                                  {a.description && <span className="faint small">{a.description}</span>}
+                                </Link>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="faint small">{appsPage.q ? tr('No application matches.') : tr('No application belongs to this team.')}</p>
+                          )
+                        }
+                      </Loader>
+                      <Pager paging={appsPage} total={appsPage.total} />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </>
+            </>
           );
         }}
       </Loader>
-    </Modal>
+    </div>
   );
 }
 

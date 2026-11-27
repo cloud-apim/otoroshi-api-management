@@ -380,6 +380,12 @@ async function consoleTour(page) {
     if (tab === 'export') await editors(page);
     await shot(page, name, title);
   }
+  const teams = await api(page, `/backoffice/api/workspaces/${WS}/teams`);
+  const platform = teams?.find((t) => !t.personal) || teams?.[0];
+  if (platform) {
+    await go(page, `${W}/settings/teams/${platform.id}`);
+    await shot(page, 'console-ws-team', 'A team — its members, owners or members, and the APIs and applications it owns');
+  }
   const hooks = await api(page, `/backoffice/api/workspaces/${WS}/webhooks`);
   if (hooks?.[0]) {
     await go(page, `${W}/settings/webhooks/${hooks[0].id}`);
