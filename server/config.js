@@ -124,6 +124,12 @@ export const config = {
     enabled: bool(env.APIM_WORKERS_ENABLED, true),
   },
 
+  // outgoing webhooks: an endpoint on a private network (loopback, RFC 1918, link-local…) is refused,
+  // unless the installation allows it — the development stack does
+  webhooks: {
+    allowPrivate: bool(env.APIM_WEBHOOKS_ALLOW_PRIVATE, !!devValue(true)),
+  },
+
   sessionTtlMs: 1000 * 60 * 60 * 24 * 7,
   // by default, secure as soon as the product is served over https
   cookieSecure: bool(env.APIM_COOKIE_SECURE, String(env.APIM_PUBLIC_URL || '').startsWith('https:')),

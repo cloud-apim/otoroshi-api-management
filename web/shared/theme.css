@@ -283,6 +283,9 @@ table.table { width: 100%; border-collapse: collapse; }
 .modal { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg); animation: pop .14s; }
 .modal.wide { max-width: 860px; }
 .modal.xwide { max-width: 1100px; }
+/* a window held within the screen: its body scrolls, its head and its foot stay */
+.modal.fit { max-height: 88vh; display: flex; flex-direction: column; }
+.modal.fit .modal-body { overflow: auto; flex: 1; min-height: 0; }
 .modal-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
 .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
 .modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '../../../shared/router.jsx';
-import { Empty, Field, Icon, Input, Loader, Markdown, Modal, Switch, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Empty, Field, Icon, Input, Loader, Markdown, Modal, Switch, Tabs, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import { CodeEditor } from '../../../shared/code-editor.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { fmtDate } from '../../../shared/lib.js';
 import { useWs } from '../../context.jsx';
@@ -8,31 +9,16 @@ import { tr } from '../../../shared/i18n.jsx';
 
 // The announcements of an api, across its versions, like a blog on its page in the portal: published
 // at once, its subscribers told in their notifications; corrected or deleted afterwards, nobody told
-// again.
+// again. Their text is Markdown.
 export function AnnouncementsTab({ api, readOnly }) {
   const { wapi } = useWs();
-  const toast = useToast();
-  const confirm = useConfirm();
   const state = useLoad(() => wapi.get(`/apis/${api.id}/announcements`), [api.id]);
   const page = useLocalPaging(state.data, { prefix: 'ann', size: 10, text: (x) => `${x.title} ${x.body} ${x.author_name || ''}` });
-  // null: no form; {}: a new one; an announcement: corrected
-  const [editing, setEditing] = useState(null);
-  // the announcement read in full, from the url
+  // the one opened, from the url, or a new one
   const [params, setParams] = useQuery();
+  const [creating, setCreating] = useState(false);
   const opened = (state.data || []).find((x) => x.id === params.get('open'));
-
-  const remove = async (n) => {
-    if (!(await confirm({ title: tr('Delete the announcement {0}?', [n.title]), message: tr('It leaves the page of the API in the portal; the notifications already sent stay.'), danger: true, confirmLabel: tr('Delete') }))) return;
-    try {
-      await wapi.del(`/apis/${api.id}/announcements/${n.id}`);
-      setParams({ open: null });
-      toast(tr('Announcement deleted'));
-      state.reload();
-    } catch (e) {
-      toast(errorMessage(e), 'error');
-    }
-  };
-
+  const close = () => (setCreating(false), setParams({ open: null }));
   return (
     <div className="col gap-16">
       <p className="muted small" style={{ margin: 0 }}>
@@ -40,7 +26,7 @@ export function AnnouncementsTab({ api, readOnly }) {
       </p>
       <ListToolbar paging={page} placeholder={tr('search the announcements')} onReload={state.reload} loading={state.loading}>
         {!readOnly && (
-          <button className="btn primary" onClick={() => setEditing({})}>
+          <button className="btn primary" onClick={() => setCreating(true)}>
             <Icon name="plus" /> {tr('New announcement')}
           </button>
         )}
@@ -74,92 +60,135 @@ export function AnnouncementsTab({ api, readOnly }) {
           )
         }
       </Loader>
-      {opened && !editing && (
-        <Modal
-          title={opened.title}
-          size="wide"
-          onClose={() => setParams({ open: null })}
-          footer={
-            !readOnly && (
-              <>
-                <button className="btn ghost danger" onClick={() => remove(opened)}>
-                  <Icon name="trash" /> {tr('Delete')}
-                </button>
-                <span className="spacer" />
-                <button className="btn" onClick={() => setEditing(opened)}>
-                  <Icon name="edit" /> {tr('Edit')}
-                </button>
-              </>
-            )
-          }
-        >
-          <p className="faint small" style={{ marginTop: 0 }}>
-            {fmtDate(opened.created_at)}
-            {opened.author_name ? ` · ${opened.author_name}` : ''}
-            {new Date(opened.updated_at) - new Date(opened.created_at) > 60e3 ? ` · ${tr('updated {0}', [fmtDate(opened.updated_at)])}` : ''}
-          </p>
-          {opened.body ? <Markdown source={opened.body} /> : <p className="muted">{tr('No text')}</p>}
-        </Modal>
+      {(creating || opened) && (
+        <AnnouncementModal
+          key={creating ? 'new' : opened.id}
+          api={api}
+          current={creating ? null : opened}
+          readOnly={readOnly}
+          onClose={close}
+          onSaved={(saved) => {
+            state.reload();
+            setCreating(false);
+            setParams({ open: saved?.id || null });
+          }}
+          onDeleted={() => (close(), state.reload())}
+        />
       )}
-      {editing && <AnnouncementForm api={api} current={editing.id ? editing : null} onClose={() => setEditing(null)} onSaved={() => (setEditing(null), state.reload())} />}
     </div>
   );
 }
 
-function AnnouncementForm({ api, current, onClose, onSaved }) {
+// one window to read an announcement and to write it — Edit, Preview —; a new one opens on Edit
+function AnnouncementModal({ api, current, readOnly, onClose, onSaved, onDeleted }) {
   const { wapi } = useWs();
   const toast = useToast();
+  const confirm = useConfirm();
+  const [tab, setTab] = useState(current ? 'preview' : 'edit');
   const [title, setTitle] = useState(current?.title || '');
   const [body, setBody] = useState(current?.body || '');
   const [notify, setNotify] = useState(true);
-  const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
+  const dirty = !current || title !== current.title || body !== current.body;
+
   const save = async () => {
     setSaving(true);
     try {
       if (current) {
-        await wapi.put(`/apis/${api.id}/announcements/${current.id}`, { title, body });
+        const saved = await wapi.put(`/apis/${api.id}/announcements/${current.id}`, { title, body });
         toast(tr('Announcement updated'));
+        onSaved(saved);
       } else {
         const r = await wapi.post(`/apis/${api.id}/announcements`, { title, body, notify });
         toast(r.told ? tr('Announcement published: {0} team(s) of subscribers told', [r.told]) : tr('Announcement published'));
+        onSaved(r);
       }
-      onSaved();
     } catch (e) {
       toast(errorMessage(e), 'error');
     } finally {
       setSaving(false);
     }
   };
+  const remove = async () => {
+    if (!(await confirm({ title: tr('Delete the announcement {0}?', [current.title]), message: tr('It leaves the page of the API in the portal; the notifications already sent stay.'), danger: true, confirmLabel: tr('Delete') }))) return;
+    try {
+      await wapi.del(`/apis/${api.id}/announcements/${current.id}`);
+      toast(tr('Announcement deleted'));
+      onDeleted();
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+  };
+
+  const preview = (
+    <div className="col gap-8">
+      <h2 style={{ margin: 0 }}>{title || <span className="faint">{tr('Title')}</span>}</h2>
+      {current && (
+        <span className="faint small">
+          {fmtDate(current.created_at)}
+          {current.author_name ? ` · ${current.author_name}` : ''}
+          {new Date(current.updated_at) - new Date(current.created_at) > 60e3 ? ` · ${tr('updated {0}', [fmtDate(current.updated_at)])}` : ''}
+        </span>
+      )}
+      {body ? <Markdown source={body} /> : <p className="muted">{tr('No text')}</p>}
+    </div>
+  );
+
   return (
     <Modal
-      title={current ? tr('Edit the announcement') : tr('New announcement')}
+      title={current ? current.title : tr('New announcement')}
+      size="wide fit"
       onClose={onClose}
-      size="wide"
       footer={
-        <button className="btn primary" disabled={!title.trim() || saving} onClick={save}>
-          {current ? tr('Save') : tr('Publish')}
-        </button>
+        !readOnly && (
+          <>
+            {current && (
+              <button className="btn ghost danger" onClick={remove}>
+                <Icon name="trash" /> {tr('Delete')}
+              </button>
+            )}
+            <span className="spacer" />
+            <button className="btn primary" disabled={!title.trim() || !dirty || saving} onClick={save}>
+              {current ? tr('Save') : tr('Publish')}
+            </button>
+          </>
+        )
       }
     >
-      <Field label={tr('Title')}>
-        <Input value={title} onChange={setTitle} autoFocus maxLength={200} />
-      </Field>
-      <Field label={tr('Text')} hint={tr('Markdown')}>
-        <div className="row gap-6 mb-8">
-          <button type="button" className={`btn sm ${preview ? '' : 'primary'}`} onClick={() => setPreview(false)}>
-            {tr('Write')}
-          </button>
-          <button type="button" className={`btn sm ${preview ? 'primary' : ''}`} onClick={() => setPreview(true)}>
-            {tr('Preview')}
-          </button>
-        </div>
-        {preview ? <div className="card card-body">{body ? <Markdown source={body} /> : <span className="muted small">{tr('Nothing to preview')}</span>}</div> : <TextArea value={body} onChange={setBody} rows={10} mono />}
-      </Field>
-      {current ? (
-        <p className="muted small">{tr('A correction is not notified again.')}</p>
+      {readOnly ? (
+        preview
       ) : (
-        <Switch checked={notify} onChange={setNotify} label={tr('Tell the subscribers of every version in their notifications')} />
+        <>
+          <div className="mb-16">
+            <Tabs
+              tabs={[
+                { id: 'edit', label: tr('Edit') },
+                { id: 'preview', label: tr('Preview') },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+          </div>
+          {tab === 'edit' ? (
+            <div className="col gap-12">
+              <Field label={tr('Title')}>
+                <Input value={title} onChange={setTitle} autoFocus maxLength={200} />
+              </Field>
+              <Field label={tr('Text')} hint={tr('Markdown')}>
+                <CodeEditor value={body} onChange={setBody} language="markdown" wordWrap="on" minHeight={280} maxHeight={520} ariaLabel={tr('text of the announcement')} placeholder={tr('# Markdown')} />
+              </Field>
+              {current ? (
+                <p className="muted small" style={{ margin: 0 }}>
+                  {tr('A correction is not notified again.')}
+                </p>
+              ) : (
+                <Switch checked={notify} onChange={setNotify} label={tr('Tell the subscribers of every version in their notifications')} />
+              )}
+            </div>
+          ) : (
+            preview
+          )}
+        </>
       )}
     </Modal>
   );

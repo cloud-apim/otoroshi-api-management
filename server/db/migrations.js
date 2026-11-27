@@ -674,6 +674,56 @@ create unique index email_deliveries_once on email_deliveries(notification_id, u
 create index email_deliveries_recent on email_deliveries(created_at desc);
 `,
   },
+  {
+    version: '0023_webhooks',
+    sql: `
+-- outgoing webhooks: the events of a workspace — what its audit trail records — sent to the endpoints
+-- its administrators declare, signed as Standard Webhooks (a whsec_ secret, sealed; the previous one
+-- signing beside it for a while after a rotation). The cursor is the last event of the trail fanned out
+create table webhook_endpoints (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  name text not null,
+  url text not null,
+  secret text not null,
+  previous_secret text,
+  previous_until timestamptz,
+  types text[] not null default '{}',
+  enabled boolean not null default true,
+  disabled_reason text,
+  failing_since timestamptz,
+  told_at timestamptz,
+  cursor bigint not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index webhook_endpoints_of on webhook_endpoints(workspace_id);
+
+-- each event sent to an endpoint: its id is the webhook-id, the same on every attempt; retried until it
+-- succeeds or its attempts are spent, kept 30 days, replayed by hand
+create table webhook_deliveries (
+  id text primary key,
+  endpoint_id text not null references webhook_endpoints(id) on delete cascade,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  event_id bigint,
+  type text not null,
+  payload jsonb not null,
+  status text not null default 'pending',
+  attempts int not null default 0,
+  next_at timestamptz not null default now(),
+  last_status int,
+  last_error text,
+  last_response text,
+  duration_ms int,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  delivered_at timestamptz
+);
+create unique index webhook_deliveries_once on webhook_deliveries(endpoint_id, event_id) where event_id is not null;
+create index webhook_deliveries_due on webhook_deliveries(next_at) where status = 'pending';
+create index webhook_deliveries_of on webhook_deliveries(endpoint_id, created_at desc);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

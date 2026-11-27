@@ -2010,5 +2010,6 @@
   "failed": "en échec",
   "Read {0}": "Lire {0}",
   "updated {0}": "modifiée le {0}",
-  "No text": "Pas de texte"
+  "No text": "Pas de texte",
+  "text of the announcement": "texte de l’annonce"
 }
