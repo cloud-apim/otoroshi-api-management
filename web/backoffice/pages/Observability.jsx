@@ -338,18 +338,26 @@ function useAnalyticsFilters(fixed = {}) {
     plan: params.get('plan') || '',
     application: fixed.application || params.get('application') || '',
     status: params.get('status') || '',
+    // an endpoint of the api: a method and a templated path
+    endpoint: params.get('endpoint') || '',
     refresh: params.get('refresh') || '',
   };
-  const key = [tf.range, tf.ms ? '' : `${tf.from}|${tf.to}`, f.api, f.plan, f.application, f.status].join('|');
+  // what the endpoints offered depend on: the slice, but not the endpoint chosen in it
+  const scope = [tf.range, tf.ms ? '' : `${tf.from}|${tf.to}`, f.api, f.plan, f.application, f.status].join('|');
+  const key = `${scope}|${f.endpoint}`;
   const query = (extra = {}) => {
     const { from, to } = timeframe(params);
     const q = new URLSearchParams({ from });
     if (to) q.set('to', to);
-    for (const k of ['api', 'plan', 'application', 'status']) if (f[k]) q.set(k, f[k]);
-    for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
+    for (const k of ['api', 'plan', 'application', 'status', 'endpoint']) if (f[k]) q.set(k, f[k]);
+    // an extra value set, or taken out when empty: the endpoints offered are those of any endpoint
+    for (const [k, v] of Object.entries(extra)) {
+      if (v !== undefined && v !== null && v !== '') q.set(k, v);
+      else q.delete(k);
+    }
     return q.toString();
   };
-  return { params, setParams, tf, f, key, query };
+  return { params, setParams, tf, f, key, scope, query };
 }
 
 // one row of filters, above everything it scopes
@@ -360,13 +368,17 @@ function FilterBar({ fixed = {}, filters, reset, children }) {
   const apps = useLoad(() => (fixed.application ? Promise.resolve([]) : wapi.get('/applications')), [slug]);
   // the plans of the api the view is on, or filtered on
   const plans = useLoad(() => (f.api ? wapi.get(`/apis/${f.api}`).then((a) => a.draft.plans) : Promise.resolve([])), [f.api]);
+  // the endpoints of that api called in the slice, the most called first
+  const endpoints = useLoad(() => (f.api ? wapi.get(`/analytics/endpoints?${filters.query({ endpoint: null })}`) : Promise.resolve([])), [slug, filters.scope]);
+  const endpointOptions = (endpoints.data || []).map((e) => ({ value: e.endpoint, label: e.endpoint }));
+  if (f.endpoint && !endpointOptions.some((o) => o.value === f.endpoint)) endpointOptions.unshift({ value: f.endpoint, label: f.endpoint });
   return (
     <div className="row wrap">
       <TimeframePicker params={params} setParams={setParams} resetPage={reset} />
       {!fixed.api && (
         <Select
           value={f.api}
-          onChange={(v) => setParams({ api: v, plan: null, ...reset })}
+          onChange={(v) => setParams({ api: v, plan: null, endpoint: null, ...reset })}
           options={[{ value: '', label: tr('All APIs') }, ...(apis.data || []).map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
           style={{ width: 200 }}
           aria-label={tr('filter by api')}
@@ -379,6 +391,15 @@ function FilterBar({ fixed = {}, filters, reset, children }) {
           options={[{ value: '', label: tr('All plans') }, ...(plans.data || []).map((p) => ({ value: p.id, label: p.name }))]}
           style={{ width: 170 }}
           aria-label={tr('filter by plan')}
+        />
+      )}
+      {f.api && (
+        <Select
+          value={f.endpoint}
+          onChange={(v) => setParams({ endpoint: v, ...reset })}
+          options={[{ value: '', label: tr('All endpoints') }, ...endpointOptions]}
+          style={{ width: 240 }}
+          aria-label={tr('filter by endpoint')}
         />
       )}
       {!fixed.application && (

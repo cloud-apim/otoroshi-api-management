@@ -558,6 +558,8 @@ function SubscriptionCard({ sub, app, onChange }) {
   const creds = (sub.credentials || []).filter((c) => c.status === 'active');
   const credsPage = useLocalPaging(creds, { local: true, size: 10, text: (c) => `${c.client_id} ${c.kind || ''}` });
   const closable = ['active', 'pending', 'pending_payment', 'suspended', 'expired'].includes(sub.status);
+  // a subscription that had a key has a usage of its own
+  const used = ['active', 'suspended', 'expired', 'closed'].includes(sub.status);
   const [pay, setPay] = useState(false);
   const [changing, setChanging] = useState(false);
   const rotate = async (c) => {
@@ -685,17 +687,24 @@ function SubscriptionCard({ sub, app, onChange }) {
           </div>
         )}
         <PendingTransfer sub={sub} onChange={onChange} />
-        {closable && (
+        {(closable || used) && (
           <div className="row">
+            {used && (
+              <Link to={`/usage?application=${app.id}&subscription=${sub.id}`} className="btn sm">
+                <Icon name="chart" /> {t('subs.keyUsage')}
+              </Link>
+            )}
             {['active', 'suspended'].includes(sub.status) && !sub.pending_transfer && (
               <button className="btn sm" onClick={() => setChanging(true)}>
                 <Icon name="swap" /> {t('transfer.change')}
               </button>
             )}
             <span className="spacer" />
-            <button className="btn ghost danger sm" onClick={close}>
-              {t('subs.close')}
-            </button>
+            {closable && (
+              <button className="btn ghost danger sm" onClick={close}>
+                {t('subs.close')}
+              </button>
+            )}
           </div>
         )}
         {changing && (

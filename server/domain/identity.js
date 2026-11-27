@@ -8,6 +8,7 @@ import { badRequest, conflict, forbidden, notFound, unauthorized } from '../http
 import { audit } from './audit.js';
 import { normalizeCategories } from './discovery.js';
 import { enqueue } from './tasks.js';
+import { policy as ingestPolicy } from './ingest-policy.js';
 
 export function publicUser(u) {
   if (!u) return null;
@@ -131,6 +132,14 @@ export async function findWorkspace(idOrSlug) {
   return rows[0] || null;
 }
 
+// how far back the consumers of a portal see their usage: 90 days unless the workspace says
+// otherwise, never beyond what the rollups keep
+export const DEFAULT_USAGE_HISTORY_DAYS = 90;
+export async function usageHistoryDays(ws) {
+  const kept = (await ingestPolicy()).retention.rollupsDays;
+  return Math.min(Number(ws.portal?.usageHistoryDays) || DEFAULT_USAGE_HISTORY_DAYS, kept);
+}
+
 export function defaultPortalSettings(name) {
   return {
     // the texts of the portal: one per language of the portal (a plain string is the default one)
@@ -185,6 +194,18 @@ export async function updateWorkspace(ctx, ws, patch) {
   const portal = patch.portal ? { ...ws.portal, ...patch.portal } : ws.portal;
   if (patch.portal?.pages !== undefined) portal.pages = normalizePages(patch.portal.pages);
   if (patch.portal?.categories !== undefined) portal.categories = normalizeCategories(patch.portal.categories);
+  // a number of days, up to the retention of the rollups; none is the default
+  if (patch.portal && 'usageHistoryDays' in patch.portal) {
+    const v = patch.portal.usageHistoryDays;
+    if (v === null || v === '') delete portal.usageHistoryDays;
+    else {
+      const kept = (await ingestPolicy()).retention.rollupsDays;
+      const days = Number(v);
+      if (!Number.isInteger(days) || days < 1 || days > kept)
+        throw badRequest(`the usage history of the portal is a number of days, from 1 to ${kept} — how long the rollups are kept`);
+      portal.usageHistoryDays = days;
+    }
+  }
   // a masked secret sent back by the console keeps the stored one
   if (patch.portal?.oidc && (!patch.portal.oidc.clientSecret || String(patch.portal.oidc.clientSecret).includes('••')))
     portal.oidc = { ...portal.oidc, clientSecret: ws.portal?.oidc?.clientSecret || '' };

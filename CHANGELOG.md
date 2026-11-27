@@ -3,6 +3,14 @@
 The notes of each release: the section of a version is the body of its GitHub release
 (`.github/workflows/release.yaml`).
 
+## Unreleased
+
+- **The usage in finer grain.** On the portal, the usage of one key — a filter of the analytics and
+  the request log, and **Usage of this key** on each subscription —, and its history set per portal
+  (**Developer portal › Settings › Usage history**: 90 days by default, up to the retention of the
+  rollups). In the console, the dashboards and the request log filtered by an endpoint of the API —
+  a method and a templated path —, from the calls and from the rollups.
+
 ## 0.1.1 — beta
 
 The beta on the release of Otoroshi 18.1: one API key for every API of an application, the requests

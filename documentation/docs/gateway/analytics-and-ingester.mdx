@@ -152,9 +152,11 @@ They speak the catalogue's vocabulary — APIs, plans, applications — not the 
 
 - **Console → Observability**, and the *Analytics* tab of each API and application. One row of
   filters scopes everything below it, and lives in the URL, so a filtered view is a bookmark: the
-  timeframe — from the last 5 minutes to the last year, or a custom range — the API, its plan, the
-  application, the status class (2xx to 5xx); a refresh, and an auto-refresh every 10 seconds to 5
-  minutes.
+  timeframe — from the last 5 minutes to the last year, or a custom range — the API, its plan, an
+  **endpoint** of the API — a method and a templated path, `GET /books/{id}`, among those called in
+  the range —, the application, the status class (2xx to 5xx); a refresh, and an auto-refresh every 10
+  seconds to 5 minutes. An endpoint filters the calls and the rollups alike: its history goes as far
+  back as the rollups.
   - **The figures**: calls and the applications that made them, requests per second, errors and
     server errors, latency — average, minimum, maximum, p95 — and the overhead of the gateway, data.
   - **Over time**: the responses, split into successes, client errors (4xx) and server errors (5xx,

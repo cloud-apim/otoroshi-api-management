@@ -1914,5 +1914,9 @@
   "A subscription request is waiting for review": "Une demande de souscription attend d’être validée",
   "{0} subscription requests are waiting for review": "{0} demandes de souscription attendent d’être validées",
   "Review the requests": "Examiner les demandes",
-  "{0} subscription requests waiting for review": "{0} demandes de souscription à valider"
+  "{0} subscription requests waiting for review": "{0} demandes de souscription à valider",
+  "All endpoints": "Tous les endpoints",
+  "filter by endpoint": "filtrer par endpoint",
+  "Usage history": "Historique de consommation",
+  "how far back the consumers see the usage of their applications, in days: 90 when empty, at most as long as the rollups are kept (Gateway › Ingestion)": "jusqu’où les consommateurs voient la consommation de leurs applications, en jours : 90 si vide, au plus la durée de conservation des agrégats (Gateway › Ingestion)"
 }

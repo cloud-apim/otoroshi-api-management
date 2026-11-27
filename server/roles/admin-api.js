@@ -1073,6 +1073,22 @@ r.get('/workspaces/:ws/analytics', async ({ ctx, params, query }) => {
     applicationId: query.get('application'),
     subscriptionId: query.get('subscription'),
     status: query.get('status'),
+    endpoint: query.get('endpoint'),
+    from: query.get('from'),
+    to: query.get('to'),
+  });
+});
+
+// the endpoints called in a range, what the dashboards are filtered on: a method and a templated path
+r.get('/workspaces/:ws/analytics/endpoints', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params);
+  return analytics.endpoints({
+    workspaceId: c.workspace.id,
+    apiId: query.get('api'),
+    planId: query.get('plan'),
+    applicationId: query.get('application'),
+    subscriptionId: query.get('subscription'),
+    status: query.get('status'),
     from: query.get('from'),
     to: query.get('to'),
   });
@@ -1086,6 +1102,7 @@ const callFilter = (c, query) => ({
   applicationId: query.get('application'),
   subscriptionId: query.get('subscription'),
   status: query.get('status'),
+  endpoint: query.get('endpoint'),
   method: query.get('method'),
   path: query.get('path'),
   clientId: query.get('client'),

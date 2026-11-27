@@ -26,8 +26,17 @@ const appsOf = (filter) => (filter.applicationIds ? '{' + filter.applicationIds.
 export const STATUS_CLASSES = ['2xx', '3xx', '4xx', '5xx'];
 const classOf = (v) => (STATUS_CLASSES.includes(v) ? Number(v[0]) * 100 : null);
 
+// an endpoint, as the tops name it: a method and a templated path ("GET /books/{id}"), or the
+// templated path alone, whatever the method
+export function endpointOf(value) {
+  const s = String(value || '').trim();
+  if (!s) return { method: null, path: null };
+  const m = /^([A-Z]+)\s+(\S.*)$/.exec(s);
+  return m ? { method: m[1], path: m[2] } : { method: null, path: s };
+}
+
 // the filters of a dashboard, on the calls or on their rollups (whose dimensions are '' for none,
-// and whose status is a class)
+// whose status is a class and whose path is the templated one)
 function filters(filter, { rollups = false } = {}) {
   const ws = filter.workspaceId || null;
   const api = filter.apiId || null;
@@ -35,15 +44,35 @@ function filters(filter, { rollups = false } = {}) {
   const app = filter.applicationId || null;
   const sub = filter.subscriptionId || null;
   const cls = classOf(filter.status);
+  const ep = endpointOf(filter.endpoint);
   const appsArr = appsOf(filter); // restricts a consumer to its own applications
   const status = rollups ? adb`status_class = ${cls}` : adb`(status / 100)::int * 100 = ${cls}`;
+  const template = rollups ? adb`path = ${ep.path}` : adb`coalesce(path_template, path) = ${ep.path}`;
   return adb`(${ws}::text is null or workspace_id = ${ws})
     and (${api}::text is null or api_id = ${api})
     and (${plan}::text is null or plan_id = ${plan})
     and (${app}::text is null or application_id = ${app})
     and (${sub}::text is null or subscription_id = ${sub})
     and (${cls}::int is null or ${status})
+    and (${ep.path}::text is null or ${template})
+    and (${ep.method}::text is null or method = ${ep.method})
     and (${appsArr}::text[] is null or application_id = any(${appsArr}::text[]))`;
+}
+
+// the endpoints called in a range — a method and a templated path —, the most called first: what a
+// dashboard is filtered on. The rollups of the range and the calls not rolled up yet, as the
+// dashboards read them, whatever endpoint the filter is on
+export async function endpoints(filter, { limit = 200 } = {}) {
+  const { start, end } = range(filter);
+  const f = { ...filter, endpoint: null };
+  const rolled = await rolledUntil();
+  const rows = await adb`select method, path, sum(calls)::int as calls from (
+      select nullif(method, '') as method, nullif(path, '') as path, calls from call_rollups
+        where hour >= date_trunc('hour', ${start}::timestamptz) and hour <= ${end} and ${filters(f, { rollups: true })}
+      union all
+      select method, coalesce(path_template, path), 1 from calls where id > ${rolled} and at >= ${start} and at <= ${end} and ${filters(f)}
+    ) e where path is not null group by 1, 2 order by 3 desc, 2 limit ${limit}`;
+  return rows.map((r) => ({ endpoint: r.method ? `${r.method} ${r.path}` : r.path, method: r.method, path: r.path, calls: r.calls }));
 }
 
 // names from the catalogue

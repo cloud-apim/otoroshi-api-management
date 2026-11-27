@@ -171,7 +171,7 @@ r.get('/portal', async ({ ctx, query }) => {
   const shown = preview ? { number: null, design: await portalDesign.draftOf(ctx.workspace) } : await portalDesign.publishedDesign(ctx.workspace);
   return {
     workspace: { slug: ctx.workspace.slug, name: ctx.workspace.name, description: ctx.workspace.description },
-    portal: publicPortal(ctx.workspace.portal),
+    portal: { ...publicPortal(ctx.workspace.portal), usageHistoryDays: await identity.usageHistoryDays(ctx.workspace) },
     design: { ...portalDesign.publicDesign(shown.design, ctx.workspace, shown.number), preview: !!preview },
     user: ctx.user ? { ...identity.publicUser(ctx.user), role: ctx.role } : null,
   };
@@ -502,6 +502,46 @@ r.get('/subscriptions/:sub/quotas', async ({ ctx, params }) => {
   return out;
 });
 
+// the client ids a subscription is called with: its active ones; a closed one, its last (ids are
+// ordered by time)
+function keysShown(summary = []) {
+  const own = summary.filter((c) => c.kind !== 'alias');
+  const active = own.filter((c) => c.status === 'active');
+  return (active.length ? active : own.sort((x, y) => (x.id < y.id ? 1 : -1)).slice(0, 1)).map((c) => c.client_id);
+}
+
+// the keys of the consumer's own applications — a subscription each, its client ids, never a
+// secret —: what its usage is filtered on
+r.get('/subscriptions', async ({ ctx }) => {
+  requireUser(ctx);
+  const subs = await subscriptions.listSubscriptions(ctx.workspace.id, { userId: ctx.user.id });
+  return subs.map((s) => ({
+    id: s.id,
+    status: s.status,
+    application_id: s.application_id,
+    application_name: s.application_name,
+    api_id: s.api_id,
+    api_name: s.api_name,
+    api_version: s.api_version,
+    plan_name: s.request?.plan_name || s.plan_id,
+    shares_credential: !!s.shares_credential,
+    client_ids: keysShown(s.credentials_summary),
+  }));
+});
+
+// how far back the consumer sees its usage: a range that starts earlier starts at the history
+async function sinceHistory(ctx, from) {
+  if (!from) return from;
+  const earliest = new Date(Date.now() - (await identity.usageHistoryDays(ctx.workspace)) * 86400e3);
+  return new Date(from) < earliest ? earliest.toISOString() : from;
+}
+
+// one key of the consumer's own: the subscription it filters its usage on
+async function mySubscriptionFilter(ctx, query) {
+  const id = query.get('subscription');
+  return id ? (await mySub(ctx, id)).id : null;
+}
+
 // the calls of the consumer's own applications: the request log of the portal, and its export
 async function myCallFilter(ctx, query) {
   requireUser(ctx);
@@ -512,12 +552,13 @@ async function myCallFilter(ctx, query) {
     workspaceId: ctx.workspace.id,
     applicationIds: ids.length ? ids : ['__none__'],
     applicationId: app,
+    subscriptionId: await mySubscriptionFilter(ctx, query),
     apiId: query.get('api'),
     planId: query.get('plan'),
     status: query.get('status'),
     method: query.get('method'),
     path: query.get('path'),
-    from: query.get('from'),
+    from: await sinceHistory(ctx, query.get('from')),
     to: query.get('to'),
   };
 }
@@ -543,6 +584,8 @@ r.get('/analytics/calls/export', async ({ ctx, query }) => {
 
 r.get('/analytics', async ({ ctx, query }) => {
   requireUser(ctx);
+  // a key of someone else is refused, whatever the consumer has
+  const subscriptionId = await mySubscriptionFilter(ctx, query);
   const ids = await myApplicationIds(ctx);
   if (!ids.length) return analytics.overview({ workspaceId: ctx.workspace.id, applicationIds: ['__none__'] });
   const app = query.get('application');
@@ -551,11 +594,11 @@ r.get('/analytics', async ({ ctx, query }) => {
     workspaceId: ctx.workspace.id,
     applicationIds: ids,
     applicationId: app,
-    subscriptionId: query.get('subscription'),
+    subscriptionId,
     apiId: query.get('api'),
     planId: query.get('plan'),
     status: query.get('status'),
-    from: query.get('from'),
+    from: await sinceHistory(ctx, query.get('from')),
     to: query.get('to'),
   });
 });

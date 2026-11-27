@@ -4,12 +4,15 @@ import { Icon, Input, Loader, Modal, Select, StatusBadge, useLoad } from '../../
 import { TimeSeries, BarList, StatTile, StackedColumns, OTHER_COLOR } from '../../shared/charts.jsx';
 import { ListToolbar, Pager, usePaging } from '../../shared/lists.jsx';
 import { fmtBytes, fmtDate, fmtNumber } from '../../shared/lib.js';
-import { api, runtime } from '../context.jsx';
+import { api, runtime, usePortal } from '../context.jsx';
 import { useI18n } from '../i18n.jsx';
 import { PageHeader, RequireUser } from '../common.jsx';
 
-// the timeframes of the analytics of the portal: presets first, then a custom range
-const RANGES = { '5m': 5 * 60e3, '30m': 30 * 60e3, '1h': 3600e3, '3h': 3 * 3600e3, '6h': 6 * 3600e3, '12h': 12 * 3600e3, '24h': 86400e3, '3d': 3 * 86400e3, '7d': 7 * 86400e3, '14d': 14 * 86400e3, '30d': 30 * 86400e3, '90d': 90 * 86400e3 };
+// the timeframes of the analytics of the portal: presets first, then a custom range; those that go
+// further back than the history of the portal are not offered
+const RANGES = { '5m': 5 * 60e3, '30m': 30 * 60e3, '1h': 3600e3, '3h': 3 * 3600e3, '6h': 6 * 3600e3, '12h': 12 * 3600e3, '24h': 86400e3, '3d': 3 * 86400e3, '7d': 7 * 86400e3, '14d': 14 * 86400e3, '30d': 30 * 86400e3, '90d': 90 * 86400e3, '180d': 180 * 86400e3, '365d': 365 * 86400e3 };
+const DEFAULT_HISTORY_DAYS = 90;
+const rangesWithin = (days) => Object.keys(RANGES).filter((k) => RANGES[k] <= days * 86400e3);
 const STATUS_CLASSES = ['2xx', '3xx', '4xx', '5xx'];
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
@@ -33,19 +36,22 @@ export function Usage() {
 // other keeps the slice
 function useFilters() {
   const [params, setParams] = useQuery();
-  const range = params.get('range') === 'custom' && params.get('from') ? 'custom' : RANGES[params.get('range')] ? params.get('range') : '24h';
-  const f = { application: params.get('application') || '', api: params.get('api') || '', status: params.get('status') || '' };
+  const days = usePortal()?.portal?.usageHistoryDays || DEFAULT_HISTORY_DAYS;
+  const offered = rangesWithin(days);
+  const range = params.get('range') === 'custom' && params.get('from') ? 'custom' : offered.includes(params.get('range')) ? params.get('range') : '24h';
+  // a key: one subscription of the consumer's applications
+  const f = { application: params.get('application') || '', api: params.get('api') || '', subscription: params.get('subscription') || '', status: params.get('status') || '' };
   // a preset is resolved once per selection, so that a refetch keeps the same window
   const from = useMemo(() => (range === 'custom' ? params.get('from') : new Date(Date.now() - RANGES[range]).toISOString()), [range, params.get('from')]);
   const to = range === 'custom' ? params.get('to') || '' : '';
   const query = (extra = {}) => {
     const q = new URLSearchParams({ from });
     if (to) q.set('to', to);
-    for (const k of ['application', 'api', 'status']) if (f[k]) q.set(k, f[k]);
+    for (const k of ['application', 'api', 'subscription', 'status']) if (f[k]) q.set(k, f[k]);
     for (const [k, v] of Object.entries(extra)) if (v) q.set(k, v);
     return q.toString();
   };
-  return { params, setParams, range, from, to, f, query, key: [from, to, f.application, f.api, f.status].join('|') };
+  return { params, setParams, range, offered, days, from, to, f, query, key: [from, to, f.application, f.api, f.subscription, f.status].join('|') };
 }
 
 function UsageView() {
@@ -69,9 +75,16 @@ function UsageView() {
 
 function FilterBar({ filters, reset = {}, children }) {
   const { t } = useI18n();
-  const { params, setParams, range, f } = filters;
+  const { params, setParams, range, f, offered, days } = filters;
   const apps = useLoad(() => api.get('/applications'), []);
   const apis = useLoad(() => api.get('/apis'), []);
+  // the keys of the consumer's applications, within the application and the api filtered on; a
+  // subscription that never had a key is left out
+  const keys = useLoad(() => api.get('/subscriptions'), []);
+  const keyOptions = (keys.data || [])
+    .filter((k) => (!f.application || k.application_id === f.application) && (!f.api || k.api_id === f.api) && !['pending', 'pending_payment', 'rejected'].includes(k.status))
+    .map((k) => ({ value: k.id, label: `${k.api_name} ${k.api_version} · ${k.plan_name}${k.client_ids[0] ? ` — ${k.client_ids[0]}` : ''}${f.application ? '' : ` (${k.application_name})`}` }));
+  const earliest = localInput(new Date(Date.now() - days * 86400e3).toISOString());
   const [from, setFrom] = useState(localInput(params.get('from')));
   const [to, setTo] = useState(localInput(params.get('to')));
   const latest = Object.values((apis.data || []).reduce((acc, a) => ({ ...acc, [a.id]: a }), {}));
@@ -82,12 +95,12 @@ function FilterBar({ filters, reset = {}, children }) {
           value={range}
           onChange={(v) => setParams({ range: v, ...(v === 'custom' ? {} : { from: null, to: null }), ...reset })}
           aria-label={t('usage.timeframe')}
-          options={[...Object.keys(RANGES).map((k) => ({ value: k, label: t(`usage.range.${k}`) })), { value: 'custom', label: t('usage.range.custom') }]}
+          options={[...offered.map((k) => ({ value: k, label: t(`usage.range.${k}`) })), { value: 'custom', label: t('usage.range.custom') }]}
         />
       </div>
       {range === 'custom' && (
         <span className="row gap-6">
-          <input className="input" type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} aria-label={t('usage.from')} style={{ width: 200 }} />
+          <input className="input" type="datetime-local" value={from} min={earliest} onChange={(e) => setFrom(e.target.value)} aria-label={t('usage.from')} style={{ width: 200 }} />
           <span className="muted">→</span>
           <input className="input" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} aria-label={t('usage.to')} style={{ width: 200 }} />
           <button className="btn sm" disabled={!from} onClick={() => setParams({ range: 'custom', from: new Date(from).toISOString(), to: to ? new Date(to).toISOString() : null, ...reset })}>
@@ -98,7 +111,7 @@ function FilterBar({ filters, reset = {}, children }) {
       <div style={{ minWidth: 200 }}>
         <Select
           value={f.application}
-          onChange={(v) => setParams({ application: v || null, ...reset })}
+          onChange={(v) => setParams({ application: v || null, subscription: null, ...reset })}
           aria-label={t('apps.title')}
           options={[{ value: '', label: t('usage.allapps') }, ...(apps.data || []).map((a) => ({ value: a.id, label: a.name }))]}
         />
@@ -106,9 +119,17 @@ function FilterBar({ filters, reset = {}, children }) {
       <div style={{ minWidth: 200 }}>
         <Select
           value={f.api}
-          onChange={(v) => setParams({ api: v || null, ...reset })}
+          onChange={(v) => setParams({ api: v || null, subscription: null, ...reset })}
           aria-label={t('usage.api')}
           options={[{ value: '', label: t('usage.allapis') }, ...latest.map((a) => ({ value: a.id, label: `${a.name} ${a.version}` }))]}
+        />
+      </div>
+      <div style={{ minWidth: 240 }}>
+        <Select
+          value={f.subscription}
+          onChange={(v) => setParams({ subscription: v || null, ...reset })}
+          aria-label={t('usage.key')}
+          options={[{ value: '', label: t('usage.allkeys') }, ...keyOptions]}
         />
       </div>
       <div style={{ minWidth: 140 }}>

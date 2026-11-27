@@ -296,6 +296,31 @@ describe('the dashboards', () => {
     const trail = await ok('GET', `/workspaces/${WS}/audit?action=analytics.calls.export`);
     expect((trail.items || trail)[0].summary).toBe('request log exported: 4 calls');
   });
+
+  test('an endpoint — a method and a templated path — filters the dashboards and the request log, from the calls and from the rollups', async () => {
+    const hour = new Date(Date.now() - 3600e3).toISOString();
+    const months = new Date(Date.now() - 90 * DAY).toISOString();
+    const at = (from, endpoint) => `/workspaces/${WS}/analytics?api=${apiId}&from=${from}${endpoint ? `&endpoint=${encodeURIComponent(endpoint)}` : ''}`;
+    // the endpoints of the range, as the tops name them
+    expect((await ok('GET', `/workspaces/${WS}/analytics/endpoints?api=${apiId}&from=${hour}`)).map((e) => e.endpoint)).toContain('GET /v1/dash/{n}');
+    const all = await ok('GET', at(hour));
+    const one = await ok('GET', at(hour, 'GET /v1/dash/{n}'));
+    expect(one.source).toBe('calls');
+    expect(one.totals.calls).toBe(all.byPath.find((r) => r.path === '/v1/dash/{n}').calls);
+    expect(one.byPath.map((r) => r.path)).toEqual(['/v1/dash/{n}']);
+    // another method: nothing; the templated path alone: every method
+    expect((await ok('GET', at(hour, 'POST /v1/dash/{n}'))).totals.calls).toBe(0);
+    expect((await ok('GET', at(hour, '/v1/dash/{n}'))).totals.calls).toBe(one.totals.calls);
+    // the request log the same
+    expect((await ok('GET', `/workspaces/${WS}/analytics/calls?api=${apiId}&from=${hour}&endpoint=${encodeURIComponent('GET /v1/dash/{n}')}`)).total).toBe(one.totals.calls);
+    // three months: read from the rollups, the calls of sixty days ago among them
+    const orders = '/v1/users/{n}/orders/{n}';
+    const long = await ok('GET', at(months));
+    const filtered = await ok('GET', at(months, `GET ${orders}`));
+    expect(filtered.source).toBe('rollups');
+    expect(filtered.totals.calls).toBe(long.byPath.find((r) => r.path === orders).calls);
+    expect((await ok('GET', `/workspaces/${WS}/analytics/endpoints?api=${apiId}&from=${months}`)).map((e) => e.endpoint)).toContain(`GET ${orders}`);
+  });
 });
 
 describe('the AI audits', () => {

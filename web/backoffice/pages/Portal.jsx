@@ -359,7 +359,7 @@ function PortalCategories({ categories, onChange, L, ro }) {
 }
 
 // the settings of the portal that are not its design: they apply at once, never by version
-const LIVE = ['languages', 'defaultLanguage', 'selfSignup', 'localLogin', 'oidc', 'discovery', 'categories'];
+const LIVE = ['languages', 'defaultLanguage', 'selfSignup', 'localLogin', 'oidc', 'discovery', 'categories', 'usageHistoryDays'];
 
 function LiveSettings() {
   const { wapi, ws, session, isAdmin } = useWs();
@@ -416,6 +416,9 @@ function LiveSettings() {
           <Setting label={tr('Discovery')} help={tr('what the catalogue shows beside the categories: the reviews of the consumers who subscribed, and the real usage of each api (its subscribed applications, its calls of the last thirty days)')}>
             <Switch checked={p.discovery?.reviews !== false} onChange={(v) => set('discovery')({ ...p.discovery, reviews: v })} label={tr('Consumer reviews')} />
             <Switch checked={p.discovery?.usage !== false} onChange={(v) => set('discovery')({ ...p.discovery, usage: v })} label={tr('Real usage')} />
+          </Setting>
+          <Setting label={tr('Usage history')} help={tr('how far back the consumers see the usage of their applications, in days: 90 when empty, at most as long as the rollups are kept (Gateway › Ingestion)')}>
+            <NumberInput value={p.usageHistoryDays} onChange={set('usageHistoryDays')} placeholder="90" min={1} style={{ width: 140 }} aria-label={tr('Usage history')} />
           </Setting>
         </fieldset>
       </div>

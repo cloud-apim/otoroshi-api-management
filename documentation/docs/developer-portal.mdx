@@ -125,8 +125,15 @@ key of the application, with the quotas of its own plan; a new secret is taken b
 ## Usage
 
 The calls of the visitor's own applications — never anyone else's — in two views that share their
-filters: the timeframe (from the last 5 minutes to the last 90 days, or a custom range), the
-application, the API and the status class. Each application links to both.
+filters: the timeframe (from the last 5 minutes to the history of the portal, or a custom range), the
+application, the API, **the key** — one subscription of these applications, named by its API, its
+plan and its client id — and the status class. Each application links to both, and each of its
+subscriptions to the usage of its key (**Usage of this key**). A key shared by every API of an
+application is the application's: its usage is the application's, or the subscription's on one API.
+
+How far back the usage goes is the **history of the portal**: 90 days unless its workspace says
+otherwise (**Developer portal › Settings › Usage history**), up to how long the rollups are kept
+(400 days by default); a range that starts earlier starts there.
 
 - **Analytics**: calls and requests per second, error rate and server errors, latency (average,
   minimum, maximum, p95) and the gateway overhead, data; the responses over time (successes, client
