@@ -222,6 +222,7 @@ function App() {
             ['/ws/:ws/notifications', () => <NotificationsPage />],
             ['/ws/:ws/portal', () => <PortalPage section="overview" />],
             ['/ws/:ws/portal/:section', (p) => <PortalPage section={p.section} />],
+            ['/ws/:ws/portal/versions/:item', (p) => <PortalPage section="versions" item={p.item} />],
             ['/ws/:ws/settings', () => <WorkspaceSettingsPage tab="general" />],
             ['/ws/:ws/settings/portal', (p) => <Redirect to={`/ws/${p.ws}/portal/settings`} />],
             ['/ws/:ws/settings/webhooks/:hook', (p) => <WebhookPage id={p.hook} />],

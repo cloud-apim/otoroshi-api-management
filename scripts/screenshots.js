@@ -404,6 +404,9 @@ async function consoleTour(page) {
     if (edit) await editors(page);
     await shot(page, name, title, { full: section !== 'home' && section !== 'templates' });
   }
+  await go(page, `${D}/versions/1`);
+  await editors(page);
+  await shot(page, 'console-portal-version', 'Developer portal — a version of its design on its page, restored into the draft from there', { full: false });
   // allowing scripts is an act of its own: the warning, never accepted by the tour
   await go(page, `${D}/styles`);
   await page.evaluate(() => {

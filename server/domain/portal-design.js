@@ -282,9 +282,10 @@ export async function listVersions(workspaceId, { limit = 50, offset = 0, q = ''
 }
 
 export async function getVersion(workspaceId, number) {
-  const row = (await db`select * from portal_versions where workspace_id = ${workspaceId} and number = ${parseInt(number, 10) || 0}`)[0];
+  const row = (await db`select v.*, u.email as published_by_email from portal_versions v left join users u on u.id = v.published_by
+    where v.workspace_id = ${workspaceId} and v.number = ${parseInt(number, 10) || 0}`)[0];
   if (!row) throw notFound(`no version ${number} of the portal design`);
-  return { number: row.number, comment: row.comment, published_at: row.published_at, design: normalizeDesign(row.design) };
+  return { number: row.number, comment: row.comment, published_at: row.published_at, published_by_email: row.published_by_email, design: normalizeDesign(row.design) };
 }
 
 // a version brought back into the draft: publishing it is the rollback

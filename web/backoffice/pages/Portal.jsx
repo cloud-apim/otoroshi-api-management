@@ -1298,33 +1298,54 @@ function AssetsSection({ data, ro, write, base }) {
 
 // ---------------------------------------------------------------- versions
 
-function VersionModal({ n, onClose }) {
-  const { wapi } = useWs();
+// a version of the design on a page of its own: what was published, immutable; restored into the
+// draft from here
+function VersionPage({ n, data, ro, dirty, restore }) {
+  const { wapi, slug } = useWs();
   const state = useLoad(() => wapi.get(`/portal/versions/${n}`), [n]);
   return (
-    <Modal title={tr('Version #{0} of the design', [n])} size="wide" onClose={onClose}>
+    <div className="col gap-12">
+      <Link to={`/ws/${slug}/portal/versions`} className="link small row gap-4" style={{ display: 'inline-flex' }}>
+        <Icon name="arrowLeft" size={14} />
+        {tr('Versions')}
+      </Link>
       <Loader state={state}>
         {(v) => (
-          <>
-            <div className="small muted">
-              {fmtDate(v.published_at)} · {modeLabel(v.design?.mode)}
-              {v.comment ? ` — ${v.comment}` : ''}
+          <div className="card">
+            <div className="card-head">
+              <Icon name="layers" />
+              <h3>{tr('Version #{0} of the design', [v.number ?? n])}</h3>
+              {Number(n) === data.published.number && (
+                <Badge kind="positive" dot>
+                  {tr('on the portal')}
+                </Badge>
+              )}
+              <span className="spacer" />
+              {!ro && (
+                <button className="btn sm" disabled={dirty} title={dirty ? tr('save or discard the changes of the draft first') : tr('bring it back into the draft')} onClick={() => restore({ number: Number(n) })}>
+                  <Icon name="refresh" /> {tr('Restore')}
+                </button>
+              )}
             </div>
-            <CodeView value={v.design} maxHeight={520} ariaLabel={tr('design of version {0}', [n])} />
-          </>
+            <div className="card-body col gap-8">
+              <div className="small muted">
+                {fmtDate(v.published_at)}
+                {v.published_by_email ? ` · ${v.published_by_email}` : ''} · {modeLabel(v.design?.mode)}
+                {v.comment ? ` — ${v.comment}` : ''}
+              </div>
+              <CodeView value={v.design} maxHeight={900} ariaLabel={tr('design of version {0}', [n])} />
+            </div>
+          </div>
         )}
       </Loader>
-    </Modal>
+    </div>
   );
 }
 
-function VersionsSection({ data, ro, dirty, onRestored }) {
+function VersionsSection({ data, ro, dirty, onRestored, item }) {
   const { wapi, slug } = useWs();
   const toast = useToast();
   const confirm = useConfirm();
-  const paging = usePaging({ prefix: 'versions', size: 25 });
-  const state = useLoad(() => wapi.get(`/portal/versions?${paging.query}`), [slug, paging.key, data.versions]);
-  const [viewing, setViewing] = useState(null);
   const restore = async (v) => {
     const ok = await confirm({
       title: tr('Restore version #{0} into the draft?', [v.number]),
@@ -1340,6 +1361,14 @@ function VersionsSection({ data, ro, dirty, onRestored }) {
       toast(errorMessage(e), 'error');
     }
   };
+  if (item) return <VersionPage key={item} n={item} data={data} ro={ro} dirty={dirty} restore={restore} />;
+  return <VersionsList data={data} ro={ro} dirty={dirty} restore={restore} />;
+}
+
+function VersionsList({ data, ro, dirty, restore }) {
+  const { wapi, slug } = useWs();
+  const paging = usePaging({ prefix: 'versions', size: 25 });
+  const state = useLoad(() => wapi.get(`/portal/versions?${paging.query}`), [slug, paging.key, data.versions]);
   return (
     <div className="col gap-12">
       <p className="muted small" style={{ margin: 0 }}>
@@ -1382,9 +1411,9 @@ function VersionsSection({ data, ro, dirty, onRestored }) {
                         </td>
                         <td className="small">{v.comment || <span className="faint">—</span>}</td>
                         <td className="actions nowrap">
-                          <button className="btn ghost sm" onClick={() => setViewing(v.number)}>
+                          <Link to={`/ws/${slug}/portal/versions/${v.number}`} className="btn ghost sm">
                             <Icon name="eye" /> {tr('View')}
-                          </button>
+                          </Link>
                           {!ro && (
                             <button className="btn ghost sm" disabled={dirty} title={dirty ? tr('save or discard the changes of the draft first') : tr('bring it back into the draft')} onClick={() => restore(v)}>
                               <Icon name="refresh" /> {tr('Restore')}
@@ -1407,7 +1436,6 @@ function VersionsSection({ data, ro, dirty, onRestored }) {
           )
         }
       </Loader>
-      {viewing && <VersionModal n={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -1516,17 +1544,18 @@ function SyncSection() {
 
 const SECTIONS = ['overview', 'settings', 'design', 'home', 'pages', 'templates', 'navigation', 'styles', 'assets', 'versions', 'sync'];
 
-export function PortalPage({ section = 'overview' }) {
+// `item`: the page of an element of a section — a version of the design
+export function PortalPage({ section = 'overview', item }) {
   const { wapi, slug } = useWs();
   const state = useLoad(() => wapi.get('/portal/design'), [slug]);
   return (
     <div className="page">
-      <Loader state={state}>{(data) => <PortalEditor key={slug} data={data} state={state} section={SECTIONS.includes(section) ? section : 'overview'} />}</Loader>
+      <Loader state={state}>{(data) => <PortalEditor key={slug} data={data} state={state} section={SECTIONS.includes(section) ? section : 'overview'} item={item} />}</Loader>
     </div>
   );
 }
 
-function PortalEditor({ data, state, section }) {
+function PortalEditor({ data, state, section, item }) {
   const { wapi, slug, ws, isAdmin } = useWs();
   const { navigate } = useRouter();
   const toast = useToast();
@@ -1670,6 +1699,7 @@ function PortalEditor({ data, state, section }) {
       {section === 'assets' && <AssetsSection data={data} ro={ro} write={write} base={portalBase} />}
       {section === 'versions' && (
         <VersionsSection
+          item={item}
           data={data}
           ro={ro}
           dirty={dirty}
