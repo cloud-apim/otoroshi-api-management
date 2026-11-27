@@ -280,8 +280,16 @@
     "title": "Workspace settings — email: the notifications sent by email, to the people of the portal and to the producers, kind by kind"
   },
   {
+    "file": "console-ws-webhooks.png",
+    "title": "Workspace settings — webhooks: the events of the workspace sent to endpoints, signed, retried"
+  },
+  {
     "file": "console-ws-export.png",
     "title": "Workspace settings — export and import"
+  },
+  {
+    "file": "console-ws-webhook.png",
+    "title": "A webhook — its secret, a test, its deliveries, replayed one by one or since a date"
   },
   {
     "file": "console-portal-overview.png",
@@ -433,7 +441,11 @@
   },
   {
     "file": "portal-announcements.png",
-    "title": "Portal — the announcements of an api"
+    "title": "Portal — the announcements of an api, each one its first lines"
+  },
+  {
+    "file": "portal-announcement.png",
+    "title": "Portal — an announcement, opened"
   },
   {
     "file": "portal-events.png",
