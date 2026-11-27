@@ -22,6 +22,7 @@ config.port = parseInt(process.env.APIM_TEST_PORT || '9117', 10);
 config.workers.enabled = false;
 config.adminToken = 'ui-test-token';
 config.publicUrl = `http://localhost:${config.port}`;
+config.webhooks.allowPrivate = true;
 
 const RUN = Date.now().toString(36);
 const WS = `ui-${RUN}`;
@@ -122,6 +123,8 @@ beforeAll(async () => {
   await call('PUT', ws('/metadata-fields'), {
     fields: [{ scope: 'subscription', key: 'project', label: 'Your project', help: 'what you build', type: 'string', portal: true, translations: { fr: { label: 'Votre projet', help: 'ce que vous construisez' } } }],
   });
+  // a webhook, off: its page
+  state.hookId = (await call('POST', ws('/webhooks'), { name: 'Shelf hook', url: 'http://127.0.0.1:9/hook', enabled: false })).id;
   const consumer = await call('POST', '/users', CONSUMER);
   await call('POST', ws('/members'), { user_id: consumer.id, role: 'consumer' });
   state.consumerId = consumer.id;
@@ -171,6 +174,7 @@ describe.skipIf(!ready)('the console', () => {
       `${W}/portal`,
       ...['settings', 'design', 'home', 'pages', 'templates', 'navigation', 'styles', 'assets', 'versions', 'sync'].map((t) => `${W}/portal/${t}`),
       ...['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
+      `${W}/settings/webhooks/${state.hookId}`,
       ...['status', 'drift', 'connection', 'ingestion', 'setup'].map((t) => `/backoffice/gateway/${t}`),
       ...['workspaces', 'users', 'authentication', 'audit', 'tokens'].map((t) => `/backoffice/settings/${t}`),
     ];

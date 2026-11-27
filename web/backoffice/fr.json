@@ -2066,6 +2066,7 @@
   "Delivered": "Envoyé",
   "Replay": "Rejouer",
   "No delivery yet": "Aucun envoi pour l’instant",
+  "No delivery matches": "Aucun envoi ne correspond",
   "Answer": "Réponse",
   "Webhooks": "Webhooks",
   "pending": "en attente",

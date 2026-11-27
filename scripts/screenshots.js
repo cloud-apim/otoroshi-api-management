@@ -374,8 +374,8 @@ async function consoleTour(page) {
   }
   const hooks = await api(page, `/backoffice/api/workspaces/${WS}/webhooks`);
   if (hooks?.[0]) {
-    await go(page, `${W}/settings/webhooks?open=${hooks[0].id}`);
-    await shot(page, 'console-ws-webhook', 'A webhook — its secret, a test, its deliveries, replayed one by one or since a date', { full: false });
+    await go(page, `${W}/settings/webhooks/${hooks[0].id}`);
+    await shot(page, 'console-ws-webhook', 'A webhook — its page: its secret, a test, its deliveries, replayed one by one or since a date');
   }
   // the page of a developer portal: the showcase workspace, its portal themed, its next design
   // written as templates in the draft

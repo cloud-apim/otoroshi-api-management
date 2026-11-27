@@ -225,7 +225,7 @@ const retryAfterMs = (value) => {
 const jitter = (ms) => Math.round(ms * (0.9 + Math.random() * 0.2));
 
 const tell = (ep, kind, title, body) =>
-  notifyApiTeam(null, { workspaceId: ep.workspace_id, face: 'console', kind, title, body, link: `/settings/webhooks?open=${ep.id}`, data: { webhook_id: ep.id } });
+  notifyApiTeam(null, { workspaceId: ep.workspace_id, face: 'console', kind, title, body, link: `/settings/webhooks/${ep.id}`, data: { webhook_id: ep.id } });
 
 // an endpoint off: what waited for it fails, to be replayed once it is on again
 async function turnOff(endpointId, reason) {

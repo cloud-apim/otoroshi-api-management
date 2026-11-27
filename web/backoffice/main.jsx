@@ -18,6 +18,7 @@ import { ObservabilityPage } from './pages/Observability.jsx';
 import { AuditPage } from './pages/Audit.jsx';
 import { NotificationsPage } from './pages/Notifications.jsx';
 import { WorkspaceSettingsPage } from './pages/WorkspaceSettings.jsx';
+import { WebhookPage } from './pages/Webhooks.jsx';
 import { PortalPage } from './pages/Portal.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
 import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
@@ -221,6 +222,7 @@ function App() {
             ['/ws/:ws/portal/:section', (p) => <PortalPage section={p.section} />],
             ['/ws/:ws/settings', () => <WorkspaceSettingsPage tab="general" />],
             ['/ws/:ws/settings/portal', (p) => <Redirect to={`/ws/${p.ws}/portal/settings`} />],
+            ['/ws/:ws/settings/webhooks/:hook', (p) => <WebhookPage id={p.hook} />],
             ['/ws/:ws/settings/:tab', (p) => <WorkspaceSettingsPage tab={p.tab} />],
             ['/gateway', () => <GatewayPage tab="status" />],
             ['/gateway/:tab', (p) => <GatewayPage tab={p.tab} />],

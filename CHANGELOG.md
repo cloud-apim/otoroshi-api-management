@@ -5,6 +5,10 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Pages instead of windows**: a webhook has a page of its own, reached from its list — its secret,
+  a test, its deliveries; **Edit** turns the page into its form; a new webhook leads to it, its secret
+  shown once.
+
 - **The page of an API on two levels of tabs**: its groups — Overview, Design, Documentation, Portal,
   Subscriptions, Operate, Settings —, then the pages of the group shown; no scroll whatever the screen.
 
