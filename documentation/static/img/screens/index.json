@@ -228,6 +228,14 @@
     "title": "Reviewing a request: usage statement, request form, terms"
   },
   {
+    "file": "console-messages.png",
+    "title": "Messages — the conversations of the people of the portal, routed to the team that answers"
+  },
+  {
+    "file": "console-conversation.png",
+    "title": "A conversation — its messages, an answer, closed or reopened"
+  },
+  {
     "file": "console-observability.png",
     "title": "Observability — the figures, responses and latency over time, hits by application and api"
   },
@@ -486,6 +494,18 @@
   {
     "file": "portal-teams.png",
     "title": "Portal — my teams"
+  },
+  {
+    "file": "portal-messages.png",
+    "title": "Portal — messages: the conversations of a person with the workspace"
+  },
+  {
+    "file": "portal-conversation.png",
+    "title": "Portal — a conversation, about an API, answered"
+  },
+  {
+    "file": "portal-conversation-new.png",
+    "title": "Portal — a new conversation, about an API: what routes it"
   },
   {
     "file": "portal-notifications.png",
