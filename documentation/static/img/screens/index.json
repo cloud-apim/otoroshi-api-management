@@ -144,6 +144,10 @@
     "title": "API — its announcements, like a blog on its page in the portal, its subscribers told"
   },
   {
+    "file": "console-api-announcement.png",
+    "title": "API — an announcement on its page, written in Markdown — Edit, Preview —"
+  },
+  {
     "file": "console-api-subscriptions.png",
     "title": "API — its subscriptions"
   },
@@ -157,7 +161,7 @@
   },
   {
     "file": "console-snapshot.png",
-    "title": "An immutable snapshot, read-only"
+    "title": "A snapshot on its page — immutable, read only, exported, deployed or rolled back to"
   },
   {
     "file": "console-deploy-dry-run.png",
@@ -296,8 +300,12 @@
     "title": "Workspace settings — export and import"
   },
   {
+    "file": "console-ws-team.png",
+    "title": "A team — its members, owners or members, and the APIs and applications it owns"
+  },
+  {
     "file": "console-ws-webhook.png",
-    "title": "A webhook — its secret, a test, its deliveries, replayed one by one or since a date"
+    "title": "A webhook — its page: its secret, a test, its deliveries, replayed one by one or since a date"
   },
   {
     "file": "console-portal-overview.png",
@@ -340,6 +348,10 @@
     "title": "Developer portal — a folder synchronised with the cli, or a remote catalog"
   },
   {
+    "file": "console-portal-version.png",
+    "title": "Developer portal — a version of its design on its page, restored into the draft from there"
+  },
+  {
     "file": "console-portal-scripts.png",
     "title": "Allowing scripts on a portal — the warning, to acknowledge"
   },
@@ -348,8 +360,12 @@
     "title": "Workspace settings — remote catalogs"
   },
   {
+    "file": "console-catalog.png",
+    "title": "A remote catalog on its page — its settings, its last sync, the APIs it manages"
+  },
+  {
     "file": "console-catalog-preview.png",
-    "title": "A catalog sync, previewed as a dry run"
+    "title": "A catalog sync, previewed as a dry run, on the page of the catalog"
   },
   {
     "file": "console-managed-api.png",

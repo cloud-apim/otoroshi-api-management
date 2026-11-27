@@ -259,9 +259,10 @@ async function consoleTour(page) {
   await go(page, `${A}/announcements`);
   await shot(page, 'console-api-announcements', 'API — its announcements, like a blog on its page in the portal, its subscribers told');
   const announced = await api(page, `/backoffice/api/workspaces/${WS}/apis/${books.id}/announcements`);
-  if (announced?.[0]) {
-    await go(page, `${A}/announcements/${announced[0].id}`);
-    await editors(page);
+  // the one of the demo, whatever else was published by hand since
+  const announcement = announced?.find((n) => n.title.startsWith('Search by author')) || announced?.at(-1);
+  if (announcement) {
+    await go(page, `${A}/announcements/${announcement.id}`);
     await click(page, 'Edit');
     await editors(page);
     await shot(page, 'console-api-announcement', 'API — an announcement on its page, written in Markdown — Edit, Preview —', { full: false });
@@ -425,9 +426,14 @@ async function consoleTour(page) {
 
   await go(page, '/backoffice/ws/gitops/settings/catalogs');
   await shot(page, 'console-ws-catalogs', 'Workspace settings — remote catalogs');
-  await click(page, 'Preview & sync');
-  await sleep(800);
-  await shot(page, 'console-catalog-preview', 'A catalog sync, previewed as a dry run', { full: false });
+  const gitopsCatalogs = await api(page, '/backoffice/api/workspaces/gitops/catalogs');
+  if (gitopsCatalogs?.[0]) {
+    await go(page, `/backoffice/ws/gitops/settings/catalogs/${gitopsCatalogs[0].id}`);
+    await shot(page, 'console-catalog', 'A remote catalog on its page — its settings, its last sync, the APIs it manages');
+    await click(page, 'Preview a sync');
+    await sleep(1500);
+    await shot(page, 'console-catalog-preview', 'A catalog sync, previewed as a dry run, on the page of the catalog');
+  }
   await go(page, '/backoffice/ws/gitops/apis/weather');
   await shot(page, 'console-managed-api', 'An api managed by a catalog: edited at its source, operable here', { full: false });
 
