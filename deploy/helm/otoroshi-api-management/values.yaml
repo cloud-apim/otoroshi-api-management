@@ -44,7 +44,7 @@ config:
   database:
     pool: 10
     analyticsPool: 5
-  # any other variable
+  # any other variable that is not secret, in the ConfigMap: { APIM_EMAIL_TRANSPORT: smtp }
   extraEnv: {}
 
 # the secrets: an existing Secret (with the keys below), or the values here
@@ -60,6 +60,13 @@ secrets:
   # the key the product seals the secrets it keeps with; on a rotation, the previous ones, comma-separated
   secretsKey: ""
   secretsPreviousKeys: ""
+  # any other variable that is secret, in a Secret of the chart: { APIM_STRIPE_SECRET_KEY: sk_live_… }
+  extraEnv: {}
+
+# more sources of variables for both deployments, as envFrom entries: a Secret or a ConfigMap made
+# elsewhere (an external-secrets operator, a vault), each key a variable
+#   - secretRef: { name: apim-payments }
+extraEnvFrom: []
 
 service:
   type: ClusterIP
@@ -79,9 +86,11 @@ resources:
   requests: { cpu: 100m, memory: 256Mi }
   limits: { memory: 1Gi }
 
+# the user of the image (apim, uid 10001): its home, the working directory, is its own
 podSecurityContext:
   runAsNonRoot: true
-  runAsUser: 1000
+  runAsUser: 10001
+  runAsGroup: 10001
 securityContext:
   allowPrivilegeEscalation: false
   capabilities: { drop: [ALL] }

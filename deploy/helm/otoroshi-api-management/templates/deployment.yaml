@@ -14,12 +14,14 @@ spec:
         app.kubernetes.io/name: {{ include "apim.fullname" . }}
         {{- include "apim.labels" . | nindent 8 }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- include "apim.checksums" . | nindent 8 }}
     spec:
       automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
       {{- end }}
+      # the variables Kubernetes would add for each service of the namespace: a service named apim would set APIM_PORT
+      enableServiceLinks: false
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: apim
@@ -33,7 +35,7 @@ spec:
             - { name: APIM_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: admin-token } } }
             - { name: APIM_INGEST_TOKEN, valueFrom: { secretKeyRef: { name: {{ include "apim.secretName" . }}, key: ingest-token } } }
           envFrom:
-            - configMapRef: { name: {{ include "apim.fullname" . }} }
+            {{- include "apim.envFrom" . | nindent 12 }}
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 5

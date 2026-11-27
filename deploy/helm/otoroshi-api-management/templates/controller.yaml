@@ -56,12 +56,14 @@ spec:
         app.kubernetes.io/name: {{ include "apim.fullname" . }}-controller
         {{- include "apim.labels" . | nindent 8 }}
       annotations:
-        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- include "apim.checksums" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "apim.fullname" . }}-controller
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{- toYaml . | nindent 8 }}
       {{- end }}
+      # the variables Kubernetes would add for each service of the namespace: a service named apim would set APIM_PORT
+      enableServiceLinks: false
       securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: controller
@@ -74,10 +76,19 @@ spec:
             - { name: APIM_WORKERS_ENABLED, value: "false" }
             {{- include "apim.env" . | nindent 12 }}
           envFrom:
-            - configMapRef: { name: {{ include "apim.fullname" . }} }
+            {{- include "apim.envFrom" . | nindent 12 }}
           readinessProbe:
             httpGet: { path: /health, port: http }
             periodSeconds: 10
           resources: {{- toYaml .Values.controller.resources | nindent 12 }}
           securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}

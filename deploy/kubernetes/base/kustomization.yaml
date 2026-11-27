@@ -6,7 +6,9 @@
 #   kubectl -n apim apply -k deploy/kubernetes/base
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-# change it in an overlay: the binding of the controller follows
+# change it in an overlay — with the namespace of the subject of the controller's ClusterRoleBinding
+# and the one in APIM_INGEST_URL, which kustomize leaves as they are (documentation › Install on
+# Kubernetes)
 namespace: apim
 labels:
   - pairs:

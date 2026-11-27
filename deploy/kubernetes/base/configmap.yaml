@@ -1,4 +1,4 @@
-# What is not secret. Every variable: documentation › Install.
+# What is not secret. Every variable: documentation › Install › Configuration.
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -63,3 +63,19 @@ describe('a resource Api', () => {
     expect(markerOf('apis', cr)).toBe('kubernetes:weather/apis/forecasts');
   });
 });
+
+describe('the pods', () => {
+  const uid = Number(read('Dockerfile').match(/--uid (\d+)/)[1]);
+  const base = ['base/apim.yaml', 'base/controller.yaml'].map((f) => YAML.parseAllDocuments(read(`${KUSTOMIZE}/${f}`)).map((d) => d.toJSON()).find((d) => d.kind === 'Deployment'));
+
+  test("run as the user of the image, whose home is the working directory", () => {
+    expect(uid).toBe(10001);
+    for (const d of base) expect(d.spec.template.spec.securityContext).toMatchObject({ runAsNonRoot: true, runAsUser: uid, runAsGroup: uid });
+    expect(YAML.parse(read(`${CHART}/values.yaml`)).podSecurityContext).toMatchObject({ runAsNonRoot: true, runAsUser: uid, runAsGroup: uid });
+  });
+
+  test('get no variables of the services of their namespace: a service named apim would set APIM_PORT', () => {
+    for (const d of base) expect(d.spec.template.spec.enableServiceLinks).toBe(false);
+    for (const f of ['templates/deployment.yaml', 'templates/controller.yaml']) expect(read(`${CHART}/${f}`)).toContain('enableServiceLinks: false');
+  });
+});

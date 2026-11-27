@@ -16,9 +16,14 @@ spec:
     spec:
       serviceAccountName: otoroshi-api-management
       automountServiceAccountToken: false
+      # the variables Kubernetes would add for each service of the namespace: a service named
+      # apim would set APIM_PORT
+      enableServiceLinks: false
+      # the user of the image (apim, uid 10001): its home, the working directory, is its own
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 10001
+        runAsGroup: 10001
       containers:
         - name: apim
           image: otoroshi-api-management

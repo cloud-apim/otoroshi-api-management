@@ -155,6 +155,16 @@ describe('the manifests', () => {
     // an existing secret, no controller: the product alone
     const minimal = helm('template', 'apim', 'otoroshi-api-management', '-n', 'apim', '--set', 'secrets.existingSecret=apim-secrets,controller.enabled=false');
     expect(YAML.parseAllDocuments(minimal).map((d) => d.toJSON()?.kind).filter(Boolean).sort()).toEqual(['ConfigMap', 'Deployment', 'Service']);
+    // secret variables of the values, in a Secret of their own, and a source made elsewhere: both deployments load them
+    const extra = helm('template', 'apim', 'otoroshi-api-management', '-n', 'apim', '--set', 'secrets.existingSecret=apim-secrets', '--set', 'secrets.extraEnv.APIM_STRIPE_SECRET_KEY=sk_test_x', '--set', 'extraEnvFrom[0].secretRef.name=apim-payments');
+    const docs = YAML.parseAllDocuments(extra).map((d) => d.toJSON()).filter(Boolean);
+    expect(docs.find((d) => d.kind === 'Secret')).toMatchObject({ metadata: { name: 'apim-otoroshi-api-management-env' }, stringData: { APIM_STRIPE_SECRET_KEY: 'sk_test_x' } });
+    for (const d of docs.filter((d) => d.kind === 'Deployment')) {
+      expect(d.spec.template.spec.containers[0].envFrom).toEqual([{ configMapRef: { name: 'apim-otoroshi-api-management' } }, { secretRef: { name: 'apim-otoroshi-api-management-env' } }, { secretRef: { name: 'apim-payments' } }]);
+      expect(Object.keys(d.spec.template.metadata.annotations).sort()).toEqual(['checksum/config', 'checksum/secret']);
+    }
+    writeFileSync(join(DIR, 'extra.yaml'), extra);
+    expect(kubectl('-n', 'apim', 'apply', '--dry-run=server', '-f', join(DIR, 'extra.yaml'))).toContain('secret/apim-otoroshi-api-management-env');
   });
 });
 

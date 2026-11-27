@@ -49,10 +49,20 @@ The notes of each release: the section of a version is the body of its GitHub re
   rollups). In the console, the dashboards and the request log filtered by an endpoint of the API —
   a method and a templated path —, from the calls and from the rollups.
 
+- **The Helm chart**: `secrets.extraEnv`, the secret variables that have no value of their own —
+  Stripe, OIDC, SMTP… —, in a Secret of the chart; `extraEnvFrom`, a Secret or a ConfigMap made
+  elsewhere (an external-secrets operator, a vault); the pods restart when a Secret the chart makes
+  changes; the controller takes the scheduling values too.
+
 ### Fixed
 
 - Instances started at once on an empty database — the replicas of a Kubernetes deployment, at
   their first install — failed their migrations but one, and restarted: they migrate one at a time.
+- The Helm chart and the Kubernetes manifests ran the pods as uid 1000, which the image does not
+  know: the product could not open its working directory and stopped at start, on a misleading
+  `Connection closed`. They run as the user of the image (10001), and their pods no longer get the
+  variables Kubernetes adds for each service of the namespace — a service named `apim` would have set
+  `APIM_PORT`.
 
 ## 0.1.1 — beta
 
