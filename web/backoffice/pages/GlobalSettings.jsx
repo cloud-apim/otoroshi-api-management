@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useRouter } from '../../shared/router.jsx';
-import { fmtDate, fmtRelative } from '../../shared/lib.js';
-import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, Modal, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
+import { Link, useRouter } from '../../shared/router.jsx';
+import { fmtDate, fmtNumber, fmtRelative } from '../../shared/lib.js';
+import { Badge, Callout, Code, Empty, Field, Icon, Input, Loader, NumberInput, Select, Setting, StatusBadge, Switch, TagsInput, errorMessage, useConfirm, useLoad, useToast } from '../../shared/ui.jsx';
 import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
@@ -384,24 +384,26 @@ function Authentication() {
 }
 
 // the audit trail leaves the product like Otoroshi's events do: exporters with a cursor
+const NEW_EXPORTER = { name: '', url: '', headers: {}, actions: [], workspace_id: '', enabled: true, batch_size: 100, from_beginning: false };
+
+function ExporterState({ e }) {
+  return <StatusBadge status={e.last_error ? 'error' : 'synced'} label={e.last_error ? tr('failing') : tr('delivering')} />;
+}
+
 function AuditExport() {
   const { workspaces } = useSession();
-  const toast = useToast();
-  const confirm = useConfirm();
   const state = useLoad(() => api.get('/audit/exporters'), []);
   const wsName = (id) => workspaces.find((w) => w.id === id)?.name || '';
   const page = useLocalPaging(state.data, { prefix: 'exporters', size: 25, text: (e) => `${e.name} ${e.url} ${(e.actions || []).join(' ')} ${wsName(e.workspace_id)} ${e.last_error || ''}` });
-  const [editing, setEditing] = useState(null);
-  const set = (k) => (v) => setEditing((e) => ({ ...e, [k]: v }));
   return (
     <div className="col gap-16">
       <div className="row">
         <p className="muted small grow">
           {tr('Every write of the admin api, and the reads of credentials and request logs, are in the audit trail. An exporter sends it in batches to a webhook (a SIEM, a log pipeline), in order and at least once: it keeps a cursor, so nothing is lost while the target is down.')}
         </p>
-        <button className="btn primary" onClick={() => setEditing({ name: '', url: '', headers: {}, actions: [], workspace_id: '', enabled: true, batch_size: 100, from_beginning: false })}>
+        <Link to="/settings/audit/exporters/new" className="btn primary">
           <Icon name="plus" /> {tr('Add exporter')}
-        </button>
+        </Link>
       </div>
       <ListToolbar paging={page} placeholder={tr('search exporters, urls, actions, workspaces')} onReload={state.reload} loading={state.loading} />
       <Loader state={state}>
@@ -409,7 +411,7 @@ function AuditExport() {
           page.items.length ? (
             <div className="card">
               {page.items.map((e) => (
-                <div key={e.id} className="list-item" style={{ alignItems: 'flex-start' }}>
+                <Link key={e.id} to={`/settings/audit/exporters/${e.id}`} className="list-item clickable" style={{ alignItems: 'flex-start' }}>
                   <Icon name="upload" />
                   <div className="grow" style={{ minWidth: 0 }}>
                     <div className="bold">
@@ -417,33 +419,11 @@ function AuditExport() {
                     </div>
                     <div className="mono tiny faint ellipsis">{e.url}</div>
                     <div className="small mt-8">
-                      <StatusBadge status={e.last_error ? 'error' : 'synced'} label={e.last_error ? tr('failing') : tr('delivering')} /> <Tr text={'{0} delivered · {1} behind{2}{3}'} args={[e.delivered, e.lag || 0, e.actions?.length ? ` · ${e.actions.join(', ')}` : tr(' · every action'), e.last_error && <span className="negative-text"> — {e.last_error}</span>]} />
+                      <ExporterState e={e} /> <Tr text={'{0} delivered · {1} behind{2}{3}'} args={[e.delivered, e.lag || 0, e.actions?.length ? ` · ${e.actions.join(', ')}` : tr(' · every action'), e.last_error && <span className="negative-text"> — {e.last_error}</span>]} />
                     </div>
                   </div>
-                  <button
-                    className="btn sm"
-                    onClick={async () => {
-                      const r = await api.post(`/audit/exporters/${e.id}/test`);
-                      toast(r.ok ? tr('Test event delivered') : tr('Test failed: {0}', [r.error]), r.ok ? 'info' : 'error');
-                    }}
-                  >
-                    {tr('Test')}
-                  </button>
-                  <button className="btn ghost sm icon" onClick={() => setEditing({ ...e, workspace_id: e.workspace_id || '' })} aria-label={tr('edit')}>
-                    <Icon name="edit" />
-                  </button>
-                  <button
-                    className="btn ghost sm icon"
-                    aria-label={tr('delete')}
-                    onClick={async () => {
-                      if (!(await confirm({ title: tr('Delete {0}?', [e.name]), danger: true, confirmLabel: tr('Delete') }))) return;
-                      await api.del(`/audit/exporters/${e.id}`);
-                      state.reload();
-                    }}
-                  >
-                    <Icon name="trash" />
-                  </button>
-                </div>
+                  <Icon name="chevronRight" size={14} />
+                </Link>
               ))}
               <Pager paging={page} total={page.total} />
             </div>
@@ -454,65 +434,165 @@ function AuditExport() {
           )
         }
       </Loader>
-      {editing && (
-        <Modal
-          title={editing.id ? tr('Exporter {0}', [editing.name]) : tr('New audit exporter')}
-          onClose={() => setEditing(null)}
-          footer={
-            <button
-              className="btn primary"
-              disabled={!editing.url}
-              onClick={async () => {
-                try {
-                  const body = { ...editing, workspace_id: editing.workspace_id || null };
-                  if (editing.id) await api.put(`/audit/exporters/${editing.id}`, body);
-                  else await api.post('/audit/exporters', body);
-                  setEditing(null);
-                  toast(tr('Exporter saved'));
-                  state.reload();
-                } catch (e) {
-                  toast(errorMessage(e), 'error');
+    </div>
+  );
+}
+
+// an audit exporter on a page of its own: its settings, where it stands — delivered, behind, its last
+// error —, a test; a new one at …/exporters/new
+export function AuditExporterPage({ id }) {
+  const { workspaces } = useSession();
+  const { navigate } = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
+  const isNew = id === 'new';
+  const state = useLoad(() => (isNew ? Promise.resolve(NEW_EXPORTER) : api.get(`/audit/exporters/${id}`)), [id]);
+  const [form, setForm] = useState(null);
+  const list = '/settings/audit';
+  return (
+    <div className="page">
+      <Loader state={state}>
+        {(ex) => {
+          const e = form || { ...ex, workspace_id: ex.workspace_id || '' };
+          const set = (k) => (v) => setForm((x) => ({ ...(x || { ...ex, workspace_id: ex.workspace_id || '' }), [k]: v }));
+          const save = async () => {
+            try {
+              const body = { ...e, workspace_id: e.workspace_id || null };
+              const saved = isNew ? await api.post('/audit/exporters', body) : await api.put(`/audit/exporters/${ex.id}`, body);
+              toast(tr('Exporter saved'));
+              setForm(null);
+              if (isNew) navigate(`/settings/audit/exporters/${saved.id}`, { replace: true });
+              else state.reload();
+            } catch (err) {
+              toast(errorMessage(err), 'error');
+            }
+          };
+          const remove = async () => {
+            if (!(await confirm({ title: tr('Delete {0}?', [ex.name]), danger: true, confirmLabel: tr('Delete') }))) return;
+            try {
+              await api.del(`/audit/exporters/${ex.id}`);
+              toast(tr('Exporter deleted'));
+              navigate(list);
+            } catch (err) {
+              toast(errorMessage(err), 'error');
+            }
+          };
+          const test = async () => {
+            try {
+              const r = await api.post(`/audit/exporters/${ex.id}/test`);
+              toast(r.ok ? tr('Test event delivered') : tr('Test failed: {0}', [r.error]), r.ok ? 'info' : 'error');
+            } catch (err) {
+              toast(errorMessage(err), 'error');
+            }
+          };
+          return (
+            <>
+              <PageHead
+                crumbs={[{ label: tr('Global settings'), to: '/settings' }, { label: tr('Audit export'), to: list }, { label: isNew ? tr('New audit exporter') : ex.name }]}
+                title={isNew ? tr('New audit exporter') : ex.name}
+                sub={
+                  !isNew && (
+                    <span className="row wrap gap-6">
+                      <ExporterState e={ex} />
+                      {!ex.enabled && <Badge>{tr('disabled')}</Badge>}
+                      <span className="mono small faint">{ex.url}</span>
+                    </span>
+                  )
                 }
-              }}
-            >
-              {tr('Save')}
-            </button>
-          }
-        >
-          <Field label={tr('Name')}>
-            <Input value={editing.name} onChange={set('name')} />
-          </Field>
-          <Field label={tr('Webhook url')} hint={tr('receives POST batches of ApimAuditEvent as a json array')}>
-            <Input value={editing.url} onChange={set('url')} mono />
-          </Field>
-          <Field label={tr('Header (e.g. a token)')}>
-            <Input
-              value={Object.entries(editing.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
-              onChange={(v) => {
-                const [k, ...rest] = v.split(':');
-                set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
-              }}
-              mono
-              placeholder={tr('Authorization: Bearer …')}
-            />
-          </Field>
-          <div className="grid-2">
-            <Field label={tr('Workspace')}>
-              <Select value={editing.workspace_id} onChange={set('workspace_id')} options={[{ value: '', label: tr('every workspace') }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]} />
-            </Field>
-            <Field label={tr('Batch size')}>
-              <NumberInput value={editing.batch_size} onChange={set('batch_size')} />
-            </Field>
-          </div>
-          <Field label={tr('Actions')} hint={tr('prefixes, e.g. subscription. or credential.read — empty: everything')}>
-            <TagsInput value={editing.actions} onChange={set('actions')} />
-          </Field>
-          <div className="row gap-24">
-            <Switch checked={editing.enabled} onChange={set('enabled')} label={tr('Enabled')} />
-            {!editing.id && <Switch checked={editing.from_beginning} onChange={set('from_beginning')} label={tr('Replay the whole trail')} />}
-          </div>
-        </Modal>
-      )}
+                actions={
+                  !isNew && (
+                    <>
+                      <button className="btn ghost danger" onClick={remove}>
+                        <Icon name="trash" /> {tr('Delete')}
+                      </button>
+                      <button className="btn" onClick={test}>
+                        <Icon name="play" /> {tr('Test')}
+                      </button>
+                    </>
+                  )
+                }
+              />
+              <div className="grid-2" style={{ alignItems: 'start' }}>
+                <div className="card">
+                  <div className="card-head">
+                    <Icon name="settings" />
+                    <h3>{tr('Settings')}</h3>
+                  </div>
+                  <div className="card-body col gap-12">
+                    <Field label={tr('Name')}>
+                      <Input value={e.name} onChange={set('name')} />
+                    </Field>
+                    <Field label={tr('Webhook url')} hint={tr('receives POST batches of ApimAuditEvent as a json array')}>
+                      <Input value={e.url} onChange={set('url')} mono />
+                    </Field>
+                    <Field label={tr('Header (e.g. a token)')}>
+                      <Input
+                        value={Object.entries(e.headers || {}).map(([k, v]) => `${k}: ${v}`).join('')}
+                        onChange={(v) => {
+                          const [k, ...rest] = v.split(':');
+                          set('headers')(k && rest.length ? { [k.trim()]: rest.join(':').trim() } : {});
+                        }}
+                        mono
+                        placeholder={tr('Authorization: Bearer …')}
+                      />
+                    </Field>
+                    <div className="grid-2">
+                      <Field label={tr('Workspace')}>
+                        <Select value={e.workspace_id} onChange={set('workspace_id')} options={[{ value: '', label: tr('every workspace') }, ...workspaces.map((w) => ({ value: w.id, label: w.name }))]} />
+                      </Field>
+                      <Field label={tr('Batch size')}>
+                        <NumberInput value={e.batch_size} onChange={set('batch_size')} />
+                      </Field>
+                    </div>
+                    <Field label={tr('Actions')} hint={tr('prefixes, e.g. subscription. or credential.read — empty: everything')}>
+                      <TagsInput value={e.actions} onChange={set('actions')} />
+                    </Field>
+                    <div className="row gap-24">
+                      <Switch checked={e.enabled} onChange={set('enabled')} label={tr('Enabled')} />
+                      {isNew && <Switch checked={e.from_beginning} onChange={set('from_beginning')} label={tr('Replay the whole trail')} />}
+                    </div>
+                    <div className="row">
+                      <span className="spacer" />
+                      {form && !isNew && (
+                        <button className="btn" onClick={() => setForm(null)}>
+                          {tr('Cancel')}
+                        </button>
+                      )}
+                      <button className="btn primary" disabled={!e.url || (!isNew && !form)} onClick={save}>
+                        {isNew ? tr('Create') : tr('Save')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {!isNew && (
+                  <div className="card">
+                    <div className="card-head">
+                      <Icon name="audit" />
+                      <h3>{tr('Where it stands')}</h3>
+                    </div>
+                    <div className="card-body">
+                      <dl className="kv">
+                        <dt>{tr('Delivered')}</dt>
+                        <dd>{fmtNumber(ex.delivered)}</dd>
+                        <dt>{tr('Behind')}</dt>
+                        <dd>{fmtNumber(ex.lag || 0)}</dd>
+                        <dt>{tr('Last delivery')}</dt>
+                        <dd>{ex.last_delivery_at ? `${fmtDate(ex.last_delivery_at)} · ${fmtRelative(ex.last_delivery_at)}` : '—'}</dd>
+                        <dt>{tr('Last error')}</dt>
+                        <dd className={ex.last_error ? 'negative-text' : 'faint'}>{ex.last_error || '—'}</dd>
+                        <dt>{tr('Workspace')}</dt>
+                        <dd>{workspaces.find((w) => w.id === ex.workspace_id)?.name || tr('every workspace')}</dd>
+                        <dt>{tr('Actions')}</dt>
+                        <dd>{ex.actions?.length ? ex.actions.join(', ') : tr('every action')}</dd>
+                      </dl>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          );
+        }}
+      </Loader>
     </div>
   );
 }

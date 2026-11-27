@@ -14,6 +14,13 @@ export async function listExporters() {
   return (await db`select e.*, (select max(id) from audit_events) - e.cursor as lag from audit_exporters e order by e.name`).map(opened);
 }
 
+// one of them, as listed: how far behind the trail it is
+export async function showExporter(id) {
+  const rows = await db`select e.*, (select max(id) from audit_events) - e.cursor as lag from audit_exporters e where e.id = ${id}`;
+  if (!rows[0]) throw notFound('exporter not found');
+  return opened(rows[0]);
+}
+
 export async function getExporter(id) {
   const rows = await db`select * from audit_exporters where id = ${id}`;
   if (!rows[0]) throw notFound('exporter not found');

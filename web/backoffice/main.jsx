@@ -21,7 +21,7 @@ import { CatalogPage, TeamPage, WorkspaceSettingsPage } from './pages/WorkspaceS
 import { WebhookPage } from './pages/Webhooks.jsx';
 import { PortalPage } from './pages/Portal.jsx';
 import { GatewayPage } from './pages/Gateway.jsx';
-import { GlobalSettingsPage } from './pages/GlobalSettings.jsx';
+import { AuditExporterPage, GlobalSettingsPage } from './pages/GlobalSettings.jsx';
 import { SubscriptionsPage } from './pages/Subscriptions.jsx';
 import { ConversationPage, MessagesPage } from './pages/Messages.jsx';
 import { PolicyGroupsPage, PolicyGroupPage } from './pages/PolicyGroups.jsx';
@@ -233,6 +233,7 @@ function App() {
             ['/gateway/:tab', (p) => <GatewayPage tab={p.tab} />],
             ['/settings', () => <GlobalSettingsPage tab="workspaces" />],
             ['/settings/:tab', (p) => <GlobalSettingsPage tab={p.tab} />],
+            ['/settings/audit/exporters/:id', (p) => <AuditExporterPage id={p.id} />],
           ]}
           fallback={
             <div className="page">

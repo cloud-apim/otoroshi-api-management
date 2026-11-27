@@ -107,7 +107,7 @@ personal data — credentials, request logs. **Console → Audit**, `GET …/aud
 
 ### Audit exporters
 
-**Global settings → Audit export**, or the admin API. The trail leaves the product in batches, to a SIEM or a log pipeline, like Otoroshi's data
+**Global settings → Audit export** — each exporter on a page of its own: its settings, what it has delivered, how far behind it is, its last error —, or the admin API. The trail leaves the product in batches, to a SIEM or a log pipeline, like Otoroshi's data
 exporters do for its events. An exporter (installation administrators) posts JSON arrays of
 `ApimAuditEvent` to a URL, optionally restricted to a workspace and to action prefixes
 (`subscription.`, `credential.read`…), with custom headers. Each exporter keeps a cursor: delivery is
@@ -120,8 +120,8 @@ curl -X POST http://localhost:9000/api/audit/exporters \
   -d '{"name": "siem", "url": "https://siem.example.com/ingest", "actions": ["subscription.", "credential."]}'
 ```
 
-`GET /audit/exporters` lists them with their lag; `POST /audit/exporters/<id>/test` sends a test
-event.
+`GET /audit/exporters` lists them with their lag, `GET /audit/exporters/<id>` reads one;
+`POST /audit/exporters/<id>/test` sends a test event.
 
 ## Export and import
 

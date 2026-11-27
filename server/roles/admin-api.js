@@ -1383,6 +1383,10 @@ r.post('/audit/exporters', async ({ ctx, body }) => {
   identity.requireAdmin(ctx);
   return hideAuth(await auditExport.saveExporter(ctx, body));
 });
+r.get('/audit/exporters/:id', async ({ ctx, params }) => {
+  identity.requireAdmin(ctx);
+  return hideAuth(await auditExport.showExporter(params.id));
+});
 r.put('/audit/exporters/:id', async ({ ctx, params, body }) => {
   identity.requireAdmin(ctx);
   const ex = await auditExport.getExporter(params.id);

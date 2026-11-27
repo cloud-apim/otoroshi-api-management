@@ -132,6 +132,10 @@ describe('at rest, end to end', () => {
     expect(isSealed(row.headers['X-Source'])).toBe(true);
     const { getExporter } = await import('../server/domain/auditExport.js');
     expect((await getExporter(ex.id)).headers.Authorization).toBe(`Bearer siem-${RUN}`);
+    // read on its page: the token masked, where it stands
+    const shown = await call('GET', `/audit/exporters/${ex.id}`);
+    expect(shown.headers).toEqual({ Authorization: '••••••', 'X-Source': 'apim' });
+    expect(Number(shown.lag)).toBeGreaterThanOrEqual(0);
     await call('DELETE', `/audit/exporters/${ex.id}`);
   });
 

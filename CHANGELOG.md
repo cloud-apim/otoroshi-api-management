@@ -17,6 +17,8 @@ The notes of each release: the section of a version is the body of its GitHub re
   it owns.
   A remote catalog, at `…/settings/catalogs/<id>`: its settings, its last sync, the APIs it manages,
   a sync previewed then run.
+  An audit exporter, at `/settings/audit/exporters/<id>`: its settings, what it delivered, how far
+  behind it is, its last error.
 
 - **The page of an API on two levels of tabs**: its groups — Overview, Design, Documentation, Portal,
   Subscriptions, Operate, Settings —, then the pages of the group shown; no scroll whatever the screen.

@@ -2117,5 +2117,11 @@
   "Not synchronised yet: the first sync comes within its interval.": "Pas encore synchronisé : la première synchro vient dans son intervalle.",
   "Not synchronised yet: its syncs are run by hand.": "Pas encore synchronisé : ses synchros se lancent à la main.",
   "The APIs it manages": "Les API qu’il gère",
-  "None yet: a sync writes the APIs of the source.": "Aucune pour l’instant : une synchro écrit les API de la source."
+  "None yet: a sync writes the APIs of the source.": "Aucune pour l’instant : une synchro écrit les API de la source.",
+  "Exporter deleted": "Exporteur supprimé",
+  "Where it stands": "Où il en est",
+  "Behind": "En retard",
+  "Last delivery": "Dernier envoi",
+  "Last error": "Dernière erreur",
+  "every action": "chaque action"
 }
