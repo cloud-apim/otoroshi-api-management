@@ -379,6 +379,28 @@ The paid plans are sold through Stripe Connect: `APIM_PAYMENTS_PROVIDER`, `APIM_
 `APIM_STRIPE_CLIENT_ID`, `APIM_STRIPE_WEBHOOK_SECRET` — see [Payments](./payments.mdx). Off by
 default.
 
+### Email
+
+How the installation sends the notifications a workspace sends by email, when its administrators
+turn them on ([email](./concepts/applications-and-subscriptions.mdx#by-email)). **Global settings ›
+Email** sets it — its secrets sealed at rest —, the variables give the values it does not set. Off by
+default: nothing is sent.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_EMAIL_TRANSPORT` | `none` | `smtp`, `mailgun`, `mailjet`, `sendgrid`, or `log` (written to the log of the product, for development) |
+| `APIM_EMAIL_FROM` | — | the sender of every email: `API portal <no-reply@example.com>` |
+| `APIM_EMAIL_SMTP_HOST` / `APIM_EMAIL_SMTP_PORT` | — / `587` | the SMTP server |
+| `APIM_EMAIL_SMTP_SECURITY` | `starttls` | `starttls` (required), `tls` (from the start, port 465), `none` (a relay of a local network only) |
+| `APIM_EMAIL_SMTP_USER` / `APIM_EMAIL_SMTP_PASSWORD` | — | its account, when it asks for one |
+| `APIM_EMAIL_API_KEY` | — | the API key of Mailgun, Mailjet or SendGrid |
+| `APIM_EMAIL_API_SECRET` | — | the secret key of Mailjet |
+| `APIM_EMAIL_DOMAIN` / `APIM_EMAIL_REGION` | — / `us` | the sending domain of Mailgun, and its region (`us` or `eu`) |
+| `APIM_EMAIL_API_BASE` | the provider's | another address for the API of the provider (a proxy) |
+
+**Send a test email** checks the transport; the emails sent, and the ones that failed with what the
+transport answered, are listed beside it.
+
 ### Console authentication
 
 | Variable | Default | Meaning |

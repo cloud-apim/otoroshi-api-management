@@ -357,6 +357,7 @@ async function consoleTour(page) {
     ['teams', 'console-ws-teams', 'Workspace settings — teams'],
     ['metadata', 'console-ws-metadata', 'Workspace settings — typed metadata fields'],
     ['payments', 'console-ws-payments', 'Workspace settings — payments: the Stripe account the paid plans are sold with, and what Stripe said'],
+    ['email', 'console-ws-email', 'Workspace settings — email: the notifications sent by email, to the people of the portal and to the producers, kind by kind'],
     ['export', 'console-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);
@@ -408,6 +409,7 @@ async function consoleTour(page) {
     ['/backoffice/settings/workspaces', 'console-global-workspaces', 'Global settings — workspaces, portal exposure'],
     ['/backoffice/settings/users', 'console-global-users', 'Global settings — users'],
     ['/backoffice/settings/authentication', 'console-global-auth', 'Global settings — authentication'],
+    ['/backoffice/settings/email', 'console-global-email', 'Global settings — email: the transport of the installation, a test, the emails sent'],
     ['/backoffice/settings/audit', 'console-global-audit-export', 'Global settings — audit trail exporters'],
     ['/backoffice/settings/tokens', 'console-global-tokens', 'Global settings — api tokens for the cli and ci'],
   ]) {

@@ -211,6 +211,13 @@ if (login.ok && cookie) {
     console.log('default   a review of books by its consumer');
   }
 }
+// the notifications of the default workspace by email too — in the development stack, written to the
+// log of the product (APIM_EMAIL_TRANSPORT=log)
+const mail = await call('GET', `${W}/email`).catch(() => null);
+if (mail && !mail.portal.enabled && !mail.console.enabled) {
+  await call('PUT', `${W}/email`, { portal: { enabled: true, kinds: { 'subscription.ending': false } }, console: { enabled: true } });
+  console.log('default   its notifications by email too');
+}
 // an announcement of books, its subscribers told: once
 const announced = await call('GET', `${W}/apis/books/announcements`).catch(() => []);
 if (Array.isArray(announced) && !announced.length) {

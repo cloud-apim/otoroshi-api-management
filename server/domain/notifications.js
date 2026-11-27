@@ -4,11 +4,18 @@
 
 import { db, newId } from '../db/index.js';
 import { likePattern } from '../http/paging.js';
+import { enqueue } from './tasks.js';
+import { wantsEmail } from './email.js';
 
 export async function notify({ workspaceId, teamId = null, userId = null, face = 'portal', kind, title, body = '', link = null, data = {} }) {
   if (!teamId && !userId) return;
+  const id = newId('ntf');
   await db`insert into notifications (id, workspace_id, team_id, user_id, face, kind, title, body, link, data)
-    values (${newId('ntf')}, ${workspaceId}, ${teamId}, ${userId}, ${face}, ${kind}, ${title}, ${body}, ${link}, ${data})`;
+    values (${id}, ${workspaceId}, ${teamId}, ${userId}, ${face}, ${kind}, ${title}, ${body}, ${link}, ${data})`;
+  // by email too, when the workspace sends this kind so: by the queue, never in the request
+  const email = (await db`select email from workspaces where id = ${workspaceId}`)[0]?.email;
+  if (wantsEmail(email, face, kind)) await enqueue('email_notification', { notification_id: id, workspace_id: workspaceId }, { runNow: false });
+  return id;
 }
 
 // what there is to decide about an api goes to its team; an api of no team is decided by the

@@ -36,6 +36,8 @@ The same commands, three ways:
 |---|---|
 | `whoami` | the user behind the token |
 | `users list [--q text]` | the people of the installation (an installation administrator's) |
+| `email test [<address>]` | an email through the transport of the installation (default: to you) |
+| `email deliveries [--q text] [--status sent\|failed]` | the emails sent, and the ones that failed with what the transport answered |
 | `users delete <email\|id>` | a person [deleted](../concepts/workspaces-teams-users.mdx#deleting-a-person): their personal applications closed and deleted, their access gone |
 | `gateway status` | gateway health, projection queue, last drift run, ingestion |
 | `gateway setup [--only key,exporter,console,portals,tls] [--dry-run] [--admin-client-id id --admin-client-secret s] [--product-url u] [--exporter-url u] [--console-host h] [--console-auth-module id] [--portal-host h] [--client-auth Want\|Need] [--rotate-key]` | the [setup of the gateway](../gateway/setup.mdx), through the admin API |

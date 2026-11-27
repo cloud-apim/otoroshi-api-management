@@ -29,6 +29,8 @@ Commands:
   whoami
   users list [--q text]                the people of the installation (an installation administrator's)
   users delete <email|id>              a person deleted: their personal applications closed and deleted, their access gone
+  email test [<address>]               an email through the transport of the installation (default: to you)
+  email deliveries [--q text] [--status sent|failed]   the emails sent, and the ones that failed
   gateway status
   gateway setup                        what the product needs on the gateway, created or repaired:
 ${SETUP_HELP}
@@ -417,6 +419,19 @@ async function main() {
         ]);
       }
       throw new Error(`${cmd} list|upgrade`);
+    }
+    case 'email': {
+      if (sub === 'test') {
+        const r = await call('POST', '/settings/email/test', a1 ? { to: a1 } : {});
+        if (OUTPUT !== 'table') return print(r);
+        return console.log(r.sent ? 'sent' : `not sent: ${r.error}`);
+      }
+      if (sub === 'deliveries') {
+        const q = new URLSearchParams({ limit: flags.limit || '50', ...(flags.q ? { q: flags.q } : {}), ...(flags.status ? { status: flags.status } : {}) });
+        const r = await call('GET', `/settings/email/deliveries?${q}`);
+        return print(r.items, [['when', (d) => new Date(d.updated_at || d.created_at).toISOString().slice(0, 16).replace('T', ' ')], ['to', 'address'], ['subject', 'subject'], ['kind', 'kind'], ['status', 'status'], ['error', (d) => d.error || '']]);
+      }
+      throw new Error('email test|deliveries');
     }
     case 'announcements': {
       const base = `${ws(a1)}/apis/${need(a2, '<api>')}/announcements`;

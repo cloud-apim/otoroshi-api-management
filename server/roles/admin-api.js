@@ -27,6 +27,7 @@ import { buildOtoroshiApi, derivedEntities } from '../otoroshi/projection.js';
 import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from '../domain/exchange.js';
 import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
+import * as email from '../domain/email.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
 import { readCertificate, issuerPatterns } from '../domain/pki.js';
@@ -116,14 +117,21 @@ r.get('/settings', async ({ ctx }) => {
       otoroshi: { ...a.otoroshi, secret: mask(a.otoroshi.secret) },
       callback: `${config.publicUrl}/backoffice/api/auth/oidc/callback`,
     })),
+    email: await emailView(),
   };
 });
+
+// the email transport of the installation, its secrets masked, and what it lacks
+async function emailView() {
+  const e = await email.emailSettings();
+  return { ...e, apiKey: mask(e.apiKey), apiSecret: mask(e.apiSecret), smtp: { ...e.smtp, password: mask(e.smtp.password) }, problems: email.emailProblems(e), ready: email.emailReady(e) };
+}
 
 r.put('/settings/:key', async ({ ctx, params, body }) => {
   identity.requireAdmin(ctx);
   // the exposure of the portals is not among them: it is set at installation (APIM_TENANCY,
   // APIM_PORTAL_EXPOSURE), since it changes the form of every public url
-  if (!['gateway', 'ingest', 'auth'].includes(params.key)) throw badRequest('unknown settings key');
+  if (!['gateway', 'ingest', 'auth', 'email'].includes(params.key)) throw badRequest('unknown settings key');
   const current = (await db`select value from settings where key = ${params.key}`)[0]?.value || {};
   const value = { ...current, ...body };
   if (params.key === 'auth') {
@@ -135,16 +143,44 @@ r.put('/settings/:key', async ({ ctx, params, body }) => {
       throw badRequest('the otoroshi mode needs the secret shared with the route that exposes the console');
   }
   if (params.key === 'gateway' && (!body.clientSecret || body.clientSecret.includes('••'))) value.clientSecret = current.clientSecret || config.otoroshi.clientSecret;
+  if (params.key === 'email') {
+    // a masked secret sent back keeps the one there is; the transport complete, or refused
+    const effective = await email.emailSettings();
+    const keep = (v, old) => (v === undefined || String(v).includes('••') ? old : v);
+    value.apiKey = keep(body.apiKey, effective.apiKey);
+    value.apiSecret = keep(body.apiSecret, effective.apiSecret);
+    value.smtp = { ...current.smtp, ...body.smtp, password: keep(body.smtp?.password, effective.smtp.password) };
+    if (value.smtp.port !== undefined && value.smtp.port !== '') value.smtp.port = Number(value.smtp.port);
+    const problems = email.emailProblems({ ...effective, ...value, smtp: { ...effective.smtp, ...value.smtp } });
+    if (problems.length) throw badRequest(problems.join('; '));
+  }
   // the policy of the ingester: checked, completed, its key kept unless rotated
   const stored = params.key === 'ingest' ? normalizeIngest(body, { ...current, key: (await ingestPolicy()).key }) : value;
   await db`insert into settings (key, value) values (${params.key}, ${sealSettings(params.key, stored)}) on conflict (key) do update set value = excluded.value, updated_at = now()`;
   invalidateGatewaySettings();
   invalidateAuthSettings();
   invalidateIngestPolicy();
+  email.invalidateEmailSettings();
   // what an ingestion policy changes is a processing of personal data: the audit keeps its old and new values
   const data = params.key === 'ingest' ? { before: publicPolicy(normalizeIngest({}, current)), after: publicPolicy(stored), rotatedKey: !!body.rotateKey } : undefined;
   await audit(ctx, { action: `settings.${params.key}.update`, entityKind: 'settings', entityId: params.key, summary: `${params.key} settings updated`, data });
   return params.key === 'ingest' ? { updated: params.key, ingest: publicPolicy(stored) } : { updated: params.key };
+});
+
+// an email to an address, through the transport of the installation: what it answers
+r.post('/settings/email/test', async ({ ctx, body }) => {
+  identity.requireAdmin(ctx);
+  const to = String(body?.to || ctx.user?.email || '').trim();
+  if (!email.parseAddress(to)) throw badRequest('to: an email address');
+  const out = await email.sendTestEmail(to);
+  await audit(ctx, { action: 'settings.email.test', entityKind: 'settings', entityId: 'email', summary: `test email to ${to}: ${out.sent ? 'sent' : `not sent, ${out.error}`}` });
+  return out;
+});
+
+// the emails sent, and the ones that failed: searched, paged
+r.get('/settings/email/deliveries', async ({ ctx, query }) => {
+  identity.requireAdmin(ctx);
+  return email.listDeliveries({ ...pageParams(query, { defaultLimit: 50, max: 200 }), status: query.get('status') || null });
 });
 
 // rolls the computed path up and applies the retention now, instead of at the next run
@@ -470,6 +506,24 @@ r.post('/workspaces/:ws/portal/preview', async ({ ctx, params }) => {
   const token = portalDesign.previewToken(c.workspace);
   const base = withPortal(c.workspace).portal_url;
   return { token, url: `${String(base).replace(/\/$/, '')}/?preview=${encodeURIComponent(token)}`, expires_in: 3600 };
+});
+
+// what the workspace sends by email: to the people of its portal, to its producers, kind by kind; and
+// whether the installation has a transport to send it with
+r.get('/workspaces/:ws/email', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  const t = await email.emailSettings();
+  return { ...email.normalizeWorkspaceEmail(c.workspace.email), kinds: email.EMAIL_KINDS, transport: { transport: t.transport, ready: email.emailReady(t) } };
+});
+
+r.put('/workspaces/:ws/email', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  const before = email.normalizeWorkspaceEmail(c.workspace.email);
+  const next = email.normalizeWorkspaceEmail({ ...before, ...(body || {}) });
+  await db`update workspaces set email = ${next}, updated_at = now() where id = ${c.workspace.id}`;
+  const said = (f) => (next[f].enabled ? `on${Object.keys(next[f].kinds).length ? `, ${Object.keys(next[f].kinds).length} kind(s) off` : ''}` : 'off');
+  await audit(c, { action: 'workspace.email.update', workspaceId: c.workspace.id, entityKind: 'workspace', entityId: c.workspace.id, summary: `email to the people of the portal ${said('portal')}, to the producers ${said('console')}`, data: { before, after: next } });
+  return next;
 });
 
 r.delete('/workspaces/:ws', async ({ ctx, params }) => {

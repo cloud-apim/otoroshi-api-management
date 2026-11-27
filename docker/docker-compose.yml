@@ -97,6 +97,9 @@ services:
       APIM_PUBLIC_URL: http://localhost:9000
       # the fake Stripe of the development: a Checkout is a page of the product
       APIM_PAYMENTS_PROVIDER: fake
+      # the emails of the development: written to the log of the product (docker compose logs apim)
+      APIM_EMAIL_TRANSPORT: log
+      APIM_EMAIL_FROM: API portal <no-reply@oto.tools>
       # the key the secrets are sealed with — the one of mise.toml and of the tests: they share the database
       APIM_SECRETS_KEY: development-only-secrets-key
     ports:

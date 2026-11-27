@@ -154,6 +154,17 @@ unread, done, or all. The admin API serves the same: `GET …/notifications?filt
 `POST …/notifications/read` (`{"ids": […]}`, all of them without), `POST …/notifications/done`
 (`{"ids": […], "done": true}`).
 
+### By email
+
+The notifications of a workspace are sent by email too once its administrators turn it on, in
+**Workspace settings › Email**: to the people of its portal, to its producers, each face apart, then
+kind by kind — a request accepted, an announcement, a version deprecated, a request to review… A
+person of the portal does not choose: what the workspace turns on is sent to them. Each person a
+notification is addressed to — a person, or the members of a team — gets it once, with a link to
+where it is dealt with; an email that fails is tried again, the ones sent never twice. The emails go
+through the transport of the installation ([email](../install.mdx#email)); without one, nothing is
+sent.
+
 ## Reviewing
 
 The console lists subscriptions per API, per application and across the workspace, with the

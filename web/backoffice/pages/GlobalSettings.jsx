@@ -6,6 +6,7 @@ import { api, useSession } from '../context.jsx';
 import { PageHead } from '../layout.jsx';
 import { ListToolbar, Pager, useLocalPaging, usePaging } from '../../shared/lists.jsx';
 import { tr, Tr } from '../../shared/i18n.jsx';
+import { EmailTransport } from './Email.jsx';
 
 const FORM_TITLES = () => ({ path: tr('by root path'), hostname: tr('by hostname'), root: tr('one workspace, at the root') });
 
@@ -519,7 +520,7 @@ function AuditExport() {
 export function GlobalSettingsPage({ tab }) {
   const { navigate } = useRouter();
   const { user } = useSession();
-  const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'audit', 'tokens'] : ['tokens'];
+  const tabs = user.is_admin ? ['workspaces', 'users', 'authentication', 'email', 'audit', 'tokens'] : ['tokens'];
   return (
     <div className="page">
       <PageHead title={tr('Global settings')} sub={tr('Installation-level: workspaces, users, access tokens.')} />
@@ -533,6 +534,7 @@ export function GlobalSettingsPage({ tab }) {
       {tab === 'workspaces' && user.is_admin && <Workspaces />}
       {tab === 'users' && user.is_admin && <Users />}
       {tab === 'authentication' && user.is_admin && <Authentication />}
+      {tab === 'email' && user.is_admin && <EmailTransport />}
       {tab === 'audit' && user.is_admin && <AuditExport />}
       {tab === 'tokens' && <Tokens />}
     </div>

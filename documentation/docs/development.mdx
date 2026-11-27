@@ -46,6 +46,8 @@ the APIs you create are reachable as `http://<domain>:8080`.
 
 - **Server changes reload by themselves**: the `apim` service runs the working copy with
   `bun --watch`. The interfaces need `bun run build`, or `mise run watch` to rebuild them on change.
+- **The emails** are written to the log of the product (`APIM_EMAIL_TRANSPORT=log`: `mise run logs`);
+  the demo turns the email of the `default` workspace on.
 - **The gateway keeps its state** in its Docker volume, across `mise run down` and a new jar;
   `mise run reset` wipes the databases and the gateway state — `mise run demo` makes the demo again,
   and catches up a gateway that lost what was deployed. A new jar or new extensions:

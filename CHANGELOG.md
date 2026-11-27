@@ -5,6 +5,11 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Email.** The notifications of a workspace sent by email, once its administrators turn it on —
+  to the people of its portal, to its producers, kind by kind (**Workspace settings › Email**) —,
+  through the transport of the installation: SMTP, Mailgun, Mailjet or SendGrid (**Global settings ›
+  Email**, or `APIM_EMAIL_*`), with a test email and the list of the emails sent.
+
 - **Announcements of an API**, like a blog: posts on its page in the portal, for all its versions,
   its subscribers told in their notifications (console, admin API, `otoroshi-apim announcements`).
   A version deprecated or archived is told to its subscribers too.

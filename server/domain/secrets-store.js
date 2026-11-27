@@ -16,6 +16,13 @@ export function sealSettings(key, v) {
       ...(v.otoroshi ? { otoroshi: { ...v.otoroshi, secret: seal(v.otoroshi.secret) } } : {}),
     };
   if (key === 'ingest') return { ...v, ...(v.key ? { key: seal(v.key) } : {}) };
+  if (key === 'email')
+    return {
+      ...v,
+      ...(v.apiKey ? { apiKey: seal(v.apiKey) } : {}),
+      ...(v.apiSecret ? { apiSecret: seal(v.apiSecret) } : {}),
+      ...(v.smtp?.password ? { smtp: { ...v.smtp, password: seal(v.smtp.password) } } : {}),
+    };
   return v;
 }
 
@@ -38,10 +45,10 @@ export async function resealAll() {
       await db`update credentials set client_secret = ${seal(c.client_secret)} where id = ${c.id}`;
       return true;
     });
-  for (const s of await db`select key, value from settings where key in ('gateway', 'auth', 'ingest')`)
+  for (const s of await db`select key, value from settings where key in ('gateway', 'auth', 'ingest', 'email')`)
     await attempt(`settings ${s.key}`, async () => {
       const v = s.value || {};
-      if (allCurrent([v.clientSecret, v.oidc?.clientSecret, v.otoroshi?.secret, v.key])) return false;
+      if (allCurrent([v.clientSecret, v.oidc?.clientSecret, v.otoroshi?.secret, v.key, v.apiKey, v.apiSecret, v.smtp?.password])) return false;
       await db`update settings set value = ${sealSettings(s.key, v)}, updated_at = now() where key = ${s.key}`;
       return true;
     });
@@ -77,8 +84,8 @@ export async function resealAll() {
 // how many values are stored in clear, for the setup check
 export async function clearSecrets() {
   const credentials = (await db`select count(*)::int as n from credentials where client_secret is not null and client_secret <> '' and client_secret not like 'enc:v1:%'`)[0].n;
-  const settings = (await db`select key, value from settings where key in ('gateway', 'auth', 'ingest')`).filter((s) =>
-    [s.value?.clientSecret, s.value?.oidc?.clientSecret, s.value?.otoroshi?.secret, s.value?.key].some((x) => x && !isSealed(x))
+  const settings = (await db`select key, value from settings where key in ('gateway', 'auth', 'ingest', 'email')`).filter((s) =>
+    [s.value?.clientSecret, s.value?.oidc?.clientSecret, s.value?.otoroshi?.secret, s.value?.key, s.value?.apiKey, s.value?.apiSecret, s.value?.smtp?.password].some((x) => x && !isSealed(x))
   ).length;
   return { credentials, settings };
 }

@@ -647,6 +647,33 @@ create table api_announcements (
 create index api_announcements_of_api on api_announcements(workspace_id, api_slug, created_at desc);
 `,
   },
+  {
+    version: '0022_email',
+    sql: `
+-- email: the notifications of a workspace sent to its people, turned on by its administrators — to
+-- the people of its portal, to its producers — then kind by kind. The transport is the installation's
+-- (the settings 'email')
+alter table workspaces add column email jsonb not null default '{}';
+
+-- each email sent, or not: a person's email of a notification sent once, whatever the retries; a
+-- test from the settings has no notification
+create table email_deliveries (
+  id text primary key,
+  notification_id text references notifications(id) on delete cascade,
+  user_id text references users(id) on delete set null,
+  workspace_id text references workspaces(id) on delete cascade,
+  kind text,
+  address text not null,
+  subject text not null,
+  status text not null,
+  error text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create unique index email_deliveries_once on email_deliveries(notification_id, user_id) where notification_id is not null;
+create index email_deliveries_recent on email_deliveries(created_at desc);
+`,
+  },
 ];
 
 export const analyticsMigrations = [
