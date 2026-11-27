@@ -155,9 +155,13 @@ The beta manages REST APIs on one Otoroshi cluster. Next:
 - **A European payment provider**, beside Stripe Connect, for the paid plans.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
-- **Notifications outside the product** — email and outgoing webhooks: a subscription to review or
-  accepted, a key about to expire, a version deprecated, a quota nearly spent. Today they live in
-  the console and the portal only.
+- **Talking to the consumers** — announcements on the page of an API, like a blog, its subscribers
+  notified; messages between producers and consumers, an inbox in the product; email and outgoing
+  webhooks on the notifications and the events, chosen per kind: a subscription to review or
+  accepted, a key about to expire, a version deprecated, a quota nearly spent. Today the
+  notifications live in the console and the portal only.
+- **Usage in finer grain** — the usage of one key on the portal, its history set per portal, the
+  dashboards of the console by endpoint.
 - **The product's own metrics** — its projection queue, drift, ingestion and errors, for
   Prometheus or OpenTelemetry; today a health check and `gateway status`.
 - **API quality** — the specifications linted, an API scored and reviewed before it is published.
