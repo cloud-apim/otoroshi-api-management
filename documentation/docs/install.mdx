@@ -401,6 +401,12 @@ default: nothing is sent.
 **Send a test email** checks the transport; the emails sent, and the ones that failed with what the
 transport answered, are listed beside it.
 
+### Webhooks
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APIM_WEBHOOKS_ALLOW_PRIVATE` | `false` (`true` with `DEV=true`) | lets a [webhook](./webhooks.mdx) post to an address of a private network — loopback, RFC 1918, link-local |
+
 ### Console authentication
 
 | Variable | Default | Meaning |

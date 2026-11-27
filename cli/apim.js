@@ -31,6 +31,12 @@ Commands:
   users delete <email|id>              a person deleted: their personal applications closed and deleted, their access gone
   email test [<address>]               an email through the transport of the installation (default: to you)
   email deliveries [--q text] [--status sent|failed]   the emails sent, and the ones that failed
+  webhooks list <ws>                   the webhooks of a workspace: their events, their state
+  webhooks add <ws> --url u [--name n] [--types a,b]   a webhook (default: every write); its secret printed once
+  webhooks test|delete|secret|rotate <ws> <id>
+  webhooks deliveries <ws> <id> [--status pending|succeeded|failed] [--q text]
+  webhooks redeliver <ws> <id> <delivery>   one delivery again, its same id
+  webhooks recover <ws> <id> --since <date> the failed since a date, replayed
   gateway status
   gateway setup                        what the product needs on the gateway, created or repaired:
 ${SETUP_HELP}
@@ -419,6 +425,34 @@ async function main() {
         ]);
       }
       throw new Error(`${cmd} list|upgrade`);
+    }
+    case 'webhooks': {
+      const base = `${ws(a1)}/webhooks`;
+      const id = () => need(a2, '<id>');
+      if (sub === 'list')
+        return print(await call('GET', base), [['id', 'id'], ['name', 'name'], ['url', 'url'], ['events', (h) => h.types.join(',')], ['state', (h) => (!h.enabled ? `off${h.disabled_reason ? `: ${h.disabled_reason}` : ''}` : h.failing_since ? 'failing' : 'on')], ['waiting', 'pending'], ['failed', 'failed']]);
+      if (sub === 'add') {
+        const h = await call('POST', base, { url: need(flags.url, '--url <url>'), name: flags.name || '', types: flags.types ? String(flags.types).split(',') : ['*'] });
+        if (OUTPUT !== 'table') return print(h);
+        return console.log(`webhook ${h.id} created; its secret, to verify its requests: ${h.secret}`);
+      }
+      if (sub === 'delete') return print(await call('DELETE', `${base}/${id()}`));
+      if (sub === 'secret') return console.log((await call('POST', `${base}/${id()}/secret`)).secret);
+      if (sub === 'rotate') return console.log(`new secret: ${(await call('POST', `${base}/${id()}/rotate`)).secret}; the previous one signs for a day more`);
+      if (sub === 'test') {
+        const d = await call('POST', `${base}/${id()}/test`);
+        return console.log(d.status === 'succeeded' ? `delivered: the endpoint answered ${d.last_status}` : `not delivered: ${d.last_error}`);
+      }
+      if (sub === 'deliveries') {
+        const q = new URLSearchParams({ limit: flags.limit || '50', ...(flags.status ? { status: flags.status } : {}), ...(flags.q ? { q: flags.q } : {}) });
+        return print((await call('GET', `${base}/${id()}/deliveries?${q}`)).items, [['id', 'id'], ['event', 'type'], ['status', 'status'], ['attempts', 'attempts'], ['answer', (d) => d.last_status ?? ''], ['error', (d) => d.last_error || ''], ['at', (d) => new Date(d.created_at).toISOString().slice(0, 16).replace('T', ' ')]]);
+      }
+      if (sub === 'redeliver') {
+        const d = await call('POST', `${base}/${id()}/deliveries/${need(a3, '<delivery>')}/redeliver`);
+        return console.log(d.status === 'succeeded' ? 'delivered' : `not delivered: ${d.last_error}`);
+      }
+      if (sub === 'recover') return console.log(`${(await call('POST', `${base}/${id()}/recover`, { since: need(flags.since, '--since <date>') })).replayed} failed delivery(ies) replayed`);
+      throw new Error('webhooks list|add|delete|secret|rotate|test|deliveries|redeliver|recover');
     }
     case 'email': {
       if (sub === 'test') {

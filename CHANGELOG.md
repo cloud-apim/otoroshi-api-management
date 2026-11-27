@@ -5,6 +5,12 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Webhooks.** The events of a workspace — what its audit trail records — sent to the endpoints its
+  administrators declare, each one taking the types it names (**Workspace settings › Webhooks**, the
+  admin API, `otoroshi-apim webhooks`): signed as Standard Webhooks, tried again at 5 s, 5 min, 30 min,
+  2 h, 5 h, 10 h and 10 h, then kept 30 days and replayed by hand, the administrators told; an endpoint
+  answering 410 or failing for five days turned off; private networks refused unless allowed.
+
 - **Email.** The notifications of a workspace sent by email, once its administrators turn it on —
   to the people of its portal, to its producers, kind by kind (**Workspace settings › Email**) —,
   through the transport of the installation: SMTP, Mailgun, Mailjet or SendGrid (**Global settings ›

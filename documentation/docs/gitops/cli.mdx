@@ -36,6 +36,8 @@ The same commands, three ways:
 |---|---|
 | `whoami` | the user behind the token |
 | `users list [--q text]` | the people of the installation (an installation administrator's) |
+| `webhooks list\|add\|delete\|secret\|rotate\|test <ws> [<id>]` | the [webhooks](../webhooks.mdx) of a workspace; `add --url u [--name n] [--types a,b]` prints its secret once |
+| `webhooks deliveries\|redeliver\|recover <ws> <id> …` | its deliveries (`--status`, `--q`), one replayed (`<delivery>`), the failed since a date (`--since`) |
 | `email test [<address>]` | an email through the transport of the installation (default: to you) |
 | `email deliveries [--q text] [--status sent\|failed]` | the emails sent, and the ones that failed with what the transport answered |
 | `users delete <email\|id>` | a person [deleted](../concepts/workspaces-teams-users.mdx#deleting-a-person): their personal applications closed and deleted, their access gone |

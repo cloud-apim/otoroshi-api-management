@@ -38,6 +38,8 @@ export const KIND_LABELS = () => ({
   'api.deprecated': tr('a version deprecated'),
   'api.archived': tr('a version archived'),
   'pin.behind': tr('a shared group or resource published, an API behind'),
+  'webhook.failing': tr('a webhook failing'),
+  'webhook.disabled': tr('a webhook turned off'),
 });
 
 // ---------------------------------------------------------------- the transport of the installation

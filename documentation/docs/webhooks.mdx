@@ -1,0 +1,106 @@
+---
+sidebar_position: 6.7
+title: Webhooks
+description: The events of a workspace sent to your endpoints — signed as Standard Webhooks, retried, kept and replayed by hand.
+---
+
+# Webhooks
+
+A workspace sends its **events** to the endpoints its administrators declare: every write its
+[audit trail](./gitops/admin-api.mdx#audit-trail) records — a subscription requested or accepted,
+an API published or deprecated, an announcement, a member added… —, each endpoint taking the types
+it names. **Workspace settings › Webhooks**, the [admin API](./gitops/admin-api.mdx) or
+`otoroshi-apim webhooks`.
+
+## The events an endpoint takes
+
+| Type | What it takes |
+|---|---|
+| `*` | every write of the trail |
+| `subscription.*` | a family: every action that starts with `subscription.` |
+| `api.announcement.publish` | one action |
+| `credential.read` | a read of the trail (a credential read, a request log exported): only when named, never by `*` |
+
+The tab of the webhook offers the actions the trail of the workspace has recorded. An endpoint
+receives the events that come after its creation; turned off and on again, it catches up with what
+happened meanwhile.
+
+## What is sent
+
+A `POST` of JSON, one event a request:
+
+```json
+{
+  "type": "subscription.accept",
+  "timestamp": "2026-11-27T10:41:06.120Z",
+  "workspace": { "id": "ws_01a1…", "slug": "default" },
+  "data": {
+    "event_id": 18342,
+    "summary": "subscription sub_01a1… accepted",
+    "entity": { "kind": "subscription", "id": "sub_01a1…" },
+    "actor": { "id": "usr_01a1…", "email": "jane@example.com", "via": "backoffice" },
+    "details": {}
+  }
+}
+```
+
+`details` is what the trail keeps of the event, left out beyond 20 kB; the address of the actor is
+never sent.
+
+## The signature
+
+Each request is signed as [Standard Webhooks](https://www.standardwebhooks.com/) — a specification
+with libraries to verify it in many languages:
+
+| Header | Value |
+|---|---|
+| `webhook-id` | the id of the delivery, `msg_…`: the same on every attempt — the key to drop a duplicate |
+| `webhook-timestamp` | when it was signed, in seconds since 1970 |
+| `webhook-signature` | `v1,` and the base64 of the HMAC-SHA256 of `<webhook-id>.<webhook-timestamp>.<body>`, keyed with the secret |
+
+The secret of the webhook, `whsec_…`, is shown once at its creation and read again on demand — each
+reading in the audit trail —; it is sealed at rest. The key of the HMAC is the base64 after `whsec_`.
+The timestamp is signed too: refuse a request signed more than five minutes ago, and a request
+captured is not replayed later.
+
+```js
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
+// the raw body, before any parsing
+function verify(secret, headers, body) {
+  const id = headers['webhook-id'];
+  const timestamp = headers['webhook-timestamp'];
+  if (Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) return false;
+  const key = Buffer.from(secret.replace(/^whsec_/, ''), 'base64');
+  const expected = Buffer.from(createHmac('sha256', key).update(`${id}.${timestamp}.${body}`).digest('base64'));
+  return headers['webhook-signature'].split(' ').some((s) => {
+    const given = Buffer.from(s.replace(/^v1,/, ''));
+    return given.length === expected.length && timingSafeEqual(given, expected);
+  });
+}
+```
+
+**Rotate** gives a new secret; the previous one signs beside it for a day — the header then carries
+two signatures —, the time for the receiver to take the new one.
+
+## The retries
+
+A delivery succeeds on a `2xx` within 15 seconds; anything else fails — a redirect too, which is not
+followed. A failed delivery is tried again **5 s, 5 min, 30 min, 2 h, 5 h, 10 h and 10 h** later
+(eight attempts over about a day and a half, a little jitter on each); a `429` or a `503` with a
+`Retry-After` is tried again when it says (a day at most). The order of the events is not kept: a
+delivery tried again may come after a more recent one — the `timestamp` of the payload orders them.
+
+Its attempts spent, a delivery is **kept**, failed: the administrators of the workspace are told in
+their notifications, once while the endpoint fails. **Replay** sends one again — the same
+`webhook-id` —, **Replay the failed since this date** all of them. An endpoint that answers `410 Gone`
+is turned off, and so is one that has failed for **five days in a row**; turned on again, its failed
+deliveries are replayed by hand. **Send a test** posts a `webhook.test` event at once. The deliveries
+are kept 30 days.
+
+## Private networks
+
+An endpoint on a private network — loopback, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`,
+link-local, their IPv6 counterparts — is refused, when it is set and before each attempt: a webhook
+must not reach what sits beside the product. `APIM_WEBHOOKS_ALLOW_PRIVATE=true` allows it (the
+development stack does).

@@ -218,6 +218,13 @@ if (mail && !mail.portal.enabled && !mail.console.enabled) {
   await call('PUT', `${W}/email`, { portal: { enabled: true, kinds: { 'subscription.ending': false } }, console: { enabled: true } });
   console.log('default   its notifications by email too');
 }
+// a webhook of the default workspace: its subscriptions and its announcements, posted to the echo
+// backend of the development stack, which answers 200
+const hooks = await call('GET', `${W}/webhooks`).catch(() => null);
+if (Array.isArray(hooks) && !hooks.some((h) => h.name === 'Echo')) {
+  await call('POST', `${W}/webhooks`, { name: 'Echo', url: 'http://echo:8080/webhooks', types: ['subscription.*', 'api.announcement.publish'] });
+  console.log('default   a webhook, its subscriptions and announcements posted to the echo backend');
+}
 // an announcement of books, its subscribers told: once
 const announced = await call('GET', `${W}/apis/books/announcements`).catch(() => []);
 if (Array.isArray(announced) && !announced.length) {

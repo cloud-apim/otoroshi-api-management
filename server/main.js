@@ -405,6 +405,9 @@ async function start() {
     setInterval(() => billing.reconcile().catch((e) => console.error('[apim] payment reconciliation failed', e.message)), config.payments.reconcileMs);
     const { deliverAll } = await import('./domain/auditExport.js');
     setInterval(() => deliverAll().catch((e) => console.error('[apim] audit export failed', e.message)), 5000);
+    // the outgoing webhooks: the new events of the trail fanned out, what is due sent
+    const { runWebhooks } = await import('./domain/webhooks.js');
+    setInterval(() => runWebhooks().catch((e) => console.error('[apim] webhooks failed', e.message)), 2000);
     setTimeout(() => runDriftDetection().catch(() => null), 5000);
   }
   // the ingester rolls its calls up and applies the retention of each path

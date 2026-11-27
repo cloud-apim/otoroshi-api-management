@@ -387,6 +387,7 @@ const STATUS_KIND = {
   in_sync: 'positive',
   synced: 'positive',
   done: 'positive',
+  succeeded: 'positive',
   enabled: 'positive',
   pending: 'warning',
   pending_payment: 'warning',

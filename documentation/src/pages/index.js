@@ -33,12 +33,17 @@ const capabilities = [
   {
     kicker: 'Portal',
     title: 'One developer portal per workspace',
-    body: 'A themable catalogue with multilingual documentation, an OpenAPI reference rendered by Scalar with a try-it that uses the consumer\'s own credentials, applications, credentials, live quotas and usage.',
+    body: 'A themable catalogue with multilingual documentation, an OpenAPI reference rendered by Scalar with a try-it that uses the consumer\'s own credentials, the announcements of each API, applications, credentials, live quotas and usage, key by key.',
   },
   {
     kicker: 'Analytics',
     title: 'Usage in the catalogue\'s vocabulary',
     body: 'An ingester receives Otoroshi events and attributes every call to its API, plan, subscription and application at ingestion — dashboards speak of products and plans, not of routes.',
+  },
+  {
+    kicker: 'Events',
+    title: 'Told, by email, by webhook',
+    body: 'A request to review, a subscription accepted, a version deprecated: the people it concerns are told in the product, and by email — SMTP, Mailgun, Mailjet, SendGrid — when a workspace turns it on. Every event of a workspace reaches your systems through webhooks, signed as Standard Webhooks, retried and replayed.',
   },
   {
     kicker: 'GitOps',

@@ -28,10 +28,14 @@ able to*: every projected Otoroshi entity stays readable, reachable and reclaima
 
 | Component | Path | What it is |
 |---|---|---|
-| Console | `/backoffice` | producers describe APIs, plans and documentation, publish and deploy, review subscriptions, watch usage |
-| Developer portal | `/<workspace>/` | consumers browse the catalogue, read the docs, try the API, subscribe, get credentials, follow their usage |
+| Console | `/backoffice` | producers describe APIs, plans and documentation, publish and deploy, review subscriptions, [announce](./concepts/apis-and-versions.mdx#announcements) what changes, watch usage |
+| Developer portal | `/<workspace>/` | consumers browse the catalogue, read the docs and the announcements, try the API, subscribe, get credentials, follow their usage key by key |
 | Admin API | `/api` | the only way to do anything in the product — the console uses the very same router |
 | Ingester | `/ingest` | receives Otoroshi events and stores them attributed to APIs, plans, subscriptions and applications |
+
+Its people are told what concerns them in the product, and [by email](./concepts/applications-and-subscriptions.mdx#by-email)
+when a workspace turns it on; its events reach other systems through [webhooks](./webhooks.mdx), signed
+as Standard Webhooks, retried and replayed.
 
 They are four **roles** of a single binary — a fifth, `controller`, reconciles the
 [Kubernetes resources](./gitops/kubernetes.mdx) of the product: a deployment can carry all of them or

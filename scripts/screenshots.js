@@ -358,11 +358,17 @@ async function consoleTour(page) {
     ['metadata', 'console-ws-metadata', 'Workspace settings — typed metadata fields'],
     ['payments', 'console-ws-payments', 'Workspace settings — payments: the Stripe account the paid plans are sold with, and what Stripe said'],
     ['email', 'console-ws-email', 'Workspace settings — email: the notifications sent by email, to the people of the portal and to the producers, kind by kind'],
+    ['webhooks', 'console-ws-webhooks', 'Workspace settings — webhooks: the events of the workspace sent to endpoints, signed, retried'],
     ['export', 'console-ws-export', 'Workspace settings — export and import'],
   ]) {
     await go(page, `${W}/settings/${tab}`);
     if (tab === 'export') await editors(page);
     await shot(page, name, title);
+  }
+  const hooks = await api(page, `/backoffice/api/workspaces/${WS}/webhooks`);
+  if (hooks?.[0]) {
+    await go(page, `${W}/settings/webhooks?open=${hooks[0].id}`);
+    await shot(page, 'console-ws-webhook', 'A webhook — its secret, a test, its deliveries, replayed one by one or since a date', { full: false });
   }
   // the page of a developer portal: the showcase workspace, its portal themed, its next design
   // written as templates in the draft

@@ -28,6 +28,7 @@ import { exportWorkspace, importWorkspace, apiDocument, applyApiDocument } from 
 import { gatewayBaseUrl } from './portal-api.js';
 import { consoleAuth, invalidateAuthSettings } from '../auth/settings.js';
 import * as email from '../domain/email.js';
+import * as webhooks from '../domain/webhooks.js';
 import * as policyGroups from '../domain/policyGroups.js';
 import * as metadata from '../domain/metadata.js';
 import { readCertificate, issuerPatterns } from '../domain/pki.js';
@@ -524,6 +525,77 @@ r.put('/workspaces/:ws/email', async ({ ctx, params, body }) => {
   const said = (f) => (next[f].enabled ? `on${Object.keys(next[f].kinds).length ? `, ${Object.keys(next[f].kinds).length} kind(s) off` : ''}` : 'off');
   await audit(c, { action: 'workspace.email.update', workspaceId: c.workspace.id, entityKind: 'workspace', entityId: c.workspace.id, summary: `email to the people of the portal ${said('portal')}, to the producers ${said('console')}`, data: { before, after: next } });
   return next;
+});
+
+// the outgoing webhooks of a workspace: its events sent to endpoints, signed, retried, replayed — an
+// administrator's
+const hookOf = async (c, params) => webhooks.getEndpoint(c.workspace.id, params.webhook);
+
+r.get('/workspaces/:ws/webhooks', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.listEndpoints(c.workspace.id);
+});
+
+// the types an endpoint may take: the actions the trail of the workspace has recorded
+r.get('/workspaces/:ws/webhook-types', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.eventTypes(c.workspace.id);
+});
+
+r.post('/workspaces/:ws/webhooks', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.createEndpoint(c, c.workspace.id, body || {});
+});
+
+r.get('/workspaces/:ws/webhooks/:webhook', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.showEndpoint(await hookOf(c, params));
+});
+
+r.put('/workspaces/:ws/webhooks/:webhook', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.updateEndpoint(c, await hookOf(c, params), body || {});
+});
+
+r.delete('/workspaces/:ws/webhooks/:webhook', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  await webhooks.deleteEndpoint(c, await hookOf(c, params));
+  return { deleted: true };
+});
+
+r.post('/workspaces/:ws/webhooks/:webhook/secret', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.revealSecret(c, await hookOf(c, params));
+});
+
+r.post('/workspaces/:ws/webhooks/:webhook/rotate', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.rotateSecret(c, await hookOf(c, params));
+});
+
+r.post('/workspaces/:ws/webhooks/:webhook/test', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.sendTest(c, await hookOf(c, params));
+});
+
+r.get('/workspaces/:ws/webhooks/:webhook/deliveries', async ({ ctx, params, query }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.listDeliveries(await hookOf(c, params), { ...pageParams(query, { defaultLimit: 50, max: 200 }), status: query.get('status') || null });
+});
+
+r.get('/workspaces/:ws/webhooks/:webhook/deliveries/:delivery', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.delivery(await hookOf(c, params), params.delivery);
+});
+
+r.post('/workspaces/:ws/webhooks/:webhook/deliveries/:delivery/redeliver', async ({ ctx, params }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.redeliver(c, await hookOf(c, params), params.delivery);
+});
+
+r.post('/workspaces/:ws/webhooks/:webhook/recover', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params, ['admin']);
+  return webhooks.recover(c, await hookOf(c, params), body?.since);
 });
 
 r.delete('/workspaces/:ws', async ({ ctx, params }) => {

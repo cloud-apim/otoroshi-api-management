@@ -22,13 +22,19 @@ consumer alone, a screen at each step.
 Two faces of one thing, plus the two services that carry them:
 
 - **an API management console** (`/backoffice`) — producers describe APIs, plans, documentation;
-  publish immutable snapshots and deploy them; review subscriptions; watch usage;
+  publish immutable snapshots and deploy them; review subscriptions; announce what changes; watch
+  usage, by API, plan, application or endpoint;
 - **a developer portal** per workspace (`/<workspace>/`) — consumers browse the catalogue, read the
-  documentation, try the API (Scalar), subscribe from their applications, get their credentials —
-  a key per subscription, or one for every API of an application — and follow their consumption;
+  documentation and the announcements, try the API (Scalar), subscribe from their applications, get
+  their credentials — a key per subscription, or one for every API of an application — and follow
+  their consumption, key by key;
 - **an admin API** (`/api`) — the only way to do anything; the console uses the very same router;
 - **an ingester** (`/ingest`) — receives Otoroshi events and stores them computed (attributed to
   api, plan, subscription, application) and, optionally, raw.
+
+Its people are told what concerns them — in the product, and by email (SMTP, Mailgun, Mailjet,
+SendGrid) when a workspace turns it on —, and its events reach other systems through webhooks, signed
+as Standard Webhooks, retried and replayed.
 
 **The product is never in the request path**: it projects policies into Otoroshi through its Admin
 API, and Otoroshi enforces them. If the product is down, traffic still flows.
@@ -155,13 +161,9 @@ The beta manages REST APIs on one Otoroshi cluster. Next:
 - **A European payment provider**, beside Stripe Connect, for the paid plans.
 - **Several gateways for one installation** — one portal, one catalogue, APIs deployed on more than
   one Otoroshi cluster (today an installation drives exactly one).
-- **Talking to the consumers** — announcements on the page of an API, like a blog, its subscribers
-  notified; messages between producers and consumers, an inbox in the product; email and outgoing
-  webhooks on the notifications and the events, chosen per kind: a subscription to review or
-  accepted, a key about to expire, a version deprecated, a quota nearly spent. Today the
-  notifications live in the console and the portal only.
-- **Usage in finer grain** — the usage of one key on the portal, its history set per portal, the
-  dashboards of the console by endpoint.
+- **Messages** — a conversation between a person of the portal and the workspace, about an API or a
+  subscription, an inbox in the product.
+- **More to tell** — a key about to expire, a quota nearly spent.
 - **The product's own metrics** — its projection queue, drift, ingestion and errors, for
   Prometheus or OpenTelemetry; today a health check and `gateway status`.
 - **API quality** — the specifications linted, an API scored and reviewed before it is published.
