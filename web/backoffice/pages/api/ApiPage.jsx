@@ -9,6 +9,7 @@ import { PlansTab } from './Plans.jsx';
 import { AsyncApiTab, DocsTab, OpenApiTab } from './Docs.jsx';
 import { DeploymentTab } from './Deployment.jsx';
 import { CatalogueTab } from './Catalogue.jsx';
+import { AnnouncementsTab } from './Announcements.jsx';
 import { SubscriptionsTable } from '../Subscriptions.jsx';
 import { AnalyticsDashboard, SecurityEvents } from '../Observability.jsx';
 import { RequestComposer } from '../../../shared/composer.jsx';
@@ -133,6 +134,7 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'openapi', label: tr('OpenAPI') },
     { id: 'asyncapi', label: tr('AsyncAPI') },
     { id: 'catalogue', label: tr('Catalogue') },
+    { id: 'announcements', label: tr('Announcements') },
     api.pending_subscriptions
       ? { id: 'subscriptions', label: tr('Subscriptions'), count: api.pending_subscriptions, attention: true, title: tr('{0} waiting for review', [api.pending_subscriptions]) }
       : { id: 'subscriptions', label: tr('Subscriptions') },
@@ -219,6 +221,7 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'openapi' && <OpenApiTab {...ctx} />}
       {tab === 'asyncapi' && <AsyncApiTab {...ctx} />}
       {tab === 'catalogue' && <CatalogueTab api={api} readOnly={!api.can_manage} />}
+      {tab === 'announcements' && <AnnouncementsTab api={api} readOnly={!api.can_manage} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
       {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
       {tab === 'test' && <TestTab api={api} draft={draft} />}

@@ -19,6 +19,16 @@ export async function notifyApiTeam(teamId, note) {
   for (const a of admins) await notify({ ...note, userId: a.user_id });
 }
 
+// what changes for the consumers of apis: the teams of the applications subscribed to them — an open
+// subscription, waiting or running —, each told once, in the portal
+export async function notifySubscribers(apiIds, note) {
+  if (!apiIds.length) return 0;
+  const teams = await db`select distinct app.team_id from subscriptions s join applications app on app.id = s.application_id
+    where s.api_id in ${db(apiIds)} and s.status in ('pending', 'pending_payment', 'active', 'suspended', 'expired')`;
+  for (const t of teams) await notify({ ...note, face: 'portal', teamId: t.team_id });
+  return teams.length;
+}
+
 // the notifications of a person in a workspace, with their own read and done marks.
 // filter: 'open' (not done, the default), 'unread', 'done', 'all'
 export async function searchFor(user, workspaceId, face, { filter = 'open', limit = 50, offset = 0, q = '' } = {}) {

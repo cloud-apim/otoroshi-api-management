@@ -20,6 +20,7 @@ import * as notifications from '../domain/notifications.js';
 import { resolveLocal } from '../otoroshi/vault-refs.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
+import * as announcements from '../domain/announcements.js';
 import { usageOf } from '../payments/usage.js';
 import { portalUrl } from '../portal-exposure.js';
 
@@ -223,7 +224,14 @@ r.get('/apis/:api', async ({ ctx, params }) => {
   const entry = await findEntry(ctx, params.api);
   const view = await apiView(entry, { full: true, sig: await signals(ctx) });
   const versions = (await catalogue(ctx)).filter((e) => e.row.slug === entry.row.slug).map((e) => ({ id: e.row.id, version: e.row.content.api.version, lifecycle: e.row.lifecycle }));
-  return { ...view, versions };
+  const announced = (await db`select count(*)::int as n from api_announcements where workspace_id = ${ctx.workspace.id} and api_slug = ${entry.row.slug}`)[0].n;
+  return { ...view, versions, announcements_count: announced };
+});
+
+// the announcements of an api, across its versions, to whoever can see the api: the most recent first
+r.get('/apis/:api/announcements', async ({ ctx, params }) => {
+  const entry = await findEntry(ctx, params.api);
+  return (await announcements.listAnnouncements(ctx.workspace.id, entry.row.slug)).map(({ id, title, body, created_at, updated_at, author_name }) => ({ id, title, body, created_at, updated_at, author_name }));
 });
 
 // the reviews of an api, across its versions: from the consumers who subscribed to it

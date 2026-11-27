@@ -211,6 +211,15 @@ if (login.ok && cookie) {
     console.log('default   a review of books by its consumer');
   }
 }
+// an announcement of books, its subscribers told: once
+const announced = await call('GET', `${W}/apis/books/announcements`).catch(() => []);
+if (Array.isArray(announced) && !announced.length) {
+  await call('POST', `${W}/apis/books/announcements`, {
+    title: 'Search by author, from June',
+    body: 'The \`/books\` resource takes an \`author\` parameter from **June 2**: no change for the calls that do not use it.\n\nThe plans and their quotas stay the same.',
+  });
+  console.log('default   an announcement of books, its subscribers told');
+}
 
 // ---------------------------------------------------------------- activity
 // the apis whose subscriptions call: their base url, their paths, the keys of their consumers

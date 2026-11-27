@@ -140,7 +140,8 @@ the subscription then has a `pending_transfer` (`-o json`), whose `status` is `a
 ## Notifications
 
 Consumers are notified of what happens to their subscriptions — accepted, rejected, suspended,
-resumed, closed, moved, a move to agree to — and producers of what they have to decide — a
+resumed, closed, moved, a move to agree to —, of the [announcements](./apis-and-versions.mdx#announcements)
+of the APIs they subscribe to, and of a version deprecated or archived; producers of what they have to decide — a
 request waiting for review, a move asked by a consumer. Notifications are addressed to teams — the
 team of the application, the team of the API; for an API of no team, the administrators of its
 workspace, who decide for it —: every member sees them, and **each reads them and marks them done on their own** — one member

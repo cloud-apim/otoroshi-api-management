@@ -41,6 +41,10 @@ ${SETUP_HELP}
   apis undeploy <ws> <api>
   apis placement <ws> <api> [--categories a,b] [--featured true|false]   where it stands in the catalogue
   apis reviews <ws> <api>              the reviews of its consumers, the hidden ones too
+  announcements list <ws> <api>        the announcements of an api, across its versions
+  announcements publish <ws> <api> --title t [-f text.md] [--quiet]
+                                       published at once, its subscribers told (not with --quiet)
+  announcements delete <ws> <api> <id>
   apis snapshots <ws> <api>
   apis export-snapshot <ws> <api> [--snapshot n]   a snapshot as a promotion document (default: the deployed one)
   promote <ws> -f <file> [--dry-run] [--deploy] [--replace-draft]
@@ -413,6 +417,17 @@ async function main() {
         ]);
       }
       throw new Error(`${cmd} list|upgrade`);
+    }
+    case 'announcements': {
+      const base = `${ws(a1)}/apis/${need(a2, '<api>')}/announcements`;
+      if (sub === 'list') return print(await call('GET', base), [['id', 'id'], ['title', 'title'], ['published', (n) => new Date(n.created_at).toISOString().slice(0, 16).replace('T', ' ')], ['by', (n) => n.author_name || '']]);
+      if (sub === 'publish') {
+        const body = flags.file ? readFileSync(flags.file, 'utf8') : '';
+        const n = await call('POST', base, { title: need(flags.title, '--title <title>'), body, notify: !flags.quiet });
+        return console.log(`announcement ${n.id} published${n.told ? `, ${n.told} team(s) of subscribers told` : ''}`);
+      }
+      if (sub === 'delete') return print(await call('DELETE', `${base}/${need(a3, '<id>')}`));
+      throw new Error('announcements list|publish|delete');
     }
     case 'dictionaries': {
       const w = a1;

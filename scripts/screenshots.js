@@ -256,6 +256,8 @@ async function consoleTour(page) {
   }
   await go(page, `${A}/catalogue`);
   await shot(page, 'console-api-catalogue', 'API — its place in the catalogue of the portal (categories, featured), and the reviews of its consumers');
+  await go(page, `${A}/announcements`);
+  await shot(page, 'console-api-announcements', 'API — its announcements, like a blog on its page in the portal, its subscribers told');
   await go(page, `${A}/subscriptions`);
   await shot(page, 'console-api-subscriptions', 'API — its subscriptions');
   if (bookSub) {
@@ -469,6 +471,8 @@ async function portalTour(page) {
   await shot(page, 'portal-plans', 'Portal — plans: what really applies, per credential');
   await go(page, `${P}/apis/books/reviews`);
   await shot(page, 'portal-reviews', 'Portal — the reviews of the consumers who subscribed');
+  await go(page, `${P}/apis/books/announcements`);
+  await shot(page, 'portal-announcements', 'Portal — the announcements of an api');
   await go(page, `${P}/apis/orders-events/events`);
   await shot(page, 'portal-events', 'Portal — the events of an event-driven api, from its AsyncAPI specification');
   await go(page, `${P}/signin`);

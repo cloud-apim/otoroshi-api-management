@@ -6,6 +6,7 @@
 import { db, newId, slugify } from '../db/index.js';
 import { badRequest, conflict, forbidden, notFound } from '../http/router.js';
 import { audit } from './audit.js';
+import { notifySubscribers } from './notifications.js';
 import { diff } from './diff.js';
 import { defaultDraft, defaultPlan, normalizeDraft, SERVED_STATUSES, validateDraft, VISIBILITIES } from './model.js';
 import { isTeamMember } from './identity.js';
@@ -124,11 +125,20 @@ export async function updateApi(ctx, api, patch) {
   return rows[0];
 }
 
+const LIFECYCLE_NOTES = {
+  deprecated: 'It is still served, and closed to new subscriptions: move to a newer version.',
+  archived: 'It is no longer served: its calls are refused.',
+};
+
 export async function setLifecycle(ctx, api, lifecycle) {
   if (!['published', 'deprecated', 'archived'].includes(lifecycle)) throw badRequest('invalid lifecycle');
   if (api.lifecycle === 'created') throw badRequest('publish the api first');
   const rows = await db`update apis set lifecycle = ${lifecycle}, updated_at = now() where id = ${api.id} returning *`;
   await audit(ctx, { action: `api.lifecycle.${lifecycle}`, workspaceId: api.workspace_id, entityKind: 'api', entityId: api.id, summary: `${api.name} ${api.version} is now ${lifecycle}` });
+  // its subscribers told what changes for them: still served but closed (deprecated), no longer served
+  const told = LIFECYCLE_NOTES[lifecycle];
+  if (told && api.lifecycle !== lifecycle)
+    await notifySubscribers([api.id], { workspaceId: api.workspace_id, kind: `api.${lifecycle}`, title: `${api.name} ${api.version} is ${lifecycle}`, body: told, link: `/apis/${api.id}`, data: { api_id: api.id } });
   return rows[0];
 }
 

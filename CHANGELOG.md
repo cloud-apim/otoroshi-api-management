@@ -5,6 +5,10 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **Announcements of an API**, like a blog: posts on its page in the portal, for all its versions,
+  its subscribers told in their notifications (console, admin API, `otoroshi-apim announcements`).
+  A version deprecated or archived is told to its subscribers too.
+
 - **The usage in finer grain.** On the portal, the usage of one key — a filter of the analytics and
   the request log, and **Usage of this key** on each subscription —, and its history set per portal
   (**Developer portal › Settings › Usage history**: 90 days by default, up to the retention of the

@@ -628,6 +628,25 @@ alter table credentials add column shared boolean not null default false;
 create unique index credentials_shared_of_application on credentials(application_id) where shared and status = 'active';
 `,
   },
+  {
+    version: '0021_announcements',
+    sql: `
+-- the announcements of an api, like a blog: posts on its page in the portal, its subscribers told in
+-- their notifications. They belong to the api across its versions (its slug), as its reviews do, and
+-- never reach the gateway
+create table api_announcements (
+  id text primary key,
+  workspace_id text not null references workspaces(id) on delete cascade,
+  api_slug text not null,
+  title text not null,
+  body text not null default '',
+  created_by text references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index api_announcements_of_api on api_announcements(workspace_id, api_slug, created_at desc);
+`,
+  },
 ];
 
 export const analyticsMigrations = [

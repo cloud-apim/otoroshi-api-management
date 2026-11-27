@@ -8,6 +8,7 @@ import { Template } from '../design.jsx';
 import { LifecycleBadge, SmallPager, SmallSearch, authLabel, priceLabel, quotaLabel, rateLabel, snippets } from '../common.jsx';
 import { SubscribeModal } from './Subscribe.jsx';
 import { Reviews } from './Reviews.jsx';
+import { Announcements } from './Announcements.jsx';
 import { Events } from './AsyncApi.jsx';
 import { Stars } from '../../shared/stars.jsx';
 import { RequestComposer } from '../../shared/composer.jsx';
@@ -50,6 +51,7 @@ function ApiView({ a, tab, page }) {
     ...(a.has_asyncapi ? [{ id: 'events', label: t('api.tab.events'), to: `${base}/events` }] : []),
     { id: 'plans', label: t('api.tab.plans'), to: `${base}/plans`, count: a.plans.length },
     ...(a.rating !== undefined ? [{ id: 'reviews', label: t('api.tab.reviews'), to: `${base}/reviews`, count: a.rating?.count || 0 }] : []),
+    ...(a.announcements_count ? [{ id: 'announcements', label: t('api.tab.announcements'), to: `${base}/announcements`, count: a.announcements_count }] : []),
   ];
   return (
     <>
@@ -130,6 +132,7 @@ function ApiView({ a, tab, page }) {
         {tab === 'try' && <Try a={a} />}
         {tab === 'plans' && <Plans a={a} />}
         {tab === 'reviews' && <Reviews a={a} />}
+        {tab === 'announcements' && <Announcements a={a} />}
         {tab === 'events' && <Events a={a} />}
       </div>
     </>

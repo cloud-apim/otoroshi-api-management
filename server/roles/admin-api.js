@@ -37,6 +37,7 @@ import { currentForm, portalBase, portalHistory, portalUrl } from '../portal-exp
 import * as promotion from '../domain/promotion.js';
 import * as billing from '../payments/billing.js';
 import * as discovery from '../domain/discovery.js';
+import * as announcements from '../domain/announcements.js';
 import * as dictionaries from '../domain/dictionaries.js';
 import * as sharedResources from '../domain/resources.js';
 import { deleteUser, isBootstrapAdmin } from '../domain/people.js';
@@ -667,6 +668,34 @@ r.post('/workspaces/:ws/apis/:api/reviews/:review/hide', async ({ ctx, params, b
   const c = await ws(ctx, params);
   await apiOf(c, params, { manage: true });
   return discovery.hideReview(c, c.workspace.id, params.review, body?.hidden !== false);
+});
+
+// the announcements of an api, across its versions: published at once, its subscribers told
+r.get('/workspaces/:ws/apis/:api/announcements', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params);
+  return announcements.listAnnouncements(c.workspace.id, api.slug);
+});
+
+r.post('/workspaces/:ws/apis/:api/announcements', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params, { manage: true });
+  return announcements.createAnnouncement(c, api, body || {});
+});
+
+r.put('/workspaces/:ws/apis/:api/announcements/:announcement', async ({ ctx, params, body }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params, { manage: true });
+  const current = await announcements.getAnnouncement(c.workspace.id, api.slug, params.announcement);
+  return announcements.updateAnnouncement(c, api, current, body || {});
+});
+
+r.delete('/workspaces/:ws/apis/:api/announcements/:announcement', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params, { manage: true });
+  const current = await announcements.getAnnouncement(c.workspace.id, api.slug, params.announcement);
+  await announcements.deleteAnnouncement(c, api, current);
+  return { deleted: true };
 });
 
 r.post('/workspaces/:ws/apis/:api/versions', async ({ ctx, params, body }) => {
