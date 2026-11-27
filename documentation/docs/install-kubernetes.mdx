@@ -1,0 +1,604 @@
+---
+sidebar_position: 3.5
+title: Install on Kubernetes
+description: The Helm chart and the Kustomize manifests — what they deploy, an installation step by step, every value of the chart, recipes, upgrades and troubleshooting.
+---
+
+# Install on Kubernetes
+
+The repository ships two ways to install the product on a cluster: a **Helm chart**,
+`deploy/helm/otoroshi-api-management`, and **Kustomize manifests**, `deploy/kubernetes`. Both
+deploy the same things:
+
+| Object | What it is |
+|---|---|
+| a `Deployment` of **the product** | the roles `ingester,api,backoffice,portal`: the admin API, the console, the developer portals, the ingester. Two replicas by default: they share the projection queue, each task claimed by one of them |
+| a `Deployment` of **its controller** | the role `controller`, **one** replica (`Recreate`): it reconciles the [Kubernetes resources](./gitops/kubernetes.mdx) of the product — `Api`, `Application`, `Subscription` — in every namespace. Its own service account and `ClusterRole` |
+| a `Service` | port `9000`, in front of the product's pods: the console, the portals, the admin API, `/ingest` |
+| a `ConfigMap` | the configuration that is not secret |
+| a `Secret` | the databases, the key to the gateway, the tokens, the key of the secrets — made by the chart, or yours |
+| the three **CRDs** | `apis.otoroshi-apim.io`, `applications.otoroshi-apim.io`, `subscriptions.otoroshi-apim.io` |
+| an `Ingress` | optional (Helm) |
+
+**Not included**: PostgreSQL and Otoroshi. Point the product at a managed PostgreSQL, or at one you
+run in the cluster, and at the Otoroshi cluster it drives — in this cluster or elsewhere. What each
+variable means is in [Install › Configuration](./install.mdx#configuration); this page says how to set
+it on Kubernetes.
+
+## Before you start
+
+- **A Kubernetes cluster** that serves `apiextensions.k8s.io/v1` and `networking.k8s.io/v1` (1.19
+  and later), and `kubectl`.
+- **Helm 3**, for the chart. The chart is in the repository: install it from a clone, at the tag of
+  the version you install (`git clone --branch v0.1.1 https://github.com/cloud-apim/otoroshi-api-management`).
+- **Otoroshi 18.1** or later, its admin API reachable from the pods, and an **admin API key with every
+  right** (see [what an installation needs](./install.mdx#what-an-installation-needs)).
+- **PostgreSQL 14** or later, reachable from the pods, with **two databases** owned by the user
+  the product connects with:
+
+  ```sql
+  CREATE DATABASE apim OWNER apim;
+  CREATE DATABASE apim_analytics OWNER apim;
+  ```
+
+  The product creates its tables itself: the migrations run at start, one instance at a time.
+- **Its connections**: each pod opens its two pools, `config.database.pool` +
+  `config.database.analyticsPool` connections (15 with the chart's values). Count them all — the
+  replicas, the controller, one more replica during a rolling update —: with the defaults,
+  4 × 15 = 60, under the `max_connections` of PostgreSQL (100 by default) minus what else uses the
+  server.
+
+## With Helm, step by step
+
+The examples install the release `apim` in the namespace `apim`. The chart names its objects
+`<release>-otoroshi-api-management` — here `apim-otoroshi-api-management`, and
+`apim-otoroshi-api-management-controller` —, or the name of the release alone when it already
+contains `otoroshi-api-management`.
+
+### 1. The secrets
+
+Make the `Secret` yourself — by hand, from a vault, with an external-secrets operator — rather than
+putting secrets in a values file. Its keys:
+
+| Key | Variable | Read by | |
+|---|---|---|---|
+| `database-url` | `APIM_DATABASE_URL` | every pod | the application database |
+| `analytics-database-url` | `APIM_ANALYTICS_DATABASE_URL` | every pod | the events and analytics database |
+| `otoroshi-client-id` | `OTOROSHI_CLIENT_ID` | every pod | the admin key of the gateway |
+| `otoroshi-client-secret` | `OTOROSHI_CLIENT_SECRET` | every pod | |
+| `admin-token` | `APIM_ADMIN_TOKEN` | the product | a static admin API token, acting as the first administrator |
+| `ingest-token` | `APIM_INGEST_TOKEN` | the product | what the data exporter of the gateway presents to `/ingest` |
+| `bootstrap-password` | `APIM_BOOTSTRAP_PASSWORD` | every pod | the local password of the first administrators |
+| `secrets-key` | `APIM_SECRETS_KEY` | every pod | the key the product [seals its secrets](./install.mdx#secrets-at-rest) with |
+| `secrets-previous-keys` | `APIM_SECRETS_PREVIOUS_KEYS` | every pod | optional: the previous keys, during a rotation |
+
+```bash
+kubectl create namespace apim
+kubectl -n apim create secret generic otoroshi-api-management \
+  --from-literal=database-url='postgres://apim:<password>@postgres.example.com:5432/apim' \
+  --from-literal=analytics-database-url='postgres://apim:<password>@postgres.example.com:5432/apim_analytics' \
+  --from-literal=otoroshi-client-id='<admin key id>' \
+  --from-literal=otoroshi-client-secret='<admin key secret>' \
+  --from-literal=admin-token="$(openssl rand -hex 24)" \
+  --from-literal=ingest-token="$(openssl rand -hex 24)" \
+  --from-literal=bootstrap-password="$(openssl rand -base64 18)" \
+  --from-literal=secrets-key="$(openssl rand -hex 32)"
+```
+
+:::warning Keep the key of the secrets
+`secrets-key` seals what the product keeps — the secrets of the credentials, its key to the gateway,
+the secrets of the identity providers. Lose it and they cannot be opened again: back it up beside the
+database. To change it, see [rotating the secrets](#rotating-the-secrets).
+:::
+
+The secrets of the development stack (`password`, `apim-admin-token`, `ingest-secret`…) are refused:
+a pod given one of them does not start.
+
+The bootstrap password, to sign in the first time:
+
+```bash
+kubectl -n apim get secret otoroshi-api-management -o jsonpath='{.data.bootstrap-password}' | base64 -d
+```
+
+### 2. The values
+
+A file of your own, `values.yaml`, with what differs from the chart's — every value is
+described [below](#the-values):
+
+```yaml
+image:
+  tag: "0.1.1"                     # pinned: the chart defaults to its appVersion
+
+config:
+  publicUrl: https://apim.example.com
+  installationName: production
+  otoroshi:
+    url: http://otoroshi-api.otoroshi.svc.cluster.local:8080   # its admin API, as the pods reach it
+    host: otoroshi-api.oto.tools                               # the Host of its admin API
+    publicScheme: https                                        # how consumers call the APIs
+    publicPort: 443
+  bootstrapAdmins: you@example.com
+
+secrets:
+  existingSecret: otoroshi-api-management
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  hosts:
+    - host: apim.example.com
+      paths: [{ path: /, pathType: Prefix }]
+  tls:
+    - { hosts: [apim.example.com], secretName: apim-tls }
+```
+
+### 3. Install
+
+```bash
+helm install apim deploy/helm/otoroshi-api-management -n apim -f values.yaml
+kubectl -n apim rollout status deploy/apim-otoroshi-api-management
+kubectl -n apim rollout status deploy/apim-otoroshi-api-management-controller
+```
+
+Helm installs the CRDs first, from the `crds/` folder of the chart. The pods are ready once
+`/health` answers — after the migrations, on the first start.
+
+### 4. The gateway
+
+The product needs a few things on Otoroshi that no API describes: its own admin key, the data exporter
+that feeds the ingester, and, if the gateway exposes them, the routes of the console and of the
+portals. The **setup** makes them ([setting the gateway up](./gateway/setup.mdx)): from the console,
+**Gateway › Setup**, or from a pod of the product, with the configuration it already has — a dry run
+first:
+
+```bash
+kubectl -n apim exec deploy/apim-otoroshi-api-management -- otoroshi-apim setup \
+  --admin-client-id '<admin key id>' --admin-client-secret '<admin key secret>' \
+  --product-url http://apim-otoroshi-api-management.apim.svc.cluster.local:9000 \
+  --dry-run
+```
+
+then the same without `--dry-run`. `--product-url` is the product as the gateway reaches it — here
+its service, when Otoroshi runs in the same cluster.
+
+**The data exporter** posts the events of the gateway to `config.ingestUrl` — by default the
+service of the release, `http://<release>-otoroshi-api-management.<namespace>.svc.cluster.local:9000/ingest`.
+When the gateway runs elsewhere, set `config.ingestUrl` to an address it reaches (the ingress:
+`https://apim.example.com/ingest`), and let the traffic of its pods through your network policies.
+The setup checks that events come in.
+
+### 5. Check
+
+```bash
+kubectl -n apim exec deploy/apim-otoroshi-api-management -- otoroshi-apim health
+kubectl -n apim logs deploy/apim-otoroshi-api-management --tail=20
+```
+
+Then the console, `https://apim.example.com/backoffice/`, with an email of `config.bootstrapAdmins`
+and the bootstrap password; **Gateway** says whether the gateway answers, **Gateway › Setup**
+what is still missing on it.
+
+## The values
+
+Every value of the chart, by group. **Sets** is the variable it sets — its meaning in
+[Install › Configuration](./install.mdx#configuration).
+
+### The image and the replicas
+
+| Value | Default | Sets | |
+|---|---|---|---|
+| `image.repository` | `ghcr.io/cloud-apim/otoroshi-api-management` | | the image the releases publish, for `linux/amd64` and `linux/arm64` |
+| `image.tag` | the `appVersion` of the chart | | pin it: `"0.1.1"` |
+| `image.pullPolicy` | `IfNotPresent` | | |
+| `imagePullSecrets` | `[]` | | for a registry of your own: `[{ name: regcred }]` |
+| `replicaCount` | `2` | | the replicas of the product. They hold no state: sessions, the task queue and the analytics are in PostgreSQL |
+| `roles` | `ingester,api,backoffice,portal` | `APIM_ROLES` | the roles of the product's pods; never `controller`, which has its deployment. See [splitting the roles](#splitting-the-roles) |
+
+### The controller
+
+| Value | Default | Sets | |
+|---|---|---|---|
+| `controller.enabled` | `true` | | the deployment of the controller, its service account, its `ClusterRole` and their binding. Off, the CRDs are still installed (`helm install --skip-crds` leaves them out) |
+| `controller.resyncMs` | `10000` | `APIM_KUBE_RESYNC_MS` | how often it passes over every resource |
+| `controller.resources` | requests `50m` / `128Mi`, limit `512Mi` | | |
+
+Its `ClusterRole`: the three resources of the product, their status and finalizers; `get`, `create`
+and `update` on secrets, where it writes the credentials of a subscription; `get` on namespaces,
+whose label names their workspace ([its rights](./gitops/kubernetes.mdx#its-rights)). Its workers are
+off: the projection queue is the product's.
+
+### The configuration
+
+Each in the `ConfigMap`, read by every pod.
+
+| Value | Default | Sets | |
+|---|---|---|---|
+| `config.publicUrl` | `https://apim.example.com` | `APIM_PUBLIC_URL` | the public base of the product: the console is at `<public url>/backoffice/` |
+| `config.installationName` | `production` | `APIM_INSTALLATION_NAME` | the name of the environment — a [promoted](./gitops/promotion.mdx) snapshot says where it comes from |
+| `config.otoroshi.url` | `http://otoroshi-api.otoroshi.svc.cluster.local:8080` | `OTOROSHI_URL` | the admin API of Otoroshi, as the pods reach it |
+| `config.otoroshi.host` | `otoroshi-api.oto.tools` | `OTOROSHI_HOST` | the `Host` of its admin API |
+| `config.otoroshi.publicScheme` | `https` | `OTOROSHI_PUBLIC_SCHEME` | how consumers call the APIs: `<scheme>://<api domain>:<port>` |
+| `config.otoroshi.publicPort` | `443` | `OTOROSHI_PUBLIC_PORT` | |
+| `config.otoroshi.backofficeUrl` | — | `OTOROSHI_BACKOFFICE_URL` | to link a projected entity in the backoffice of Otoroshi; none, no link |
+| `config.ingestUrl` | the service of the release | `APIM_INGEST_URL` | `/ingest` as the gateway reaches it: the target of its data exporter |
+| `config.tenancy` | `multi` | `APIM_TENANCY` | `multi`, one portal per workspace · `single`, one workspace, its portal at the root |
+| `config.portal.exposure` | `path` | `APIM_PORTAL_EXPOSURE` | `path`: `<portal url>/<workspace>/` · `hostname`: `<workspace>.<domain>/` ([portal exposure](./install.mdx#portal-exposure)) |
+| `config.portal.domain` | — | `APIM_PORTAL_DOMAIN` | required with `hostname` |
+| `config.portal.url` | `config.publicUrl` | `APIM_PORTAL_URL` | the public base of the portals |
+| `config.bootstrapAdmins` | `admin@example.com` | `APIM_BOOTSTRAP_ADMINS` | the emails of the installation administrators, comma-separated |
+| `config.cookieSecure` | `true` | `APIM_COOKIE_SECURE` | session cookies `Secure`: `false` only for a test reached over plain http, whose sign-in would fail otherwise |
+| `config.database.pool` | `10` | `APIM_DATABASE_POOL` | the connections each pod opens to the application database |
+| `config.database.analyticsPool` | `5` | `APIM_ANALYTICS_DATABASE_POOL` | the same, to the analytics database |
+| `config.extraEnv` | `{}` | any | the other variables that are not secret, in the `ConfigMap`: `{ APIM_EMAIL_TRANSPORT: smtp }` |
+
+A change of the `ConfigMap` restarts the pods (its checksum is an annotation of theirs).
+
+### The secrets
+
+| Value | Default | |
+|---|---|---|
+| `secrets.existingSecret` | — | the name of a `Secret` you made, with [its keys](#1-the-secrets). Given, the chart makes none, and the values below are not read |
+| `secrets.databaseUrl` | — | `database-url` — required without `existingSecret`, like the next seven |
+| `secrets.analyticsDatabaseUrl` | — | `analytics-database-url` |
+| `secrets.otoroshiClientId` | — | `otoroshi-client-id` |
+| `secrets.otoroshiClientSecret` | — | `otoroshi-client-secret` |
+| `secrets.adminToken` | — | `admin-token` |
+| `secrets.ingestToken` | — | `ingest-token` |
+| `secrets.bootstrapPassword` | — | `bootstrap-password` |
+| `secrets.secretsKey` | — | `secrets-key` |
+| `secrets.secretsPreviousKeys` | — | `secrets-previous-keys`, optional |
+| `secrets.extraEnv` | `{}` | the other variables that are secret, each key a variable, in a `Secret` of the chart, `<release>-otoroshi-api-management-env` — made with `existingSecret` too: `{ APIM_STRIPE_SECRET_KEY: sk_live_… }` |
+| `extraEnvFrom` | `[]` | more sources of variables for both deployments, as `envFrom` entries: a `Secret` or a `ConfigMap` made elsewhere, each key a variable — `[{ secretRef: { name: apim-payments } }]` |
+
+Without `existingSecret`, the chart refuses to render while one of the eight is missing, and names it.
+A change of a `Secret` the chart makes restarts the pods; a change of yours does not — restart
+them: `kubectl -n apim rollout restart deployment -l app.kubernetes.io/instance=apim`.
+
+### The variables without a value of their own
+
+Every other variable of [the configuration](./install.mdx#configuration) goes in `config.extraEnv`
+when it is not secret, and in `secrets.extraEnv` or a source of `extraEnvFrom` when it is:
+
+| Variables | Secret | |
+|---|---|---|
+| `APIM_BOOTSTRAP_WORKSPACE` | no | the workspace made on the first start |
+| `APIM_PROJECTION_INTERVAL_MS`, `APIM_DRIFT_INTERVAL_MS`, `APIM_WORKERS_ENABLED` | no | the workers |
+| `APIM_DATABASE_IDLE_TIMEOUT_S` | no | |
+| `APIM_INGEST_STORE_RAW`, `APIM_INGEST_RETENTION_MS` | no | the ingester |
+| `APIM_WEBHOOKS_ALLOW_PRIVATE` | no | [webhooks](./webhooks.mdx) to private networks |
+| `APIM_CONSOLE_AUTH`, `APIM_OIDC_ISSUER`, `APIM_OIDC_CLIENT_ID`, `APIM_OIDC_SCOPES`, `APIM_OIDC_LABEL`, `APIM_OTOROSHI_CLAIM_HEADER` | no | the [sign-in to the console](./authentication.mdx) |
+| `APIM_OIDC_CLIENT_SECRET`, `APIM_OTOROSHI_CLAIM_SECRET` | **yes** | |
+| `APIM_EMAIL_TRANSPORT`, `APIM_EMAIL_FROM`, `APIM_EMAIL_SMTP_HOST`, `APIM_EMAIL_SMTP_PORT`, `APIM_EMAIL_SMTP_SECURITY`, `APIM_EMAIL_SMTP_USER`, `APIM_EMAIL_DOMAIN`, `APIM_EMAIL_REGION`, `APIM_EMAIL_API_BASE` | no | the [email](./install.mdx#email) |
+| `APIM_EMAIL_SMTP_PASSWORD`, `APIM_EMAIL_API_KEY`, `APIM_EMAIL_API_SECRET` | **yes** | |
+| `APIM_PAYMENTS_PROVIDER`, `APIM_STRIPE_CLIENT_ID`, `APIM_STRIPE_API_VERSION`, `APIM_PAYMENTS_RECONCILE_MS` | no | the [payments](./payments.mdx) |
+| `APIM_STRIPE_SECRET_KEY`, `APIM_STRIPE_WEBHOOK_SECRET` | **yes** | |
+
+The sign-in to the console and the email can also be set from the console, **Global settings** —
+their secrets sealed in the database —, which takes precedence over the variables.
+
+Never set `DEV`: it fills what is missing with the values of the development stack.
+
+### The exposure
+
+| Value | Default | |
+|---|---|---|
+| `service.type` | `ClusterIP` | `LoadBalancer` or `NodePort` to expose the product without an ingress |
+| `service.port` | `9000` | the port of the service (the pods listen on `9000`); the default `config.ingestUrl` follows it |
+| `ingress.enabled` | `false` | an `Ingress` to the service |
+| `ingress.className` | — | its `ingressClassName` |
+| `ingress.annotations` | `{}` | e.g. `cert-manager.io/cluster-issuer` |
+| `ingress.hosts` | `apim.example.com`, `/` | its rules: `[{ host, paths: [{ path, pathType }] }]` |
+| `ingress.tls` | `[]` | `[{ hosts: […], secretName }]` |
+
+An ingress on `/` exposes everything the product serves: the console (`/backoffice`), the portals,
+the admin API (`/api`, a bearer token), the ingester (`/ingest`, its token) and the callbacks of
+Stripe (`/payments`). To expose less, see [exposing what browsers need](#exposing-only-what-browsers-need).
+
+### The pods
+
+| Value | Default | |
+|---|---|---|
+| `resources` | requests `100m` / `256Mi`, limit `1Gi` | the product's pods |
+| `podSecurityContext` | `runAsNonRoot`, `runAsUser: 10001`, `runAsGroup: 10001` | both deployments. `10001` is the user of the image: its home is the working directory, which another uid cannot open |
+| `securityContext` | no privilege escalation, every capability dropped | the containers of both |
+| `nodeSelector`, `tolerations`, `affinity` | none | both deployments |
+
+The pods mount no service account token but the controller's, and get none of the variables
+Kubernetes adds for each service of the namespace (`enableServiceLinks: false`). The readiness probe
+is `/health`, every 5 seconds (the controller's, every 10); the liveness probe of the product, every
+20. On
+`SIGTERM` a pod stops taking requests and finishes the ones in flight, within ten seconds.
+
+## Recipes
+
+### Trying it on a test cluster
+
+Plain http, reached through a port forward:
+
+```yaml
+config:
+  publicUrl: http://localhost:9000
+  cookieSecure: false
+  otoroshi:
+    url: http://otoroshi-api.otoroshi.svc.cluster.local:8080
+    host: otoroshi-api.oto.tools
+    publicScheme: http
+    publicPort: 8080
+secrets:
+  existingSecret: otoroshi-api-management
+replicaCount: 1
+```
+
+```bash
+kubectl -n apim port-forward svc/apim-otoroshi-api-management 9000:9000
+# the console: http://localhost:9000/backoffice/
+```
+
+### Portals by hostname
+
+Each workspace at `https://<workspace>.apis.example.com/`, the console at
+`https://apim.example.com/backoffice/` — a wildcard DNS entry and a wildcard certificate (a DNS-01
+challenge with cert-manager):
+
+```yaml
+config:
+  publicUrl: https://apim.example.com
+  portal:
+    exposure: hostname
+    domain: apis.example.com
+    url: https://apis.example.com
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: apim.example.com
+      paths: [{ path: /, pathType: Prefix }]
+    - host: "*.apis.example.com"
+      paths: [{ path: /, pathType: Prefix }]
+  tls:
+    - { hosts: [apim.example.com, "*.apis.example.com"], secretName: apim-tls }
+```
+
+The bare domain leads to the portal of the bootstrap workspace. Choose the form before the first
+links circulate: [changing it later](./install.mdx#changing-the-form) redirects, as long as the old
+hosts reach the product.
+
+### Exposing only what browsers need
+
+When the gateway runs in the cluster and CI calls the admin API from inside, the public ingress needs
+the console and the portals only — the callbacks of Stripe too, with paid plans:
+
+```yaml
+config:
+  portal: { exposure: hostname, domain: apis.example.com, url: https://apis.example.com }
+ingress:
+  enabled: true
+  hosts:
+    - host: apim.example.com
+      paths:
+        - { path: /backoffice, pathType: Prefix }
+        - { path: /payments, pathType: Prefix }     # with paid plans: Stripe calls the product back
+    - host: "*.apis.example.com"
+      paths: [{ path: /, pathType: Prefix }]
+```
+
+The ingester stays on the service of the release (the default `config.ingestUrl`), the admin API too
+(`http://apim-otoroshi-api-management.apim.svc.cluster.local:9000/api`).
+
+**Through the gateway instead of an ingress**: the setup makes routes of Otoroshi to the console and
+the portals (`--console-host`, `--portal-host`, `--product-url` the service), and the product is
+reached like any API — with an auth module of the gateway in front of the console if you want it
+([setup](./gateway/setup.mdx)). `ingress.enabled` stays `false`.
+
+### Splitting the roles
+
+The public portals and the ingester do not have the profile of the console. The chart deploys one
+set of roles per release: a second release serves the portals — here by hostname —, from the same
+values plus its own:
+
+```yaml
+# values.yaml, shared: the configuration, the secret, and the release that ingests
+roles: ingester,api,backoffice
+config:
+  publicUrl: https://apim.example.com
+  ingestUrl: http://apim-otoroshi-api-management.apim.svc.cluster.local:9000/ingest
+  portal: { exposure: hostname, domain: apis.example.com, url: https://apis.example.com }
+  # …
+secrets:
+  existingSecret: otoroshi-api-management
+ingress:
+  enabled: true
+  hosts:
+    - host: apim.example.com
+      paths: [{ path: /, pathType: Prefix }]
+```
+
+```yaml
+# values-portals.yaml: the portals alone, without a controller, on their hosts
+roles: portal
+replicaCount: 4
+controller:
+  enabled: false
+config:
+  database: { pool: 4, analyticsPool: 2 }
+ingress:
+  hosts:
+    - host: "*.apis.example.com"
+      paths: [{ path: /, pathType: Prefix }]
+```
+
+```bash
+helm install apim deploy/helm/otoroshi-api-management -n apim -f values.yaml
+helm install apim-portals deploy/helm/otoroshi-api-management -n apim -f values.yaml -f values-portals.yaml --skip-crds
+```
+
+Both share the `Secret` and the databases. `config.ingestUrl` names the release that ingests: by
+default each release would name its own service. The workers run on the pods of `api` or
+`backoffice` only, the rollups on the pods of `ingester`: a portal-only pod serves, nothing more.
+Count the connections of both releases together.
+
+### Paid plans
+
+```bash
+kubectl -n apim create secret generic apim-payments \
+  --from-literal=APIM_STRIPE_SECRET_KEY='sk_live_…' \
+  --from-literal=APIM_STRIPE_WEBHOOK_SECRET='whsec_…'
+```
+
+```yaml
+config:
+  extraEnv:
+    APIM_PAYMENTS_PROVIDER: stripe
+    APIM_STRIPE_CLIENT_ID: ca_…
+extraEnvFrom:
+  - secretRef: { name: apim-payments }
+```
+
+Stripe calls `<public url>/payments/stripe/webhook`: the ingress has to let `/payments` through
+([payments](./payments.mdx)).
+
+### Single sign-on and email
+
+```yaml
+config:
+  extraEnv:
+    APIM_OIDC_ISSUER: https://idp.example.com
+    APIM_OIDC_CLIENT_ID: apim-console
+    APIM_EMAIL_TRANSPORT: smtp
+    APIM_EMAIL_FROM: "API portal <no-reply@example.com>"
+    APIM_EMAIL_SMTP_HOST: smtp.example.com
+    APIM_EMAIL_SMTP_USER: apim
+secrets:
+  existingSecret: otoroshi-api-management
+  extraEnv:
+    APIM_OIDC_CLIENT_SECRET: "…"
+    APIM_EMAIL_SMTP_PASSWORD: "…"
+```
+
+Or from the console, **Global settings › Authentication** and **› Email**, nothing in the values.
+
+## Operating it
+
+### Upgrading
+
+Read the section **Upgrades** of the version in `CHANGELOG.md` first. Then, from the clone at the new
+tag:
+
+```bash
+# Helm installs the CRDs of crds/ the first time only: apply them yourself
+kubectl apply -f deploy/helm/otoroshi-api-management/crds/
+helm upgrade apim deploy/helm/otoroshi-api-management -n apim -f values.yaml --set image.tag=<version>
+```
+
+The new pods migrate the databases at start, one at a time, while the previous ones keep serving
+(migrations are never edited once released: an installation upgrades in place). The gateway serves
+the calls throughout — the product is [never in the request path](./gateway/product-down.mdx).
+
+### Rotating the secrets
+
+- **The key of the secrets**: put the new one in `secrets-key`, the previous one in
+  `secrets-previous-keys`, restart. At start every secret is sealed again with the new key; once all
+  the pods run with it, remove the previous one ([secrets at rest](./install.mdx#secrets-at-rest)).
+- **The tokens** (`admin-token`, `ingest-token`): change them in the `Secret`, restart, then run the
+  `exporter` part of the setup again, which gives the data exporter the new ingest token.
+- **The key of the product to the gateway**: `otoroshi-apim setup --rotate-key`.
+
+### Uninstalling
+
+```bash
+helm uninstall apim -n apim
+```
+
+removes the pods, the `ConfigMap`, the `Secret` the chart made and the rights of the controller. The
+gateway keeps serving what was projected, the databases keep everything, and a new installation on the
+same databases takes over.
+
+**The CRDs and the resources stay**: Helm never deletes CRDs. A resource carries the finalizer of the
+controller, `otoroshi-apim.io/cleanup`, and deleting it deletes what it owns — its API removed from the
+gateway, its subscription closed — unless it is annotated `otoroshi-apim.io/deletion-policy: detach`
+([who owns what](./gitops/kubernetes.mdx#who-owns-what)). Delete the resources while the controller
+runs; once it is gone, a resource being deleted waits on its finalizer, and removing the finalizer by
+hand leaves its objects in the product. Deleting a CRD deletes every resource of its kind.
+
+### Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| a pod exits at start naming variables | they are missing: the log lists every one; or a secret is one of the development stack's |
+| `secrets.<name> is required` at `helm install` | the chart makes the `Secret`, and that value is not given — or give `secrets.existingSecret` |
+| `Connection closed`, `too many clients already` at start | the database cannot be reached or refuses: its address, its credentials, its `max_connections` reached — count the pools. And the user of the pods: another uid than `10001` cannot open the working directory of the image, and fails the same way |
+| the sign-in loops, on plain http | `config.cookieSecure: true`: the browser keeps no `Secure` cookie over http |
+| **Gateway** says the gateway does not answer | `config.otoroshi.url` and `config.otoroshi.host`, as the pods reach them; the admin key |
+| no analytics | the data exporter cannot reach `config.ingestUrl`, or presents another token: the setup checks the events of the last fifteen minutes |
+| a resource stays in `Error`, `unknown team …` or `workspace … does not exist` | it lands in a workspace that does not have it: the label `otoroshi-apim.io/workspace` of its namespace, its annotation ([the workspace of a resource](./gitops/kubernetes.mdx#the-workspace-of-a-resource)) |
+| a resource does not move, nor its status | the controller: `kubectl -n apim logs deploy/apim-otoroshi-api-management-controller` |
+
+## With Kustomize
+
+`deploy/kubernetes/base` holds the same objects as the chart — the CRDs, the `ConfigMap`, the
+deployments of the product and of its controller, their service accounts, the `ClusterRole` and its
+binding, the service —, in the namespace `apim`, the image at `latest`. The `Secret` is not in it:
+`deploy/kubernetes/secret.example.yaml` has its keys, the ones [above](#1-the-secrets).
+
+```bash
+kubectl create namespace apim
+kubectl -n apim apply -f secret.yaml          # secret.example.yaml, with your values
+kubectl apply -k deploy/kubernetes/base       # its ConfigMap edited first
+```
+
+Rather than editing the base, an **overlay** of your own changes what differs — this one deploys in
+the namespace `api-management`, pins the image, merges its configuration into the `ConfigMap`, adds
+a `Secret` of variables and three replicas:
+
+```yaml
+# overlays/production/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: api-management
+resources:
+  - ../../deploy/kubernetes/base
+images:
+  # the name the base gives the image
+  - name: ghcr.io/cloud-apim/otoroshi-api-management
+    newTag: "0.1.1"
+patches:
+  # kustomize leaves the subject of the controller's binding in its namespace: move it
+  - target: { kind: ClusterRoleBinding, name: otoroshi-api-management-controller }
+    patch: |-
+      - op: replace
+        path: /subjects/0/namespace
+        value: api-management
+  # what is not secret, merged into the ConfigMap of the base — the namespace of the ingester's url too
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: otoroshi-api-management
+      data:
+        APIM_PUBLIC_URL: https://apim.example.com
+        APIM_INGEST_URL: http://otoroshi-api-management.api-management.svc.cluster.local:9000/ingest
+        OTOROSHI_URL: http://otoroshi-api.otoroshi.svc.cluster.local:8080
+        APIM_BOOTSTRAP_ADMINS: you@example.com
+  # more variables, from a Secret of your own: both deployments
+  - target: { kind: Deployment }
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/envFrom/-
+        value: { secretRef: { name: apim-extra } }
+  - target: { kind: Deployment, name: otoroshi-api-management }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+```
+
+```bash
+kubectl kustomize overlays/production        # what it renders
+kubectl apply -k overlays/production
+```
+
+The base is configured as the chart's defaults; what a [value](#the-values) changes, a patch
+changes — `secrets.extraEnv` is a `Secret` of yours, through `envFrom` as above. Upgrading is
+applying the overlay again with the new tag of the image: the CRDs are part of the base.

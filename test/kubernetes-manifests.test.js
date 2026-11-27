@@ -79,3 +79,20 @@ describe('the pods', () => {
     for (const f of ['templates/deployment.yaml', 'templates/controller.yaml']) expect(read(`${CHART}/${f}`)).toContain('enableServiceLinks: false');
   });
 });
+
+describe('the documentation of the chart', () => {
+  // a Kubernetes structure is documented as a whole; every other value, one by one
+  const WHOLE = new Set(['resources', 'controller.resources', 'podSecurityContext', 'securityContext', 'nodeSelector', 'tolerations', 'affinity', 'ingress.hosts', 'ingress.tls', 'ingress.annotations', 'config.extraEnv', 'secrets.extraEnv']);
+  const paths = (o, prefix = '') =>
+    Object.entries(o).flatMap(([k, v]) => {
+      const p = prefix ? `${prefix}.${k}` : k;
+      return v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length && !WHOLE.has(p) ? paths(v, p) : [p];
+    });
+
+  test('describes every value of the chart', () => {
+    const page = read('documentation/docs/install-kubernetes.mdx');
+    const values = paths(YAML.parse(read(`${CHART}/values.yaml`)));
+    expect(values.length).toBeGreaterThan(40);
+    expect(values.filter((p) => !page.includes(`\`${p}\``))).toEqual([]);
+  });
+});

@@ -44,7 +44,13 @@ API, and Otoroshi enforces them. If the product is down, traffic still flows.
 The executable of a [release](https://github.com/cloud-apim/otoroshi-api-management/releases), beside
 Otoroshi 18.1 and PostgreSQL: the **quickstart** of the documentation (`documentation/docs/quickstart.mdx`)
 makes an installation on one machine, configured as in production, and calls a first API through the
-gateway; **Install** covers a production one — roles, the image, Kubernetes and Helm.
+gateway; **Install** covers a production one — roles, the image, the configuration —, and **Install on
+Kubernetes** the Helm chart (`deploy/helm`, every value described) and the Kustomize manifests
+(`deploy/kubernetes`):
+
+```sh
+helm install apim deploy/helm/otoroshi-api-management -n apim --create-namespace -f values.yaml
+```
 
 ## Develop it
 

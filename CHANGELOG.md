@@ -49,6 +49,11 @@ The notes of each release: the section of a version is the body of its GitHub re
   rollups). In the console, the dashboards and the request log filtered by an endpoint of the API —
   a method and a templated path —, from the calls and from the rollups.
 
+- **Install on Kubernetes**, a page of the documentation of its own: an installation with Helm step
+  by step — the secrets, the values, the setup of the gateway —, every value of the chart, recipes
+  (a test cluster, portals by hostname, exposing only what browsers need, roles split between
+  releases, paid plans, single sign-on and email), upgrades, rotations, uninstalling,
+  troubleshooting, and the Kustomize overlays.
 - **The Helm chart**: `secrets.extraEnv`, the secret variables that have no value of their own —
   Stripe, OIDC, SMTP… —, in a Secret of the chart; `extraEnvFrom`, a Secret or a ConfigMap made
   elsewhere (an external-secrets operator, a vault); the pods restart when a Secret the chart makes
