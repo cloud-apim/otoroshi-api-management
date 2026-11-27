@@ -489,6 +489,20 @@ export function Tabs({ tabs, value, onChange }) {
   );
 }
 
+// the tabs under a tab: the pages of a group, lighter than their group
+export function SubTabs({ tabs, value, onChange, label }) {
+  return (
+    <div className="subtabs" role="tablist" aria-label={label}>
+      {tabs.map((t) => (
+        <button key={t.id} role="tab" aria-selected={value === t.id} className={value === t.id ? 'on' : ''} onClick={() => onChange(t.id)} title={t.title}>
+          {t.label}
+          {t.count !== undefined && t.count !== null && <span className={t.attention ? 'count attention' : 'count'}>{t.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function DiffView({ changes, empty = tr('No change') }) {
   if (!changes) return null;
   if (!changes.length) return <div className="muted small">{empty}</div>;

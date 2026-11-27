@@ -72,7 +72,7 @@ says how it will be called.
 
 ### 3. Point it at its backend
 
-**Backends** holds where the calls go. The backends are infrastructure — targets, TLS, timeouts,
+**Design › Backends** holds where the calls go. The backends are infrastructure — targets, TLS, timeouts,
 load balancing — and belong to the route, never to the offer.
 
 ![The Backends tab: the default backend, http://echo:8080](/img/tutorial/04-console-backends.jpg)
@@ -187,7 +187,7 @@ components:
               format: date-time
 ```
 
-**OpenAPI**: paste it in the editor — or save it as a file and **From a local file…**, or **Import**
+**Documentation › OpenAPI**: paste it in the editor — or save it as a file and **From a local file…**, or **Import**
 it from a URL. The outline lists its operations. **Save draft**.
 
 ![The OpenAPI tab: the specification in the editor, its outline: GET POST /shipments, GET /shipments/{id}](/img/tutorial/06-console-openapi.jpg)
@@ -396,7 +396,7 @@ gateway — nobody had to approve it.
 
 ![The Subscriptions tab of the API: Parcel tracker, Free, active, synced](/img/tutorial/22-console-subscriptions.jpg)
 
-**Analytics**: every call of the API, the refused one too, by plan, by application, by status.
+**Operate › Analytics**: every call of the API, the refused one too, by plan, by application, by status.
 
 ![The Analytics tab of the API: its calls, the refused one among them, the responses over time](/img/tutorial/23-console-analytics.jpg)
 
@@ -405,7 +405,7 @@ gateway — nobody had to approve it.
 - **A plan for the bigger consumers**: **Plans → Add plan**, more quota and *Manual review* — the
   requests wait in **Subscriptions** for a producer. Adding a tier is a catalogue operation, never an
   infrastructure one ([plans](./concepts/plans.mdx)).
-- **A change**: edit the draft, publish snapshot #2; the **Deployment** tab redeploys any earlier
+- **A change**: edit the draft, publish snapshot #2; **Operate › Deployment** redeploys any earlier
   snapshot ([APIs and versions](./concepts/apis-and-versions.mdx)).
 - **The API as a file**: `otoroshi-apim apis get acme shipments -o yaml` gives the same API as a
   [declarative document](./gitops/declarative-documents.mdx), to keep in git and apply from a CI

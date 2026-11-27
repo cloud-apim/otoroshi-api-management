@@ -183,6 +183,7 @@ async function producer(page) {
   await click(page, 'Apply', '.modal button');
 
   // its contract: the specification of the tutorial, as a file
+  await click(page, 'Documentation', '[role=tab]');
   await click(page, 'OpenAPI', '[role=tab], a, button');
   const input = await page.$('input[type=file]');
   await input.uploadFile(await specification());
@@ -191,6 +192,7 @@ async function producer(page) {
   await saveDraft(page);
 
   // the plan: who may call, how much, approved at once
+  await click(page, 'Design', '[role=tab]');
   await click(page, 'Plans', '[role=tab], a, button');
   await click(page, 'Edit');
   await fill(page, 'Name', 'Free', '.drawer');

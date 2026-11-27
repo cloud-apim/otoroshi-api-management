@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useRouter } from '../../../shared/router.jsx';
 import { fmtRelative } from '../../../shared/lib.js';
-import { Badge, Callout, DiffView, Dropdown, Field, Icon, Input, Loader, MenuItem, Modal, StatusBadge, Switch, Tabs, errorMessage, useLoad, useToast } from '../../../shared/ui.jsx';
+import { Badge, Callout, DiffView, Dropdown, Field, Icon, Input, Loader, MenuItem, Modal, StatusBadge, SubTabs, Switch, Tabs, errorMessage, useLoad, useToast } from '../../../shared/ui.jsx';
 import { useWs } from '../../context.jsx';
 import { PageHead } from '../../layout.jsx';
 import { OverviewTab, ResourcesTab, BackendsTab, FlowsTab, SettingsTab } from './tabs.jsx';
@@ -130,7 +130,7 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'backends', label: tr('Backends'), count: draft.backends.length },
     { id: 'flows', label: tr('Policies & flows'), count: draft.flows.length },
     { id: 'plans', label: tr('Plans'), count: draft.plans.length },
-    { id: 'documentation', label: tr('Documentation') },
+    { id: 'documentation', label: tr('Pages') },
     { id: 'openapi', label: tr('OpenAPI') },
     { id: 'asyncapi', label: tr('AsyncAPI') },
     { id: 'catalogue', label: tr('Catalogue') },
@@ -143,6 +143,31 @@ function ApiEditor({ api, tab, reload }) {
     { id: 'analytics', label: tr('Analytics') },
     { id: 'settings', label: tr('Settings') },
   ];
+  // two levels: the groups, then the tabs of the group shown — the one last opened in each group
+  // opened again
+  const groups = [
+    { id: 'overview', label: tr('Overview'), tabs: ['overview'] },
+    { id: 'design', label: tr('Design'), tabs: ['resources', 'backends', 'flows', 'plans'] },
+    { id: 'docs', label: tr('Documentation'), tabs: ['documentation', 'openapi', 'asyncapi'] },
+    { id: 'portal', label: tr('Portal'), tabs: ['catalogue', 'announcements'] },
+    { id: 'subscriptions', label: tr('Subscriptions'), tabs: ['subscriptions'] },
+    { id: 'operate', label: tr('Operate'), tabs: ['deployment', 'test', 'analytics'] },
+    { id: 'settings', label: tr('Settings'), tabs: ['settings'] },
+  ];
+  const group = groups.find((g) => g.tabs.includes(tab)) || groups[0];
+  const lastOf = useRef({});
+  lastOf.current[group.id] = tab;
+  const groupTabs = groups.map((g) => {
+    const own = tabs.filter((t) => g.tabs.includes(t.id));
+    // a group of one tab carries its count; a group of several, the attention one of them asks for
+    if (own.length === 1) return { ...own[0], id: g.id, label: g.label };
+    const asking = own.filter((t) => t.attention);
+    return asking.length ? { id: g.id, label: g.label, count: asking.reduce((n, t) => n + t.count, 0), attention: true } : { id: g.id, label: g.label };
+  });
+  const goGroup = (id) => {
+    const g = groups.find((x) => x.id === id);
+    go(lastOf.current[id] || g.tabs[0]);
+  };
   const ctx = { api, draft, setDraft, identity, setIdent, readOnly, validation, order, reload, dirty };
 
   return (
@@ -210,7 +235,8 @@ function ApiEditor({ api, tab, reload }) {
         </Callout>
       )}
       <div className="mb-16">
-        <Tabs tabs={tabs} value={tab} onChange={go} />
+        <Tabs tabs={groupTabs} value={group.id} onChange={goGroup} />
+        {group.tabs.length > 1 && <SubTabs tabs={tabs.filter((t) => group.tabs.includes(t.id))} value={tab} onChange={go} label={group.label} />}
       </div>
       {tab === 'overview' && <OverviewTab {...ctx} />}
       {tab === 'resources' && <ResourcesTab {...ctx} />}

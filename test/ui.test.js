@@ -207,6 +207,8 @@ describe.skipIf(!ready)('the console', () => {
     expect(created.draft.entrypoint.domain).toBe(`lighthouse-${RUN}.oto.tools`);
     // a plan of its own, on the draft
     await go(page, `/backoffice/ws/${WS}/apis/${state.createdApiId}/plans`);
+    // the tabs of an api on two levels: its group, then its page in the group
+    expect(await page.evaluate(() => [...document.querySelectorAll('.tabs [aria-selected=true], .subtabs [aria-selected=true]')].map((t) => t.innerText.replace(/\s*\d+$/, '').trim()))).toEqual(['Design', 'Plans']);
     await click(page, 'Add plan');
     await fill(page, 'Name', 'Gold', '.drawer');
     await click(page, 'Apply to the draft');

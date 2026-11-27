@@ -5,6 +5,9 @@ The notes of each release: the section of a version is the body of its GitHub re
 
 ## Unreleased
 
+- **The page of an API on two levels of tabs**: its groups — Overview, Design, Documentation, Portal,
+  Subscriptions, Operate, Settings —, then the pages of the group shown; no scroll whatever the screen.
+
 - **Messages.** A person of a portal writes to the workspace — **Messages**, **Ask a question** on an
   API, **Ask about it** on a subscription —, the subject routing the conversation to the team that
   answers (the administrators otherwise), answered from **Messages** in the console or with

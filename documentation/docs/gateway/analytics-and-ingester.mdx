@@ -150,7 +150,7 @@ figures identical.
 
 They speak the catalogue's vocabulary — APIs, plans, applications — not the infrastructure's.
 
-- **Console → Observability**, and the *Analytics* tab of each API and application. One row of
+- **Console → Observability**, and **Operate › Analytics** on the page of an API, *Usage* on an application. One row of
   filters scopes everything below it, and lives in the URL, so a filtered view is a bookmark: the
   timeframe — from the last 5 minutes to the last year, or a custom range — the API, its plan, an
   **endpoint** of the API — a method and a templated path, `GET /books/{id}`, among those called in
@@ -186,7 +186,7 @@ They speak the catalogue's vocabulary — APIs, plans, applications — not the 
   adds `Otoroshi headers in` to the flows of an API, unless its settings say otherwise:
   **Settings › Correlation**), and the request log keeps it — a request id a consumer or a backend
   quotes finds its call in the search of the request log.
-- **Console → Observability → Security**, and the *Analytics* tab of an API whose plans carry the
+- **Console → Observability → Security**, and **Operate › Analytics** of an API whose plans carry the
   threat protection: the security events by category, action and plan, how many were refused or
   masked, the latest ones. Reading them is recorded in the audit trail: they carry the address of
   the caller.

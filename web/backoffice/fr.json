@@ -2095,5 +2095,7 @@
   "answer": "réponse",
   "{0} conversation(s) waiting for an answer": "{0} conversation(s) en attente de réponse",
   "Send": "Envoyer",
-  "closed": "close"
+  "closed": "close",
+  "Portal": "Portail",
+  "Operate": "Exploitation"
 }

@@ -276,6 +276,12 @@ table.table { width: 100%; border-collapse: collapse; }
 .tabs a.on, .tabs button.on { color: var(--ink); border-bottom-color: var(--accent); }
 .tabs .count { font-size: 11px; background: var(--selected); border-radius: 999px; padding: 0 6px; }
 .tabs .count.attention { background: var(--warning-bg); color: var(--warning-text); font-weight: 600; }
+.subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.subtabs button { font: inherit; font-size: 13px; font-weight: 550; border: 0; background: transparent; color: var(--muted); padding: 5px 12px; border-radius: 999px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.subtabs button:hover { background: var(--hover); color: var(--ink); }
+.subtabs button.on { background: var(--accent-subtle); color: var(--accent-text); }
+.subtabs .count { font-size: 11px; background: var(--selected); border-radius: 999px; padding: 0 6px; }
+.subtabs .count.attention { background: var(--warning-bg); color: var(--warning-text); font-weight: 600; }
 
 /* ------------------------------------------------------------------ modal / drawer / toast */
 .overlay { position: fixed; inset: 0; background: #0b122066; display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; z-index: 100; overflow: auto; animation: fade .12s; }
