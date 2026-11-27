@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '../../../shared/router.jsx';
 import { Empty, Field, Icon, Input, Loader, Markdown, Modal, Switch, TextArea, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { fmtDate } from '../../../shared/lib.js';
@@ -16,11 +17,15 @@ export function AnnouncementsTab({ api, readOnly }) {
   const page = useLocalPaging(state.data, { prefix: 'ann', size: 10, text: (x) => `${x.title} ${x.body} ${x.author_name || ''}` });
   // null: no form; {}: a new one; an announcement: corrected
   const [editing, setEditing] = useState(null);
+  // the announcement read in full, from the url
+  const [params, setParams] = useQuery();
+  const opened = (state.data || []).find((x) => x.id === params.get('open'));
 
   const remove = async (n) => {
     if (!(await confirm({ title: tr('Delete the announcement {0}?', [n.title]), message: tr('It leaves the page of the API in the portal; the notifications already sent stay.'), danger: true, confirmLabel: tr('Delete') }))) return;
     try {
       await wapi.del(`/apis/${api.id}/announcements/${n.id}`);
+      setParams({ open: null });
       toast(tr('Announcement deleted'));
       state.reload();
     } catch (e) {
@@ -45,30 +50,20 @@ export function AnnouncementsTab({ api, readOnly }) {
           page.items.length ? (
             <>
               {page.items.map((n) => (
-                <div key={n.id} className="card">
-                  <div className="card-head">
+                <button key={n.id} type="button" className="card announce-card" onClick={() => setParams({ open: n.id })} aria-label={tr('Read {0}', [n.title])}>
+                  <div className="row gap-8 wrap">
                     <h3 className="grow">{n.title}</h3>
                     <span className="faint small">
                       {fmtDate(n.created_at)}
                       {n.author_name ? ` · ${n.author_name}` : ''}
                     </span>
-                    {!readOnly && (
-                      <>
-                        <button className="btn sm" onClick={() => setEditing(n)} aria-label={tr('Edit {0}', [n.title])}>
-                          <Icon name="edit" />
-                        </button>
-                        <button className="btn sm ghost danger" onClick={() => remove(n)} aria-label={tr('Delete {0}', [n.title])}>
-                          <Icon name="trash" />
-                        </button>
-                      </>
-                    )}
                   </div>
                   {n.body && (
-                    <div className="card-body">
+                    <div className="announce-preview" aria-hidden="true">
                       <Markdown source={n.body} />
                     </div>
                   )}
-                </div>
+                </button>
               ))}
               <Pager paging={page} total={page.total} />
             </>
@@ -79,6 +74,33 @@ export function AnnouncementsTab({ api, readOnly }) {
           )
         }
       </Loader>
+      {opened && !editing && (
+        <Modal
+          title={opened.title}
+          size="wide"
+          onClose={() => setParams({ open: null })}
+          footer={
+            !readOnly && (
+              <>
+                <button className="btn ghost danger" onClick={() => remove(opened)}>
+                  <Icon name="trash" /> {tr('Delete')}
+                </button>
+                <span className="spacer" />
+                <button className="btn" onClick={() => setEditing(opened)}>
+                  <Icon name="edit" /> {tr('Edit')}
+                </button>
+              </>
+            )
+          }
+        >
+          <p className="faint small" style={{ marginTop: 0 }}>
+            {fmtDate(opened.created_at)}
+            {opened.author_name ? ` · ${opened.author_name}` : ''}
+            {new Date(opened.updated_at) - new Date(opened.created_at) > 60e3 ? ` · ${tr('updated {0}', [fmtDate(opened.updated_at)])}` : ''}
+          </p>
+          {opened.body ? <Markdown source={opened.body} /> : <p className="muted">{tr('No text')}</p>}
+        </Modal>
+      )}
       {editing && <AnnouncementForm api={api} current={editing.id ? editing : null} onClose={() => setEditing(null)} onSaved={() => (setEditing(null), state.reload())} />}
     </div>
   );

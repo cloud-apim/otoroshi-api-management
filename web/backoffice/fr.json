@@ -2007,5 +2007,8 @@
   "The installation has no email transport ready: an installation administrator sets it in Global settings › Email.": "L’installation n’a pas de transport d’e-mail prêt : un administrateur de l’installation le règle dans Réglages globaux › E-mail.",
   "on": "activé",
   "off": "désactivé",
-  "failed": "en échec"
+  "failed": "en échec",
+  "Read {0}": "Lire {0}",
+  "updated {0}": "modifiée le {0}",
+  "No text": "Pas de texte"
 }

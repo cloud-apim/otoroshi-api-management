@@ -92,7 +92,7 @@ describe('the announcements of an api', () => {
     expect(n.told).toBe(1);
     const mine = await told('alice', 'api.announcement');
     expect(mine).toHaveLength(1);
-    expect(mine[0]).toMatchObject({ title: 'Atlas — Version 2 is out', body: 'Move to 2.0.0 before June.', link: `/apis/${state.atlas.slug}/announcements` });
+    expect(mine[0]).toMatchObject({ title: 'Atlas — Version 2 is out', body: 'Move to 2.0.0 before June.', link: `/apis/${state.atlas.slug}/announcements/${n.id}` });
     expect(await told('bob', 'api.announcement')).toEqual([]);
     // on the page of the api, for anyone who can see it, whatever the version shown
     const page = (await portal(null, 'GET', `/apis/${state.atlas.id}/announcements`)).body;

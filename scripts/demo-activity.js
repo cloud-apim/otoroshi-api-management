@@ -223,7 +223,7 @@ const announced = await call('GET', `${W}/apis/books/announcements`).catch(() =>
 if (Array.isArray(announced) && !announced.length) {
   await call('POST', `${W}/apis/books/announcements`, {
     title: 'Search by author, from June',
-    body: 'The \`/books\` resource takes an \`author\` parameter from **June 2**: no change for the calls that do not use it.\n\nThe plans and their quotas stay the same.',
+    body: 'The `/books` resource takes an `author` parameter from **June 2**: no change for the calls that do not use it.\n\n```http\nGET /v1/books?author=Ursula%20K.%20Le%20Guin\n```\n\nThe search by title keeps its parameter, `title`; both combine. The plans and their quotas stay the same.\n\nA question: the support of the portal answers it.',
   });
   console.log('default   an announcement of books, its subscribers told');
 }

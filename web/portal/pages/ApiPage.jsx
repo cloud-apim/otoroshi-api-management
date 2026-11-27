@@ -132,7 +132,7 @@ function ApiView({ a, tab, page }) {
         {tab === 'try' && <Try a={a} />}
         {tab === 'plans' && <Plans a={a} />}
         {tab === 'reviews' && <Reviews a={a} />}
-        {tab === 'announcements' && <Announcements a={a} />}
+        {tab === 'announcements' && <Announcements a={a} id={page} />}
         {tab === 'events' && <Events a={a} />}
       </div>
     </>

@@ -474,7 +474,9 @@ async function portalTour(page) {
   await go(page, `${P}/apis/books/reviews`);
   await shot(page, 'portal-reviews', 'Portal — the reviews of the consumers who subscribed');
   await go(page, `${P}/apis/books/announcements`);
-  await shot(page, 'portal-announcements', 'Portal — the announcements of an api');
+  await shot(page, 'portal-announcements', 'Portal — the announcements of an api, each one its first lines');
+  await click(page, '', { selector: 'a.pt-announce' });
+  await shot(page, 'portal-announcement', 'Portal — an announcement, opened');
   await go(page, `${P}/apis/orders-events/events`);
   await shot(page, 'portal-events', 'Portal — the events of an event-driven api, from its AsyncAPI specification');
   await go(page, `${P}/signin`);

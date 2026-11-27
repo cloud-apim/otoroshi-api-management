@@ -54,7 +54,7 @@ export async function createAnnouncement(ctx, api, input = {}) {
     const versions = await db`select id from apis where workspace_id = ${api.workspace_id} and slug = ${api.slug}`;
     told = await notifySubscribers(
       versions.map((x) => x.id),
-      { workspaceId: api.workspace_id, kind: 'api.announcement', title: `${api.name} — ${v.title}`, body: excerpt(v.body), link: `/apis/${api.slug}/announcements`, data: { api_slug: api.slug, announcement_id: id } }
+      { workspaceId: api.workspace_id, kind: 'api.announcement', title: `${api.name} — ${v.title}`, body: excerpt(v.body), link: `/apis/${api.slug}/announcements/${id}`, data: { api_slug: api.slug, announcement_id: id } }
     );
   }
   await audit(ctx, {
