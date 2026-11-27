@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useQuery } from '../../../shared/router.jsx';
-import { Empty, Field, Icon, Input, Loader, Markdown, Modal, Switch, Tabs, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
+import React, { useEffect, useState } from 'react';
+import { Link, useQuery, useRouter } from '../../../shared/router.jsx';
+import { Empty, Field, Icon, Input, Loader, Markdown, Switch, Tabs, errorMessage, useConfirm, useLoad, useToast } from '../../../shared/ui.jsx';
 import { CodeEditor } from '../../../shared/code-editor.jsx';
 import { ListToolbar, Pager, useLocalPaging } from '../../../shared/lists.jsx';
 import { fmtDate } from '../../../shared/lib.js';
@@ -9,16 +9,24 @@ import { tr } from '../../../shared/i18n.jsx';
 
 // The announcements of an api, across its versions, like a blog on its page in the portal: published
 // at once, its subscribers told in their notifications; corrected or deleted afterwards, nobody told
-// again. Their text is Markdown.
-export function AnnouncementsTab({ api, readOnly }) {
-  const { wapi } = useWs();
+// again. Their text is Markdown. Each one on a page of its own — `item`, or `new` —, from the list.
+export function AnnouncementsTab({ api, readOnly, item }) {
+  if (item) return <AnnouncementPage key={item} api={api} id={item === 'new' ? null : item} readOnly={readOnly} />;
+  return <AnnouncementsList api={api} readOnly={readOnly} />;
+}
+
+function AnnouncementsList({ api, readOnly }) {
+  const { wapi, slug } = useWs();
+  const { navigate } = useRouter();
   const state = useLoad(() => wapi.get(`/apis/${api.id}/announcements`), [api.id]);
   const page = useLocalPaging(state.data, { prefix: 'ann', size: 10, text: (x) => `${x.title} ${x.body} ${x.author_name || ''}` });
-  // the one opened, from the url, or a new one
-  const [params, setParams] = useQuery();
-  const [creating, setCreating] = useState(false);
-  const opened = (state.data || []).find((x) => x.id === params.get('open'));
-  const close = () => (setCreating(false), setParams({ open: null }));
+  const base = `/ws/${slug}/apis/${api.id}/announcements`;
+  // the links of before, ?open=<id>, lead to the page of the announcement
+  const [params] = useQuery();
+  const legacy = params.get('open');
+  useEffect(() => {
+    if (legacy) navigate(`${base}/${legacy}`, { replace: true });
+  }, [legacy]);
   return (
     <div className="col gap-16">
       <p className="muted small" style={{ margin: 0 }}>
@@ -26,9 +34,9 @@ export function AnnouncementsTab({ api, readOnly }) {
       </p>
       <ListToolbar paging={page} placeholder={tr('search the announcements')} onReload={state.reload} loading={state.loading}>
         {!readOnly && (
-          <button className="btn primary" onClick={() => setCreating(true)}>
+          <Link to={`${base}/new`} className="btn primary">
             <Icon name="plus" /> {tr('New announcement')}
-          </button>
+          </Link>
         )}
       </ListToolbar>
       <Loader state={state}>
@@ -36,7 +44,7 @@ export function AnnouncementsTab({ api, readOnly }) {
           page.items.length ? (
             <>
               {page.items.map((n) => (
-                <button key={n.id} type="button" className="card announce-card" onClick={() => setParams({ open: n.id })} aria-label={tr('Read {0}', [n.title])}>
+                <Link key={n.id} to={`${base}/${n.id}`} className="card announce-card" aria-label={tr('Read {0}', [n.title])}>
                   <div className="row gap-8 wrap">
                     <h3 className="grow">{n.title}</h3>
                     <span className="faint small">
@@ -49,7 +57,7 @@ export function AnnouncementsTab({ api, readOnly }) {
                       <Markdown source={n.body} />
                     </div>
                   )}
-                </button>
+                </Link>
               ))}
               <Pager paging={page} total={page.total} />
             </>
@@ -60,28 +68,21 @@ export function AnnouncementsTab({ api, readOnly }) {
           )
         }
       </Loader>
-      {(creating || opened) && (
-        <AnnouncementModal
-          key={creating ? 'new' : opened.id}
-          api={api}
-          current={creating ? null : opened}
-          readOnly={readOnly}
-          onClose={close}
-          onSaved={(saved) => {
-            state.reload();
-            setCreating(false);
-            setParams({ open: saved?.id || null });
-          }}
-          onDeleted={() => (close(), state.reload())}
-        />
-      )}
     </div>
   );
 }
 
-// one window to read an announcement and to write it — Edit, Preview —; a new one opens on Edit
-function AnnouncementModal({ api, current, readOnly, onClose, onSaved, onDeleted }) {
+// an announcement on a page of its own: read, and written — Edit, Preview —; a new one opens on Edit
+function AnnouncementPage({ api, id, readOnly }) {
   const { wapi } = useWs();
+  const state = useLoad(() => (id ? wapi.get(`/apis/${api.id}/announcements/${id}`) : Promise.resolve(null)), [api.id, id]);
+  return <Loader state={state}>{(current) => <AnnouncementEditor key={current?.id || 'new'} api={api} current={current} readOnly={readOnly} reload={state.reload} />}</Loader>;
+}
+
+function AnnouncementEditor({ api, current, readOnly, reload }) {
+  const { wapi, slug } = useWs();
+  const { navigate } = useRouter();
+  const list = `/ws/${slug}/apis/${api.id}/announcements`;
   const toast = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState(current ? 'preview' : 'edit');
@@ -97,11 +98,11 @@ function AnnouncementModal({ api, current, readOnly, onClose, onSaved, onDeleted
       if (current) {
         const saved = await wapi.put(`/apis/${api.id}/announcements/${current.id}`, { title, body });
         toast(tr('Announcement updated'));
-        onSaved(saved);
+        reload();
       } else {
         const r = await wapi.post(`/apis/${api.id}/announcements`, { title, body, notify });
         toast(r.told ? tr('Announcement published: {0} team(s) of subscribers told', [r.told]) : tr('Announcement published'));
-        onSaved(r);
+        navigate(`${list}/${r.id}`, { replace: true });
       }
     } catch (e) {
       toast(errorMessage(e), 'error');
@@ -114,7 +115,7 @@ function AnnouncementModal({ api, current, readOnly, onClose, onSaved, onDeleted
     try {
       await wapi.del(`/apis/${api.id}/announcements/${current.id}`);
       toast(tr('Announcement deleted'));
-      onDeleted();
+      navigate(list);
     } catch (e) {
       toast(errorMessage(e), 'error');
     }
@@ -135,61 +136,64 @@ function AnnouncementModal({ api, current, readOnly, onClose, onSaved, onDeleted
   );
 
   return (
-    <Modal
-      title={current ? current.title : tr('New announcement')}
-      size="wide fit"
-      onClose={onClose}
-      footer={
-        !readOnly && (
+    <div className="col gap-16">
+      <div className="row wrap">
+        <Link to={list} className="link small row gap-4" style={{ display: 'inline-flex' }}>
+          <Icon name="arrowLeft" size={14} />
+          {tr('Announcements')}
+        </Link>
+        <span className="spacer" />
+        {!readOnly && (
           <>
             {current && (
               <button className="btn ghost danger" onClick={remove}>
                 <Icon name="trash" /> {tr('Delete')}
               </button>
             )}
-            <span className="spacer" />
             <button className="btn primary" disabled={!title.trim() || !dirty || saving} onClick={save}>
               {current ? tr('Save') : tr('Publish')}
             </button>
           </>
-        )
-      }
-    >
-      {readOnly ? (
-        preview
-      ) : (
-        <>
-          <div className="mb-16">
-            <Tabs
-              tabs={[
-                { id: 'edit', label: tr('Edit') },
-                { id: 'preview', label: tr('Preview') },
-              ]}
-              value={tab}
-              onChange={setTab}
-            />
-          </div>
-          {tab === 'edit' ? (
-            <div className="col gap-12">
-              <Field label={tr('Title')}>
-                <Input value={title} onChange={setTitle} autoFocus maxLength={200} />
-              </Field>
-              <Field label={tr('Text')} hint={tr('Markdown')}>
-                <CodeEditor value={body} onChange={setBody} language="markdown" wordWrap="on" minHeight={280} maxHeight={520} ariaLabel={tr('text of the announcement')} placeholder={tr('# Markdown')} />
-              </Field>
-              {current ? (
-                <p className="muted small" style={{ margin: 0 }}>
-                  {tr('A correction is not notified again.')}
-                </p>
-              ) : (
-                <Switch checked={notify} onChange={setNotify} label={tr('Tell the subscribers of every version in their notifications')} />
-              )}
+        )}
+      </div>
+      <div className="card card-body">
+        {readOnly ? (
+          preview
+        ) : (
+          <>
+            {!current && <h2 style={{ marginTop: 0 }}>{tr('New announcement')}</h2>}
+            <div className="mb-16">
+              <Tabs
+                tabs={[
+                  { id: 'edit', label: tr('Edit') },
+                  { id: 'preview', label: tr('Preview') },
+                ]}
+                value={tab}
+                onChange={setTab}
+              />
             </div>
-          ) : (
-            preview
-          )}
-        </>
-      )}
-    </Modal>
+            {tab === 'edit' ? (
+              <div className="col gap-12">
+                <Field label={tr('Title')}>
+                  <Input value={title} onChange={setTitle} autoFocus maxLength={200} />
+                </Field>
+                <Field label={tr('Text')} hint={tr('Markdown')}>
+                  <CodeEditor value={body} onChange={setBody} language="markdown" wordWrap="on" minHeight={360} maxHeight={720} ariaLabel={tr('text of the announcement')} placeholder={tr('# Markdown')} />
+                </Field>
+                {current ? (
+                  <p className="muted small" style={{ margin: 0 }}>
+                    {tr('A correction is not notified again.')}
+                  </p>
+                ) : (
+                  <Switch checked={notify} onChange={setNotify} label={tr('Tell the subscribers of every version in their notifications')} />
+                )}
+              </div>
+            ) : (
+              preview
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

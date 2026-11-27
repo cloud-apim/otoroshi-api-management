@@ -258,6 +258,14 @@ async function consoleTour(page) {
   await shot(page, 'console-api-catalogue', 'API — its place in the catalogue of the portal (categories, featured), and the reviews of its consumers');
   await go(page, `${A}/announcements`);
   await shot(page, 'console-api-announcements', 'API — its announcements, like a blog on its page in the portal, its subscribers told');
+  const announced = await api(page, `/backoffice/api/workspaces/${WS}/apis/${books.id}/announcements`);
+  if (announced?.[0]) {
+    await go(page, `${A}/announcements/${announced[0].id}`);
+    await editors(page);
+    await click(page, 'Edit');
+    await editors(page);
+    await shot(page, 'console-api-announcement', 'API — an announcement on its page, written in Markdown — Edit, Preview —', { full: false });
+  }
   await go(page, `${A}/subscriptions`);
   await shot(page, 'console-api-subscriptions', 'API — its subscriptions');
   if (bookSub) {

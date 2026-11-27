@@ -37,6 +37,15 @@ export async function listAnnouncements(workspaceId, slug) {
     where an.workspace_id = ${workspaceId} and an.api_slug = ${slug} order by an.created_at desc, an.id desc`;
 }
 
+// one of them, as listed
+export async function showAnnouncement(workspaceId, slug, id) {
+  const row = (await db`select an.id, an.api_slug, an.title, an.body, an.created_at, an.updated_at, u.name as author_name
+    from api_announcements an left join users u on u.id = an.created_by
+    where an.workspace_id = ${workspaceId} and an.api_slug = ${slug} and an.id = ${id}`)[0];
+  if (!row) throw notFound('announcement not found');
+  return row;
+}
+
 export async function getAnnouncement(workspaceId, slug, id) {
   const row = (await db`select * from api_announcements where workspace_id = ${workspaceId} and api_slug = ${slug} and id = ${id}`)[0];
   if (!row) throw notFound('announcement not found');

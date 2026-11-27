@@ -46,17 +46,18 @@ function pick(obj, keys) {
   return Object.fromEntries(keys.map((k) => [k, obj[k]]));
 }
 
-export function ApiPage({ id, tab }) {
+// `item`: the page of an element of a tab — an announcement, a snapshot
+export function ApiPage({ id, tab, item }) {
   const { wapi, slug } = useWs();
   const state = useLoad(() => wapi.get(`/apis/${id}`), [slug, id]);
   return (
     <div className="page">
-      <Loader state={state}>{(api) => <ApiEditor key={api.id + api.draft_updated_at} api={api} tab={tab} reload={state.reload} />}</Loader>
+      <Loader state={state}>{(api) => <ApiEditor key={api.id + api.draft_updated_at} api={api} tab={tab} item={item} reload={state.reload} />}</Loader>
     </div>
   );
 }
 
-function ApiEditor({ api, tab, reload }) {
+function ApiEditor({ api, tab, item, reload }) {
   const { wapi, slug } = useWs();
   const { navigate } = useRouter();
   const toast = useToast();
@@ -247,7 +248,7 @@ function ApiEditor({ api, tab, reload }) {
       {tab === 'openapi' && <OpenApiTab {...ctx} />}
       {tab === 'asyncapi' && <AsyncApiTab {...ctx} />}
       {tab === 'catalogue' && <CatalogueTab api={api} readOnly={!api.can_manage} />}
-      {tab === 'announcements' && <AnnouncementsTab api={api} readOnly={!api.can_manage} />}
+      {tab === 'announcements' && <AnnouncementsTab api={api} readOnly={!api.can_manage} item={item} />}
       {tab === 'subscriptions' && <SubscriptionsTable query={`api=${api.id}`} showApi={false} onChanged={reload} />}
       {tab === 'deployment' && <DeploymentTab {...ctx} readOnly={!operable} onDeploy={(snapshot) => setDeploying({ snapshot })} />}
       {tab === 'test' && <TestTab api={api} draft={draft} />}

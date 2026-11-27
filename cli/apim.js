@@ -56,6 +56,7 @@ ${SETUP_HELP}
   announcements list <ws> <api>        the announcements of an api, across its versions
   announcements publish <ws> <api> --title t [-f text.md] [--quiet]
                                        published at once, its subscribers told (not with --quiet)
+  announcements show <ws> <api> <id>   one of them, its text in Markdown
   announcements delete <ws> <api> <id>
   apis snapshots <ws> <api>
   apis export-snapshot <ws> <api> [--snapshot n]   a snapshot as a promotion document (default: the deployed one)
@@ -501,8 +502,12 @@ async function main() {
         const n = await call('POST', base, { title: need(flags.title, '--title <title>'), body, notify: !flags.quiet });
         return console.log(`announcement ${n.id} published${n.told ? `, ${n.told} team(s) of subscribers told` : ''}`);
       }
+      if (sub === 'show') {
+        const n = await call('GET', `${base}/${need(a3, '<id>')}`);
+        return console.log(`# ${n.title}\n\n${n.created_at}${n.author_name ? ` · ${n.author_name}` : ''}\n\n${n.body}`);
+      }
       if (sub === 'delete') return print(await call('DELETE', `${base}/${need(a3, '<id>')}`));
-      throw new Error('announcements list|publish|delete');
+      throw new Error('announcements list|show|publish|delete');
     }
     case 'dictionaries': {
       const w = a1;

@@ -848,6 +848,12 @@ r.post('/workspaces/:ws/apis/:api/announcements', async ({ ctx, params, body }) 
   return announcements.createAnnouncement(c, api, body || {});
 });
 
+r.get('/workspaces/:ws/apis/:api/announcements/:announcement', async ({ ctx, params }) => {
+  const c = await ws(ctx, params);
+  const api = await apiOf(c, params);
+  return announcements.showAnnouncement(c.workspace.id, api.slug, params.announcement);
+});
+
 r.put('/workspaces/:ws/apis/:api/announcements/:announcement', async ({ ctx, params, body }) => {
   const c = await ws(ctx, params);
   const api = await apiOf(c, params, { manage: true });

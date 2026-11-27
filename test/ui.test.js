@@ -123,6 +123,8 @@ beforeAll(async () => {
   await call('PUT', ws('/metadata-fields'), {
     fields: [{ scope: 'subscription', key: 'project', label: 'Your project', help: 'what you build', type: 'string', portal: true, translations: { fr: { label: 'Votre projet', help: 'ce que vous construisez' } } }],
   });
+  // an announcement, told to nobody: its page
+  state.annId = (await call('POST', ws(`/apis/${api.id}/announcements`), { title: 'Shelves moved', body: 'The **shelves** moved.', notify: false })).id;
   // a webhook, off: its page
   state.hookId = (await call('POST', ws('/webhooks'), { name: 'Shelf hook', url: 'http://127.0.0.1:9/hook', enabled: false })).id;
   const consumer = await call('POST', '/users', CONSUMER);
@@ -175,6 +177,8 @@ describe.skipIf(!ready)('the console', () => {
       ...['settings', 'design', 'home', 'pages', 'templates', 'navigation', 'styles', 'assets', 'versions', 'sync'].map((t) => `${W}/portal/${t}`),
       ...['general', 'members', 'teams', 'metadata', 'payments', 'catalogs', 'export'].map((t) => `${W}/settings/${t}`),
       `${W}/settings/webhooks/${state.hookId}`,
+      `${W}/apis/${state.apiId}/announcements/${state.annId}`,
+      `${W}/apis/${state.apiId}/announcements/new`,
       ...['status', 'drift', 'connection', 'ingestion', 'setup'].map((t) => `/backoffice/gateway/${t}`),
       ...['workspaces', 'users', 'authentication', 'audit', 'tokens'].map((t) => `/backoffice/settings/${t}`),
     ];

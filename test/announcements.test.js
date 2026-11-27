@@ -109,6 +109,9 @@ describe('the announcements of an api', () => {
   test('corrected without telling again, published quietly, deleted; a title is required', async () => {
     const base = `/workspaces/${WS}/apis/${state.atlas.id}/announcements`;
     expect((await ok('PUT', `${base}/${state.first}`, { title: 'Version 2 is out, at last' })).title).toBe('Version 2 is out, at last');
+    // one of them, from any version of the api
+    expect(await ok('GET', `${base}/${state.first}`)).toMatchObject({ id: state.first, title: 'Version 2 is out, at last', body: 'Move to **2.0.0** before June.' });
+    expect((await call('GET', `${base}/ann_nope`)).status).toBe(404);
     const quiet = await ok('POST', base, { title: 'A typo fixed in the docs', notify: false });
     expect(quiet.told).toBe(0);
     expect(await told('alice', 'api.announcement')).toHaveLength(1);
